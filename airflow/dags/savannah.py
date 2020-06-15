@@ -15,7 +15,7 @@ args = {
     'start_date': days_ago(2),
 }
 
-service = ApiDetails(username='<username>, password='<password>')
+service = ApiDetails(username='<username>', password='<password>')
 
 
 # Auth request
