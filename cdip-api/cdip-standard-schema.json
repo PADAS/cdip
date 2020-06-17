@@ -1,0 +1,244 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://cdip.org/cdip-standard.json",
+    "type": "object",
+    "title": "CDIP Sensor Record",
+    "description": "CDIP Standard Sensor Record Format",
+    "default": {},
+    "examples": [
+        {
+            "device": {
+                "external_id": "1234",
+                "internal_id": "42736058-88d9-4baf-a5d0-2fa13f862d22"
+            },
+            "location": {
+                "x": 35.5,
+                "y": 1.2,
+                "time": "2020-06-17 12:41:31+0300",
+                "z": 94,
+                "hdop": 1,
+                "vdop": 1
+            },
+            "data": {
+                "voltage": 5.6,
+                "temperature": 16.8
+            },
+            "messaging": {},
+            "integration": {
+                "id": "59f419a4-c377-4c99-b397-de629224293d"
+            }
+        }
+    ],
+    "required": [
+        "device",
+        "location",
+        "data",
+        "integration"
+    ],
+    "additionalProperties": true,
+    "properties": {
+        "device": {
+            "$id": "#/properties/device",
+            "type": "object",
+            "title": "Device identifiers",
+            "description": "This property holds information to identify a single device and it's associated data within CDIP.",
+            "default": {},
+            "examples": [
+                {
+                    "external_id": "1234",
+                    "internal_id": "42736058-88d9-4baf-a5d0-2fa13f862d22"
+                }
+            ],
+            "required": [
+                "external_id",
+                "internal_id"
+            ],
+            "additionalProperties": true,
+            "properties": {
+                "external_id": {
+                    "$id": "#/properties/device/properties/external_id",
+                    "type": "string",
+                    "title": "Device external_id",
+                    "description": "Unique ID that identifies a device in an external system..",
+                    "default": "",
+                    "examples": [
+                        "1234"
+                    ]
+                },
+                "internal_id": {
+                    "$id": "#/properties/device/properties/internal_id",
+                    "type": "string",
+                    "title": "internal_id",
+                    "description": "Globally unique identifier for this device within CDIP.",
+                    "default": "",
+                    "examples": [
+                        "42736058-88d9-4baf-a5d0-2fa13f862d22"
+                    ]
+                }
+            }
+        },
+        "location": {
+            "$id": "#/properties/location",
+            "type": "object",
+            "title": "The location schema",
+            "description": "Indicate geo-spatial location and time for a record.",
+            "default": {},
+            "examples": [
+                {
+                    "x": 35.5,
+                    "y": 1.2,
+                    "time": "2020-06-17 12:41:31+0300",
+                    "z": 94,
+                    "hdop": 1,
+                    "vdop": 1
+                }
+            ],
+            "required": [
+                "x",
+                "y",
+                "time"
+            ],
+            "additionalProperties": true,
+            "properties": {
+                "x": {
+                    "$id": "#/properties/location/properties/x",
+                    "type": "number",
+                    "title": "Decimal longitude",
+                    "description": "Decimal longitude",
+                    "default": 0.0,
+                    "examples": [
+                        35.5
+                    ]
+                },
+                "y": {
+                    "$id": "#/properties/location/properties/y",
+                    "type": "number",
+                    "title": "Decimal latitude",
+                    "description": "Decimal latitude",
+                    "default": 0.0,
+                    "examples": [
+                        1.2
+                    ]
+                },
+                "time": {
+                    "$id": "#/properties/location/properties/time",
+                    "type": "string",
+                    "title": "Timestamp",
+                    "description": "ISO format Timestamp",
+                    "default": "",
+                    "examples": [
+                        "2020-06-17 12:41:31+0300"
+                    ]
+                },
+                "z": {
+                    "$id": "#/properties/location/properties/z",
+                    "type": "integer",
+                    "title": "Altitude (meters)",
+                    "description": "Altitude in meters.",
+                    "default": 0,
+                    "examples": [
+                        94
+                    ]
+                },
+                "hdop": {
+                    "$id": "#/properties/location/properties/hdop",
+                    "type": "integer",
+                    "title": "HDOP",
+                    "description": "Horizontal dilution of precision",
+                    "default": 0,
+                    "examples": [
+                        1
+                    ]
+                },
+                "vdop": {
+                    "$id": "#/properties/location/properties/vdop",
+                    "type": "integer",
+                    "title": "VDOP",
+                    "description": "Vertical dilution of precision",
+                    "default": 0,
+                    "examples": [
+                        1
+                    ]
+                }
+            }
+        },
+        "data": {
+            "$id": "#/properties/data",
+            "type": "object",
+            "title": "Side data",
+            "description": "Unstructured data from source",
+            "default": {},
+            "examples": [
+                {
+                    "voltage": 5.6,
+                    "temperature": 16.8
+                }
+            ],
+            "required": [],
+            "additionalProperties": true,
+            "properties": {
+                "voltage": {
+                    "$id": "#/properties/data/properties/voltage",
+                    "type": "number",
+                    "title": "Voltage",
+                    "description": "",
+                    "default": 0.0,
+                    "examples": [
+                        5.6
+                    ]
+                },
+                "temperature": {
+                    "$id": "#/properties/data/properties/temperature",
+                    "type": "number",
+                    "title": "Temperature",
+                    "description": "Temperature reported by device",
+                    "default": 0.0,
+                    "examples": [
+                        16.8
+                    ]
+                }
+            }
+        },
+        "messaging": {
+            "$id": "#/properties/messaging",
+            "type": "object",
+            "title": "Message data",
+            "description": "TDB: messaging side data",
+            "default": {},
+            "examples": [
+                {}
+            ],
+            "required": [],
+            "additionalProperties": true,
+            "properties": {}
+        },
+        "integration": {
+            "$id": "#/properties/integration",
+            "type": "object",
+            "title": "Integration",
+            "description": "Identify the integration through which data is in CDIP.",
+            "default": {},
+            "examples": [
+                {
+                    "id": "59f419a4-c377-4c99-b397-de629224293d"
+                }
+            ],
+            "required": [
+                "id"
+            ],
+            "additionalProperties": true,
+            "properties": {
+                "id": {
+                    "$id": "#/properties/integration/properties/id",
+                    "type": "string",
+                    "title": "Integration Identifier",
+                    "description": "Unique identifier for CDIP integration.",
+                    "default": "",
+                    "examples": [
+                        "59f419a4-c377-4c99-b397-de629224293d"
+                    ]
+                }
+            }
+        }
+    }
+}
