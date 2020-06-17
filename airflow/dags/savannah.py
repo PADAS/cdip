@@ -4,9 +4,10 @@ import requests
 import json
 import getpass
 
-from airflow.models import DAG
+from airflow.models import DAG, Connection
 from airflow.utils.dates import days_ago
 from airflow.operators.python_operator import PythonOperator
+from airflow.hooks.base_hook import BaseHook
 
 from utils import send_to_er, transform_records, ApiDetails
 
@@ -15,18 +16,17 @@ args = {
     'start_date': days_ago(2),
 }
 
-service = ApiDetails(username='<username>', password='<password>')
-
 
 # Auth request
 # The payload will include a list of collar IDs at data['records']
 def fetch_collarids_from_savannah(*args, **context):
     print('fetch_collarids_from_savannah entered')
-    response = requests.post(f'{service.api_root}/savannah_data/data_auth',
+    connection = BaseHook.get_connection("savannah_api")
+    response = requests.post(f'{connection.host}/savannah_data/data_auth',
                              data={
                                  'request': 'authenticate',
-                                 'uid': service.username,
-                                 'pwd': service.password
+                                 'uid': connection.login,
+                                 'pwd': connection.password
                              },
                              )
 
@@ -37,8 +37,8 @@ def fetch_collarids_from_savannah(*args, **context):
         if auth_result.get('sucess'):
             collar_ids = auth_result['records']
 
-            print('== Collar list ==')
-            [print(x) for x in collar_ids]
+            # print('== Collar list ==')
+            # [print(x) for x in collar_ids]
             return collar_ids
         else:
             print(f"Login wasn't successful. {auth_result['login_error_msg']}")
@@ -53,16 +53,18 @@ def fetch_collars(**context):
     collar_ids = context['task_instance'].xcom_pull(task_ids='fetch_collarids_from_savannah')
     print(f'== {len(collar_ids)} collars received ==')
 
+    connection = BaseHook.get_connection("savannah_api")
+
     # fetch data for each collar and accumulate in a list
     records_by_collar_id = {}
     for collar_id in collar_ids:
         print(f'Fetching for collar: {collar_id}')
         # print(f'Fetching a batch for collar: {collar_id} with record_index={highest_known_index}')
-        response = requests.post(f'{service.api_root}/savannah_data/data_request',
+        response = requests.post(f'{connection.host}/savannah_data/data_request',
                                  data={
                                      'request': 'data_download',
-                                     'uid': service.username,
-                                     'pwd': service.password,
+                                     'uid': connection.login,
+                                     'pwd': connection.password,
                                      'collar': collar_id,
                                      'record_index': -1
                                  })
@@ -74,7 +76,6 @@ def fetch_collars(**context):
             if result and result['records']:
                 if len(result['records']) > 10:
                     result['records'] = result['records'][:10]
-
                 records_by_collar_id[collar_id] = result['records']
 
         else:
@@ -109,6 +110,7 @@ dag = DAG(
     schedule_interval=None,
     tags=['savannah_client']
 )
+
 
 fetch_collarids_from_savannah_task = PythonOperator(
     task_id='fetch_collarids_from_savannah',
