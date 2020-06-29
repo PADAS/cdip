@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Integration: {{module.name}}{% endblock %}
+
+{% block content %}
+    <h1>Some Information</h1>
+    <p>Additional Information</p>
+
+    <a href="{% url 'welcome' %}">Home</a>
+
+{% endblock %}
