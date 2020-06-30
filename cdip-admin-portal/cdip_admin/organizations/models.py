@@ -29,4 +29,4 @@ class UserProfile(models.Model):
     organizations = models.ManyToManyField(Organization)
 
     def __str__(self):
-        return f"{self.user.lastName, self.user.firstName}"
+        return f"{self.user.last_name, self.user.first_name}"
