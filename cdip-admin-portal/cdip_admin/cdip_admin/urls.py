@@ -15,7 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from website.views import welcome, date, about
 
 
@@ -26,3 +26,6 @@ urlpatterns = [
     path('about', about),
     path('integrations/', include('integrations.urls')),
 ]
+
+
+urlpatterns += staticfiles_urlpatterns()
