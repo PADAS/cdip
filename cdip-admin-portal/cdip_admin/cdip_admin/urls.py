@@ -16,13 +16,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
-from website.views import welcome, date, about
+from website.views import welcome, date, about, complete, index, logout, profile
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', welcome, name='welcome'),
+    path('complete/', complete, name='complete'),
     path('date', date),
     path('about', about),
     path('integrations/', include('integrations.urls')),
+    path('', index),
+    path('logout', logout),
+    path('', include('django.contrib.auth.urls')),
+    path('', include('social_django.urls')),
+    path('profile/', profile, name='profile'),
 ]
