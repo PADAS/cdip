@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: mdillon/postgis:9.6
+          image: mdillon/postgis:11
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
