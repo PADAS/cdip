@@ -43,10 +43,28 @@ INSTALLED_APPS = [
     'integrations',
     'core',
     'organizations',
-
+    'social_django',
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+SOCIAL_AUTH_TRAILING_SLASH = False  # Remove trailing slash from routes
+SOCIAL_AUTH_AUTH0_DOMAIN = 'dev-fop-06qh.us.auth0.com'
+SOCIAL_AUTH_AUTH0_KEY = 'dm9ayezQyQe5Xc4kBLKAnqy0Vut4wBpN'
+SOCIAL_AUTH_AUTH0_SECRET = '2EAPIHslJJ9mAq9sl8rJQ9S6uX2vFZrPV4m5R4vADU3x0CYp1Ql3El2TLBd1xl0U'
+LOGIN_URL = '/login/auth0'
+LOGIN_REDIRECT_URL = '/'
+
+
+SOCIAL_AUTH_AUTH0_SCOPE = [
+    'openid',
+    'profile',
+    'email'
+]
+
+AUTHENTICATION_BACKENDS = {
+    'website.auth0backend.Auth0',
+    'django.contrib.auth.backends.ModelBackend'
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
