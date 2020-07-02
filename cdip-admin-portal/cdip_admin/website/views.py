@@ -1,7 +1,5 @@
-from django.shortcuts import render
 from django.http import HttpResponse
 from datetime import datetime
-from django.shortcuts import render, redirect
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 import json
@@ -10,10 +8,12 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 from urllib.parse import urlencode
 
-from integrations.models import InboundIntegrationType
+import logging
 
+from integrations.models import InboundIntegrationType
 from organizations.models import UserProfile
 
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 def welcome(request):
@@ -27,24 +27,6 @@ def date(request):
 
 def about(request):
     return HttpResponse("I am working on CDIP. Have a nice day!")
-
-
-@login_required
-def complete(request):
-    user = request.user
-    auth0user = user.social_auth.get(provider='auth0')
-    userdata = {
-        'user_id': auth0user.uid,
-        'name': user.first_name,
-        'lastName': user.last_name,
-        'picture': auth0user.extra_data['picture'],
-        'email': auth0user.extra_data['email'],
-    }
-
-    return render(request, 'website/complete.html', {
-        'auth0User': auth0user,
-        'userdata': json.dumps(userdata, indent=4)
-    })
 
 
 def index(request):
@@ -70,8 +52,13 @@ def profile(request):
 
     user_profile = []
 
-    for org in user.userprofile.organizations.all():
-        user_profile.append(org.name)
+    try:
+        for org in user.user_profile.organizations.all():
+            user_profile.append(org.name)
+    except UserProfile.DoesNotExist: 
+        logger.debug('User has no UserProfile')
+
+    something = user.get_all_permissions()
 
     userdata = {
         'user_id': auth0user.uid,
@@ -84,4 +71,8 @@ def profile(request):
         'auth0User': auth0user,
         'userdata': json.dumps(userdata, indent=4)
     })
+
+
+
+
 

@@ -10,7 +10,11 @@ croniter==0.3.32
 cryptography==2.9.2
 defusedxml==0.7.0rc1
 django-bootstrap4==2.1.1
+djangorestframework==3.11.0
+django-cors-headers~=3.1.1
 django-crispy-forms==1.9.1
+django-rbac==0.9
+drf-jwt~=1.13.3
 ecdsa==0.15
 gunicorn==19.9.0
 idna==2.10
@@ -34,3 +38,7 @@ soupsieve==2.0.1
 sqlparse==0.3.1
 urllib3==1.25.9
 zipp==3.1.0
+babel==2.8.0
+django-phonenumber-field==4.0.0
+phonenumbers==8.12.6
+
