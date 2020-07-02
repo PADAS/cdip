@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'core',
     'organizations',
     'social_django',
+    'phonenumber_field',
+    'rest_framework',
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
@@ -54,6 +56,30 @@ LOGIN_URL = '/login/auth0'
 LOGIN_REDIRECT_URL = '/'
 
 
+JWT_AUTH = {
+    'JWT_PAYLOAD_GET_USERNAME_HANDLER':
+        'cdip_admin.utils.jwt_get_username_from_payload_handler',
+    'JWT_DECODE_HANDLER':
+        'cdip_adim.utils.jwt_decode_token',
+    'JWT_ALGORITHM': 'RS256',
+    'JWT_AUDIENCE': 'http://localhost:8000/',
+    'JWT_ISSUER': '5MdF0BGaakFjWZ9B7zzxNb5CQZwACYEI',
+    'JWT_AUTH_HEADER_PREFIX': 'Bearer',
+}
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+}
+
+
 SOCIAL_AUTH_AUTH0_SCOPE = [
     'openid',
     'profile',
@@ -62,7 +88,8 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
 
 AUTHENTICATION_BACKENDS = {
     'website.auth0backend.Auth0',
-    'django.contrib.auth.backends.ModelBackend'
+    'django.contrib.auth.backends.ModelBackend',
+    'django.contrib.auth.backends.RemoteUserBackend',
 }
 
 MIDDLEWARE = [
@@ -73,6 +100,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.contrib.auth.middleware.RemoteUserMiddleware',
 ]
 
 ROOT_URLCONF = 'cdip_admin.urls'
