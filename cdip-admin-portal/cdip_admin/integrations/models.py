@@ -11,6 +11,7 @@ from organizations.models import Organization, OrganizationGroup
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.name}"
@@ -22,6 +23,7 @@ class InboundIntegrationType(TimestampedModel):
 class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.name}"
