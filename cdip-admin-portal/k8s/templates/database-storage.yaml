@@ -1,0 +1,31 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  namespace: ${KUBERNETES_NAMESPACE}
+  name: cdip-postgres-pv-volume
+  labels:
+    type: local
+    app: postgres
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "${LOCAL_DATABASE_STORAGE}"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ${KUBERNETES_NAMESPACE}
+  name: cdip-postgres-pv-claim
+  labels:
+    app: postgres
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
