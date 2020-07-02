@@ -8,9 +8,12 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 from urllib.parse import urlencode
 
+import logging
 
 from integrations.models import InboundIntegrationType
+from organizations.models import UserProfile
 
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 def welcome(request):
@@ -49,8 +52,11 @@ def profile(request):
 
     user_profile = []
 
-    for org in user.userprofile.organizations.all():
-        user_profile.append(org.name)
+    try:
+        for org in user.user_profile.organizations.all():
+            user_profile.append(org.name)
+    except UserProfile.DoesNotExist: 
+        logger.debug('User has no UserProfile')
 
     something = user.get_all_permissions()
 
