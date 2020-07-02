@@ -1,0 +1,41 @@
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h3>Menu</h3>
+    </div>
+    <ul class="list-unstyled components">
+        {% if perms.integrations.view_inboundintegrationtype %}
+        <h5>Inbound Integrations</h5>
+        <li>
+            <a href="{% url 'integrations_list' %}">
+                Type Descriptions
+            </a>
+            {% if perms.integrations.add_inboundintegrationtype %}
+            <a href="#">
+                Configure Integration
+            </a>
+            {% endif %}
+        </li>
+        {% endif %}
+        {% if perms.integrations.view_outboundintegrationtype %}
+        <h5>Outbound Integrations</h5>
+        <li>
+            <a href="{% url 'integrations_list' %}">
+                Type Descriptions
+            </a>
+            {% if perms.integrations.add_outboundintegrationtype %}
+            <a href="#">
+                Configure Integration
+            </a>
+            {% endif %}
+        </li>
+        {% endif %}
+        {% if perms.organizations.view_organization %}
+        <h5>Organizations</h5>
+        <li>
+            <a href="{% url 'organizations_list' %}">
+                Organization Information
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>

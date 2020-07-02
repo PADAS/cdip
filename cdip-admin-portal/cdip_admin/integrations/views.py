@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.forms import modelform_factory
+from django.contrib.auth.decorators import user_passes_test
 
 from .models import InboundIntegrationType
 
@@ -11,8 +12,11 @@ def detail(request, module_id):
 
 
 def integrations_list(request):
-    return render(request, "integrations/integrations_list.html",
-                  {"integrations": InboundIntegrationType.objects.all()})
+    if request.user.has_perm("integrations.view_inboundintegrationtype"):
+        return render(request, "integrations/integrations_list.html",
+                      {"integrations": InboundIntegrationType.objects.all()})
+    else:
+        return redirect("welcome")
 
 
 IntegrationForm = modelform_factory(InboundIntegrationType, exclude=[])
@@ -27,4 +31,3 @@ def new(request):
     else:
         form = IntegrationForm
     return render(request, "integrations/new.html", {"form": form})
-

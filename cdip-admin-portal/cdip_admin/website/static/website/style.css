@@ -1,10 +1,9 @@
 body {
+    font-size:100%;
     font-family: sans-serif;
     color: forestgreen;
     background-color: #F5F5F5;
 }
-
-
 
 .wrapper {
     display: flex;
@@ -31,18 +30,18 @@ body {
 }
 
 #sidebar ul.components {
-    padding: 20px 0;
+    padding: 0 0 20px 0;
     border-bottom: 1px solid #47748b;
 }
 
-#sidebar ul p {
+#sidebar ul h5 {
+    padding-left:20px;
+    padding-top:20px;
     color: #000000;
-    padding: 10px;
 }
 
 #sidebar ul li a {
-    padding: 10px;
-    font-size: 1.1em;
+    padding-left:40px;
     display: block;
 }
 #sidebar ul li a:hover {
@@ -55,7 +54,6 @@ body {
     background: #6d7fcc;
 }
 ul ul a {
-    font-size: 0.9em !important;
-    padding-left: 30px !important;
+   /* padding-left: 40px !important;*/
     background: #6d7fcc;
 }
