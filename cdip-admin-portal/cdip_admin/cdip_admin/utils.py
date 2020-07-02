@@ -14,7 +14,7 @@ def jwt_get_username_from_payload_handler(payload):
 
 def jwt_decode_token(token):
     header = jwt.get_unverified_header(token)
-    jwks = requests.get('https://{}/.well-known/jwks.json'.format('YOUR_DOMAIN')).json()
+    jwks = requests.get('https://{}/.well-known/jwks.json'.format('dev-fop-06qh.us.auth0.com')).json()
     public_key = None
     for jwk in jwks['keys']:
         if jwk['kid'] == header['kid']:
@@ -23,5 +23,5 @@ def jwt_decode_token(token):
     if public_key is None:
         raise Exception('Public key not found.')
 
-    issuer = 'https://{}/'.format('YOUR_DOMAIN')
-    return jwt.decode(token, public_key, audience='YOUR_API_IDENTIFIER', issuer=issuer, algorithms=['RS256'])
+    issuer = 'https://{}/'.format('dev-fop-06qh.us.auth0.com')
+    return jwt.decode(token, public_key, audience='http://localhost:8000/', issuer=issuer, algorithms=['RS256'])
