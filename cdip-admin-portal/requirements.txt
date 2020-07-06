@@ -29,6 +29,7 @@ importlib-metadata==1.6.1  # via -r requirements.in, django-bootstrap4
 natsort==7.0.1            # via -r requirements.in, croniter
 oauthlib==3.1.0           # via -r requirements.in, requests-oauthlib, social-auth-core
 phonenumbers==8.12.6      # via -r requirements.in
+psycopg2-binary==2.8.3    # via -r requirements.in
 pyasn1==0.4.8             # via -r requirements.in, python-jose, rsa
 pycparser==2.20           # via -r requirements.in, cffi
 pyjwt==1.7.1              # via -r requirements.in, drf-jwt, social-auth-core
