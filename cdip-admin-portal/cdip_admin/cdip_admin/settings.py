@@ -61,7 +61,7 @@ JWT_AUTH = {
     'JWT_PAYLOAD_GET_USERNAME_HANDLER':
         'cdip_admin.utils.jwt_get_username_from_payload_handler',
     'JWT_DECODE_HANDLER':
-        'cdip_adim.utils.jwt_decode_token',
+        'cdip_admin.utils.jwt_decode_token',
     'JWT_ALGORITHM': 'RS256',
     'JWT_AUDIENCE': 'http://localhost:8000/',
     'JWT_ISSUER': '5MdF0BGaakFjWZ9B7zzxNb5CQZwACYEI',
@@ -99,10 +99,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.contrib.auth.middleware.RemoteUserMiddleware',
-]
+] 
 
 ROOT_URLCONF = 'cdip_admin.urls'
 
