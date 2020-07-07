@@ -7,7 +7,7 @@
 # source code.
 
 # Set this path to the root of your Django projects (where you have manage.py)
-#das_server_source_path = "/home/someuser/padas/cdip/cdip_admin/cdip_admin"
+#cdip_portal_source_path = "/home/someuser/padas/cdip/cdip_admin"
 
 # Set this to a path where the database will store it's files.
 #local_database_storage = "/home/someuser/cdip-localdata"

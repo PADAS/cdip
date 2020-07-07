@@ -17,7 +17,6 @@ from django.contrib import admin
 from django.urls import path, include
 from api.views import public, private, private_scoped, OrganizationsListView
 from website.views import welcome, date, about, index, logout, profile
-from website.views import welcome, date, about, index, logout, profile
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 
