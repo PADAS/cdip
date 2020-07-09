@@ -38,6 +38,8 @@ class InboundIntegrationConfiguration(TimestampedModel):
     endpoint = models.URLField(blank=True)
     slug = models.SlugField(blank=True)
 
+    # TODO: Generic Outbound Configuration
+
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
 
