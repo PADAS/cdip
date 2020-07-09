@@ -6,6 +6,7 @@
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'website/style.css' %}">
     <link rel="stylesheet" href="{% static 'website/css/bootstrap.min.css' %}">
+    <script src="{% static 'website/js/jquery-3.5.1.min.js' %}"></script>
     <script src="{% static 'website/js/bootstrap.js' %} "></script>
 </head>
 <body>
@@ -16,6 +17,9 @@
         {% endif %}
         <div class="container-fluid" id="content">
             {% block content %} {% endblock %}
+            {% if is_paginated %}
+                {% include "website/includes/pagination.html" %}
+            {% endif %}
         </div>
     </div>
 </body>
