@@ -43,3 +43,11 @@ Run an Airflow scheduler in a different termimal.
 ```export AIRFLOW_HOME=$(pwd)
 airflow scheduler
 ```
+
+## Configuration needed for running the savannah_streams DAG
+The savannah_streams DAG uses Redis Streams as the datastore for observations being processed in the system, which requires Redis v5.0 or higher. Additionally, the following 3 connections need to be added to Airflow under Admin->Connections in the web UI
+* Savannah tracking endpoint configuration: Add this as a connection of type HTTP. Set the Conn Id to ```savannah_api```. The Host field will likely be https://api.savannahtracking.co.ke. The Login and Password fields are also required.
+* Destination endpoint configuration: This code assumes an ER instance as the destination. Add this as a connection of type HTTP. Set the Conn Id to ```cdip_destination```. The Host field will be a URL to an ER API, e.g., https://dev.pamdas.org/api/v1.0. Enter a valid ER auth token in the Password field.
+* Redis configuration: Add this as a connection of type Redis. Set the Conn Id to ```redis_connection```. Enter the host name in the Host field (donot add the "redis://" or "https://" before the host name string). Enter a password if one is needed for access redis. 
+
+The DAG uses 3 streams that get created when a task writes to them for the very first time. The stream names are currently hardcoded in the DAG.

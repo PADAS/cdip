@@ -1,15 +1,21 @@
-from datetime import datetime, timedelta
-import pytz
-import requests
 import json
-import getpass
 
-from airflow.models import DAG, Connection
-from airflow.utils.dates import days_ago
-from airflow.operators.python_operator import PythonOperator
+import requests
 from airflow.hooks.base_hook import BaseHook
+from airflow.models import DAG
+from airflow.operators.python_operator import PythonOperator
+from airflow.utils.dates import days_ago
 
-from utils import send_to_destination, transform_records, ApiDetails
+from utils import send_to_destination, transform_records
+from cdip_http_hook import CdipHttpHook
+
+
+"""
+Another version of savannah integration. this fetches data from savannah using the CdipHttpHook. 
+Airflow's HttpHook is easily swapped out with CdipHttpHook.
+this code below configures CdipHttpHook by reading savannah config from Airflow's connection model.
+non-demo code will fetch this config from CDIP admin.
+"""
 
 args = {
     'owner': 'Airflow',
@@ -17,19 +23,20 @@ args = {
 }
 
 
-# Auth request
-# The payload will include a list of collar IDs at data['records']
 def fetch_collarids_from_savannah(*args, **context):
     print('fetch_collarids_from_savannah entered')
     connection = BaseHook.get_connection("savannah_api")
-    response = requests.post(f'{connection.host}/savannah_data/data_auth',
+
+    # http_hook = HttpHook(http_conn_id='savannah_api')
+
+    # fetch using CdipHttpHook
+    http_hook = CdipHttpHook(connection.host)
+    response = http_hook.run(endpoint='savannah_data/data_auth',
                              data={
                                  'request': 'authenticate',
                                  'uid': connection.login,
                                  'pwd': connection.password
-                             },
-                             )
-
+                             })
     if response.status_code == 200:
 
         auth_result = json.loads(response.text)
@@ -54,13 +61,18 @@ def fetch_collars(**context):
     print(f'== {len(collar_ids)} collars received ==')
 
     connection = BaseHook.get_connection("savannah_api")
+    # http_hook = HttpHook(http_conn_id='savannah_api')
+
+    # fetch using CdipHttpHook
+    http_hook = CdipHttpHook(connection.host)
 
     # fetch data for each collar and accumulate in a list
+
     records_by_collar_id = {}
     for collar_id in collar_ids:
         print(f'Fetching for collar: {collar_id}')
         # print(f'Fetching a batch for collar: {collar_id} with record_index={highest_known_index}')
-        response = requests.post(f'{connection.host}/savannah_data/data_request',
+        response = http_hook.run(endpoint='savannah_data/data_request',
                                  data={
                                      'request': 'data_download',
                                      'uid': connection.login,
@@ -105,7 +117,7 @@ def post_to_destination(*args, **context):
 
 
 dag = DAG(
-    dag_id='Savannah-DAG',
+    dag_id='Savannah-DAG-hooks',
     default_args=args,
     schedule_interval=None,
     tags=['savannah_client']
@@ -133,13 +145,14 @@ transform_savannah_to_cdip_task = PythonOperator(
     dag=dag,
 )
 
-post_to_destination_task = PythonOperator(
-    task_id='post_to_destination',
-    provide_context=True,
-    python_callable=post_to_destination,
-    dag=dag,
-)
+# post_to_destination_task = PythonOperator(
+#     task_id='post_to_destination',
+#     provide_context=True,
+#     python_callable=post_to_destination,
+#     dag=dag,
+# )
 
-fetch_collarids_from_savannah_task >> fetch_collars_task >> transform_savannah_to_cdip_task >> post_to_destination_task
+fetch_collarids_from_savannah_task >> fetch_collars_task >> transform_savannah_to_cdip_task
+# >> post_to_destination_task
 
 
