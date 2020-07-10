@@ -9,7 +9,7 @@ from airflow.utils.dates import days_ago
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.base_hook import BaseHook
 
-from utils import send_to_er, transform_records, ApiDetails
+from utils import send_to_destination, transform_records, ApiDetails
 
 args = {
     'owner': 'Airflow',
@@ -101,7 +101,7 @@ def post_to_destination(*args, **context):
     print('========POSTING records=========')
     print(f'{len(records_to_post)} recs')
 
-    send_to_er(records_to_post)
+    send_to_destination(records_to_post)
 
 
 dag = DAG(

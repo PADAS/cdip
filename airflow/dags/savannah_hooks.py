@@ -6,7 +6,7 @@ from airflow.models import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.utils.dates import days_ago
 
-from utils import send_to_er, transform_records
+from utils import send_to_destination, transform_records
 from cdip_http_hook import CdipHttpHook
 
 
@@ -113,7 +113,7 @@ def post_to_destination(*args, **context):
     print('========POSTING records=========')
     print(f'{len(records_to_post)} recs')
 
-    send_to_er(records_to_post)
+    send_to_destination(records_to_post)
 
 
 dag = DAG(

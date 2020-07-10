@@ -9,7 +9,7 @@ from airflow.operators.dagrun_operator import TriggerDagRunOperator
 from airflow.utils.dates import days_ago
 from walrus import Database
 
-from utils import send_to_er, transform_records, to_er_observation
+from utils import send_to_destination, transform_records, to_er_observation
 from cdip_http_hook import CdipHttpHook
 
 args = {
@@ -29,6 +29,8 @@ LAST_ID_READY = 'last-id-ready'
 # the fetch_* tasks get things going. external invocations could also startup DAGs and pass in data.
 def fetch_collarids_from_savannah(*args, **context):
     print('fetch_collarids_from_savannah entered')
+
+    # this info will come from cdip admin api in an integrated system
     connection = BaseHook.get_connection("savannah_api")
 
     # fetch using CdipHttpHook
@@ -74,7 +76,7 @@ def fetch_collars(**context):
                                      'uid': connection.login,
                                      'pwd': connection.password,
                                      'collar': collar_id,
-                                     'record_index': -1
+                                     'record_index': -1 # TODO: need to store & reuse cursor.
                                  })
 
         if response.status_code == 200:
@@ -111,6 +113,7 @@ def transform_savannah_to_cdip(**context):
     if not last_id_unprocessed:
         redis.set(LAST_ID_UNPROCESSED, 0)
 
+    # TODO: read in batches rather than reading everything new since last_id
     unprocessed_records = unprocessed_stream.read(last_id=last_id_unprocessed)
     # print(unprocessed_records)
     if unprocessed_records:
@@ -156,6 +159,29 @@ def prepare_to_send(**context):
         redis.set(LAST_ID_TRANSFORMED, transformed_records[-1][0])
 
 
+def post_to_destination(**context):
+    print('post_to_destination entered')
+
+    redis = _get_redis_connection()
+    ready_stream = redis.Stream(READY_TO_GO)
+
+    last_id_ready = redis.get(LAST_ID_READY)
+    if not last_id_ready:
+        redis.set(LAST_ID_READY, 0)
+
+    ready_records = ready_stream.read(last_id=0)
+    if ready_records:
+        to_send_list = [json.loads(r[1][b'data']) for r in ready_records]
+
+        print('========POSTING records=========')
+        print(f'{len(to_send_list)} recs')
+
+        dest_host, dest_auth_token = _get_dest_connection()
+        send_to_destination(to_send_list, destination_host=dest_host, destination_auth_token=dest_auth_token)
+        # finally update LAST_ID_READY
+        redis.set(LAST_ID_READY, ready_records[-1][0])
+
+
 def _get_redis_connection():
     redis_config = BaseHook.get_connection("redis_connection")
 
@@ -166,13 +192,17 @@ def _get_redis_connection():
     )
 
 
-with DAG(
-    dag_id='Savannah-streams',
-    default_args=args,
-    schedule_interval=None,
-    tags=['savannah_client']
-) as dag:
+# this info will come from cdip admin api in an integrated system
+def _get_dest_connection():
+    config = BaseHook.get_connection('cdip_destination')
+    return config.host, config.password
 
+with DAG(
+        dag_id='Savannah-streams',
+        default_args=args,
+        schedule_interval=None,
+        tags=['savannah_client']
+) as dag:
     fetch_collarids_from_savannah_task = PythonOperator(
         task_id='fetch_collarids_from_savannah',
         provide_context=True,
@@ -197,17 +227,19 @@ with DAG(
         python_callable=prepare_to_send,
     )
 
-    fetch_collarids_from_savannah_task >> fetch_collars_task >> transform_savannah_to_cdip_task >> prepare_to_send_task
+    post_to_destination_task = PythonOperator(
+        task_id='post_to_destination',
+        provide_context=True,
+        python_callable=post_to_destination,
+    )
 
     # trigger_next = TriggerDagRunOperator(
     #     task_id='trigger_next',
     #     trigger_dag_id='To-destination'
     # )
 
-    # post_to_destination_task = PythonOperator(
-    #     task_id='post_to_destination',
-    #     provide_context=True,
-    #     python_callable=post_to_destination,
-    # )
-
-
+    fetch_collarids_from_savannah_task \
+    >> fetch_collars_task \
+    >> transform_savannah_to_cdip_task \
+    >> prepare_to_send_task \
+    >> post_to_destination_task
