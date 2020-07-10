@@ -4,6 +4,8 @@ from typing import NamedTuple
 from datetime import datetime
 import requests
 
+from airflow.exceptions import AirflowException
+
 cursors = {}
 
 
@@ -71,9 +73,9 @@ ER_API_BASE = 'https://dev.pamdas.org/api/v1.0'
 ER_API_AUTH_TOKEN = 'blah'
 
 
-def send_to_er(observations):
+def send_to_destination(observations, destination_host=ER_API_BASE, destination_auth_token=ER_API_AUTH_TOKEN):
     if observations:
-        url = '/'.join((ER_API_BASE,
+        url = '/'.join((destination_host,
                         'sensors',
                         'generic',
                         'savannah-airflow',
@@ -91,11 +93,12 @@ def send_to_er(observations):
                 response = requests.post(url,
                                          json=batch,
                                          headers={
-                                             'Authorization': f'Bearer {ER_API_AUTH_TOKEN}'})
+                                             'Authorization': f'Bearer {destination_auth_token}'})
                 print(f'{response.text} {response.status_code}')
             except Exception as ex:
                 print(
                     f'Exception occurred while posting to destination DAS: {ex}')
+                raise AirflowException(f'Exception occurred while posting to destination DAS: {ex}')
     else:
         print('Observations empty, nothing to post')
 
