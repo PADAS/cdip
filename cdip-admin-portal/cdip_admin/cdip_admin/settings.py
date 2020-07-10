@@ -11,6 +11,14 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+import environ
+from pathlib import Path
+
+
+env = environ.Env()
+# reading .env file
+environ.Env.read_env()
+
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,10 +28,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '***REMOVED***'
+# SECRET_KEY = '***REMOVED***'
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = []
 
@@ -50,9 +59,9 @@ INSTALLED_APPS = [
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 SOCIAL_AUTH_TRAILING_SLASH = False  # Remove trailing slash from routes
-SOCIAL_AUTH_AUTH0_DOMAIN = 'dev-fop-06qh.us.auth0.com'
-SOCIAL_AUTH_AUTH0_KEY = 'dm9ayezQyQe5Xc4kBLKAnqy0Vut4wBpN'
-SOCIAL_AUTH_AUTH0_SECRET = '2EAPIHslJJ9mAq9sl8rJQ9S6uX2vFZrPV4m5R4vADU3x0CYp1Ql3El2TLBd1xl0U'
+SOCIAL_AUTH_AUTH0_DOMAIN = env('SOCIAL_AUTH_AUTH0_DOMAIN')
+SOCIAL_AUTH_AUTH0_KEY = env('SOCIAL_AUTH_AUTH0_KEY')
+SOCIAL_AUTH_AUTH0_SECRET = env('SOCIAL_AUTH_AUTH0_SECRET')
 LOGIN_URL = '/login/auth0'
 LOGIN_REDIRECT_URL = '/'
 
@@ -63,8 +72,8 @@ JWT_AUTH = {
     'JWT_DECODE_HANDLER':
         'cdip_admin.utils.jwt_decode_token',
     'JWT_ALGORITHM': 'RS256',
-    'JWT_AUDIENCE': 'http://localhost:8000/',
-    'JWT_ISSUER': '5MdF0BGaakFjWZ9B7zzxNb5CQZwACYEI',
+    'JWT_AUDIENCE': env('JWT_AUDIENCE'),
+    'JWT_ISSUER': env('JWT_ISSUER'),
     'JWT_AUTH_HEADER_PREFIX': 'Bearer',
 }
 
