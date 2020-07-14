@@ -24,24 +24,13 @@ class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    use_endpoint = models.BooleanField(default=False)
+    use_login = models.BooleanField(default=False)
+    use_password = models.BooleanField(default=False)
+    use_token = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name}"
-
-
-# This is the information for a given configuration this will include a specific organizations account information
-# Or organization specific information
-class InboundIntegrationConfiguration(TimestampedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    endpoint = models.URLField(blank=True)
-    slug = models.SlugField(blank=True)
-
-    # TODO: Generic Outbound Configuration
-
-    def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -51,7 +40,29 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     endpoint = models.URLField(blank=True)
-    slug = models.SlugField(blank=True)
+    login = models.CharField(max_length=200, blank=True)
+    password = models.CharField(max_length=200, blank=True)
+    token = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return f"{self.type.name} - {self.owner.name}"
+
+
+# This is the information for a given configuration this will include a specific organizations account information
+# Or organization specific information
+class InboundIntegrationConfiguration(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
+    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    endpoint = models.URLField(blank=True)
+    cursor = models.CharField(max_length=200, blank=True)
+    # TODO: Move Secrets to a secure location
+    login = models.CharField(max_length=200, blank=True)
+    password = models.CharField(max_length=200, blank=True)
+    token = models.CharField(max_length=200, blank=True)
+    useDefaultConfiguration = models.BooleanField(default=True)
+    defaultConfiguration = models.ManyToManyField(OutboundIntegrationConfiguration)
+    useAdvancedConfiguration = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
@@ -64,6 +75,7 @@ class Device(TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     location = models.SlugField(blank=True)
+    cursor = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
