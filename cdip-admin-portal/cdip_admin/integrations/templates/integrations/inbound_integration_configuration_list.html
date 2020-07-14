@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Inbound Integration Configurations{% endblock %}
+
+{% block content %}
+
+    <h2>Inbound Integration Configuration</h2>
+        <ul>
+            {% for integration in integrations %}
+                <li>
+                    <a href="{% url 'inbound_integration_configuration_detail' integration.id %}">
+                        {{ integration.name }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+
+{% endblock %}

@@ -6,11 +6,16 @@
         {% if perms.integrations.view_inboundintegrationtype %}
         <h5>Inbound Integrations</h5>
         <li>
-            <a href="{% url 'integrations_list' %}">
+            <a href="{% url 'inbound_integration_type_list' %}">
                 Type Descriptions
             </a>
+            {% if perms.integrations.view_inboundintegrationconfiguration%}
+            <a href="{% url 'inbound_integration_configuration_list' %}">
+                Inbound Integrations
+            </a>
+            {% endif %}
             {% if perms.integrations.add_inboundintegrationtype %}
-            <a href="#">
+            <a href="{% url 'inbound_integration_configuration_add' %}">
                 Configure Integration
             </a>
             {% endif %}
@@ -19,11 +24,16 @@
         {% if perms.integrations.view_outboundintegrationtype %}
         <h5>Outbound Integrations</h5>
         <li>
-            <a href="{% url 'integrations_list' %}">
+            <a href="{% url 'outbound_integration_type_list' %}">
                 Type Descriptions
             </a>
+            {% if perms.integrations.view_outboundintegrationconfiguration %}
+            <a href="{% url 'outbound_integration_configuration_list' %}">
+                Outbound Integrations
+            </a>
+            {% endif %}
             {% if perms.integrations.add_outboundintegrationtype %}
-            <a href="#">
+            <a href="{% url 'outbound_integration_configuration_add' %}">
                 Configure Integration
             </a>
             {% endif %}
