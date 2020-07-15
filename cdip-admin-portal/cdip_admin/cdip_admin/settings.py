@@ -15,6 +15,7 @@ import environ
 from pathlib import Path
 
 
+
 env = environ.Env()
 # reading .env file
 environ.Env.read_env()
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
     'social_django',
     'phonenumber_field',
     'rest_framework',
+    'rest_framework_swagger'
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
@@ -87,6 +89,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
 
