@@ -15,8 +15,6 @@ def organizations_list(request):
 
         profile = request.user.user_profile
 
-
-
         return render(request, "organizations/organizations_list.html",
                       {"organizations": profile.organizations.all()})
     else:
