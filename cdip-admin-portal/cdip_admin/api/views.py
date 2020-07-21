@@ -1,10 +1,9 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework_jwt.authentication import JSONWebTokenAuthentication
+from rest_framework.views import APIView
 from rest_framework import generics, viewsets
 from rest_framework.response import Response
 
@@ -67,43 +66,76 @@ def private_scoped(request):
 
 
 class OrganizationsListView(generics.ListAPIView):
+    """ Returns List of Organizations """
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
 
 
-class OrganizationDetailsView(generics.RetrieveAPIView):
+class OrganizationDetailsView(APIView):
+    """ Returns Detail of an Organization """
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
 
 
 class InboundIntegrationTypeListView(generics.ListAPIView):
+    """ Returns List of Inbound Integration Types """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
 
 class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
+    """ Returns Detail of an Inbound Integration Type """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
 
 class OutboundIntegrationTypeListView(generics.ListAPIView):
+    """ Returns List of Outbound Integration Types """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
 
 class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
+    """ Returns Detail of an Outbound Integration Type """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
 
 
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
+    """ Returns List of Inbound Integration Configurations """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
 
 
 class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated, JSONWebTokenAuthentication]
+    """ Returns Detail of an Inbound Integration Configuration """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
+
+
+class InboundIntegrationConfigurationDetailsViewByType(APIView):
+    """ Returns Detail of an Inbound Integration Configuration by the Integration Type"""
+    def get_object(self, type_id):
+        try:
+            return InboundIntegrationConfiguration.objects.get(type__id=type_id)
+        except InboundIntegrationConfiguration.DoesNotExist:
+            raise Http404
+
+    def get(self, request, type_id, format=None):
+        configuration = self.get_object(type_id)
+        serializer = InboundIntegrationConfigurationSerializer(configuration)
+        return Response(serializer.data)
+
+
+class OutboundIntegrationConfigurationListView(generics.ListAPIView):
+    """ Returns List of Outbound Integration Configurations """
+    queryset = OutboundIntegrationConfiguration.objects.all()
+    serializer_class = OutboundIntegrationConfigurationSerializer
+
+
+class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
+    """ Returns Detail of an Outbound Integration Configuration """
+    queryset = OutboundIntegrationConfiguration.objects.all()
+    serializer_class = OutboundIntegrationConfigurationSerializer
 
 

@@ -5,6 +5,7 @@ from integrations.models import *
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Organization
         fields = ['id', 'name', 'description']
@@ -27,3 +28,9 @@ class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OutboundIntegrationType
         fields = ['id', 'name', 'description']
+
+
+class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InboundIntegrationConfiguration
+        fields = ['id', 'type', 'owner', 'endpoint', 'cursor', 'login', 'password', 'token']
