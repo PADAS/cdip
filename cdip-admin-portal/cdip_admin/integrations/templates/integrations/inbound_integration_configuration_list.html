@@ -9,7 +9,7 @@
             {% for integration in integrations %}
                 <li>
                     <a href="{% url 'inbound_integration_configuration_detail' integration.id %}">
-                        {{ integration.name }}
+                        {{ integration.type.name }} - {{ integration.owner.name }}
                     </a>
                 </li>
             {% endfor %}

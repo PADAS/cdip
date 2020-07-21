@@ -1,15 +1,21 @@
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework import generics
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework_jwt.authentication import JSONWebTokenAuthentication
+from rest_framework import generics, viewsets
+from rest_framework.response import Response
 
 from functools import wraps
 import jwt
 
-from .serializers import OrganizationSerializer
+from .serializers import *
 
 from organizations.models import Organization
+
+from integrations.models import *
 
 
 def get_token_auth_header(request):
@@ -21,7 +27,7 @@ def get_token_auth_header(request):
         return parts[1]
 
 
-def requires_scope(required_scope):
+def requires_scope(required_scope: object) -> object:
     """Determines if the required scope is present in the Access Token
     Args:
         required_scope (str): The scope required to access the resource
@@ -63,5 +69,41 @@ def private_scoped(request):
 class OrganizationsListView(generics.ListAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+
+
+class OrganizationDetailsView(generics.RetrieveAPIView):
+    queryset = Organization.objects.all()
+    serializer_class = OrganizationSerializer
+
+
+class InboundIntegrationTypeListView(generics.ListAPIView):
+    queryset = InboundIntegrationType.objects.all()
+    serializer_class = InboundIntegrationTypeSerializer
+
+
+class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
+    queryset = InboundIntegrationType.objects.all()
+    serializer_class = InboundIntegrationTypeSerializer
+
+
+class OutboundIntegrationTypeListView(generics.ListAPIView):
+    queryset = OutboundIntegrationType.objects.all()
+    serializer_class = InboundIntegrationTypeSerializer
+
+
+class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
+    queryset = OutboundIntegrationType.objects.all()
+    serializer_class = OutboundIntegrationTypeSerializer
+
+
+class InboundIntegrationConfigurationListView(generics.ListAPIView):
+    queryset = InboundIntegrationConfiguration.objects.all()
+    serializer_class = InboundIntegrationConfigurationSerializer
+
+
+class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated, JSONWebTokenAuthentication]
+    queryset = InboundIntegrationConfiguration.objects.all()
+    serializer_class = InboundIntegrationConfigurationSerializer
 
 
