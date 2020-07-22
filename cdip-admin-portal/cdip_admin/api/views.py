@@ -17,13 +17,14 @@ from organizations.models import Organization
 from integrations.models import *
 
 
-def get_token_auth_header(request):
+def get_token_auth_header(args):
     """Obtains the Access Token from the Authorization Header
     """
-    auth = request.headers.get("authorization", None)
-    if auth:
-        parts = auth.split()
-        return parts[1]
+    for arg in args:
+        auth = arg.headers.get("authorization", None)
+        if auth:
+            parts = auth.split()
+            return parts[1]
 
 
 def requires_scope(required_scope: object) -> object:
@@ -34,7 +35,7 @@ def requires_scope(required_scope: object) -> object:
     def require_scope(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            token = get_token_auth_header(args[0])
+            token = get_token_auth_header(args)
             decoded = jwt.decode(token, verify=False)
             if decoded.get("scope"):
                 token_scopes = decoded["scope"].split()
@@ -70,11 +71,19 @@ class OrganizationsListView(generics.ListAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
 
+    @requires_scope('read:organizations')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
-class OrganizationDetailsView(APIView):
+
+class OrganizationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Organization """
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+
+    @requires_scope('read:organizations')
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
 
 class InboundIntegrationTypeListView(generics.ListAPIView):
@@ -82,11 +91,19 @@ class InboundIntegrationTypeListView(generics.ListAPIView):
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
+    @requires_scope('read:inboundintegrationtype')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Inbound Integration Type """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
+
+    @requires_scope('read:inboundintegrationtype')
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
 
 class OutboundIntegrationTypeListView(generics.ListAPIView):
@@ -94,11 +111,19 @@ class OutboundIntegrationTypeListView(generics.ListAPIView):
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
+    @requires_scope('read:outboundintegrationtype')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Type """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
+
+    @requires_scope('read:outboundintegrationtype')
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
 
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
@@ -106,11 +131,19 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
 
+    @requires_scope('read:inboundintegrationconfiguration')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Inbound Integration Configuration """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
+
+    @requires_scope('read:inboundintegrationconfiguration')
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
 
 class InboundIntegrationConfigurationDetailsViewByType(APIView):
@@ -121,6 +154,7 @@ class InboundIntegrationConfigurationDetailsViewByType(APIView):
         except InboundIntegrationConfiguration.DoesNotExist:
             raise Http404
 
+    @requires_scope('read:inboundintegrationconfiguration')
     def get(self, request, type_id, format=None):
         configuration = self.get_object(type_id)
         serializer = InboundIntegrationConfigurationSerializer(configuration)
@@ -132,10 +166,18 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
+    @requires_scope('read:outboundintegrationconfiguration')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Configuration """
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
+
+    @requires_scope('read:outboundintegrationconfiguration')
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
 
