@@ -36,6 +36,10 @@ def requires_scope(required_scope: object) -> object:
         @wraps(f)
         def decorated(*args, **kwargs):
             token = get_token_auth_header(args)
+            if token is None:
+                response = JsonResponse({'message': 'You don\'t have access to this resource'})
+                response.status_code = 403
+                return response
             decoded = jwt.decode(token, verify=False)
             if decoded.get("scope"):
                 token_scopes = decoded["scope"].split()
