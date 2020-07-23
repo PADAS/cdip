@@ -7,3 +7,5 @@ be needed to successfully run the application.
     + Will need to edit index.html file in package
     + venv/Lib/site-packages/rest_framework_swagger/templates/rest_framework_swagger/index.html
     + on line 2 replace {% load staticfiles %} with {% load static %}
+    
++ Currently scopes are working for machine to machine communication for the API
