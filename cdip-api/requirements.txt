@@ -4,20 +4,29 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
+certifi==2020.6.20        # via requests
+chardet==3.0.4            # via requests
 click==7.1.2              # via uvicorn
 ecdsa==0.15               # via python-jose
+environs==8.0.0           # via -r requirements.in
 fastapi==0.59.0           # via -r requirements.in
 gunicorn==20.0.4          # via -r requirements.in
 h11==0.9.0                # via uvicorn
-httptools==0.1.1          # via uvicorn
+httptools==0.1.1          # via -r requirements.in, uvicorn
+idna==2.10                # via requests
+marshmallow==3.7.1        # via environs
+passlib==1.7.2            # via -r requirements.in
 pyasn1==0.4.8             # via python-jose, rsa
 pydantic==1.6             # via -r requirements.in, fastapi
+python-dotenv==0.14.0     # via -r requirements.in, environs
 python-jose==3.1.0        # via -r requirements.in
 pytz==2020.1              # via -r requirements.in
 redis==3.5.3              # via -r requirements.in, walrus
+requests==2.24.0          # via -r requirements.in
 rsa==4.6                  # via python-jose
 six==1.15.0               # via -r requirements.in, ecdsa, python-jose
 starlette==0.13.4         # via fastapi
+urllib3==1.25.9           # via -r requirements.in, requests
 uvicorn==0.11.5           # via -r requirements.in
 uvloop==0.14.0            # via uvicorn
 walrus==0.8.1             # via -r requirements.in

@@ -1,7 +1,19 @@
-SOCIAL_AUTH_AUTH0_DOMAIN='dev-fop-06qh.us.auth0.com'
-SOCIAL_AUTH_AUTH0_KEY='dm9ayezQyQe5Xc4kBLKAnqy0Vut4wBpN'
-SOCIAL_AUTH_AUTH0_SECRET='2EAPIHslJJ9mAq9sl8rJQ9S6uX2vFZrPV4m5R4vADU3x0CYp1Ql3El2TLBd1xl0U'
+from environs import Env
 
-AUTH0_DOMAIN = SOCIAL_AUTH_AUTH0_DOMAIN
-API_AUDIENCE = 'http://localhost:8000/'
-ALGORITHMS = ["RS256"]
+env = Env()
+env.read_env()
+
+AUTH0_ALGORITHMS = env.list('AUTH0_ALGORITHMS')
+
+AUTH0_API_AUDIENCE = env('AUTH0_API_AUDIENCE')
+AUTH0_DOMAIN = env('AUTH0_DOMAIN')
+
+OAUTH_TOKEN_URL = f"https://{AUTH0_DOMAIN}/oauth/token"
+
+# Settings for stream, where this API writes.
+REDIS_HOST = env.str('REDIS_HOST')
+REDIS_PORT = env.int('REDIS_PORT', 6739)
+REDIS_DB = env.int('REDIS_DB', 0)
+
+# Application settings
+POSITIONS_STREAM_KEY=env.str('POSITIONS_STREAM_KEY', 'positions')
