@@ -1,5 +1,7 @@
 from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.conf import settings
+
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -10,9 +12,11 @@ from rest_framework.response import Response
 from functools import wraps
 import jwt
 
+
 from .serializers import *
 
 from organizations.models import Organization
+from website import auth0backend
 
 from integrations.models import *
 
@@ -25,6 +29,9 @@ def get_token_auth_header(args):
         if auth:
             parts = auth.split()
             return parts[1]
+        elif arg.user.social_auth.model.access_token:
+            auth0user = arg.user.social_auth.get(provider='auth0')
+            return auth0user.access_token
 
 
 def requires_scope(required_scope: object) -> object:

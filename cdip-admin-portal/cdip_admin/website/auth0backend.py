@@ -44,3 +44,4 @@ class Auth0(BaseOAuth2):
             "email": payload["email"],
         }
 
+
