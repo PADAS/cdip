@@ -21,7 +21,7 @@ def get_token():
 
 
 def get_accounts():
-    conn = http.client.HTTPConnection("dev-fop-06qh.us.auth0.com")
+    conn = http.client.HTTPConnection("dev-fop-06qh.us.auth0.com/api/v2/")
 
     token = get_token()
 
