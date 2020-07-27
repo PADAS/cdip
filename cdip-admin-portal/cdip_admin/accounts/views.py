@@ -7,7 +7,8 @@ from .utils import get_accounts, Account
 # Create your views here.
 class AccountList(ListView):
     template_name = 'accounts/account_list.html'
-    queryset = get_accounts()
+    queryset = None
+    get_accounts()
     context_object_name = 'accounts'
     paginate_by = 2
 
