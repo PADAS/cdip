@@ -1,41 +1,140 @@
 import http.client
 import json
+import logging
+import requests
+from django.http import JsonResponse
+from environ import Env
+
+env = Env()
+env.read_env()
+
+AUTH0_API_AUDIENCE = env.str('JWT_AUDIENCE')
+AUTH0_DOMAIN = env.str('SOCIAL_AUTH_AUTH0_DOMAIN')
+AUTH0_CLIENT_ID = env.str('AUTH0_CLIENT_ID')
+AUTH0_CLIENT_SECRET = env.str('SOCIAL_AUTH_AUTH0_SECRET')
+
+oauth_token_url = f"https://{AUTH0_DOMAIN}/oauth/token"
+auth0_url = f"https://{AUTH0_DOMAIN}/api/v2/"
+
+logger = logging.getLogger(__name__)
 
 
-def get_token():
-    conn = http.client.HTTPSConnection("dev-fop-06qh.us.auth0.com")
+def get_access_token():
+    logger.debug('Getting Auth0 Access Token')
+    response = requests.post(oauth_token_url,
+                             json={
+                                 "client_id": 'dm9ayezQyQe5Xc4kBLKAnqy0Vut4wBpN',
+                                 'client_secret': '2EAPIHslJJ9mAq9sl8rJQ9S6uX2vFZrPV4m5R4vADU3x0CYp1Ql3El2TLBd1xl0U',
+                                 'audience': 'https://dev-fop-06qh.us.auth0.com/api/v2/',
+                                 'grant_type': 'client_credentials'
+                             })
 
-    payload = "{\"client_id\":\"98b2myE6ZMQk5hCD6goatV7iTUcEejV1\"," \
-              "\"client_secret\":\"_oLeoOMp1wLj3h_I-giZtfcvYeElEDorKV1ZV-ZBVXflSBQ2ZNqVvA3fyAnTr20X\"," \
-              "\"audience\":\"https://dev-fop-06qh.us.auth0.com/api/v2/\"," \
-              "\"grant_type\":\"client_credentials\"}"
+    if response.status_code == 200:
+        return response.json()
 
-    headers = {'content-type': "application/json"}
-
-    conn.request("POST", "/oauth/token", payload, headers)
-
-    res = conn.getresponse()
-    data = res.read()
-
-    return data.decode("utf-8")
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
 
 
 def get_accounts():
-    conn = http.client.HTTPSConnection("dev-fop-06qh.us.auth0.com/api/v2/")
+
+    url = auth0_url + 'users'
+
+    token = get_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
 
     headers = {
-        'authorization': "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjVWU1gxc3F3OUhicV9xWUY5NERlOCJ9.eyJpc3MiOiJodHRwczovL2Rldi1mb3AtMDZxaC51cy5hdXRoMC5jb20vIiwic3ViIjoiOThiMm15RTZaTVFrNWhDRDZnb2F0VjdpVFVjRWVqVjFAY2xpZW50cyIsImF1ZCI6Imh0dHBzOi8vZGV2LWZvcC0wNnFoLnVzLmF1dGgwLmNvbS9hcGkvdjIvIiwiaWF0IjoxNTk1ODcyODE3LCJleHAiOjE1OTU5NTkyMTcsImF6cCI6Ijk4YjJteUU2Wk1RazVoQ0Q2Z29hdFY3aVRVY0VlalYxIiwic2NvcGUiOiJyZWFkOmNsaWVudF9ncmFudHMgY3JlYXRlOmNsaWVudF9ncmFudHMgZGVsZXRlOmNsaWVudF9ncmFudHMgdXBkYXRlOmNsaWVudF9ncmFudHMgcmVhZDp1c2VycyB1cGRhdGU6dXNlcnMgZGVsZXRlOnVzZXJzIGNyZWF0ZTp1c2VycyByZWFkOnVzZXJzX2FwcF9tZXRhZGF0YSB1cGRhdGU6dXNlcnNfYXBwX21ldGFkYXRhIGRlbGV0ZTp1c2Vyc19hcHBfbWV0YWRhdGEgY3JlYXRlOnVzZXJzX2FwcF9tZXRhZGF0YSByZWFkOnVzZXJfY3VzdG9tX2Jsb2NrcyBjcmVhdGU6dXNlcl9jdXN0b21fYmxvY2tzIGRlbGV0ZTp1c2VyX2N1c3RvbV9ibG9ja3MgY3JlYXRlOnVzZXJfdGlja2V0cyByZWFkOmNsaWVudHMgdXBkYXRlOmNsaWVudHMgZGVsZXRlOmNsaWVudHMgY3JlYXRlOmNsaWVudHMgcmVhZDpjbGllbnRfa2V5cyB1cGRhdGU6Y2xpZW50X2tleXMgZGVsZXRlOmNsaWVudF9rZXlzIGNyZWF0ZTpjbGllbnRfa2V5cyByZWFkOmNvbm5lY3Rpb25zIHVwZGF0ZTpjb25uZWN0aW9ucyBkZWxldGU6Y29ubmVjdGlvbnMgY3JlYXRlOmNvbm5lY3Rpb25zIHJlYWQ6cmVzb3VyY2Vfc2VydmVycyB1cGRhdGU6cmVzb3VyY2Vfc2VydmVycyBkZWxldGU6cmVzb3VyY2Vfc2VydmVycyBjcmVhdGU6cmVzb3VyY2Vfc2VydmVycyByZWFkOmRldmljZV9jcmVkZW50aWFscyB1cGRhdGU6ZGV2aWNlX2NyZWRlbnRpYWxzIGRlbGV0ZTpkZXZpY2VfY3JlZGVudGlhbHMgY3JlYXRlOmRldmljZV9jcmVkZW50aWFscyByZWFkOnJ1bGVzIHVwZGF0ZTpydWxlcyBkZWxldGU6cnVsZXMgY3JlYXRlOnJ1bGVzIHJlYWQ6cnVsZXNfY29uZmlncyB1cGRhdGU6cnVsZXNfY29uZmlncyBkZWxldGU6cnVsZXNfY29uZmlncyByZWFkOmhvb2tzIHVwZGF0ZTpob29rcyBkZWxldGU6aG9va3MgY3JlYXRlOmhvb2tzIHJlYWQ6YWN0aW9ucyB1cGRhdGU6YWN0aW9ucyBkZWxldGU6YWN0aW9ucyBjcmVhdGU6YWN0aW9ucyByZWFkOmVtYWlsX3Byb3ZpZGVyIHVwZGF0ZTplbWFpbF9wcm92aWRlciBkZWxldGU6ZW1haWxfcHJvdmlkZXIgY3JlYXRlOmVtYWlsX3Byb3ZpZGVyIGJsYWNrbGlzdDp0b2tlbnMgcmVhZDpzdGF0cyByZWFkOnRlbmFudF9zZXR0aW5ncyB1cGRhdGU6dGVuYW50X3NldHRpbmdzIHJlYWQ6bG9ncyByZWFkOnNoaWVsZHMgY3JlYXRlOnNoaWVsZHMgdXBkYXRlOnNoaWVsZHMgZGVsZXRlOnNoaWVsZHMgcmVhZDphbm9tYWx5X2Jsb2NrcyBkZWxldGU6YW5vbWFseV9ibG9ja3MgdXBkYXRlOnRyaWdnZXJzIHJlYWQ6dHJpZ2dlcnMgcmVhZDpncmFudHMgZGVsZXRlOmdyYW50cyByZWFkOmd1YXJkaWFuX2ZhY3RvcnMgdXBkYXRlOmd1YXJkaWFuX2ZhY3RvcnMgcmVhZDpndWFyZGlhbl9lbnJvbGxtZW50cyBkZWxldGU6Z3VhcmRpYW5fZW5yb2xsbWVudHMgY3JlYXRlOmd1YXJkaWFuX2Vucm9sbG1lbnRfdGlja2V0cyByZWFkOnVzZXJfaWRwX3Rva2VucyBjcmVhdGU6cGFzc3dvcmRzX2NoZWNraW5nX2pvYiBkZWxldGU6cGFzc3dvcmRzX2NoZWNraW5nX2pvYiByZWFkOmN1c3RvbV9kb21haW5zIGRlbGV0ZTpjdXN0b21fZG9tYWlucyBjcmVhdGU6Y3VzdG9tX2RvbWFpbnMgdXBkYXRlOmN1c3RvbV9kb21haW5zIHJlYWQ6ZW1haWxfdGVtcGxhdGVzIGNyZWF0ZTplbWFpbF90ZW1wbGF0ZXMgdXBkYXRlOmVtYWlsX3RlbXBsYXRlcyByZWFkOm1mYV9wb2xpY2llcyB1cGRhdGU6bWZhX3BvbGljaWVzIHJlYWQ6cm9sZXMgY3JlYXRlOnJvbGVzIGRlbGV0ZTpyb2xlcyB1cGRhdGU6cm9sZXMgcmVhZDpwcm9tcHRzIHVwZGF0ZTpwcm9tcHRzIHJlYWQ6YnJhbmRpbmcgdXBkYXRlOmJyYW5kaW5nIGRlbGV0ZTpicmFuZGluZyByZWFkOmxvZ19zdHJlYW1zIGNyZWF0ZTpsb2dfc3RyZWFtcyBkZWxldGU6bG9nX3N0cmVhbXMgdXBkYXRlOmxvZ19zdHJlYW1zIGNyZWF0ZTpzaWduaW5nX2tleXMgcmVhZDpzaWduaW5nX2tleXMgdXBkYXRlOnNpZ25pbmdfa2V5cyByZWFkOmxpbWl0cyB1cGRhdGU6bGltaXRzIiwiZ3R5IjoiY2xpZW50LWNyZWRlbnRpYWxzIn0.BT30mEEOrn9ZQJQsBYb36lZRQ3iTprkf5ZFSOqVkI3YVYnDHHR7RnfFW9IWQMq3yjuqdR6bMsl0WfA_5f3wd2mkQFVv-GwCopglj2cxExN7sGT_74TN8OmEwgvqVPOmF09UembMVa7CM6QEqH3B1Di7LjRDmriy-G266F8-n2qwAD_Zg6QFblEPSQJLVreIbekAra0e4NkBRCnGXq6RQfB_3VCy8oFyGDvcBd7M49FuZrM_W6-dxaNud6xflhdULbOgujo9pG9_laCTfR0KlSZw9RZ3bS5yt6Vj7oG8SKs10tjjhqYMCcVG6NRsK-H53GRp7XfXhfIxM-xDCMG_XCA"}
+        "authorization": f"{token['token_type']} {token['access_token']}"
+    }
 
-    conn.request("GET", "users", headers=headers)
+    response = requests.get(url=url, headers=headers)
 
-    res = conn.getresponse()
-    data = res.read()
+    if response.status_code == 200:
+        return response.json()
 
-    print(data.decode("utf-8"))
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
 
 
-class Account(object):
-    def __init__(self, name: str, email: str):
-        self.first_name = name
-        self.last_name = email
+def get_account(user_id):
+    url = auth0_url + 'users/' + user_id
+
+    token = get_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}"
+    }
+
+    response = requests.get(url=url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
+
+
+def add_account(account_info):
+    url = auth0_url + 'users'
+
+    token = get_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
+    }
+
+    response = requests.post(url=url, headers=headers, json=account_info)
+
+    if response.status_code == 201:
+        return response.json()
+
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
+
+
+def update_account(account_info, user_id):
+    url = auth0_url + 'users/' + user_id
+
+    token = get_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
+    }
+
+    response = requests.patch(url=url, headers=headers, json=account_info)
+
+    if response.status_code == 200:
+        return response.json()
+
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
+
+
+
+
+
+
 

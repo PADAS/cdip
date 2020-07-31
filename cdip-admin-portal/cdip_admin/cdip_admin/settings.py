@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 import os
 import environ
 from pathlib import Path
+from django.utils.translation import ugettext_lazy as _
 
 
 
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
     'integrations',
     'core',
     'organizations',
+    'accounts',
     'social_django',
     'phonenumber_field',
     'rest_framework',
@@ -109,6 +111,7 @@ AUTHENTICATION_BACKENDS = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -180,6 +183,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
+
+LANGUAGES = (
+    ('en', _('English'))
+)
 
 LANGUAGE_CODE = 'en-us'
 
