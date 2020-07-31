@@ -9,3 +9,12 @@ be needed to successfully run the application.
     + on line 2 replace {% load staticfiles %} with {% load static %}
     
 + Currently scopes are working for machine to machine communication for the API
+
++ Internationalization/Localization Setup:
+    + On MacOS install brew:
+        + In terminal paste: 
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+        + After Install Run: brew install gettext
+        + You may need to force link: brew link --force gettext
+    + On Windows follow steps at https://docs.djangoproject.com/en/3.0/topics/i18n/translation/#gettext-on-windows
+    
