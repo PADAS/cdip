@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 import os
 import environ
 from pathlib import Path
+from django.utils.translation import ugettext_lazy as _
 
 
 
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
     'integrations',
     'core',
     'organizations',
+    'accounts',
     'social_django',
     'phonenumber_field',
     'rest_framework',
@@ -66,6 +68,7 @@ SOCIAL_AUTH_AUTH0_KEY = env('SOCIAL_AUTH_AUTH0_KEY')
 SOCIAL_AUTH_AUTH0_SECRET = env('SOCIAL_AUTH_AUTH0_SECRET')
 LOGIN_URL = '/login/auth0'
 LOGIN_REDIRECT_URL = '/'
+AUDIENCE = env('JWT_AUDIENCE')
 
 
 JWT_AUTH = {
@@ -108,6 +111,7 @@ AUTHENTICATION_BACKENDS = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -180,7 +184,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGES = (
+    ('en', _('English')),
+    ('es', _('Spanish'))
+)
+
+LANGUAGE_CODE = 'en'
 
 TIME_ZONE = 'UTC'
 
