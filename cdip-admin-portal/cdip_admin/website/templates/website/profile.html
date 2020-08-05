@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 
-{% load i18n %}
-
 {% block content %}
     <div>
-        <h1>{% blocktrans ''%}Welcome {{ user.username }}{% endblocktrans %}</h1>
+        <h1>Welcome {{ user.username }}</h1>
         <img class="img-thumbnail" style="border-radius: 50%; max-width: 200px;" src="{{ auth0User.extra_data.picture }}"/>
         <pre>{{ userdata }}</pre>
     </div>

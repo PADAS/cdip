@@ -131,3 +131,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 cdip-admin-portal/cdip_admin/.idea/workspace.xml
+.DS_Store
+*.iml
+*.iml
+cdip-admin-portal/.idea/cdip-admin-portal.iml
