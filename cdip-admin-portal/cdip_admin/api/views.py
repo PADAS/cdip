@@ -17,6 +17,7 @@ from .serializers import *
 
 from organizations.models import Organization
 from website import auth0backend
+from accounts.utils import get_user_permissions
 
 from integrations.models import *
 
@@ -29,9 +30,14 @@ def get_token_auth_header(args):
         if auth:
             parts = auth.split()
             return parts[1]
-        elif arg.user.social_auth.model.access_token:
+
+
+def get_user_perms(args):
+    for arg in args:
+        if hasattr(arg, 'user'):
             auth0user = arg.user.social_auth.get(provider='auth0')
-            return auth0user.access_token
+            permissions = get_user_permissions(auth0user.uid)
+            return permissions
 
 
 def requires_scope(required_scope: object) -> object:
@@ -44,6 +50,11 @@ def requires_scope(required_scope: object) -> object:
         def decorated(*args, **kwargs):
             token = get_token_auth_header(args)
             if token is None:
+                permissions = get_user_perms(args)
+                for permission in permissions:
+                    permission_name = permission['permission_name']
+                    if permission_name == required_scope:
+                        return f(*args, **kwargs)
                 response = JsonResponse({'message': 'You don\'t have access to this resource'})
                 response.status_code = 403
                 return response
