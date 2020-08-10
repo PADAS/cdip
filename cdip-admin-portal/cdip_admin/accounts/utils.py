@@ -133,6 +133,30 @@ def update_account(account_info, user_id):
         logger.warning(f'[{response.status_code}], {response.text}')
 
 
+def get_user_permissions(user_id):
+    url = auth0_url + 'users/' + user_id + '/permissions'
+
+    token = get_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}"
+    }
+
+    response = requests.get(url=url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
+
+
 
 
 
