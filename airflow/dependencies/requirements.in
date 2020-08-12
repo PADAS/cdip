@@ -1,3 +1,0 @@
-requests==2.23.0
-apache-airflow==1.10.10
-cryptography==2.9.2
