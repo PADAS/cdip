@@ -40,6 +40,9 @@ flask==1.1.2              # via apache-airflow, flask-admin, flask-appbuilder, f
 funcsigs==1.0.2           # via apache-airflow
 future==0.18.2            # via apache-airflow
 graphviz==0.14            # via apache-airflow
+google-api-python-client==1.10.0  # via -r requirements.in
+google-auth-httplib2==0.0.4  # via -r requirements.in
+google-cloud-storage==1.30.0  # via -r requirements.in
 gunicorn==19.10.0         # via apache-airflow
 idna==2.9                 # via email-validator, requests
 importlib-metadata==1.6.1  # via argcomplete, jsonschema
@@ -73,7 +76,7 @@ python3-openid==3.1.0     # via flask-openid
 pytz==2020.1              # via babel, flask-babel, pandas, tzlocal
 pytzdata==2019.3          # via pendulum
 pyyaml==5.3.1             # via apispec, flask-swagger
-requests==2.23.0          # via -r requirements.in, apache-airflow
+requests==2.24.0          # via -r requirements.in, apache-airflow
 setproctitle==1.1.10      # via apache-airflow
 six==1.15.0               # via cryptography, flask-jwt-extended, jsonschema, prison, pyrsistent, python-dateutil, sqlalchemy-utils, tenacity, thrift
 sqlalchemy-jsonfield==0.9.0  # via apache-airflow
@@ -89,6 +92,7 @@ typing==3.7.4.1           # via sqlalchemy-jsonfield
 tzlocal==1.5.1            # via apache-airflow, pendulum
 unicodecsv==0.14.1        # via apache-airflow
 urllib3==1.25.9           # via requests
+walrus==0.8.1             # via -r requirements.in
 werkzeug==0.16.1          # via apache-airflow, flask, flask-caching, flask-jwt-extended
 wtforms==2.3.1            # via flask-admin, flask-wtf
 zipp==3.1.0               # via importlib-metadata
