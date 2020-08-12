@@ -1,4 +1,7 @@
-requests==2.23.0
+requests==2.24.0
 apache-airflow==1.10.10
 cryptography==2.9.2
 walrus==0.8.1
+google-auth-httplib2==0.0.4
+google-api-python-client==1.10.0
+google-cloud-storage==1.30.0
