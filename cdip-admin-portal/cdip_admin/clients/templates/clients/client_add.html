@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags %}
+
+{% block title %}Add Client{% endblock %}
+
+{% block content %}
+
+    <form action="{% url 'client_add' %}" method="POST">
+        {% csrf_token %}
+        {{ form|crispy }}
+    <button type="submit"  class="btn btn-success">Submit</button>
+
+</form>
+
+{% endblock %}
