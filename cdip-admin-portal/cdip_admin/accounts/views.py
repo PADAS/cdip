@@ -1,7 +1,5 @@
 from django.shortcuts import render, redirect
 
-import json
-
 from .forms import AccountForm, AccountUpdateForm
 from .utils import get_accounts, get_account, add_account, update_account
 

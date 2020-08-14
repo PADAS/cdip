@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Client: {{module.name}}{% endblock %}
+
+{% block content %}
+
+    <h1>{{module.name}}</h1>
+    <p>ID: {{module.client_id}}</p>
+    <p>Secret: {{module.client_secret}}</p>
+    <a class="btn btn-primary" href="{% url 'client_update' module.client_id %}" role="button">Update</a>
+
+{% endblock %}

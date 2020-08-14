@@ -1,6 +1,4 @@
 from django.http import JsonResponse, Http404
-from django.shortcuts import get_object_or_404
-from django.conf import settings
 
 
 from rest_framework.decorators import api_view, permission_classes
@@ -15,9 +13,7 @@ import jwt
 
 from .serializers import *
 
-from organizations.models import Organization
-from website import auth0backend
-from accounts.utils import get_user_permissions
+from core.utils import get_user_permissions
 
 from integrations.models import *
 
