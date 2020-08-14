@@ -27,6 +27,7 @@ urlpatterns = [
     path('integrations/', include('integrations.urls')),
     path('organizations/', include('organizations.urls')),
     path('accounts/', include('accounts.urls')),
+    path('clients/', include('clients.urls')),
     path('api/', include('api.urls')),
     path('', index),
     path('logout', logout),
