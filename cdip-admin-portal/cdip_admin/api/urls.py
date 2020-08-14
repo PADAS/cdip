@@ -22,7 +22,7 @@ urlpatterns = [
          name='inboundintegrationconfiguration_list'),
     path('v1.0/inboundintegrationconfigurations/<pk>', InboundIntegrationConfigurationDetailsView.as_view(),
          name='inboundintegrationconfigurations_detail'),
-    path('v1.0/inboundintegrationconfigurations/<type_id>/type', InboundIntegrationConfigurationDetailsViewByType.as_view(),
+    path('v1.0/inboundintegrationconfigurations/<type_id>/type', InboundIntegrationConfigurationListViewByType.as_view(),
          name='inboundintegrationconfigurationsbytype_detail'),
 
     path('v1.0/outboundintegrationtypes', OutboundIntegrationTypeListView.as_view(), name='outboundintegrationtype_list'),
