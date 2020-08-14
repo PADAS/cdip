@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'core',
     'organizations',
     'accounts',
+    'clients',
     'social_django',
     'phonenumber_field',
     'rest_framework',
@@ -69,6 +70,9 @@ SOCIAL_AUTH_AUTH0_SECRET = env('SOCIAL_AUTH_AUTH0_SECRET')
 LOGIN_URL = '/login/auth0'
 LOGIN_REDIRECT_URL = '/'
 AUDIENCE = env('JWT_AUDIENCE')
+AUTH0_TENANT = env('AUTH0_TENANT')
+AUTH0_MANAGEMENT_AUDIENCE = env('AUTH0_MANAGEMENT_AUDIENCE')
+AUTH0_MANAGEMENT_CLIENT_ID = env.str('AUTH0_MANAGEMENT_CLIENT_ID')
 
 
 JWT_AUTH = {

@@ -15,6 +15,7 @@ from organizations.models import UserProfile
 
 logger = logging.getLogger(__name__)
 
+
 # Create your views here.
 def welcome(request):
     return render(request, "website/welcome.html",
