@@ -168,19 +168,22 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
-class InboundIntegrationConfigurationDetailsViewByType(APIView):
-    """ Returns Detail of an Inbound Integration Configuration by the Integration Type"""
-    def get_object(self, type_id):
-        try:
-            return InboundIntegrationConfiguration.objects.get(type__id=type_id)
-        except InboundIntegrationConfiguration.DoesNotExist:
-            raise Http404
+class InboundIntegrationConfigurationListViewByType(generics.ListAPIView):
+    """ Returns Detail of an Inbound Integration Configuration """
+    # queryset = InboundIntegrationConfiguration.objects.all()
+    serializer_class = InboundIntegrationConfigurationSerializer
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the purchases for
+        the user as determined by the username portion of the URL.
+        """
+        type_id = self.kwargs['type_id']
+        return InboundIntegrationConfiguration.objects.filter(type__id=type_id)
 
     @requires_scope('read:inboundintegrationconfiguration')
-    def get(self, request, type_id, format=None):
-        configuration = self.get_object(type_id)
-        serializer = InboundIntegrationConfigurationSerializer(configuration)
-        return Response(serializer.data)
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
