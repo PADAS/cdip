@@ -4,14 +4,20 @@ from django.forms import modelform_factory
 from django.contrib.auth.decorators import user_passes_test
 from django.views.generic import ListView
 
+import logging
+
+from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
 from .models import InboundIntegrationType, OutboundIntegrationType\
-    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration
+        , InboundIntegrationConfiguration, OutboundIntegrationConfiguration
+
+logger = logging.getLogger(__name__)
 
 
 ###
 # Inbound Integration Type Methods/Classes
 ###
 def inbound_integration_type_detail(request, module_id):
+    logger.info(f"Request for Integration Type: {module_id}")
     integration_module = get_object_or_404(InboundIntegrationType, pk=module_id)
     return render(request, "integrations/inbound_integration_type_detail.html", {"module": integration_module})
 
@@ -53,17 +59,14 @@ class InboundIntegrationConfigurationList(ListView):
     paginate_by = 2
 
 
-InboundIntegrationForm = modelform_factory(InboundIntegrationConfiguration, exclude=['id'])
-
-
 def inbound_integration_configuration_add(request):
     if request.method == "POST":
-        form = InboundIntegrationForm(request.POST)
+        form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             form.save()
             return redirect("welcome")
     else:
-        form = InboundIntegrationForm
+        form = InboundIntegrationConfigurationForm
     return render(request, "integrations/inbound_integration_configuration_add.html", {"form": form})
 
 
@@ -83,15 +86,12 @@ class OutboundIntegrationConfigurationList(ListView):
     paginate_by = 2
 
 
-OutboundIntegrationForm = modelform_factory(OutboundIntegrationConfiguration, exclude=['id'])
-
-
 def outbound_integration_configuration_add(request):
     if request.method == "POST":
-        form = OutboundIntegrationForm(request.POST)
+        form = OutboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             form.save()
             return redirect("welcome")
     else:
-        form = OutboundIntegrationForm
+        form = OutboundIntegrationConfigurationForm
     return render(request, "integrations/outbound_integration_configuration_add.html", {"form": form})

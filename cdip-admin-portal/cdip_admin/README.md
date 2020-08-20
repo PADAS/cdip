@@ -18,3 +18,10 @@ be needed to successfully run the application.
         + You may need to force link: brew link --force gettext
     + On Windows follow steps at https://docs.djangoproject.com/en/3.0/topics/i18n/translation/#gettext-on-windows
     
+    + To Update the Localization files with new items run the following commands:
+```shell
+        python manage.py makemessages
+
+        python manage.py compilemessages
+```
+    

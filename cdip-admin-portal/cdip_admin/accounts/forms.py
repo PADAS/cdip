@@ -1,5 +1,7 @@
 from django import forms
 
+from accounts.models import AccountProfile
+
 
 class AccountForm(forms.Form):
     name = forms.CharField(max_length=200, required=True)
@@ -11,6 +13,13 @@ class AccountForm(forms.Form):
 class AccountUpdateForm(forms.Form):
     name = forms.CharField(max_length=200, required=True)
     email = forms.EmailField(max_length=200, required=True)
+
+
+class AccountProfileForm(forms.ModelForm):
+
+    class Meta:
+        model = AccountProfile
+        exclude = ['id', 'user_id']
 
 
 

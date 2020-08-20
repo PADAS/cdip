@@ -170,10 +170,6 @@ class InboundIntegrationConfigurationListViewByType(generics.ListAPIView):
     serializer_class = InboundIntegrationConfigurationSerializer
 
     def get_queryset(self):
-        """
-        This view should return a list of all the purchases for
-        the user as determined by the username portion of the URL.
-        """
         type_id = self.kwargs['type_id']
         return InboundIntegrationConfiguration.objects.filter(type__id=type_id)
 
@@ -200,5 +196,29 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     @requires_scope('read:outboundintegrationconfiguration')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
+
+
+class OutboundIntegrationConfigurationListViewByInboundIntegrationConfiguration(generics.ListAPIView):
+    """ Returns Detail of an Outbound Integration Configuration """
+    serializer_class = OutboundIntegrationConfigurationSerializer
+
+    def get_queryset(self):
+        integration_id = self.kwargs['integration_id']
+        try:
+            inbound_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
+            items = inbound_integration.defaultConfiguration.all()
+            # af538781-6c17-4a2b-af98-d0b318701741
+            return items
+
+        except InboundIntegrationConfiguration.DoesNotExist:
+
+            raise Http404
+
+
+    @requires_scope('read:outboundintegrationconfiguration')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+
 
 

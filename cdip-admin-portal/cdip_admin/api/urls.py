@@ -33,6 +33,9 @@ urlpatterns = [
          name='outboundintegrationconfiguration_list'),
     path('v1.0/outboundintegrationconfigurations/<pk>', OutboundIntegrationConfigurationDetailsView.as_view(),
          name='outboundintegrationconfigurations_detail'),
+    path('v1.0/outboundintegrationconfigurations/<integration_id>/InboundConfig',
+         OutboundIntegrationConfigurationListViewByInboundIntegrationConfiguration.as_view(),
+         name='outboundintegrationconfigurationsbyinboundconfiguration_detail'),
 
     url(r'^docs/', schema_view),
 ]
