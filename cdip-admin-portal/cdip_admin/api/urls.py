@@ -24,6 +24,8 @@ urlpatterns = [
          name='inboundintegrationconfigurations_detail'),
     path('v1.0/inboundintegrationconfigurations/<type_id>/type', InboundIntegrationConfigurationListViewByType.as_view(),
          name='inboundintegrationconfigurationsbytype_detail'),
+    path('v1.0/inboundintegrationconfigurations/<pk>', UpdateInboundIntegrationConfigurationCursor.as_view(),
+         name='updateinboundintegrationconfigurations_cursor'),
 
     path('v1.0/outboundintegrationtypes', OutboundIntegrationTypeListView.as_view(), name='outboundintegrationtype_list'),
     path('v1.0/outboundintegrationtypes/<pk>', OutboundIntegrationTypeDetailsView.as_view(),
@@ -33,6 +35,9 @@ urlpatterns = [
          name='outboundintegrationconfiguration_list'),
     path('v1.0/outboundintegrationconfigurations/<pk>', OutboundIntegrationConfigurationDetailsView.as_view(),
          name='outboundintegrationconfigurations_detail'),
+    path('v1.0/outboundintegrationconfigurations/<integration_id>/inboundconfig',
+         OutboundIntegrationConfigurationListViewByInboundIntegrationConfiguration.as_view(),
+         name='outboundintegrationconfigurationsbyinboundconfiguration_detail'),
 
     url(r'^docs/', schema_view),
 ]

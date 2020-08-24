@@ -22,7 +22,7 @@ I recommend installing a python virtual environment, likely in or near the folde
 
 ## Install requirements
 
-```pip installl -r dependencies/requirements.txt```
+```pip install -r dependencies/requirements.txt```
 
 ## Run Airflow Web Server
 

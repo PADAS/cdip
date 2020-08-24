@@ -1,68 +1,70 @@
+{% load i18n %}
+
 <div id="sidebar">
     <div class="sidebar-header">
-        <h3>Menu</h3>
+        <h3>{% trans 'Menu' %}</h3>
     </div>
     <ul class="list-unstyled components">
         {% if perms.integrations.view_inboundintegrationtype %}
-        <h5>Inbound Integrations</h5>
+        <h5>{% trans 'Inbound Integrations' %}</h5>
         <li>
             <a href="{% url 'inbound_integration_type_list' %}">
-                Type Descriptions
+                {% trans 'Type Descriptions' %}
             </a>
             {% if perms.integrations.view_inboundintegrationconfiguration%}
             <a href="{% url 'inbound_integration_configuration_list' %}">
-                Inbound Integrations
+                {% trans 'Inbound Integrations' %}
             </a>
             {% endif %}
             {% if perms.integrations.add_inboundintegrationtype %}
             <a href="{% url 'inbound_integration_configuration_add' %}">
-                Configure Integration
+                {% trans 'Configure Integration' %}
             </a>
             {% endif %}
         </li>
         {% endif %}
         {% if perms.integrations.view_outboundintegrationtype %}
-        <h5>Outbound Integrations</h5>
+        <h5>{% trans 'Outbound Integrations' %}</h5>
         <li>
             <a href="{% url 'outbound_integration_type_list' %}">
-                Type Descriptions
+                {% trans 'Type Descriptions' %}
             </a>
             {% if perms.integrations.view_outboundintegrationconfiguration %}
             <a href="{% url 'outbound_integration_configuration_list' %}">
-                Outbound Integrations
+                {% trans 'Outbound Integrations' %}
             </a>
             {% endif %}
             {% if perms.integrations.add_outboundintegrationtype %}
             <a href="{% url 'outbound_integration_configuration_add' %}">
-                Configure Integration
+                {% trans 'Configure Integration' %}
             </a>
             {% endif %}
         </li>
         {% endif %}
         {% if perms.organizations.view_organization %}
-        <h5>Organizations</h5>
+        <h5>{% trans 'Organizations' %}</h5>
         <li>
             <a href="{% url 'organizations_list' %}">
-                Organization Information
+                {% trans 'Organization Information' %}
             </a>
         </li>
         {% endif %}
-        <h5>Accounts</h5>
+        <h5>{% trans 'Accounts' %}</h5>
         <li>
             <a href="{% url 'account_list' %}">
-                Accounts Information
+                {% trans 'Accounts Information' %}
             </a>
             <a href="{% url 'account_add' %}">
-                Add Account
+                {% trans 'Add Account' %}
             </a>
         </li>
-        <h5>Clients</h5>
+        <h5>{% trans 'Clients' %}</h5>
         <li>
             <a href="{% url 'client_list' %}">
-                Client Information
+                {% trans 'Client Information' %}
             </a>
             <a href="{% url 'client_add' %}">
-                Add Client
+                {% trans 'Add Client' %}
             </a>
         </li>
     </ul>
