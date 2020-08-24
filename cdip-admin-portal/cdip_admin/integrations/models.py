@@ -1,5 +1,4 @@
 import uuid
-
 from django.db import models
 from core.models import TimestampedModel
 from organizations.models import Organization, OrganizationGroup
@@ -11,6 +10,7 @@ from organizations.models import Organization, OrganizationGroup
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200)
     description = models.TextField(blank=True)
 
     def __str__(self):
@@ -23,6 +23,7 @@ class InboundIntegrationType(TimestampedModel):
 class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200)
     description = models.TextField(blank=True)
     use_endpoint = models.BooleanField(default=False)
     use_login = models.BooleanField(default=False)
@@ -39,6 +40,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    cursor = models.JSONField(default=dict)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
     password = models.CharField(max_length=200, blank=True)
@@ -55,7 +57,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     endpoint = models.URLField(blank=True)
-    cursor = models.CharField(max_length=200, blank=True)
+    cursor = models.JSONField(default=dict)
     # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
     password = models.CharField(max_length=200, blank=True)
@@ -75,7 +77,7 @@ class Device(TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     location = models.SlugField(blank=True)
-    cursor = models.CharField(max_length=200, blank=True)
+    cursor = models.JSONField(default=dict)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
@@ -101,7 +103,7 @@ class DeviceGroup(TimestampedModel):
 
 # Stores the Device Configuration for a DeviceGroup
 class DeviceGroupConfiguration(TimestampedModel):
-    id = id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     device_group = models.OneToOneField(Device, on_delete=models.CASCADE)
     configuration = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='configurations')
