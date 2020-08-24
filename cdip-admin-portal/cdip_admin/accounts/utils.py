@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_accounts():
+    """
+        List of all accounts
+    """
 
     url = auth0_url + 'users'
 
@@ -30,13 +33,21 @@ def get_accounts():
         "authorization": f"{token['token_type']} {token['access_token']}"
     }
 
-    response = requests.get(url=url, headers=headers)
+    try:
+        response = requests.get(url=url, headers=headers)
+    except Exception as e:
+        logger.exception(e)
+        response = JsonResponse({'message': 'An unexpected error occurred please retry the request. If the problem '
+                                            'continues please contact a system administrator.'})
+        response.status_code = 500
+        return response
 
     if response.status_code == 200:
         return response.json()
 
     else:
         logger.warning(f'[{response.status_code}], {response.text}')
+        return response
 
 
 def get_account(user_id):
@@ -82,7 +93,6 @@ def add_account(account_info):
 
     if response.status_code == 201:
         return response.json()
-
     else:
         logger.warning(f'[{response.status_code}], {response.text}')
 
