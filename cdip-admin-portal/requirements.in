@@ -1,4 +1,4 @@
-Django==3.0.7
+Django==3.1
 PyJWT==1.7.1
 asgiref==3.2.10
 beautifulsoup4==4.9.1
