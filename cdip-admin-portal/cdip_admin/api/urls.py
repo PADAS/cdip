@@ -24,7 +24,7 @@ urlpatterns = [
          name='inboundintegrationconfigurations_detail'),
     path('v1.0/inboundintegrationconfigurations/<type_id>/type', InboundIntegrationConfigurationListViewByType.as_view(),
          name='inboundintegrationconfigurationsbytype_detail'),
-    path('v1.0/inboundintegrationconfigurations/<pk>', UpdateInboundIntegrationConfigurationCursor.as_view(),
+    path('v1.0/inboundintegrationconfigurations/<pk>/Update', UpdateInboundIntegrationConfigurationCursor.as_view(),
          name='updateinboundintegrationconfigurations_cursor'),
 
     path('v1.0/outboundintegrationtypes', OutboundIntegrationTypeListView.as_view(), name='outboundintegrationtype_list'),
