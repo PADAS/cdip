@@ -154,7 +154,7 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
-class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
+class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView):
     """ Returns Detail of an Inbound Integration Configuration """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
@@ -163,18 +163,13 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
+    @requires_scope('update:inboundintegrationconfiguration')
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
 
-class UpdateInboundIntegrationConfigurationCursor(generics.UpdateAPIView):
-    queryset = InboundIntegrationConfiguration.objects.all()
-    serializer_class = InboundIntegrationConfigurationSerializer
-
-    # def patch(self, request, *args, **kwargs):
-    #     configuration = self.get_object()
-    #     serializer = InboundIntegrationConfigurationSerializer(configuration, data=request.data, partial=True)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return JsonResponse(code=201, data=serializer.data)
-    #     return JsonResponse(code=400, data="wrong parameters")
+    @requires_scope('patch:inboundintegrationconfiguration')
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
 
 
 class InboundIntegrationConfigurationListViewByType(generics.ListAPIView):
