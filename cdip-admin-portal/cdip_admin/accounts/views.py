@@ -1,5 +1,5 @@
 import logging
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 
 from .forms import AccountForm, AccountUpdateForm, AccountProfileForm
@@ -19,7 +19,23 @@ def account_list(request):
 def account_detail(request, user_id):
     logger.info('Getting account detail')
     account = get_account(user_id)
-    return render(request, "accounts/account_detail.html", {"module": account})
+
+    try:
+        profile = AccountProfile.objects.get(user_id=user_id)
+    except ObjectDoesNotExist:
+        profile = None
+
+    organizations = []
+
+    if profile:
+        try:
+            for org in profile.organizations.all():
+                organizations.append(org.name)
+        except profile.DoesNotExist:
+            logger.debug('User has no UserProfile')
+
+    return render(request, "accounts/account_detail.html", {"account": account, "profile": profile,
+                                                            "organizations": organizations})
 
 
 def account_add(request):
@@ -70,10 +86,10 @@ def account_profile_add(request, user_id):
 
         if profile_form.is_valid():
             profile_form.save()
-
             return redirect('account_detail', user_id=user_id)
         else:
-            return redirect("welcome")
+            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
+                                                                         "profile_form": profile_form})
 
     else:
         profile_form = AccountProfileForm()
@@ -84,25 +100,20 @@ def account_profile_add(request, user_id):
 def account_profile_update(request, user_id):
     if request.method == 'POST':
         profile_form = AccountProfileForm(request.POST)
-
         if profile_form.is_valid():
-            profile = profile_form.save(commit=False)
-            profile.user_id = user_id
-            profile.save()
+            profile_form.save()
             return redirect('account_detail', user_id=user_id)
         else:
-            return redirect("welcome")
+            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
+                                                                         "profile_form": profile_form})
 
     else:
         profile_form = AccountProfileForm()
 
-        try:
-            profile = AccountProfile.objects.get(user_id=user_id)
-        except ObjectDoesNotExist:
-            profile = None
+        profile = get_object_or_404(AccountProfile, user_id=user_id)
 
-        if profile:
-            profile_form.initial['id'] = profile.id
-            profile_form.initial['user_id'] = profile.user_id
-            profile_form.initial['organizations'] = profile.organizations
-        return render(request, "accounts/account_profile_update.html", {"user_id": user_id, "profile_form": profile_form})
+        profile_form.initial['id'] = profile.id
+        profile_form.initial['user_id'] = profile.user_id
+        profile_form.initial['organizations'] = profile.organizations
+
+        return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form, "user_id": user_id})

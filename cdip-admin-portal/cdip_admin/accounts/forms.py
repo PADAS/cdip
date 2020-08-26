@@ -16,10 +16,20 @@ class AccountUpdateForm(forms.Form):
 
 
 class AccountProfileForm(forms.ModelForm):
+    user_id = forms.CharField(widget=forms.HiddenInput)
 
     class Meta:
         model = AccountProfile
-        exclude = ['id', 'user_id']
+        exclude = ['id']
+
+
+class AccountProfileUpdateForm(forms.ModelForm):
+    id = forms.UUIDField(widget=forms.HiddenInput)
+    user_id = forms.CharField(widget=forms.HiddenInput)
+
+    class Meta:
+        model = AccountProfile
+        fields = ['id', 'user_id', 'organizations']
 
 
 
