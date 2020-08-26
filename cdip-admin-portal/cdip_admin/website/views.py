@@ -59,8 +59,6 @@ def profile(request):
     except UserProfile.DoesNotExist: 
         logger.debug('User has no UserProfile')
 
-    something = user.get_all_permissions()
-
     userdata = {
         'user_id': auth0user.uid,
         'name': user.first_name,

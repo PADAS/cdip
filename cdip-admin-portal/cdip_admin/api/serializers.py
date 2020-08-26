@@ -20,8 +20,9 @@ class InboundIntegrationTypeSerializer(serializers.ModelSerializer):
 class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'endpoint', 'cursor', 'login', 'password', 'token',
+        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token',
                   'defaultConfiguration']
+        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'defaultConfiguration']
 
 
 class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
@@ -33,4 +34,4 @@ class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
 class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'endpoint', 'cursor', 'login', 'password', 'token']
+        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token']

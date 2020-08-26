@@ -1,6 +1,6 @@
 from django.http import JsonResponse, Http404
 
-
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from functools import wraps
 import jwt
 
-
+from .filters import InboundIntegrationConfigurationFilter
 from .serializers import *
 
 from core.utils import get_user_permissions
@@ -65,23 +65,6 @@ def requires_scope(required_scope: object) -> object:
             return response
         return decorated
     return require_scope
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def public(request):
-    return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
-
-
-@api_view(['GET'])
-def private(request):
-    return JsonResponse({'message': 'Hello from a private endpoint! You need to be authenticated to see this.'})
-
-
-@api_view(['GET'])
-@requires_scope('read:messages')
-def private_scoped(request):
-    return JsonResponse({'message': 'Hello from a private endpoint! You need to be authenticated and have a scope of read:messages to see this.'})
 
 
 class OrganizationsListView(generics.ListAPIView):
@@ -148,6 +131,9 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = InboundIntegrationConfigurationFilter
+    # filterset_fields = ['type__id', 'type__slug']
 
     @requires_scope('read:inboundintegrationconfiguration')
     def get(self, request, *args, **kwargs):
@@ -172,20 +158,6 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
         return self.partial_update(request, *args, **kwargs)
 
 
-class InboundIntegrationConfigurationListViewByType(generics.ListAPIView):
-    """ Returns Detail of an Inbound Integration Configuration """
-    # queryset = InboundIntegrationConfiguration.objects.all()
-    serializer_class = InboundIntegrationConfigurationSerializer
-
-    def get_queryset(self):
-        type_id = self.kwargs['type_id']
-        return InboundIntegrationConfiguration.objects.filter(type__id=type_id)
-
-    @requires_scope('read:inboundintegrationconfiguration')
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-
-
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
     queryset = OutboundIntegrationConfiguration.objects.all()
@@ -205,27 +177,6 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-
-class OutboundIntegrationConfigurationListViewByInboundIntegrationConfiguration(generics.ListAPIView):
-    """ Returns Detail of an Outbound Integration Configuration """
-    serializer_class = OutboundIntegrationConfigurationSerializer
-
-    def get_queryset(self):
-        integration_id = self.kwargs['integration_id']
-        try:
-            inbound_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
-            items = inbound_integration.defaultConfiguration.all()
-            # af538781-6c17-4a2b-af98-d0b318701741
-            return items
-
-        except InboundIntegrationConfiguration.DoesNotExist:
-
-            raise Http404
-
-
-    @requires_scope('read:outboundintegrationconfiguration')
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
 
 
 
