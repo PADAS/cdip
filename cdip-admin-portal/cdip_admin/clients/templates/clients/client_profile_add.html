@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% trans 'Add Client Profile' %}{% endblock %}
+
+{% block content %}
+
+    <form action="{% url 'client_profile_add' client_id %}" method="POST">
+        {% csrf_token %}
+        {{ profile_form|crispy }}
+    <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
+    {{ form.errors }}
+</form>
+
+{% endblock %}
