@@ -98,8 +98,11 @@ def account_profile_add(request, user_id):
 
 
 def account_profile_update(request, user_id):
+
+    profile = get_object_or_404(AccountProfile, user_id=user_id)
+
     if request.method == 'POST':
-        profile_form = AccountProfileForm(request.POST)
+        profile_form = AccountProfileForm(instance=profile, data=request.POST)
         if profile_form.is_valid():
             profile_form.save()
             return redirect('account_detail', user_id=user_id)
@@ -110,10 +113,10 @@ def account_profile_update(request, user_id):
     else:
         profile_form = AccountProfileForm()
 
-        profile = get_object_or_404(AccountProfile, user_id=user_id)
+
 
         profile_form.initial['id'] = profile.id
         profile_form.initial['user_id'] = profile.user_id
-        profile_form.initial['organizations'] = profile.organizations
+        profile_form.initial['organizations'] = profile.organizations.all()
 
         return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form, "user_id": user_id})
