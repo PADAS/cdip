@@ -1,6 +1,8 @@
 from django import forms
 from environ import Env
 
+from clients.models import ClientProfile
+
 env = Env()
 env.read_env()
 
@@ -35,6 +37,23 @@ class ClientForm(forms.Form):
 class ClientUpdateForm(forms.Form):
     name = forms.CharField(max_length=200, required=True)
     description = forms.CharField(max_length=200, required=True)
+
+
+class ClientProfileForm(forms.ModelForm):
+    client_id = forms.CharField(widget=forms.HiddenInput)
+
+    class Meta:
+        model = ClientProfile
+        exclude = ['id', 'organizations']
+
+
+class ClientProfileUpdateForm(forms.ModelForm):
+    id = forms.UUIDField(widget=forms.HiddenInput)
+    client_id = forms.CharField(widget=forms.HiddenInput)
+
+    class Meta:
+        model = ClientProfile
+        fields = ['id', 'client_id', 'type']
 
 
 
