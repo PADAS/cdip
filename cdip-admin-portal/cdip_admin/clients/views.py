@@ -71,9 +71,8 @@ def client_update(request, client_id):
 
     else:
         form = ClientUpdateForm()
-        account = get_client(client_id)
-        form.initial['name'] = account["name"]
-        form.initial['description'] = account["description"]
+        client = get_client(client_id)
+        form.initial['name'] = client["name"]
         return render(request, "clients/client_update.html", {"form": form, "client_id": client_id})
 
 
