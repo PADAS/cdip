@@ -6,7 +6,7 @@
 
 {% block content %}
 
-    <form action="{% url 'client_update' user_id %}" method="POST">
+    <form action="{% url 'client_update' client_id %}" method="POST">
         {% csrf_token %}
         {{ form|crispy }}
         <button type="submit"  class="btn btn-success">Submit</button>
