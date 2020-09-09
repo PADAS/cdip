@@ -1,5 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse, Http404
+from django.core.exceptions import PermissionDenied
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
@@ -113,7 +114,7 @@ class OrganizationsListView(generics.ListAPIView):
         if profile.organizations:
             queryset = Organization.objects.filter(id__in=profile.organizations.all())
         else:
-            raise Http404
+            raise PermissionDenied
         return queryset
 
     @requires_scope('read:organizations')
@@ -189,7 +190,7 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
             else:
                 queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
         else:
-            queryset = []
+            raise PermissionDenied
 
         return queryset
 
