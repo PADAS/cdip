@@ -1,16 +1,16 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse, Http404
+from django.core.exceptions import PermissionDenied
 
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.views import APIView
-from rest_framework import generics, viewsets
-from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import generics
 
 from functools import wraps
 import jwt
 
-
+from accounts.models import AccountProfile
+from clients.models import ClientProfile
+from .filters import InboundIntegrationConfigurationFilter
 from .serializers import *
 
 from core.utils import get_user_permissions
@@ -23,9 +23,14 @@ def get_token_auth_header(args):
     """
     for arg in args:
         auth = arg.headers.get("authorization", None)
+        token = None
         if auth:
+            auth0user = arg.user.username
+            name = auth0user.split('@')
+            arg.session['user_id'] = name[0]
             parts = auth.split()
-            return parts[1]
+            token = parts[1]
+            return token
 
 
 def get_user_perms(args):
@@ -33,7 +38,37 @@ def get_user_perms(args):
         if hasattr(arg, 'user'):
             auth0user = arg.user.social_auth.get(provider='auth0')
             permissions = get_user_permissions(auth0user.uid)
+            arg.session['user_id'] = auth0user.uid
             return permissions
+
+
+def get_profile(user_id):
+    profile = get_user_profile(user_id)
+
+    if profile is None:
+        profile = get_client_profile(user_id)
+
+    return profile
+
+
+def get_user_profile(user_id):
+
+    try:
+        profile = AccountProfile.objects.get(user_id=user_id)
+    except ObjectDoesNotExist:
+        profile = None
+
+    return profile
+
+
+def get_client_profile(user_id):
+
+    try:
+        profile = ClientProfile.objects.get(client_id=user_id)
+    except ObjectDoesNotExist:
+        profile = None
+
+    return profile
 
 
 def requires_scope(required_scope: object) -> object:
@@ -67,27 +102,20 @@ def requires_scope(required_scope: object) -> object:
     return require_scope
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def public(request):
-    return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
-
-
-@api_view(['GET'])
-def private(request):
-    return JsonResponse({'message': 'Hello from a private endpoint! You need to be authenticated to see this.'})
-
-
-@api_view(['GET'])
-@requires_scope('read:messages')
-def private_scoped(request):
-    return JsonResponse({'message': 'Hello from a private endpoint! You need to be authenticated and have a scope of read:messages to see this.'})
-
-
 class OrganizationsListView(generics.ListAPIView):
     """ Returns List of Organizations """
-    queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+
+    def get_queryset(self):
+        user_id = self.request.session['user_id']
+
+        profile = get_profile(user_id)
+
+        if profile.organizations:
+            queryset = Organization.objects.filter(id__in=profile.organizations.all())
+        else:
+            raise PermissionDenied
+        return queryset
 
     @requires_scope('read:organizations')
     def get(self, request, *args, **kwargs):
@@ -148,6 +176,23 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = InboundIntegrationConfigurationFilter
+
+    def get_queryset(self):
+        user_id = self.request.session['user_id']
+
+        profile = get_profile(user_id)
+
+        if profile:
+            if isinstance(profile, ClientProfile):
+                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
+            else:
+                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
+        else:
+            raise PermissionDenied
+
+        return queryset
 
     @requires_scope('read:inboundintegrationconfiguration')
     def get(self, request, *args, **kwargs):
@@ -172,20 +217,6 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
         return self.partial_update(request, *args, **kwargs)
 
 
-class InboundIntegrationConfigurationListViewByType(generics.ListAPIView):
-    """ Returns Detail of an Inbound Integration Configuration """
-    # queryset = InboundIntegrationConfiguration.objects.all()
-    serializer_class = InboundIntegrationConfigurationSerializer
-
-    def get_queryset(self):
-        type_id = self.kwargs['type_id']
-        return InboundIntegrationConfiguration.objects.filter(type__id=type_id)
-
-    @requires_scope('read:inboundintegrationconfiguration')
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-
-
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
     queryset = OutboundIntegrationConfiguration.objects.all()
@@ -205,27 +236,6 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-
-class OutboundIntegrationConfigurationListViewByInboundIntegrationConfiguration(generics.ListAPIView):
-    """ Returns Detail of an Outbound Integration Configuration """
-    serializer_class = OutboundIntegrationConfigurationSerializer
-
-    def get_queryset(self):
-        integration_id = self.kwargs['integration_id']
-        try:
-            inbound_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
-            items = inbound_integration.defaultConfiguration.all()
-            # af538781-6c17-4a2b-af98-d0b318701741
-            return items
-
-        except InboundIntegrationConfiguration.DoesNotExist:
-
-            raise Http404
-
-
-    @requires_scope('read:outboundintegrationconfiguration')
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
 
 
 

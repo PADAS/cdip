@@ -10,5 +10,3 @@ class AccountProfile(models.Model):
     user_id = models.CharField(max_length=200)
     organizations = models.ManyToManyField(Organization)
 
-    def __str__(self):
-        return f"{self.user.last_name, self.user.first_name}"
