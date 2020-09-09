@@ -36,7 +36,6 @@ class ClientForm(forms.Form):
 
 class ClientUpdateForm(forms.Form):
     name = forms.CharField(max_length=200, required=True)
-    description = forms.CharField(max_length=200, required=True)
 
 
 class ClientProfileForm(forms.ModelForm):
