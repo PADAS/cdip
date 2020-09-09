@@ -40,7 +40,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    cursor = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
     password = models.CharField(max_length=200, blank=True)
@@ -57,7 +57,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     endpoint = models.URLField(blank=True)
-    cursor = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
     # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
     password = models.CharField(max_length=200, blank=True)
@@ -77,7 +77,7 @@ class Device(TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     location = models.SlugField(blank=True)
-    cursor = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"

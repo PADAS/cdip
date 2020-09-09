@@ -1,12 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Client: {{module.name}}{% endblock %}
+{% block title %}Client: {{client.name}}{% endblock %}
 
 {% block content %}
 
-    <h1>{{module.name}}</h1>
-    <p>ID: {{module.client_id}}</p>
-    <p>Secret: {{module.client_secret}}</p>
-    <a class="btn btn-primary" href="{% url 'client_update' module.client_id %}" role="button">Update</a>
+    <h1>{{client.name}}</h1>
+    <p>ID: {{client.client_id}}</p>
+    <p>Secret: {{client.client_secret}}</p>
+    {% if profile %}
+        <p>{{ profile.type__name }}</p>
+        <pre>{{ organizations }}</pre>
+        <a class="btn btn-primary" href="{% url 'client_profile_update' client.client_id %}" role="button">Update Profile</a>
+    {% else %}
+        <a class="btn btn-primary" href="{% url 'client_profile_add' client.client_id %}" role="button">Add Profile</a>
+    {% endif %}
+    <a class="btn btn-primary" href="{% url 'client_update' client.client_id %}" role="button">Update</a>
 
 {% endblock %}

@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Account: {{module.name}}{% endblock %}
+{% block title %}Account: {{account.name}}{% endblock %}
 
 {% block content %}
 
-    <h1>{{module.name}}</h1>
-    <p>{{module.email}}</p>
-    <a class="btn btn-primary" href="{% url 'account_update' module.user_id %}" role="button">Update</a>
+    <h1>{{account.name}}</h1>
+    <p>{{account.email}}</p>
+    {% if profile %}
+        <pre>{{ organizations }}</pre>
+        <a class="btn btn-primary" href="{% url 'account_profile_update' account.user_id %}" role="button">Update Profile</a>
+    {% else %}
+        <a class="btn btn-primary" href="{% url 'account_profile_add' account.user_id %}" role="button">Add Profile</a>
+    {% endif %}
+    <a class="btn btn-primary" href="{% url 'account_update' account.user_id %}" role="button">Update Account</a>
+
 
 {% endblock %}
