@@ -1,0 +1,31 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "cdip-admin"
+  namespace: "default"
+  labels:
+    app: "cdip-admin"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "cdip-admin"
+  template:
+    metadata:
+      labels:
+        app: "cdip-admin"
+    spec:
+      containers:
+      - image: "gcr.io/cdip-78ca/cdip-admin:latest"
+        name: "cdip-admin"
+        env:
+        - name: DB_HOST
+          value: 172.22.160.3
+        - name: DB_NAME
+          value: cdip_admin
+        - name: DB_PASSWORD
+          value: EBZuD^Q3so2Pce#cNPgeoQn7qAv1FcGC32v50lE@
+        - name: DB_PORT
+          value: 5432
+        - name: ALLOWED_HOSTS
+          value: 35.192.111.237

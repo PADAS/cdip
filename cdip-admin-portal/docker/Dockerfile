@@ -1,9 +1,9 @@
 FROM ubuntu:20.04
 MAINTAINER chrisdo@vulcan.com
 
-RUN apt-get update
-
-RUN DEBIAN_FRONTEND=noninteractive \
+# use apt-get update and install in the same RUN command: http://lenguyenthedat.com/docker-cache/
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
     git \
     libpq-dev \
@@ -15,6 +15,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
     gnupg \
     locales locales-all \
     software-properties-common \
+    postgresql-client-12 \
     && apt-get autoremove 
 
 
@@ -22,8 +23,9 @@ RUN DEBIAN_FRONTEND=noninteractive \
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 089EBE08314DF160
 RUN /bin/sh -c 'echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu bionic main" >> /etc/apt/sources.list.d/ubuntugis.list'
 
-RUN apt-get update
-RUN apt-get -y install gdal-bin libgdal-dev
+#RUN apt-get update
+RUN apt-get update && \
+    apt-get -y install gdal-bin libgdal-dev
 RUN export CPLUS_INCLUDE_PATH=/usr/include/gdal
 RUN export C_INCLUDE_PATH=/usr/include/gdal
 RUN pip3 install GDAL==$(gdal-config --version)
@@ -41,7 +43,6 @@ ARG built_version=""
 ADD ./cdip_admin /var/www/app
 
 EXPOSE 8000
-EXPOSE 5400
 
 ENV LC_ALL C.UTF-8
 ENV LANG C.UTF-8
