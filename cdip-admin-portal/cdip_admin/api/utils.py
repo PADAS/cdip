@@ -10,7 +10,7 @@ def update_device_information(config):
     logger.info('Update Device Information')
     for key in config.state:
         try:
-            device = Device.objects.get(id=key)
+            device = Device.objects.get(name=key, type_id=config.type__id)
         except ObjectDoesNotExist:
             logger.info('Device not found. Create a new one.')
             device = Device.objects.create(type_id=config.id, name=key, owner_id=config.owner__id,
