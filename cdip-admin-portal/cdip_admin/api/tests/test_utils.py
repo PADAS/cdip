@@ -42,6 +42,7 @@ class TestUpdateDeviceInformation(TestCase):
         inbound_config = InboundIntegrationConfiguration.objects.get(id=1)
         update_device_information(inbound_config)
         count = Device.objects.count()
+
         # Assert the count is correct
         self.assertEquals(count, 10)
 
@@ -49,6 +50,10 @@ class TestUpdateDeviceInformation(TestCase):
         device_1 = Device.objects.get(name='ST2010-2758')
         device_state_1 = DeviceState.objects.get(device__id=device_1.id)
         self.assertEquals(device_state_1.end_state, "14469583")
+
+        device_2 = Device.objects.get(name='ST2010-2762')
+        device_state_2 = DeviceState.objects.get(device__id=device_2.id)
+        self.assertEquals(device_state_2.end_state, "14488454")
 
         # Update the cursor info to add a few more devices and update a couple of the cursors
         state = dict(cursors={
