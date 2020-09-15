@@ -73,14 +73,24 @@ class InboundIntegrationConfiguration(TimestampedModel):
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
+    type = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
     location = models.SlugField(blank=True)
-    state = models.JSONField(default=dict)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
+
+
+# This is where the information is stored for a specific device
+class DeviceState(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    device_id = models.ForeignKey(Device, on_delete=models.CASCADE)
+    end_state = models.CharField(max_length=200)
+
+    def __str__(self):
+        return f"{self.end_state}"
 
 
 # This allows an organization to group a set of devices to send information to a series of outbound configs
