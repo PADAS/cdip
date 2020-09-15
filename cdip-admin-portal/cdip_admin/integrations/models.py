@@ -73,24 +73,22 @@ class InboundIntegrationConfiguration(TimestampedModel):
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
+    external_id = models.CharField(max_length=200)
     outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
-    location = models.SlugField(blank=True)
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.inbound_configuration.name} - {self.owner.name}"
 
-    constraints = [
-        models.UniqueConstraint(fields=['type', 'name'], name='type_name_unique_constraint')
-    ]
+    class Meta:
+        unique_together = ('inbound_configuration', 'external_id')
 
 
 # This is where the information is stored for a specific device
 class DeviceState(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
 
     def __str__(self):
