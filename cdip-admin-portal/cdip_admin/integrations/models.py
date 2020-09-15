@@ -82,6 +82,10 @@ class Device(TimestampedModel):
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
 
+    constraints = [
+        models.UniqueConstraint(fields=['type', 'name'], name='type_name_unique_constraint')
+    ]
+
 
 # This is where the information is stored for a specific device
 class DeviceState(TimestampedModel):
