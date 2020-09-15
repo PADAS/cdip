@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from api.utils import update_device_information
-from integrations.models import Device, InboundIntegrationConfiguration, InboundIntegrationType, \
+from integrations.models import Device, DeviceState, InboundIntegrationConfiguration, InboundIntegrationType, \
     OutboundIntegrationConfiguration, OutboundIntegrationType
 
 from organizations.models import Organization
@@ -46,7 +46,9 @@ class TestUpdateDeviceInformation(TestCase):
         self.assertEquals(count, 10)
 
         # Assert some of the cursor values in the DeviceState Table
-        device1 = Device.objects.get(name='ST2010-2758')
+        device_1 = Device.objects.get(name='ST2010-2758')
+        device_state_1 = DeviceState.objects.get(device__id=device_1.id)
+        self.assertEquals(device_state_1.end_state, "14469583")
 
         # Update the cursor info to add a few more devices and update a couple of the cursors
         state = dict(cursors={

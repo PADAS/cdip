@@ -90,7 +90,7 @@ class Device(TimestampedModel):
 # This is where the information is stored for a specific device
 class DeviceState(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    device_id = models.ForeignKey(Device, on_delete=models.CASCADE)
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
     end_state = models.CharField(max_length=200)
 
     def __str__(self):
