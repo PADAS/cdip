@@ -13,15 +13,13 @@ class TestUpdateDeviceInformation(TestCase):
         # This where to setup the initial data
         organization = Organization.objects.create(name="WPS", description="An Organization for testing.")
 
-        outbound_type = OutboundIntegrationType.objects.create(name="Earthranger", description="ER")
+        outbound_type = OutboundIntegrationType.objects.create(name="EarthRanger", description="ER")
 
         outbound_config = OutboundIntegrationConfiguration.objects.create(type_id=outbound_type.id, owner_id=organization.id)
 
-        default_config = [outbound_config]
-
         inbound_type = InboundIntegrationType.objects.create(name="Savannah Tracker")
 
-        state = dict(cursors={
+        state = dict({
             "ST2010-2758": 14469583,
             "ST2010-2759": 14430249,
             "ST2010-2760": 14650428,
@@ -35,11 +33,14 @@ class TestUpdateDeviceInformation(TestCase):
         })
 
         inbound_config = InboundIntegrationConfiguration.objects.create(type_id=inbound_type.id, owner_id=organization.id,
-                                                                        defaultConfiguration=default_config, state=state)
+                                                                        state=state)
+
+        inbound_config.defaultConfiguration.add(outbound_config)
 
     def test_update_device_information(self):
         # Update a Bunch of devices
-        inbound_config = InboundIntegrationConfiguration.objects.get(id=1)
+        inbound_config = InboundIntegrationConfiguration.objects.first()
+        self.assertIsNotNone(inbound_config)
         update_device_information(inbound_config)
         count = Device.objects.count()
 
@@ -47,21 +48,21 @@ class TestUpdateDeviceInformation(TestCase):
         self.assertEquals(count, 10)
 
         # Assert some of the cursor values in the DeviceState Table
-        device_1 = Device.objects.get(name='ST2010-2758')
+        device_1 = Device.objects.get(external_id='ST2010-2758')
         device_state_1 = DeviceState.objects.get(device__id=device_1.id)
         self.assertEquals(device_state_1.end_state, "14469583")
 
-        device_2 = Device.objects.get(name='ST2010-2762')
+        device_2 = Device.objects.get(external_id='ST2010-2762')
         device_state_2 = DeviceState.objects.get(device__id=device_2.id)
         self.assertEquals(device_state_2.end_state, "14488454")
 
         # Update the cursor info to add a few more devices and update a couple of the cursors
-        state = dict(cursors={
-            "ST2010-2758": 14469583,
+        state = dict({
+            "ST2010-2758": 14469900,
             "ST2010-2759": 14430249,
             "ST2010-2760": 14650428,
             "ST2010-2761": 14722788,
-            "ST2010-2762": 14488454,
+            "ST2010-2762": 14488750,
             "ST2010-2763": 14454926,
             "ST2010-2764": 14699313,
             "ST2010-2765": 14428313,
@@ -82,6 +83,27 @@ class TestUpdateDeviceInformation(TestCase):
         self.assertEquals(count, 15)
 
         # Assert that work check the count and values of a couple devices
+        device_1 = Device.objects.get(external_id='ST2010-2758')
+        device_state_1 = DeviceState.objects.filter(device__id=device_1.id).order_by('-created_at').first()
+        self.assertEquals(device_state_1.end_state, "14469900")
+
+        device_2 = Device.objects.get(external_id='ST2010-2762')
+        device_state_2 = DeviceState.objects.filter(device__id=device_2.id).order_by('-created_at').first()
+        self.assertEquals(device_state_2.end_state, "14488750")
+
+        device_3 = Device.objects.get(external_id='ST2010-2760')
+        device_state_3 = DeviceState.objects.filter(device__id=device_3.id).order_by('-created_at').first()
+        self.assertEquals(device_state_3.end_state, "14650428")
+
+        device_4 = Device.objects.get(external_id='ST2010-2772')
+        device_state_4 = DeviceState.objects.filter(device__id=device_4.id).order_by('-created_at').first()
+        self.assertEquals(device_state_4.end_state, "17638614")
+
+        outbound_config = device_4.outbound_configuration.first()
+        self.assertIsNotNone(outbound_config)
+        outbound_type = outbound_config.type
+        self.assertIsNotNone(outbound_type)
+        self.assertEquals(outbound_type.name, "EarthRanger")
 
         # state = dict(cursors={
         #     "ST2010-2758": 14469583,
