@@ -41,7 +41,7 @@ class TestUpdateDeviceInformation(TestCase):
         # Update a Bunch of devices
         inbound_config = InboundIntegrationConfiguration.objects.first()
         self.assertIsNotNone(inbound_config)
-        update_device_information(inbound_config)
+        update_device_information(inbound_config.state, inbound_config)
         count = Device.objects.count()
 
         # Assert the count is correct
@@ -77,7 +77,7 @@ class TestUpdateDeviceInformation(TestCase):
 
         inbound_config.state = state
 
-        update_device_information(inbound_config)
+        update_device_information(state, inbound_config)
         count = Device.objects.count()
         # Assert the count is correct
         self.assertEquals(count, 15)

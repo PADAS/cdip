@@ -78,7 +78,7 @@ class Device(TimestampedModel):
     outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
 
     def __str__(self):
-        return f"{self.inbound_configuration.name} - {self.owner.name}"
+        return f"{self.inbound_configuration.type.name} - {self.inbound_configuration.owner.name}"
 
     class Meta:
         unique_together = ('inbound_configuration', 'external_id')
