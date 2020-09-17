@@ -39,7 +39,6 @@ class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
 class DeviceSerializer(serializers.ModelSerializer):
     inbound_configuration_id = serializers.CharField(source='inbound_configuration.id', read_only=True)
-
     outbound_configuration_id = serializers.CharField(source='outbound_configuration.id', read_only=True)
 
     class Meta:
