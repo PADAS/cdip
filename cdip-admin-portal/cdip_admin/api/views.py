@@ -280,6 +280,26 @@ class DeviceStateListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
 
+    def get_queryset(self):
+        device_states = []
+        inbound_config_id = None
+        if self.args:
+            inbound_config_id = self.args['inbound_config_id']
+
+        if inbound_config_id:
+            devices = Device.objects.filter(inbound_configuration__id='inbound_config_id').all()
+        else:
+            devices = Device.objects.all()
+
+        for device in devices:
+            device_state = DeviceState.objects.filter(device__id=device.id).order_by('-created_at').first()
+            if device_state:
+                device_states.append(device_state.id)
+
+        queryset = DeviceState.objects.filter(id__in=device_states).all()
+
+        return queryset
+
     # TODO: Create New Permission Set for Device Management
     @requires_scope('read:inboundintegrationconfiguration')
     def get(self, request, *args, **kwargs):
