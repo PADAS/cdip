@@ -31,10 +31,10 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
 
 class DeviceStateFilter(django_filters.FilterSet):
 
-    inbound_config_slug = django_filters.CharFilter(
-        field_name='device__inbound_configuration__slug',
-        lookup_expr='exact'
-    )
+    # inbound_config_slug = django_filters.CharFilter(
+    #     field_name='device__inbound_configuration__slug',
+    #     lookup_expr='exact'
+    # )
 
     inbound_config_id = django_filters.UUIDFilter(
         field_name='device__inbound_configuration__id',
