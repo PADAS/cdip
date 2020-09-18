@@ -91,6 +91,11 @@ class DeviceState(TimestampedModel):
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['device', 'created_at']),
+        ]
+
     def __str__(self):
         return f"{self.end_state}"
 

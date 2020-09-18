@@ -1,23 +1,20 @@
 import json
+from functools import wraps
 
+import jwt
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import JsonResponse, Http404
 from django.core.exceptions import PermissionDenied
-
+from django.db.models import F, Window
+from django.db.models.functions import FirstValue
+from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
 
-from functools import wraps
-import jwt
-
 from accounts.models import AccountProfile
 from clients.models import ClientProfile
+from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
-
-from core.utils import get_user_permissions
-
-from integrations.models import *
 from .utils import update_device_information
 
 
@@ -274,29 +271,22 @@ class DeviceListView(generics.ListAPIView):
 
 
 class DeviceStateListView(generics.ListAPIView):
-    """ Returns Device States """
+    """ Returns Device States -- Latest state for each device. """
     queryset = DeviceState.objects.all()
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
 
     def get_queryset(self):
-        device_states = []
-        inbound_config_id = None
-        if self.args:
-            inbound_config_id = self.args['inbound_config_id']
 
-        if inbound_config_id:
-            devices = Device.objects.filter(inbound_configuration__id='inbound_config_id').all()
-        else:
-            devices = Device.objects.all()
+        filter = {
+            'device__inbound_configuration__id': self.args['inbound_config_id']
+        } if self.args else {}
 
-        for device in devices:
-            device_state = DeviceState.objects.filter(device__id=device.id).order_by('-created_at').first()
-            if device_state:
-                device_states.append(device_state.id)
-
-        queryset = DeviceState.objects.filter(id__in=device_states).all()
+        queryset = DeviceState.objects.filter(**filter).annotate(
+            last_end_state=Window(expression=FirstValue(F('end_state')),
+                                   partition_by=F('device_id'), order_by=[F('created_at').desc(),])
+                                   ).distinct('device_id')
 
         return queryset
 
