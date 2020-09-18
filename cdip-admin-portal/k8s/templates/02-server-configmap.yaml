@@ -1,0 +1,11 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: server-configmap
+data:
+  CORS_ORIGIN_ALLOW_ALL: "False"
+  CORS_REPLACE_HTTPS_REFERER: "True"
+  CSRF_COOKIE_SECURE: "False"
+  SESSION_COOKIE_SECURE: "False"
+  TIME_ZONE: "US/Pacific"
