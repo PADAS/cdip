@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-portal
+spec:
+  selector: 
+    matchLabels: 
+      cdip.component: cdip-portal
+  template:
+    metadata:
+      labels:
+        cdip.component: cdip-portal
+      annotations:
+        prometheus.io/port: "9102"
+    spec:
+      containers:
+      - image: "${CDIP_PORTAL_IMAGE}"
+        imagePullPolicy: IfNotPresent
+        name: cdip-portal
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+        ports:
+          - containerPort: 8000
+        env:
+        - name: DB_HOST
+          value: "172.22.160.3"
+        - name: DB_NAME
+          value: "dev_cdipdb"
+        - name: DB_USER
+          value: "cdip_admin"
+        - name: DB_PASSWORD
+          value: "EBZuD^Q3so2Pce#cNPgeoQn7qAv1FcGC32v50lE@"
+        - name: DB_PORT
+          value: "5432"
+        - name: ALLOWED_HOSTS
+          value: "34.121.95.185"
+        envFrom:
+          - configMapRef:
+              name: server-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-portal
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    cdip.component: cdip-portal

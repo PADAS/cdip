@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-api
+spec:
+  selector:
+    matchLabels:
+      cdip.component: cdip-api
+  template:
+    metadata:
+      labels:
+        cdip.component: cdip-api
+      annotations:
+        prometheus.io/port: "9102"
+    spec:
+      containers:
+      - image: "${CDIP_API_IMAGE}"
+        imagePullPolicy: IfNotPresent
+        name: cdip-api
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+        ports:
+          - containerPort: 9999
+        env:
+        envFrom:
+          - configMapRef:
+              name: server-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-api
+spec:
+  type: NodePort
+  ports:
+  - port: 9999
+    targetPort: 9999
+  selector:
+    cdip.component: cdip-api

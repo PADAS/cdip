@@ -8,10 +8,8 @@ resource "template_dir" "deployments" {
 
   vars = {
     KUBERNETES_NAMESPACE   = var.namespace
-    CDIP_PORTAL_SOURCE_PATH = var.cdip_portal_source_path
-    LOCAL_DATABASE_STORAGE = var.local_database_storage
-    LOCAL_MEDIA_STORAGE    = var.local_media_storage
-    FQDN                   = var.fqdn
+    CDIP_PORTAL_IMAGE = var.cdip_portal_image
+    CDIP_API_IMAGE = var.cdip_api_image
   }
 }
 
@@ -20,20 +18,12 @@ variable "namespace" {
   default = "cdip"
 }
 
-variable "cdip_portal_source_path" {
+variable "cdip_portal_image" {
   type    = string
-  default = ""
+  default = "gcr.io/cdip-78ca/cdip-portal:latest"
 }
 
-variable "local_database_storage" {
+variable "cdip_api_image" {
   type = string
-}
-
-variable "local_media_storage" {
-  type = string
-}
-
-variable "fqdn" {
-  type = string
-  default = "localhost:31443"
+  default = "gcr.io/cdip-78ca/cdip-api:latest"
 }
