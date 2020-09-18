@@ -41,14 +41,15 @@ def index(request):
 def logout(request):
     log_out(request)
     return_to = urlencode({'returnTo': request.build_absolute_uri('/')})
-    logout_url = 'https://%s/v2/logout?client_id=%s&%s' % \
-                 (settings.SOCIAL_AUTH_AUTH0_DOMAIN, settings.SOCIAL_AUTH_AUTH0_KEY, return_to)
+
+    logout_url = f'https://{settings.SOCIAL_AUTH_AUTH0_DOMAIN}/v2/logout?client_id={settings.SOCIAL_AUTH_AUTH0_KEY}&{return_to}'
     return HttpResponseRedirect(logout_url)
 
 
 @login_required
 def profile(request):
     user = request.user
+    logger.debug('User: %s', user)
     auth0user = user.social_auth.get(provider='auth0')
 
     user_profile = []
