@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import logging
 
 from integrations.models import InboundIntegrationType
-from organizations.models import UserProfile
+from organizations.models import UserProfile, Organization
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +49,13 @@ def logout(request):
 @login_required
 def profile(request):
     user = request.user
-    logger.debug('User: %s', user)
+    logger.debug('User: %s (%s)', user, user.id)
     auth0user = user.social_auth.get(provider='auth0')
 
     user_profile = []
 
     try:
-        for org in user.user_profile.organizations.all():
+        for org in Organization.objects.filter(user_profile__user=user):
             user_profile.append(org.name)
     except UserProfile.DoesNotExist: 
         logger.debug('User has no UserProfile')
