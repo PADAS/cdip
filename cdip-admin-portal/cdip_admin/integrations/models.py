@@ -9,7 +9,7 @@ from organizations.models import Organization, OrganizationGroup
 # Example Inbound Integrations: Savannah Tracking Collars, Garmin Inreach
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, verbose_name='Type')
     slug = models.SlugField(max_length=200)
     description = models.TextField(blank=True)
 

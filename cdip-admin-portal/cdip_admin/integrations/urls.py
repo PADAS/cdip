@@ -7,6 +7,8 @@ urlpatterns = [
          name='device_detail'),
     path('devices', views.DeviceList.as_view(), name='device_list'),
 
+    path('devices/state/', views.DeviceStateList.as_view(), name='device_state_list'),
+
     path('integrations/inbound/type/<uuid:module_id>', views.inbound_integration_type_detail,
          name='inbound_integration_type_detail'),
     path('integrations/inbound/type', views.InboundIntegrationTypeList.as_view(), name='inbound_integration_type_list'),
