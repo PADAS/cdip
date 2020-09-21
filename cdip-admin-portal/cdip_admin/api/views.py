@@ -174,9 +174,6 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
 
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations
-        Example State: {
-                            "state": "{\"ST2010-2758\": 14469584, \"ST2010-2759\": 14430249, \"ST2010-2760\": 14650428}"
-                       }
     """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
@@ -204,7 +201,11 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
 
 
 class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView):
-    """ Returns Detail of an Inbound Integration Configuration """
+    """ Returns Detail of an Inbound Integration Configuration
+        Example State: {
+                            "state": "{\"ST2010-2758\": 14469584, \"ST2010-2759\": 14430249, \"ST2010-2760\": 14650428}"
+                       }
+    """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
 

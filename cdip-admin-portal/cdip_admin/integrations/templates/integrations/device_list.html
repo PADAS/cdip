@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Devices{% endblock %}
+
+{% block content %}
+
+    <ul>
+        {% for device in devices %}
+            <li>
+                <a href="{% url 'device_detail' device.id %}">
+                    {{ device.external_id }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+{% endblock %}

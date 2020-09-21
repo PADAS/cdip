@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Device State List{% endblock %}
+
+{% block content %}
+
+    <ul>
+        {% for state in states %}
+            <li>
+                {{ state.created_at }} - {{ state.device.external_id }}
+            </li>
+        {% endfor %}
+    </ul>
+
+{% endblock %}
