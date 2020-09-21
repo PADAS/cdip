@@ -3,15 +3,26 @@
 {% block title %}Devices{% endblock %}
 
 {% block content %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">External ID</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Type</th>
+                <th scope="col">Created</th>
+            </tr>
+        </thead>
+        <tbody>
+             {% for device in devices %}
+                <tr onclick="window.location='{% url 'device_detail' device.id %}'">
+                    <td>{{ device.external_id }}</td>
+                    <td>{{ device.inbound_configuration.owner.name }}</td>
+                    <td>{{ device.inbound_configuration.type.name }}</td>
+                    <td>{{ device.created_at }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
-    <ul>
-        {% for device in devices %}
-            <li>
-                <a href="{% url 'device_detail' device.id %}">
-                    {{ device.external_id }}
-                </a>
-            </li>
-        {% endfor %}
-    </ul>
 
 {% endblock %}
