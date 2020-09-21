@@ -4,7 +4,7 @@
 
 {% block content %}
 
-    <h1>{{device.owner__name}}</h1>
-    <p>{{device.id}}</p>
+    <h1>{{device.inbound_configuration.type}}</h1>
+    <p>{{device.id}} - {{ device.inbound_configuration.owner.name }}</p>
 
 {% endblock %}
