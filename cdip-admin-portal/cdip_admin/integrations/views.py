@@ -7,10 +7,27 @@ from django.views.generic import ListView
 import logging
 
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
-from .models import InboundIntegrationType, OutboundIntegrationType\
-        , InboundIntegrationConfiguration, OutboundIntegrationConfiguration
+from .models import InboundIntegrationType, OutboundIntegrationType \
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device
 
 logger = logging.getLogger(__name__)
+
+
+###
+# Device Methods/Classes
+###
+def device_detail(request, module_id):
+    logger.info(f"Request for Device: {module_id}")
+    device = get_object_or_404(Device, pk=module_id)
+    return render(request, "integrations/device_detail.html", {"device": device})
+
+
+class DeviceList(ListView):
+    template_name = 'integrations/device_list.html'
+    queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
+                                                      'inbound_configuration__type__name')
+    context_object_name = 'devices'
+    paginate_by = 2
 
 
 ###

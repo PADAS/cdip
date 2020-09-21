@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import logging
 
 from integrations.models import InboundIntegrationType
-from organizations.models import UserProfile
+from organizations.models import UserProfile, Organization
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +41,21 @@ def index(request):
 def logout(request):
     log_out(request)
     return_to = urlencode({'returnTo': request.build_absolute_uri('/')})
-    logout_url = 'https://%s/v2/logout?client_id=%s&%s' % \
-                 (settings.SOCIAL_AUTH_AUTH0_DOMAIN, settings.SOCIAL_AUTH_AUTH0_KEY, return_to)
+
+    logout_url = f'https://{settings.SOCIAL_AUTH_AUTH0_DOMAIN}/v2/logout?client_id={settings.SOCIAL_AUTH_AUTH0_KEY}&{return_to}'
     return HttpResponseRedirect(logout_url)
 
 
 @login_required
 def profile(request):
     user = request.user
+    logger.debug('User: %s (%s)', user, user.id)
     auth0user = user.social_auth.get(provider='auth0')
 
     user_profile = []
 
     try:
-        for org in user.user_profile.organizations.all():
+        for org in Organization.objects.filter(user_profile__user=user):
             user_profile.append(org.name)
     except UserProfile.DoesNotExist: 
         logger.debug('User has no UserProfile')
