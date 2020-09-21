@@ -9,6 +9,8 @@ from django.db.models.functions import FirstValue
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
+from rest_framework.decorators import permission_classes, api_view
+from rest_framework.permissions import AllowAny
 
 from accounts.models import AccountProfile
 from clients.models import ClientProfile
@@ -16,6 +18,12 @@ from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import update_device_information
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public(request):
+    return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
 
 
 def get_token_auth_header(args):

@@ -7,6 +7,8 @@ from api.views import *
 schema_view = get_swagger_view(title="CDIP ADMIN API")
 
 urlpatterns = [
+    path('v1.0/public', public),
+
     path('v1.0/devices', DeviceListView.as_view(), name='device_list_api'),
     path('v1.0/devices/<pk>', DeviceDetailsView.as_view(), name='device_detail_api'),
 
