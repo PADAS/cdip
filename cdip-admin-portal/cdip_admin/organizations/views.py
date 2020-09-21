@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import FormView
 
-from .models import Organization
+from .models import Organization, UserProfile
 
 
 # Create your views here.
@@ -13,10 +13,9 @@ def organizations_detail(request, module_id):
 def organizations_list(request):
     if request.user.has_perm('organizations.view_organization'):
 
-        profile = request.user.user_profile
-
+        organizations = Organization.objects.filter(user_profile__user=request.user)
         return render(request, "organizations/organizations_list.html",
-                      {"organizations": profile.organizations.all()})
+                      {"organizations": organizations})
     else:
         return redirect("welcome")
 
