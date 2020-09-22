@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}Device: {{device.external_id}}{% endblock %}
+
+{% block content %}
+
+    <h1>{{device.inbound_configuration.type}}</h1>
+    <p>{{device.id}} - {{ device.inbound_configuration.owner.name }}</p>
+
+{% endblock %}

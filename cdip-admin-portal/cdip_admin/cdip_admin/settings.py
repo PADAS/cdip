@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_tables2',
     'crispy_forms',
     'website',
     'integrations',
@@ -56,7 +57,8 @@ INSTALLED_APPS = [
     'social_django',
     'phonenumber_field',
     'rest_framework',
-    'rest_framework_swagger'
+    'rest_framework_swagger',
+    "bootstrap4",
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
