@@ -1,16 +1,45 @@
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.shortcuts import render, get_object_or_404, redirect
-from django.forms import modelform_factory
-from django.contrib.auth.decorators import user_passes_test
 from django.views.generic import ListView
+from django_filters.views import FilterView
+from django_tables2.views import SingleTableMixin
 
 import logging
 
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
-from .models import InboundIntegrationType, OutboundIntegrationType\
-        , InboundIntegrationConfiguration, OutboundIntegrationConfiguration
+from .filters import DeviceStateFilter
+from .models import InboundIntegrationType, OutboundIntegrationType \
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState
+from .tables import DeviceStateTable
 
 logger = logging.getLogger(__name__)
+
+
+###
+# Device Methods/Classes
+###
+def device_detail(request, module_id):
+    logger.info(f"Request for Device: {module_id}")
+    device = get_object_or_404(Device, pk=module_id)
+    return render(request, "integrations/device_detail.html", {"device": device})
+
+
+class DeviceList(ListView):
+    template_name = 'integrations/device_list.html'
+    queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
+                                                      'inbound_configuration__type__name')
+    context_object_name = 'devices'
+    paginate_by = 4
+
+
+###
+# DeviceState Methods/Classes
+###
+class DeviceStateList(SingleTableMixin, FilterView):
+    model = DeviceState
+    table_class = DeviceStateTable
+    template_name = 'integrations/device_state_list.html'
+    filterset_class = DeviceStateFilter
 
 
 ###

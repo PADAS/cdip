@@ -9,7 +9,7 @@ from organizations.models import Organization, OrganizationGroup
 # Example Inbound Integrations: Savannah Tracking Collars, Garmin Inreach
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, verbose_name='Type')
     slug = models.SlugField(max_length=200)
     description = models.TextField(blank=True)
 
@@ -73,14 +73,31 @@ class InboundIntegrationConfiguration(TimestampedModel):
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    location = models.SlugField(blank=True)
-    state = models.JSONField(default=dict)
+    inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
+    external_id = models.CharField(max_length=200)
+    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.inbound_configuration.type.name} - {self.inbound_configuration.owner.name}"
+
+    class Meta:
+        unique_together = ('inbound_configuration', 'external_id')
+
+
+# This is where the information is stored for a specific device
+class DeviceState(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    # TODO: Update end_state as Json
+    end_state = models.CharField(max_length=200)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['device', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.end_state}"
 
 
 # This allows an organization to group a set of devices to send information to a series of outbound configs
