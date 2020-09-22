@@ -5,6 +5,18 @@
         <h3>{% trans 'Menu' %}</h3>
     </div>
     <ul class="list-unstyled components">
+        <h5>{% trans 'Devices' %}</h5>
+        <li>
+            <a href="{% url 'device_list' %}">
+                {% trans 'Devices' %}
+            </a>
+        </li>
+        <h5>{% trans 'Device State' %}</h5>
+        <li>
+            <a href="{% url 'device_state_list' %}">
+                {% trans 'Device States' %}
+            </a>
+        </li>
         {% if perms.integrations.view_inboundintegrationtype %}
         <h5>{% trans 'Inbound Integrations' %}</h5>
         <li>
