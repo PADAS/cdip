@@ -36,7 +36,7 @@ ADD requirements.txt /workspace/requirements.txt
 
 RUN pip3 install -U "pip"
 
-RUN pip3 install -r /workspace/requirements.txt --no-cache-dir 
+RUN pip3 install -r /workspace/requirements.txt --no-cache-dir
 
 ARG built_version=""
 

@@ -16,8 +16,26 @@ spec:
     spec:
       containers:
       - image: "${CDIP_PORTAL_IMAGE}"
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         name: cdip-portal
+        livenessProbe:
+          httpGet:
+            path: /api/v1.0/public
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1.0/public
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
         resources:
           requests:
             cpu: "100m"
@@ -36,7 +54,9 @@ spec:
         - name: DB_PORT
           value: "5432"
         - name: ALLOWED_HOSTS
-          value: "34.121.95.185"
+          value: "${SITE_FQDN}"
+        - name: DEBUG
+          value: "False"
         envFrom:
           - configMapRef:
               name: server-configmap
@@ -47,7 +67,7 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: cdip-portal
 spec:
-  type: LoadBalancer
+  type: NodePort
   ports:
   - port: 8000
     targetPort: 8000
