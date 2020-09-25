@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cdip-ingress
+  namespace: cdip-v1
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "site-ip-cdipdev"
+spec:
+  rules:
+    - http:
+        paths:
+        - path: /*
+          backend:
+            serviceName: cdip-portal
+            servicePort: 8000
+#        - path: /web/*
+#          backend:
+#            serviceName: web
+#            servicePort: 8080
+# TODO: can't figure out why cdip-api is not accessible behind ingress!
+#        - path: /api/*
+#          backend:
+#            serviceName: cdip-api
+#            servicePort: 9999
+
+  tls:
+  - secretName: padas-cert
