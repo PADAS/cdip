@@ -16,6 +16,7 @@ RUN apt-get update && \
     locales locales-all \
     software-properties-common \
     postgresql-client-12 \
+    vim \
     && apt-get autoremove 
 
 
@@ -51,6 +52,7 @@ ENV LANGUAGE C.UTF-8
 ENV BUILT_VERSION=${built_version}
 
 ENV DJANGO_SETTINGS_MODULE=cdip_admin.settings
+ENV DEBUG=False
 
 # Default service name
 ENV SERVICE_NAME=cdip_portal
