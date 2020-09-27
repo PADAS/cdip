@@ -42,6 +42,7 @@ RUN pip3 install -r /workspace/requirements.txt --no-cache-dir
 ARG built_version=""
 
 ADD ./cdip_admin /var/www/app
+ADD ./swagger-fix/index.html /usr/local/lib/python3.8/dist-packages/rest_framework_swagger/templates/rest_framework_swagger/
 
 EXPOSE 8000
 
