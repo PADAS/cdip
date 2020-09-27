@@ -52,6 +52,7 @@ social-auth-core==3.3.3   # via -r requirements.in, social-auth-app-django
 soupsieve==2.0.1          # via -r requirements.in, beautifulsoup4
 sqlparse==0.3.1           # via -r requirements.in, django
 urllib3==1.25.9           # via -r requirements.in, requests
+whitenoise==5.2.0
 zipp==3.1.0               # via -r requirements.in, importlib-metadata
 
 pip~=20.2.1
