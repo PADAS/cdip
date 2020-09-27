@@ -9,3 +9,4 @@ data:
   CSRF_COOKIE_SECURE: "False"
   SESSION_COOKIE_SECURE: "False"
   TIME_ZONE: "US/Pacific"
+  REDIS_HOST: "10.170.75.131"
