@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: test-airflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: airflow
+  template:
+    metadata:
+      labels:
+        name: airflow
+    spec:
+      containers:
+        - name: webserver
+          image: "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
+          imagePullPolicy: Always
+          ports:
+            - name: webserver
+              containerPort: 8080
+          args: ["webserver"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/dags
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
+#          env:
+#            - name: SQL_ALCHEMY_CONN
+#              valueFrom:
+#                secretKeyRef:
+#                  name: airflow-secrets
+#                  key: sql_alchemy_conn
+        - name: scheduler
+          image: "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
+          imagePullPolicy: Always
+          args: ["scheduler"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/dags
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
+      volumes:
+        - name: airflow-configmap
+          configMap:
+            name: airflow-configmap
+        - name: airflow-dags
+          persistentVolumeClaim:
+            claimName: airflow-dags
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: airflow-logs
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "test-airflow"
+  name: cdip-airflow
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    name: airflow
