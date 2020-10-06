@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: airflow
-  namespace: test-airflow
+  namespace: "${KUBERNETES_NAMESPACE}"
 spec:
   replicas: 1
   selector:
@@ -13,10 +13,23 @@ spec:
       labels:
         name: airflow
     spec:
+      initContainers:
+        - name: init-airflow
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: Always
+          command: ['sh', '-c', "airflow initdb"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+          env:
+            # TODO: read conn str as a secret
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              value: "${AIRFLOW_METADB_CONN_STR}"
       containers:
         - name: webserver
-          image: "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
-          imagePullPolicy: Always
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: IfNotPresent
           ports:
             - name: webserver
               containerPort: 8080
@@ -29,15 +42,18 @@ spec:
               mountPath: /root/airflow/dags
             - name: airflow-logs
               mountPath: /root/airflow/logs
-#          env:
-#            - name: SQL_ALCHEMY_CONN
+          env:
+            # TODO: read conn str as a secret
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              value: "${AIRFLOW_METADB_CONN_STR}"
+#            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
 #              valueFrom:
 #                secretKeyRef:
 #                  name: airflow-secrets
 #                  key: sql_alchemy_conn
         - name: scheduler
-          image: "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
-          imagePullPolicy: Always
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: IfNotPresent
           args: ["scheduler"]
           volumeMounts:
             - name: airflow-configmap
@@ -47,6 +63,10 @@ spec:
               mountPath: /root/airflow/dags
             - name: airflow-logs
               mountPath: /root/airflow/logs
+          env:
+            # TODO: read conn str as a secret
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              value: "${AIRFLOW_METADB_CONN_STR}"
       volumes:
         - name: airflow-configmap
           configMap:
@@ -63,8 +83,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: "test-airflow"
-  name: cdip-airflow
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: airflow
 spec:
   type: LoadBalancer
   ports:
