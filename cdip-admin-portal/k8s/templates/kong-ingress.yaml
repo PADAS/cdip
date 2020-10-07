@@ -1,0 +1,43 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: cdip-kong-ingress
+  namespace: "${KUBERNETES_NAMESPACE}"
+  annotations:
+    kubernetes.io/ingress.class: kong
+    konghq.com/override: customized-kong-ingress
+#    This below doesn't work with Kong. ingress comes up with the kong-proxy's external IP.
+#    kubernetes.io/ingress.global-static-ip-name: site-ip-cdipdev
+spec:
+  rules:
+  - host: "${SITE_FQDN}"
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: cdip-portal
+          servicePort: 8000
+      - path: /airflow
+        backend:
+          serviceName: airflow
+          servicePort: 8080
+      - path: /api
+        backend:
+          serviceName: cdip-api
+          servicePort: 9999
+  tls:
+    - secretName: padas-cert
+      hosts:
+        - "${SITE_FQDN}"
+
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongIngress
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: customized-kong-ingress
+route:
+  protocols:
+  - https
+  https_redirect_status_code: 302
+  strip_path: true
