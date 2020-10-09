@@ -17,6 +17,7 @@ spec:
         - name: init-airflow
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: Always
+          # TODO: need to configure redis location for downstream dag to pickup
           command: ['sh', '-c', "airflow initdb"]
           volumeMounts:
             - name: airflow-configmap
@@ -86,7 +87,7 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: airflow
 spec:
-  type: LoadBalancer
+  type: NodePort
   ports:
   - port: 8080
     targetPort: 8080

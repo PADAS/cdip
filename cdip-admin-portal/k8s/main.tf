@@ -13,6 +13,7 @@ resource "template_dir" "deployments" {
     AIRFLOW_IMAGE = var.airflow_image
     AIRFLOW_METADB_CONN_STR = var.airflow_metadb_conn_str
     SITE_FQDN = var.site-fqdn
+    AIRFLOW_FQDN = var.airflow-fqdn
 
 //    ALLOWED_HOSTS = var.allowed-hosts
   }
@@ -43,6 +44,10 @@ variable "airflow_metadb_conn_str" {
 }
 
 variable "site-fqdn" {
+  type = string
+}
+
+variable "airflow-fqdn" {
   type = string
 }
 
