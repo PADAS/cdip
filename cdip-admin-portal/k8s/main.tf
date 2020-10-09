@@ -11,7 +11,6 @@ resource "template_dir" "deployments" {
     CDIP_PORTAL_IMAGE = var.cdip_portal_image
     CDIP_API_IMAGE = var.cdip_api_image
     AIRFLOW_IMAGE = var.airflow_image
-    AIRFLOW_METADB_CONN_STR = var.airflow_metadb_conn_str
     SITE_FQDN = var.site-fqdn
     AIRFLOW_FQDN = var.airflow-fqdn
 
@@ -37,10 +36,6 @@ variable "cdip_api_image" {
 variable "airflow_image" {
   type = string
   default = "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
-}
-
-variable "airflow_metadb_conn_str" {
-  type = string
 }
 
 variable "site-fqdn" {
