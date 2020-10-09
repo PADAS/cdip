@@ -48,9 +48,15 @@ spec:
         - name: DB_NAME
           value: "dev_cdipdb"
         - name: DB_USER
-          value: "cdip_admin"
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.db.username
         - name: DB_PASSWORD
-          value: "EBZuD^Q3so2Pce#cNPgeoQn7qAv1FcGC32v50lE@"
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.db.password
         - name: DB_PORT
           value: "5432"
         - name: ALLOWED_HOSTS
