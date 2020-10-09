@@ -35,9 +35,7 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: cdip-api
 spec:
-# TODO: temporary till i figure out why api svc is not accessible via K8s ingress. The IP below is static
   type: NodePort
-#  loadBalancerIP: "35.239.235.48"
   ports:
   - port: 9999
     targetPort: 9999
