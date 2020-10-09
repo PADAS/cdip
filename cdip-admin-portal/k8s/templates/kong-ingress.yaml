@@ -10,6 +10,14 @@ metadata:
 #    kubernetes.io/ingress.global-static-ip-name: site-ip-cdipdev
 spec:
   rules:
+#  TODO: have keycloak behind this ingress too?
+  - host: "${AIRFLOW_FQDN}"
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: airflow
+          servicePort: 8080
   - host: "${SITE_FQDN}"
     http:
       paths:
@@ -17,10 +25,6 @@ spec:
         backend:
           serviceName: cdip-portal
           servicePort: 8000
-      - path: /airflow
-        backend:
-          serviceName: airflow
-          servicePort: 8080
       - path: /api
         backend:
           serviceName: cdip-api
@@ -29,6 +33,7 @@ spec:
     - secretName: padas-cert
       hosts:
         - "${SITE_FQDN}"
+        - "${AIRFLOW_FQDN}"
 
 ---
 apiVersion: configuration.konghq.com/v1
