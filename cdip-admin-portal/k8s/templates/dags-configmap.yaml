@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: dags-configmap
+data:
+  # TODO: read secret from k8s secrets, cleanup dags folder path
+
+  # Auth0 tenant settings.
+  AUTH0_ALGORITHMS: "RS256"
+  AUTH0_AUDIENCE: "http://localhost:8000/"
+  AUTH0_DOMAIN: "dev-fop-06qh.us.auth0.com"
+
+  AUTH0_CLIENT_ID: "8nXepra8UXR6viRY0X6KTA4zpACEpQxD"
+  AUTH0_CLIENT_SECRET: "***REMOVED***"
+
+  PORTAL_ENDPOINT: "http://cdip-dev.pamdas.org"
+
+  # Coordinates for a Redis Instance.
+  REDIS_HOST: "10.170.75.131"
+
+  AIRFLOW__CORE__DAGS_FOLDER: "/root/airflow/dags/cdip-downstream/dags"
