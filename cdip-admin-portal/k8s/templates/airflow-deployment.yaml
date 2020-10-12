@@ -13,11 +13,12 @@ spec:
       labels:
         name: airflow
     spec:
+      securityContext:
+        fsGroup: 65533 # to make SSH key readable
       initContainers:
         - name: init-airflow
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: Always
-          # TODO: need to configure redis location for downstream dag to pickup
           command: ['sh', '-c', "airflow initdb"]
           volumeMounts:
             - name: airflow-configmap
@@ -30,6 +31,23 @@ spec:
                   name: cdip-secrets
                   key: airflow.sql_alchemy_conn
       containers:
+        - name: git-sync
+          image: k8s.gcr.io/git-sync:v3.1.6
+          args:
+            - "-ssh"
+            - "-repo=git@github.com:PADAS/cdip-downstream.git"
+            - "-dest=cdip-downstream"
+            - "-branch=docker-k8s"
+            - "-depth=1"
+            - "--wait=30"
+          securityContext:
+            runAsUser: 65533 # git-sync user
+          volumeMounts:
+            - name: git-secret
+              mountPath: /etc/git-secret
+              readOnly: true
+            - name: airflow-dags
+              mountPath: /tmp/git
         - name: webserver
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: IfNotPresent
@@ -51,6 +69,9 @@ spec:
                 secretKeyRef:
                   name: cdip-secrets
                   key: airflow.sql_alchemy_conn
+          envFrom:
+            - configMapRef:
+                name: dags-configmap
         - name: scheduler
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: IfNotPresent
@@ -69,7 +90,14 @@ spec:
                 secretKeyRef:
                   name: cdip-secrets
                   key: airflow.sql_alchemy_conn
+          envFrom:
+            - configMapRef:
+                name: dags-configmap
       volumes:
+        - name: git-secret
+          secret:
+            secretName: git-repo-creds
+            defaultMode: 0400
         - name: airflow-configmap
           configMap:
             name: airflow-configmap
