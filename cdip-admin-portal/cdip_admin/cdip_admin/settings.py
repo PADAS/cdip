@@ -51,22 +51,27 @@ INSTALLED_APPS = [
     'integrations',
     'core',
     'organizations',
-    'accounts',
+    'profiles',
     'clients',
     'social_django',
+    'django_keycloak.apps.KeycloakAppConfig',
     'phonenumber_field',
     'rest_framework',
     'rest_framework_swagger',
     "bootstrap4",
 ]
 
+LOGIN_URL = 'keycloak_login'
+KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
+
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 SOCIAL_AUTH_TRAILING_SLASH = False  # Remove trailing slash from routes
 SOCIAL_AUTH_AUTH0_DOMAIN = env('SOCIAL_AUTH_AUTH0_DOMAIN')
 SOCIAL_AUTH_AUTH0_KEY = env('SOCIAL_AUTH_AUTH0_KEY')
 SOCIAL_AUTH_AUTH0_SECRET = env('SOCIAL_AUTH_AUTH0_SECRET')
-LOGIN_URL = '/login/auth0'
+
 LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 AUDIENCE = env('JWT_AUDIENCE')
 AUTH0_TENANT = env('AUTH0_TENANT')
 AUTH0_MANAGEMENT_AUDIENCE = env('AUTH0_MANAGEMENT_AUDIENCE')
@@ -82,6 +87,27 @@ JWT_AUTH = {
     'JWT_ISSUER': env('JWT_ISSUER'),
     'JWT_AUTH_HEADER_PREFIX': 'Bearer',
 }
+
+# Excempt list - URL paths that doesn't need Keycloak Authorization
+# KEYCLOAK_BEARER_AUTHENTICATION_EXEMPT_PATHS = [
+#     'admin', 'accounts',
+#     ]
+# CONFIG_DIR = os.path.join(os.path.dirname(__file__),os.pardir)
+# KEYCLOAK_CLIENT_PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgPnFfQALNHbiAHY2Pq32ka/8PYvuWFuw" \
+#                              "/qdLXJxP88lFSEaO66wc8KnXJBsn02DqsOL2qk5tzlORW8EHl/4UuGrZzVFsZCcr6FRJOCowPAU8ksjn81" \
+#                              "/BvO1kAD5NNgnBmZ5W8pso4VlVr2Mg7Fs6FXmuxhOvS3G+OpmlXFiYAkV3r2n7SseriS+VjBNBPzV" \
+#                              "+skFTZjP6qovi7BME2vW+sAKptmlqBlrHtL8c37ge3eX0n2s+XYkqm+2V94LM9n6E02LwxR4GhLs3UmXgB9h8r" \
+#                              "/3J9c0Yn4ydnvEDWJP92d7R7reWzl0TkHnUS8Vd74LET7fzPu3/24XYlEX8BO/UCwIDAQAB"
+# KEYCLOAK_CONFIG = {
+#     'KEYCLOAK_REALM': 'master',
+#     'KEYCLOAK_CLIENT_ID': '***REMOVED***',
+#     'KEYCLOAK_DEFAULT_ACCESS': 'ALLOW', # DENY or ALLOW
+#     'KEYCLOAK_AUTHORIZATION_CONFIG': os.path.join(CONFIG_DIR , 'authorization-config.json'),
+#     'KEYCLOAK_METHOD_VALIDATE_TOKEN': 'DECODE',
+#     'KEYCLOAK_SERVER_URL': 'https://cdip-auth.pamdas.org/auth/',
+#     'KEYCLOAK_CLIENT_SECRET_KEY': '***REMOVED***',
+#     'KEYCLOAK_CLIENT_PUBLIC_KEY': KEYCLOAK_CLIENT_PUBLIC_KEY,
+# }
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
@@ -103,9 +129,9 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
 ]
 
 AUTHENTICATION_BACKENDS = {
-    'website.auth0backend.Auth0',
     'django.contrib.auth.backends.ModelBackend',
     'django.contrib.auth.backends.RemoteUserBackend',
+    'django_keycloak.auth.backends.KeycloakAuthorizationCodeBackend',
 }
 
 MIDDLEWARE = [
@@ -114,6 +140,7 @@ MIDDLEWARE = [
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'django_keycloak.middleware.BaseKeycloakMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -153,13 +180,6 @@ DATABASES = {
         'PORT': env('DB_PORT'),
     }
 }
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-#     }
-# }
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
