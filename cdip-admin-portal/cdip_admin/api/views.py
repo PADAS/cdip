@@ -1,4 +1,5 @@
 import json
+import logging
 from functools import wraps
 
 import jwt
@@ -12,12 +13,14 @@ from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
-from accounts.models import AccountProfile
+from profiles.models import AccountProfile
 from clients.models import ClientProfile
 from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import update_device_information
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
@@ -190,17 +193,21 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
 
     def get_queryset(self):
         user_id = self.request.session['user_id']
-
+        if user_id is None:
+            logger.warning("Retrieve Inbound Configuration, User Not Logged In")
+            raise PermissionDenied
+        logger.info("Retrieve Inbound Configuration",
+                    extra={"user_id": user_id})
         profile = get_profile(user_id)
-
         if profile:
             if isinstance(profile, ClientProfile):
                 queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
             else:
                 queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
         else:
+            logger.warning("Retrieve Inbound Configuration, Profile Not Found",
+                           extra={"user_id": user_id})
             raise PermissionDenied
-
         return queryset
 
     @requires_scope('read:inboundintegrationconfiguration')

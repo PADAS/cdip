@@ -5,7 +5,7 @@ import requests
 from django.http import JsonResponse
 from environ import Env
 
-from accounts.models import AccountProfile
+from profiles.models import AccountProfile
 
 env = Env()
 env.read_env()
