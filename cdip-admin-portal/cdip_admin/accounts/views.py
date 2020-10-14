@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def account_list(request):
     logger.info('Getting account list')
     accounts = get_accounts()
-    return render(request, "profiles/account_list.html", {"module": accounts})
+    return render(request, "accounts/account_list.html", {"module": accounts})
 
 
 def account_detail(request, user_id):
@@ -34,7 +34,7 @@ def account_detail(request, user_id):
         except profile.DoesNotExist:
             logger.debug('User has no UserProfile')
 
-    return render(request, "profiles/account_detail.html", {"account": account, "profile": profile,
+    return render(request, "accounts/account_detail.html", {"account": account, "profile": profile,
                                                             "organizations": organizations})
 
 
@@ -55,7 +55,7 @@ def account_add(request):
 
     else:
         account_form = AccountForm()
-        return render(request, "profiles/account_add.html", {"account_form": account_form})
+        return render(request, "accounts/account_add.html", {"account_form": account_form})
 
 
 def account_update(request, user_id):
@@ -77,7 +77,7 @@ def account_update(request, user_id):
         account_form.initial['name'] = account["name"]
         account_form.initial['email'] = account["email"]
 
-        return render(request, "profiles/account_update.html", {"account_form": account_form, "user_id": user_id})
+        return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
 
 def account_profile_add(request, user_id):
@@ -88,13 +88,13 @@ def account_profile_add(request, user_id):
             profile_form.save()
             return redirect('account_detail', user_id=user_id)
         else:
-            return render(request, "profiles/account_profile_add.html", {"user_id": user_id,
+            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
                                                                          "profile_form": profile_form})
 
     else:
         profile_form = AccountProfileForm()
         profile_form.initial['user_id'] = user_id
-        return render(request, "profiles/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
+        return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
 
 def account_profile_update(request, user_id):
@@ -107,7 +107,7 @@ def account_profile_update(request, user_id):
             profile_form.save()
             return redirect('account_detail', user_id=user_id)
         else:
-            return render(request, "profiles/account_profile_add.html", {"user_id": user_id,
+            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
                                                                          "profile_form": profile_form})
 
     else:
@@ -119,4 +119,4 @@ def account_profile_update(request, user_id):
         profile_form.initial['user_id'] = profile.user_id
         profile_form.initial['organizations'] = profile.organizations.all()
 
-        return render(request, "profiles/account_profile_update.html", {"profile_form": profile_form, "user_id": user_id})
+        return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form, "user_id": user_id})
