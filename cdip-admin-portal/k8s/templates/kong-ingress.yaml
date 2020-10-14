@@ -30,7 +30,7 @@ spec:
           serviceName: cdip-api
           servicePort: 9999
   tls:
-    - secretName: padas-cert
+    - secretName: ingress-tls
       hosts:
         - "${SITE_FQDN}"
         - "${AIRFLOW_FQDN}"
