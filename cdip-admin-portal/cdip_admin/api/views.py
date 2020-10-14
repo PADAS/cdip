@@ -233,13 +233,15 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
         pk = kwargs['pk']
         response = self.update(request, *args, **kwargs)
         data = request.data
-        state = json.loads(data['state'])
+        state = data['state']
         item = InboundIntegrationConfiguration.objects.get(id=pk)
         update_device_information(state, item)
         return response
 
+    # TODO: this doesn't work yet with the savannah function
     @requires_scope('patch:inboundintegrationconfiguration')
     def patch(self, request, *args, **kwargs):
+        # TODO: update_device_information takes 2 params
         update_device_information(self.queryset)
         return self.partial_update(request, *args, **kwargs)
 
