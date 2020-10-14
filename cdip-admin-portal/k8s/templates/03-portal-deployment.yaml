@@ -63,6 +63,11 @@ spec:
           value: "${SITE_FQDN}"
         - name: DEBUG
           value: "False"
+        - name: FERNET_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.fernet_keys
         envFrom:
           - configMapRef:
               name: server-configmap
