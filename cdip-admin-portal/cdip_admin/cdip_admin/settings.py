@@ -25,6 +25,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
+
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '^$pu=5yw^4cl1&7e#89&-&8*&_*&_hwas*fv!h-=zsl6j2hg0b'
 SECRET_KEY = env("SECRET_KEY")
@@ -51,7 +52,7 @@ INSTALLED_APPS = [
     'integrations',
     'core',
     'organizations',
-    'profiles',
+    'accounts',
     'clients',
     'social_django',
     'django_keycloak.apps.KeycloakAppConfig',
