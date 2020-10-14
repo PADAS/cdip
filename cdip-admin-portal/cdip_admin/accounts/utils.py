@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def get_accounts():
     """
-        List of all profiles
+        List of all accounts
     """
 
     url = auth0_url + 'users'

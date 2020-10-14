@@ -13,7 +13,7 @@ from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
-from profiles.models import AccountProfile
+from accounts.models import AccountProfile
 from clients.models import ClientProfile
 from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
