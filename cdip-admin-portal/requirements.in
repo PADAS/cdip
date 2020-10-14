@@ -26,7 +26,7 @@ idna==2.10
 importlib-metadata==1.6.1
 natsort==7.0.1
 oauthlib==3.1.0
-psycopg2-binary==2.8.3
+psycopg2-binary==2.8.6
 pyasn1==0.4.8
 pycparser==2.20
 python-dateutil==2.8.1
@@ -47,4 +47,9 @@ zipp==3.1.0
 babel==2.8.0
 django-phonenumber-field==4.0.0
 phonenumbers==8.12.6
+Jinja2~=2.11.2
+simplejson~=3.17.2
+coreapi~=2.3.3
+uritemplate~=3.0.1
+coreschema~=0.0.4
 
