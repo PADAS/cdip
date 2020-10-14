@@ -4,3 +4,11 @@ metadata:
   name: ${KUBERNETES_NAMESPACE}
   labels:
     name: ${KUBERNETES_NAMESPACE}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${FUNCTIONS_NAMESPACE}
+  labels:
+    name: ${FUNCTIONS_NAMESPACE}
