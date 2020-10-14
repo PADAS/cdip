@@ -3,6 +3,7 @@ MAINTAINER ***REMOVED***o@vulcan.com
 
 # use apt-get update and install in the same RUN command: http://lenguyenthedat.com/docker-cache/
 RUN apt-get update && \
+    apt-get -y upgrade && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
     git \
