@@ -59,6 +59,9 @@ ENV DEBUG=False
 # Default service name
 ENV SERVICE_NAME=cdip_portal
 
+# if connecting to db running on localhost
+ENV DB_HOST=host.docker.internal
+
 WORKDIR /var/www/app
 
 RUN mkdir -p /var/www/static

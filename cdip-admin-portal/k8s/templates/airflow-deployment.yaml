@@ -14,7 +14,7 @@ spec:
         name: airflow
     spec:
       securityContext:
-        fsGroup: 65533 # to make SSH key readable
+        fsGroup: 65533 # to make SSH key readable. 65533 is git-sync user
       initContainers:
         - name: init-airflow
           image: "${AIRFLOW_IMAGE}"
