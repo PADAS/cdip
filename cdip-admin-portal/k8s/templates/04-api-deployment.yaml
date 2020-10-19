@@ -14,10 +14,41 @@ spec:
       annotations:
         prometheus.io/port: "9102"
     spec:
+      volumes:
+      - name: telegraf-config-volume
+        configMap:
+          name: telegraf-configmap
+          items:
+            - key: telegraf_conf
+              path: telegraf.conf
+      - name: metrics-writer-credentials
+        secret:
+          secretName: metrics-writer-credentials
+          items:
+            - key: credentials_json
+              path: metrics-writer-credentials.json
       containers:
       - image: "${CDIP_API_IMAGE}"
         imagePullPolicy: Always
         name: cdip-api
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9999
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9999
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
         resources:
           requests:
             cpu: "100m"
@@ -28,6 +59,20 @@ spec:
         envFrom:
           - configMapRef:
               name: server-configmap
+      - name: telegraf
+        image: telegraf:1.15
+        ports:
+          - containerPort: 8125
+        volumeMounts:
+          - name: telegraf-config-volume
+            mountPath: "/etc/telegraf/"
+            readOnly: true
+          - name: metrics-writer-credentials
+            mountPath: "/etc/cdip/"
+            readOnly: true
+        env:
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: "/etc/cdip/metrics-writer-credentials.json"
 ---
 apiVersion: v1
 kind: Service

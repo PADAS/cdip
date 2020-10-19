@@ -8,6 +8,7 @@ cffi==1.14.0
 chardet==3.0.4
 croniter==0.3.32
 cryptography==2.9.2
+datadog==0.39.0
 defusedxml==0.7.0rc1
 django-bootstrap4==2.1.1
 django-fernet-fields==0.6
