@@ -11,6 +11,7 @@ from .models import OutboundIntegrationConfiguration, InboundIntegrationConfigur
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput(render_value=True))
 
     class Meta:
         model = InboundIntegrationConfiguration
@@ -21,6 +22,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
 
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput(render_value=True))
 
     class Meta:
         model = OutboundIntegrationConfiguration
