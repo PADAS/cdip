@@ -14,12 +14,12 @@ admin.site.register(DeviceState)
 
 
 @admin.register(InboundIntegrationConfiguration)
-class InboundIntegrationConfiguration(admin.ModelAdmin):
+class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = InboundIntegrationConfigurationForm
 
 
 @admin.register(OutboundIntegrationConfiguration)
-class OutboundIntegrationConfiguration(admin.ModelAdmin):
+class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = OutboundIntegrationConfigurationForm
