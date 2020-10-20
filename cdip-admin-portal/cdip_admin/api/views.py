@@ -11,6 +11,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
+from datadog import statsd
 
 from accounts.models import AccountProfile
 from clients.models import ClientProfile
@@ -23,6 +24,7 @@ from .utils import update_device_information
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def public(request):
+    statsd.increment('portal.healthcheck')
     return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
 
 
