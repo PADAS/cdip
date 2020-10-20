@@ -8,6 +8,7 @@ cffi==1.14.0
 chardet==3.0.4
 croniter==0.3.32
 cryptography==2.9.2
+datadog==0.39.0
 defusedxml==0.7.0rc1
 django-bootstrap4==2.1.1
 django-fernet-fields==0.6
@@ -48,9 +49,5 @@ zipp==3.1.0
 babel==2.8.0
 django-phonenumber-field==4.0.0
 phonenumbers==8.12.6
-Jinja2~=2.11.2
-simplejson~=3.17.2
-coreapi~=2.3.3
-uritemplate~=3.0.1
-coreschema~=0.0.4
+whitenoise==5.2.0
 

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-portal
+spec:
+  selector: 
+    matchLabels: 
+      cdip.component: cdip-portal
+  template:
+    metadata:
+      labels:
+        cdip.component: cdip-portal
+    spec:
+      volumes:
+        - name: telegraf-config-volume
+          configMap:
+            name: telegraf-configmap
+            items:
+              - key: telegraf_conf
+                path: telegraf.conf
+        - name: metrics-writer-credentials
+          secret:
+            secretName: metrics-writer-credentials
+            items:
+            - key: credentials_json
+              path: metrics-writer-credentials.json
+      containers:
+      - image: "${CDIP_PORTAL_IMAGE}"
+        imagePullPolicy: Always
+        name: cdip-portal
+        livenessProbe:
+          httpGet:
+            path: /api/v1.0/public
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1.0/public
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "${SITE_FQDN}"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+        ports:
+          - containerPort: 8000
+        env:
+        - name: DB_HOST
+          value: "172.22.160.3"
+        - name: DB_NAME
+          value: "dev_cdipdb"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.db.username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.db.password
+        - name: DB_PORT
+          value: "5432"
+        - name: ALLOWED_HOSTS
+          value: "${SITE_FQDN}"
+        - name: DEBUG
+          value: "False"
+        - name: FERNET_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: cdip-secrets
+              key: portal.fernet_keys
+        envFrom:
+          - configMapRef:
+              name: server-configmap
+      - name: telegraf
+        image: telegraf:1.15
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 8125
+        volumeMounts:
+          - name: telegraf-config-volume
+            mountPath: "/etc/telegraf/"
+            readOnly: true
+          - name: metrics-writer-credentials
+            mountPath: "/etc/cdip/"
+            readOnly: true
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/etc/cdip/metrics-writer-credentials.json"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: cdip-portal
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    cdip.component: cdip-portal
