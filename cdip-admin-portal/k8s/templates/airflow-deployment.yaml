@@ -37,7 +37,7 @@ spec:
             - "-ssh"
             - "-repo=git@github.com:PADAS/cdip-downstream.git"
             - "-dest=cdip-downstream"
-            - "-branch=docker-k8s"
+            - "-branch=master"
             - "-depth=1"
             - "--wait=30"
           securityContext:
