@@ -10,15 +10,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: metrics
-  name: cdip-metrics
+  name: cdip-metrics-proxy
 spec:
   selector:
     matchLabels:
-      cdip.component: cdip-metrics
+      cdip.component: cdip-metrics-proxy
   template:
     metadata:
       labels:
-        cdip.component: cdip-metrics
+        cdip.component: cdip-metrics-proxy
     spec:
       volumes:
         - name: telegraf-config-volume
@@ -70,7 +70,7 @@ spec:
     protocol: TCP
     name: nc
   selector:
-    cdip.component: cdip-metrics
+    cdip.component: cdip-metrics-proxy
 
 ---
 apiVersion: v1
