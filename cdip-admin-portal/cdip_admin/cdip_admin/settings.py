@@ -64,6 +64,7 @@ INSTALLED_APPS = [
 
 LOGIN_URL = 'keycloak_login'
 KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
+KEYCLOAK_ISSUER = 'https://cdip-auth.pamdas.org/auth/realms/cdip-dev'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 SOCIAL_AUTH_TRAILING_SLASH = False  # Remove trailing slash from routes
@@ -132,7 +133,7 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
 AUTHENTICATION_BACKENDS = {
     'django.contrib.auth.backends.ModelBackend',
     'django.contrib.auth.backends.RemoteUserBackend',
-    'django_keycloak.auth.backends.KeycloakAuthorizationCodeBackend',
+    'cdip_admin.auth.backends.KeycloakAuthorizationCodeBackend',
 }
 
 MIDDLEWARE = [
