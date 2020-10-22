@@ -55,7 +55,7 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: metrics
-  name: cdip-metrics
+  name: cdip-metrics-proxy
 spec:
   type: NodePort
   ports:

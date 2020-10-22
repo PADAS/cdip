@@ -103,10 +103,10 @@ spec:
             name: airflow-configmap
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: airflow-dags
+            claimName: "${AIRFLOW_DAGS_VOLUME}"
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: airflow-logs
+            claimName: "${AIRFLOW_LOGS_VOLUME}"
 
 
 ---
