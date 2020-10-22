@@ -61,3 +61,7 @@ sqlparse==0.3.1           # via -r requirements.in, django
 uritemplate==3.0.1        # via -r requirements.in, coreapi
 urllib3==1.25.9           # via -r requirements.in, requests
 zipp==3.1.0               # via -r requirements.in, importlib-metadata
+
+pip~=20.2.1
+setuptools~=49.2.1
+future~=0.18.2
