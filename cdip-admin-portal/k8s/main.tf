@@ -14,6 +14,8 @@ resource "template_dir" "deployments" {
     AIRFLOW_IMAGE = var.airflow_image
     SITE_FQDN = var.site-fqdn
     AIRFLOW_FQDN = var.airflow-fqdn
+    AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
+    AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
 
 //    ALLOWED_HOSTS = var.allowed-hosts
   }
