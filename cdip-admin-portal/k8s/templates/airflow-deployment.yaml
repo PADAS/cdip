@@ -34,11 +34,11 @@ spec:
         - name: git-sync
           image: k8s.gcr.io/git-sync:v3.1.6
           args:
-            - "-ssh"
-            - "-repo=git@github.com:PADAS/cdip-downstream.git"
-            - "-dest=cdip-downstream"
-            - "-branch=master"
-            - "-depth=1"
+            - "--ssh"
+            - "--repo=git@github.com:PADAS/cdip-downstream.git"
+            - "--dest=cdip-downstream"
+            - "--branch=master"
+            - "--depth=1"
             - "--wait=30"
           securityContext:
             runAsUser: 65533 # git-sync user
