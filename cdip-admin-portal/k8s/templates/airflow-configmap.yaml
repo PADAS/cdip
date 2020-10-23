@@ -8,7 +8,7 @@ data:
     [core]
     # The folder where your airflow pipelines live, most likely a
     # subfolder in a code repository. This path must be absolute.
-    dags_folder = /root/airflow/dags/cdip-downstream/dags
+    # dags_folder = /root/airflow/dags/cdip-downstream/dags
 
     # The folder where airflow should store its log files
     # This path must be absolute
