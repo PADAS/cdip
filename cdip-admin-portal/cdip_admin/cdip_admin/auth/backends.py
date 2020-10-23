@@ -44,35 +44,45 @@ class KeycloakAuthorizationBase(object):
         if not hasattr(user_obj, 'oidc_profile'):
             return set()
 
-        return set()
-        rpt_decoded = oidc_profile.get_entitlement(oidc_profile=user_obj.oidc_profile)
+        # rpt_decoded = oidc_profile.get_entitlement(oidc_profile=user_obj.oidc_profile)
+
+        # Look up permissions (what was once called "entitlements") and use them to generate
+        # permissions.
+        client = user_obj.oidc_profile.realm.client
+        access_token = oidc_profile.get_active_access_token(oidc_profile=user_obj.oidc_profile)
+
+        # Not sure why but it requires adding audience argument.
+        # TODO: Move this code to it's own function.
+        auth_response = client.openid_api_client.uma_ticket(access_token, audience=client.client_id)
+        rpt_decoded = client.openid_api_client.decode_token(
+            token=auth_response['access_token'],
+            key=client.realm.certs,
+            algorithms=client.openid_api_client.well_known[
+                'id_token_signing_alg_values_supported']
+        )
 
         if settings.KEYCLOAK_PERMISSIONS_METHOD == 'role':
-            return [
+            permissions = [
                 role for role in rpt_decoded['resource_access'].get(
                     user_obj.oidc_profile.realm.client.client_id,
                     {'roles': []}
                 )['roles']
             ]
+
+            return permissions
+
         elif settings.KEYCLOAK_PERMISSIONS_METHOD == 'resource':
             permissions = []
             for p in rpt_decoded['authorization'].get('permissions', []):
                 if 'scopes' in p:
                     for scope in p['scopes']:
-                        if '.' in p['resource_set_name']:
-                            app, model = p['resource_set_name'].split('.', 1)
-                            permissions.append('{app}.{scope}_{model}'.format(
-                                app=app,
-                                scope=scope,
-                                model=model
-                            ))
+                        if '.' in p['rsname']:
+                            app, model = p['rsname'].split('.', 1)
+                            permissions.append(f'{app}.{scope}_{model}')
                         else:
-                            permissions.append('{scope}_{resource}'.format(
-                                scope=scope,
-                                resource=p['resource_set_name']
-                            ))
+                            permissions.append('{scope}_{p["rsname"]}')
                 else:
-                    permissions.append(p['resource_set_name'])
+                    permissions.append(p['rsname'])
 
             return permissions
         else:
