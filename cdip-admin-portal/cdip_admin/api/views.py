@@ -3,6 +3,7 @@ import logging
 from functools import wraps
 
 import jwt
+import rest_framework
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Window
@@ -14,6 +15,7 @@ from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
 from accounts.models import AccountProfile
+from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
 from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
@@ -33,24 +35,24 @@ def get_token_auth_header(args):
     """Obtains the Access Token from the Authorization Header
     """
     for arg in args:
-        auth = arg.headers.get("authorization", None)
-        token = None
-        if auth:
-            auth0user = arg.user.username
-            name = auth0user.split('@')
-            arg.session['user_id'] = name[0]
-            parts = auth.split()
-            token = parts[1]
-            return token
+        if isinstance(arg, rest_framework.request.Request):
+            return arg.auth
 
 
-def get_user_perms(args):
-    for arg in args:
-        if hasattr(arg, 'user'):
-            auth0user = arg.user.social_auth.get(provider='auth0')
-            permissions = get_user_permissions(auth0user.uid)
-            arg.session['user_id'] = auth0user.uid
-            return permissions
+def get_user_perms(token):
+    permissions = []
+    for p in token['authorization'].get('permissions', []):
+        if 'scopes' in p:
+            for scope in p['scopes']:
+                if '.' in p['rsname']:
+                    app, model = p['rsname'].split('.', 1)
+                    permissions.append(f'{app}.{scope}_{model}')
+                else:
+                    permissions.append('{scope}_{p["rsname"]}')
+        else:
+            permissions.append(p['rsname'])
+
+    return permissions
 
 
 def get_profile(user_id):
@@ -91,21 +93,11 @@ def requires_scope(required_scope: object) -> object:
         @wraps(f)
         def decorated(*args, **kwargs):
             token = get_token_auth_header(args)
-            if token is None:
-                permissions = get_user_perms(args)
-                for permission in permissions:
-                    permission_name = permission['permission_name']
-                    if permission_name == required_scope:
-                        return f(*args, **kwargs)
-                response = JsonResponse({'message': 'You don\'t have access to this resource'})
-                response.status_code = 403
-                return response
-            decoded = jwt.decode(token, verify=False)
-            if decoded.get("scope"):
-                token_scopes = decoded["scope"].split()
-                for token_scope in token_scopes:
-                    if token_scope == required_scope:
-                        return f(*args, **kwargs)
+            decoded = jwt_decode_token(token.decode('ascii'))
+            token_scopes = get_user_perms(decoded)
+            for token_scope in token_scopes:
+                if token_scope == required_scope:
+                    return f(*args, **kwargs)
             response = JsonResponse({'message': 'You don\'t have access to this resource'})
             response.status_code = 403
             return response
@@ -251,7 +243,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
-    @requires_scope('read:outboundintegrationconfiguration')
+    @requires_scope('Default Resource')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
