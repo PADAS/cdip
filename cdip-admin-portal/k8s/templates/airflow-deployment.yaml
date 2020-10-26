@@ -24,6 +24,10 @@ spec:
             - name: airflow-configmap
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/code
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
           env:
             - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
               valueFrom:
@@ -60,7 +64,7 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/dags
+              mountPath: /root/airflow/code
             - name: airflow-logs
               mountPath: /root/airflow/logs
           env:
@@ -81,7 +85,7 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/dags
+              mountPath: /root/airflow/code
             - name: airflow-logs
               mountPath: /root/airflow/logs
           env:
