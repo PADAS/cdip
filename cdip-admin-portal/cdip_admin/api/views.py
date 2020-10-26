@@ -36,7 +36,10 @@ def get_token_auth_header(args):
     """
     for arg in args:
         if isinstance(arg, rest_framework.request.Request):
-            return arg.auth
+            if arg.user:
+                return arg.user.oidc_profile.access_token
+            else:
+                return arg.auth.decode('ascii')
 
 
 def get_user_perms(token):
@@ -48,7 +51,7 @@ def get_user_perms(token):
                     app, model = p['rsname'].split('.', 1)
                     permissions.append(f'{app}.{scope}_{model}')
                 else:
-                    permissions.append('{scope}_{p["rsname"]}')
+                    permissions.append(f'{scope}:{p["rsname"]}')
         else:
             permissions.append(p['rsname'])
 
@@ -93,7 +96,7 @@ def requires_scope(required_scope: object) -> object:
         @wraps(f)
         def decorated(*args, **kwargs):
             token = get_token_auth_header(args)
-            decoded = jwt_decode_token(token.decode('ascii'))
+            decoded = jwt_decode_token(token)
             token_scopes = get_user_perms(decoded)
             for token_scope in token_scopes:
                 if token_scope == required_scope:
@@ -243,7 +246,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
-    @requires_scope('Default Resource')
+    @requires_scope('read:outboundintegrationconfiguration')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
