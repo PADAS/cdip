@@ -15,9 +15,9 @@ from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
 from accounts.models import AccountProfile
+from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
-from core.utils import get_user_permissions
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import update_device_information
@@ -31,31 +31,36 @@ def public(request):
     return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
 
 
-def get_token_auth_header(args):
+def get_user_perms(args):
     """Obtains the Access Token from the Authorization Header
     """
     for arg in args:
         if isinstance(arg, rest_framework.request.Request):
-            if arg.user:
-                return arg.user.oidc_profile.access_token
+            if arg.auth:
+                permissions = []
+                token = jwt_decode_token(arg.auth.decode('ascii'))
+                for p in token['authorization'].get('permissions', []):
+                    if 'scopes' in p:
+                        for scope in p['scopes']:
+                            if '.' in p['rsname']:
+                                app, model = p['rsname'].split('.', 1)
+                                permissions.append(f'{app}.{scope}.{model}')
+                            else:
+                                permissions.append(f'{scope}:{p["rsname"]}')
+                    else:
+                        permissions.append(p['rsname'])
+
+                return permissions
             else:
-                return arg.auth.decode('ascii')
+                token = jwt_decode_token(arg.user.oidc_profile.access_token)
+                permissions = [
+                    role for role in token['resource_access'].get(
+                        settings.KEYCLOAK_CLIENT_ID,
+                        {'roles': []}
+                    )['roles']
+                ]
 
-
-def get_user_perms(token):
-    permissions = []
-    for p in token['authorization'].get('permissions', []):
-        if 'scopes' in p:
-            for scope in p['scopes']:
-                if '.' in p['rsname']:
-                    app, model = p['rsname'].split('.', 1)
-                    permissions.append(f'{app}.{scope}_{model}')
-                else:
-                    permissions.append(f'{scope}:{p["rsname"]}')
-        else:
-            permissions.append(p['rsname'])
-
-    return permissions
+                return permissions
 
 
 def get_profile(user_id):
@@ -95,9 +100,7 @@ def requires_scope(required_scope: object) -> object:
     def require_scope(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            token = get_token_auth_header(args)
-            decoded = jwt_decode_token(token)
-            token_scopes = get_user_perms(decoded)
+            token_scopes = get_user_perms(args)
             for token_scope in token_scopes:
                 if token_scope == required_scope:
                     return f(*args, **kwargs)

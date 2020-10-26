@@ -78,9 +78,9 @@ class KeycloakAuthorizationBase(object):
                     for scope in p['scopes']:
                         if '.' in p['rsname']:
                             app, model = p['rsname'].split('.', 1)
-                            permissions.append(f'{app}.{scope}_{model}')
+                            permissions.append(f'{app}.{scope}.{model}')
                         else:
-                            permissions.append('{scope}_{p["rsname"]}')
+                            permissions.append(f'{scope}.{p["rsname"]}')
                 else:
                     permissions.append(p['rsname'])
 
