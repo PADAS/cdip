@@ -19,4 +19,4 @@ data:
   # Coordinates for a Redis Instance.
   REDIS_HOST: "10.170.75.131"
 
-  AIRFLOW__CORE__DAGS_FOLDER: "/root/airflow/dags/cdip-downstream/dags"
+  AIRFLOW__CORE__DAGS_FOLDER: "/root/airflow/code/cdip-downstream/dags"
