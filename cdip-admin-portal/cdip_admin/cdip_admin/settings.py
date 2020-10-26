@@ -65,6 +65,10 @@ INSTALLED_APPS = [
 LOGIN_URL = 'keycloak_login'
 KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
 KEYCLOAK_ISSUER = 'https://cdip-auth.pamdas.org/auth/realms/cdip-dev'
+KEYCLOAK_SERVER = 'https://cdip-auth.pamdas.org'
+KEYCLOAK_REALM = 'cdip-dev'
+KEYCLOAK_CLIENT_ID = 'cdip-admin-portal'
+KEYCLOAK_CLIENT_SECRET = '2b8f86b7-f079-4a98-b1a1-4f533d325388'
 
 # Use Resources and Scopes that mirror Django Permissions.
 KEYCLOAK_PERMISSIONS_METHOD = "resource"
