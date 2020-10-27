@@ -4,13 +4,13 @@ from django.contrib.auth import authenticate
 from jose import JWTError
 from jose import jwt
 from six.moves.urllib.request import urlopen
+from cdip_admin import settings
 
-import requests
-
-KEYCLOAK_SERVER = 'https://cdip-auth.pamdas.org'
-KEYCLOAK_REALM = 'cdip-dev'
-KEYCLOAK_CLIENT_ID = 'cdip-admin-portal'
-KEYCLOAK_CLIENT_SECRET = '2b8f86b7-f079-4a98-b1a1-4f533d325388'
+KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
+KEYCLOAK_REALM = settings.KEYCLOAK_REALM
+KEYCLOAK_CLIENT_ID = settings.KEYCLOAK_CLIENT_ID
+KEYCLOAK_CLIENT_SECRET = settings.KEYCLOAK_CLIENT_SECRET
+JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs'
 
 
 def jwt_get_username_from_payload_handler(payload):
@@ -40,7 +40,6 @@ def decode_token(token: str):
 
     return token_data
 
-JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs'
 
 def get_json_web_keyset():
 
