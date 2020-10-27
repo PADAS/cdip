@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Create your views here.
 def welcome(request):
-    return render(request, "website/welcome.html",
-                  {"integrations": InboundIntegrationType.objects.all()})
+    return render(request, "website/welcome.html")
 
 
 def date(request):
