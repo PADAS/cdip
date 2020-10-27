@@ -24,6 +24,10 @@ spec:
             - name: airflow-configmap
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/code
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
           env:
             - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
               valueFrom:
@@ -34,11 +38,11 @@ spec:
         - name: git-sync
           image: k8s.gcr.io/git-sync:v3.1.6
           args:
-            - "-ssh"
-            - "-repo=git@github.com:PADAS/cdip-downstream.git"
-            - "-dest=cdip-downstream"
-            - "-branch=master"
-            - "-depth=1"
+            - "--ssh"
+            - "--repo=git@github.com:PADAS/cdip-downstream.git"
+            - "--dest=cdip-downstream"
+            - "--branch=master"
+            - "--depth=1"
             - "--wait=30"
           securityContext:
             runAsUser: 65533 # git-sync user
@@ -60,7 +64,7 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/dags
+              mountPath: /root/airflow/code
             - name: airflow-logs
               mountPath: /root/airflow/logs
           env:
@@ -81,7 +85,7 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/dags
+              mountPath: /root/airflow/code
             - name: airflow-logs
               mountPath: /root/airflow/logs
           env:
@@ -103,10 +107,10 @@ spec:
             name: airflow-configmap
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: airflow-dags
+            claimName: "${AIRFLOW_DAGS_VOLUME}"
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: airflow-logs
+            claimName: "${AIRFLOW_LOGS_VOLUME}"
 
 
 ---

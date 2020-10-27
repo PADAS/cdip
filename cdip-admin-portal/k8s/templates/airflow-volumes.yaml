@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: airflow-logs
+  name: "${AIRFLOW_LOGS_VOLUME}"
   namespace: "${KUBERNETES_NAMESPACE}"
 spec:
   accessModes:
@@ -14,11 +14,11 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: airflow-dags
+  name: "${AIRFLOW_DAGS_VOLUME}"
   namespace: "${KUBERNETES_NAMESPACE}"
 spec:
   accessModes:
     - ReadOnlyMany
   resources:
     requests:
-      storage: 2Gi
+      storage: 200Mi
