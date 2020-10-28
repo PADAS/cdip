@@ -8,3 +8,12 @@ class TimestampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class Task(models.Model):
+
+    class Meta:
+        permissions = [
+            ("admin", "Admin Role"),
+            ("viewer", "Viewer Role"),
+        ]
