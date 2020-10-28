@@ -65,3 +65,7 @@ uritemplate==3.0.1        # via coreapi
 urllib3==1.25.9           # via -r requirements.in, requests
 whitenoise==5.2.0         # via -r requirements.in
 zipp==3.1.0               # via -r requirements.in, importlib-metadata
+
+pip~=20.2.1
+setuptools~=49.2.1
+future~=0.18.2

@@ -13,27 +13,31 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf.urls import url
 from django.contrib import admin
 from django.urls import path, include
-from website.views import welcome, date, about, index, logout, profile
+from website.views import welcome, date, about, index, login_view, logout_view, profile
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', welcome, name='welcome'),
+    url(r'^keycloak/', include('django_keycloak.urls')),
     path('date', date),
-    path('about', about),
+    path('about', about, name='about'),
     path('integrations/', include('integrations.urls')),
     path('organizations/', include('organizations.urls')),
     path('accounts/', include('accounts.urls')),
     path('clients/', include('clients.urls')),
     path('api/', include('api.urls')),
     path('', index),
-    path('logout', logout),
+    path('login', login_view),
+    path('logout', logout_view),
     path('', include('django.contrib.auth.urls')),
     path('', include('social_django.urls')),
     path('profile/', profile, name='profile'),
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
 
 
