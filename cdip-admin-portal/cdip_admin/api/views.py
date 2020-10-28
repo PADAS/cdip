@@ -92,7 +92,7 @@ def get_client_profile(user_id):
     return profile
 
 
-def requires_scope(required_scope: object) -> object:
+def requires_scope(required_scope: list) -> list:
     """Determines if the required scope is present in the Access Token
     Args:
         required_scope (str): The scope required to access the resource
@@ -102,7 +102,7 @@ def requires_scope(required_scope: object) -> object:
         def decorated(*args, **kwargs):
             token_scopes = get_user_perms(args)
             for token_scope in token_scopes:
-                if token_scope == required_scope:
+                if token_scope in required_scope:
                     return f(*args, **kwargs)
             response = JsonResponse({'message': 'You don\'t have access to this resource'})
             response.status_code = 403
@@ -126,7 +126,7 @@ class OrganizationsListView(generics.ListAPIView):
             raise PermissionDenied
         return queryset
 
-    @requires_scope('read:organizations')
+    @requires_scope(['read:organizations', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -136,7 +136,7 @@ class OrganizationDetailsView(generics.RetrieveAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
 
-    @requires_scope('read:organizations')
+    @requires_scope(['read:organizations', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -146,7 +146,7 @@ class InboundIntegrationTypeListView(generics.ListAPIView):
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
-    @requires_scope('read:inboundintegrationtype')
+    @requires_scope(['read:inboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -156,7 +156,7 @@ class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
-    @requires_scope('read:inboundintegrationtype')
+    @requires_scope(['read:inboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -166,7 +166,7 @@ class OutboundIntegrationTypeListView(generics.ListAPIView):
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
 
-    @requires_scope('read:outboundintegrationtype')
+    @requires_scope(['read:outboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -176,7 +176,7 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
 
-    @requires_scope('read:outboundintegrationtype')
+    @requires_scope(['read:outboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -208,7 +208,7 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
             raise PermissionDenied
         return queryset
 
-    @requires_scope('read:inboundintegrationconfiguration')
+    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -222,11 +222,11 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
 
-    @requires_scope('read:inboundintegrationconfiguration')
+    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @requires_scope('update:inboundintegrationconfiguration')
+    @requires_scope(['update:inboundintegrationconfiguration', 'core.admin'])
     def put(self, request, *args, **kwargs):
         pk = kwargs['pk']
         response = self.update(request, *args, **kwargs)
@@ -237,7 +237,7 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
         return response
 
     # TODO: this doesn't work yet with the savannah function
-    @requires_scope('patch:inboundintegrationconfiguration')
+    @requires_scope(['patch:inboundintegrationconfiguration', 'core.admin'])
     def patch(self, request, *args, **kwargs):
         # TODO: update_device_information takes 2 params
         update_device_information(self.queryset)
@@ -249,7 +249,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
-    @requires_scope('read:outboundintegrationconfiguration')
+    @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -259,7 +259,7 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
-    @requires_scope('read:outboundintegrationconfiguration')
+    @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -270,7 +270,7 @@ class DeviceDetailsView(generics.RetrieveAPIView):
     serializer_class = DeviceSerializer
 
     # TODO: Create New Permission Set for Device Management
-    @requires_scope('read:inboundintegrationconfiguration')
+    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -281,7 +281,7 @@ class DeviceListView(generics.ListAPIView):
     serializer_class = DeviceSerializer
 
     # TODO: Create New Permission Set for Device Management
-    @requires_scope('read:inboundintegrationconfiguration')
+    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -307,7 +307,7 @@ class DeviceStateListView(generics.ListAPIView):
         return queryset
 
     # TODO: Create New Permission Set for Device Management
-    @requires_scope('read:inboundintegrationconfiguration')
+    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
