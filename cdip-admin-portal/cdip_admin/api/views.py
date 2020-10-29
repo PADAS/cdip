@@ -189,24 +189,24 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
 
-    def get_queryset(self):
-        user_id = self.request.session['user_id']
-        if user_id is None:
-            logger.warning("Retrieve Inbound Configuration, User Not Logged In")
-            raise PermissionDenied
-        logger.info("Retrieve Inbound Configuration",
-                    extra={"user_id": user_id})
-        profile = get_profile(user_id)
-        if profile:
-            if isinstance(profile, ClientProfile):
-                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
-            else:
-                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
-        else:
-            logger.warning("Retrieve Inbound Configuration, Profile Not Found",
-                           extra={"user_id": user_id})
-            raise PermissionDenied
-        return queryset
+    # def get_queryset(self):
+    #     user_id = self.request.session['user_id']
+    #     if user_id is None:
+    #         logger.warning("Retrieve Inbound Configuration, User Not Logged In")
+    #         raise PermissionDenied
+    #     logger.info("Retrieve Inbound Configuration",
+    #                 extra={"user_id": user_id})
+    #     profile = get_profile(user_id)
+    #     if profile:
+    #         if isinstance(profile, ClientProfile):
+    #             queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
+    #         else:
+    #             queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
+    #     else:
+    #         logger.warning("Retrieve Inbound Configuration, Profile Not Found",
+    #                        extra={"user_id": user_id})
+    #         raise PermissionDenied
+    #     return queryset
 
     @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
