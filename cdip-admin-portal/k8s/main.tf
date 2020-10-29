@@ -13,6 +13,7 @@ resource "template_dir" "deployments" {
     CDIP_API_IMAGE = var.cdip_api_image
     AIRFLOW_IMAGE = var.airflow_image
     SITE_FQDN = var.site-fqdn
+    API_FQDN = var.api-fqdn
     AIRFLOW_FQDN = var.airflow-fqdn
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
     AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
@@ -50,6 +51,10 @@ variable "site-fqdn" {
 }
 
 variable "airflow-fqdn" {
+  type = string
+}
+
+variable "api-fqdn" {
   type = string
 }
 
