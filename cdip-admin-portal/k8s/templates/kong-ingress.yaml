@@ -25,7 +25,10 @@ spec:
         backend:
           serviceName: cdip-portal
           servicePort: 8000
-      - path: /api
+  - host: "${API_FQDN}"
+    http:
+      paths:
+      - path: /
         backend:
           serviceName: cdip-api
           servicePort: 9999
@@ -34,6 +37,7 @@ spec:
       hosts:
         - "${SITE_FQDN}"
         - "${AIRFLOW_FQDN}"
+        - "${API_FQDN}"
 
 ---
 apiVersion: configuration.konghq.com/v1
