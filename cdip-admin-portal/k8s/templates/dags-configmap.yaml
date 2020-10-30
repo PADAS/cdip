@@ -4,17 +4,14 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: dags-configmap
 data:
-  # TODO: read secret from k8s secrets, cleanup dags folder path
+  # TODO: read secret from k8s secrets
 
-  # Auth0 tenant settings.
-  AUTH0_ALGORITHMS: "RS256"
-  AUTH0_AUDIENCE: "http://localhost:8000/"
-  AUTH0_DOMAIN: "dev-fop-06qh.us.auth0.com"
+  # Keycloak settings.
+  KEYCLOAK_ISSUER: https://cdip-auth.pamdas.org/auth/realms/cdip-dev
+  KEYCLOAK_CLIENT_ID: cdip-admin-portal
+  KEYCLOAK_CLIENT_SECRET: 2b8f86b7-f079-4a98-b1a1-4f533d325388
 
-  AUTH0_CLIENT_ID: "8nXepra8UXR6viRY0X6KTA4zpACEpQxD"
-  AUTH0_CLIENT_SECRET: "YokDhDBKFxxGyoUsBPNJoAgDykx6bqz-cYBXtmvKd25XCxI6vtq6wWxyNjs0SDVg"
-
-  PORTAL_ENDPOINT: "http://cdip-dev.pamdas.org"
+  PORTAL_ENDPOINT: "https://cdip-dev.pamdas.org"
 
   # Coordinates for a Redis Instance.
   REDIS_HOST: "10.170.75.131"
