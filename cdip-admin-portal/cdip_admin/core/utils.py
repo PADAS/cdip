@@ -19,8 +19,6 @@ def get_admin_access_token():
         'grant_type': 'client_credentials',
         'client_id': KEYCLOAK_ADMIN_CLIENT_ID,
         'client_secret': KEYCLOAK_ADMIN_CLIENT_SECRET,
-        'scope': 'openid',
-        'audience': KEYCLOAK_ADMIN_CLIENT_ID,
     }
     response = requests.post(oauth_token_url,
                              data=payload)
