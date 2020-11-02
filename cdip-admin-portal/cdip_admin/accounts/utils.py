@@ -1,15 +1,13 @@
 import requests
 from django.http import JsonResponse
 import logging
-from environ import Env
 
-from core.utils import get_access_token
+from cdip_admin import settings
+from core.utils import get_admin_access_token
 
-env = Env()
-env.read_env()
-
-AUTH0_DOMAIN = env.str('SOCIAL_AUTH_AUTH0_DOMAIN')
-auth0_url = f"https://{AUTH0_DOMAIN}/api/v2/"
+KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
+KEYCLOAK_REALM = settings.KEYCLOAK_REALM
+KEYCLOAK_ADMIN_API = f'{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/'
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +17,9 @@ def get_accounts():
         List of all accounts
     """
 
-    url = auth0_url + 'users'
+    url = KEYCLOAK_ADMIN_API + 'users'
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -51,9 +49,9 @@ def get_accounts():
 
 
 def get_account(user_id):
-    url = auth0_url + 'users/' + user_id
+    url = KEYCLOAK_ADMIN_API + 'users/' + user_id
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -75,9 +73,9 @@ def get_account(user_id):
 
 
 def add_account(account_info):
-    url = auth0_url + 'users'
+    url = KEYCLOAK_ADMIN_API + 'users'
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -98,9 +96,9 @@ def add_account(account_info):
 
 
 def update_account(account_info, user_id):
-    url = auth0_url + 'users/' + user_id
+    url = KEYCLOAK_ADMIN_API + 'users/' + user_id
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
