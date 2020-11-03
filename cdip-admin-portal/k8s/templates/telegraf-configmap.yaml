@@ -42,7 +42,7 @@ data:
           # The period on which to flush & clear the aggregator.
           period = "60s"
           drop_original = true
-          stats = ["mean", "count"]
+          stats = ["mean", "count", "sum"]
 
         #[[outputs.http]]
         #  url = "http://metrics-consolidator.metrics.svc.cluster.local:8086/telegraf"
