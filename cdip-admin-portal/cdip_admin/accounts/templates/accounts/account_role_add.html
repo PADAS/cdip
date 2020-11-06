@@ -3,13 +3,13 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% trans 'Add Account' %}{% endblock %}
+{% block title %}{% trans 'Add Account Roles' %}{% endblock %}
 
 {% block content %}
 
-    <form action="{% url 'account_add' %}" method="POST">
+    <form action="{% url 'account_role_add' user_id %}" method="POST">
         {% csrf_token %}
-        {{ account_form|crispy }}
+        {{ account_role_form|crispy }}
     <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
 
 </form>
