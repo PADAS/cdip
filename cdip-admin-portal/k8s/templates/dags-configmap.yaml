@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: dags-configmap
+data:
+  # TODO: read secret from k8s secrets
+
+  # Keycloak settings.
+  KEYCLOAK_ISSUER: https://cdip-auth.pamdas.org/auth/realms/cdip-dev
+  KEYCLOAK_CLIENT_ID: cdip-admin-portal
+  KEYCLOAK_CLIENT_SECRET: 2b8f86b7-f079-4a98-b1a1-4f533d325388
+
+  PORTAL_ENDPOINT: "https://cdip-dev.pamdas.org"
+
+  # Coordinates for a Redis Instance.
+  REDIS_HOST: "10.170.75.131"
+
+  AIRFLOW__CORE__DAGS_FOLDER: "/root/airflow/code/cdip-downstream/dags"

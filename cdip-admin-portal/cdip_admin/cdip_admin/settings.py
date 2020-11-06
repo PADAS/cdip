@@ -29,11 +29,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '^$pu=5yw^4cl1&7e#89&-&8*&_*&_hwas*fv!h-=zsl6j2hg0b'
 SECRET_KEY = env("SECRET_KEY")
+FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = ['35.192.111.237']
+ALLOWED_HOSTS = [env.str('ALLOWED_HOSTS', default='localhost')]
 
 STATIC_ROOT = '/var/www/static/'
 
@@ -148,6 +150,7 @@ AUTHENTICATION_BACKENDS = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
