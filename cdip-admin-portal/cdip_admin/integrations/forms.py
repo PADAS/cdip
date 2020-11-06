@@ -18,6 +18,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         exclude = ['id']
         widgets = {
             'password': forms.PasswordInput(),
+            'state': forms.HiddenInput()
         }
 
 
