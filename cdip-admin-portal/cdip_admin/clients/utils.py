@@ -1,14 +1,10 @@
 import requests
 from django.http import JsonResponse
 import logging
-from environ import Env
 
-from core.utils import get_access_token
+from core.utils import get_admin_access_token
 
-env = Env()
-env.read_env()
-
-AUTH0_DOMAIN = env.str('SOCIAL_AUTH_AUTH0_DOMAIN')
+AUTH0_DOMAIN = 'what'
 auth0_url = f"https://{AUTH0_DOMAIN}/api/v2/"
 
 logger = logging.getLogger(__name__)
@@ -17,7 +13,7 @@ logger = logging.getLogger(__name__)
 def get_clients():
     url = auth0_url + 'clients'
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -41,7 +37,7 @@ def get_clients():
 def get_client(client_id):
     url = auth0_url + 'clients/' + client_id
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -72,7 +68,7 @@ def add_client(client_info):
         'client_credentials'
     ]
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
@@ -96,7 +92,7 @@ def add_client(client_info):
 def update_client(client_info, client_id):
     url = auth0_url + 'clients/' + client_id
 
-    token = get_access_token()
+    token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')

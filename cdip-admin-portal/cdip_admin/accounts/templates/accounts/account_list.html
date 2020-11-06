@@ -8,8 +8,8 @@
         <ul>
             {% for user in module %}
                 <li>
-                    <a href="{% url 'account_detail' user.user_id %}">
-                        {{ user.name }} - {{ user.email }}
+                    <a href="{% url 'account_detail' user.id %}">
+                        {{ user.lastName }}, {{ user.firstName }} - {{ user.email }}
                     </a>
                 </li>
             {% endfor %}

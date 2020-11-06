@@ -1,18 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Account: {{account.name}}{% endblock %}
+{% block title %}Account: {{account.lastName}}{% endblock %}
 
 {% block content %}
 
-    <h1>{{account.name}}</h1>
+    <h3>{{account.lastName}}, {{account.firstName}}</h3>
+    <h3>{{ account.username }}</h3>
     <p>{{account.email}}</p>
+    {% if roles %}
+        <h5>Roles:</h5>
+        {% for role in roles %}
+            <p>{{ role.name }}</p>
+        {% endfor %}
+    {% endif %}
     {% if profile %}
         <pre>{{ organizations }}</pre>
-        <a class="btn btn-primary" href="{% url 'account_profile_update' account.user_id %}" role="button">Update Profile</a>
+        <a class="btn btn-primary" href="{% url 'account_profile_update' account.id %}" role="button">Update Profile</a>
     {% else %}
-        <a class="btn btn-primary" href="{% url 'account_profile_add' account.user_id %}" role="button">Add Profile</a>
+        <a class="btn btn-primary" href="{% url 'account_profile_add' account.id %}" role="button">Add Profile</a>
     {% endif %}
-    <a class="btn btn-primary" href="{% url 'account_update' account.user_id %}" role="button">Update Account</a>
+    <a class="btn btn-primary" href="{% url 'account_role_add' account.id %}" role="button">Manage Roles</a>
+    <a class="btn btn-primary" href="{% url 'account_update' account.id %}" role="button">Update Account</a>
 
 
 {% endblock %}
