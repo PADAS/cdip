@@ -1,12 +1,7 @@
 from django import forms
-from environ import Env
 
 from clients.models import ClientProfile
 
-env = Env()
-env.read_env()
-
-AUTH0_TENANT = env('AUTH0_TENANT')
 
 grant_types = {
     'authorization_code': 'authorization_code',

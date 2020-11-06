@@ -1,14 +1,10 @@
 import requests
 from django.http import JsonResponse
 import logging
-from environ import Env
 
 from core.utils import get_admin_access_token
 
-env = Env()
-env.read_env()
-
-AUTH0_DOMAIN = env.str('SOCIAL_AUTH_AUTH0_DOMAIN')
+AUTH0_DOMAIN = 'what'
 auth0_url = f"https://{AUTH0_DOMAIN}/api/v2/"
 
 logger = logging.getLogger(__name__)
