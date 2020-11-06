@@ -1,18 +1,23 @@
 from django import forms
+from django.contrib.auth.models import Permission
 
 from accounts.models import AccountProfile
+from core.models import Task
 
 
 class AccountForm(forms.Form):
-    name = forms.CharField(max_length=200, required=True)
-    email = forms.EmailField(max_length=200, required=True)
-    password = forms.CharField(widget=forms.PasswordInput, label="Password", required=True)
-    connection = forms.CharField(initial='Username-Password-Authentication', widget=forms.HiddenInput)
+    firstName = forms.CharField(max_length=200, label='First Name', required=True)
+    lastName = forms.CharField(max_length=200, label='Last Name', required=True)
+    username = forms.CharField(max_length=200, label='User Name', required=True)
+    email = forms.EmailField(max_length=200, label='Email', required=True)
 
 
 class AccountUpdateForm(forms.Form):
-    name = forms.CharField(max_length=200, required=True)
-    email = forms.EmailField(max_length=200, required=True)
+    all_permissions = Task._meta.permissions
+    firstName = forms.CharField(max_length=200, label='First Name', required=True)
+    lastName = forms.CharField(max_length=200, label='Last Name', required=True)
+    username = forms.CharField(max_length=200, label='User Name', required=True)
+    email = forms.EmailField(max_length=200, label='Email', required=True)
 
 
 class AccountProfileForm(forms.ModelForm):
@@ -30,6 +35,13 @@ class AccountProfileUpdateForm(forms.ModelForm):
     class Meta:
         model = AccountProfile
         fields = ['id', 'user_id', 'organizations']
+
+
+class AccountRoleForm(forms.Form):
+    user_id = forms.CharField(widget=forms.HiddenInput)
+    all_permissions = Task._meta.permissions
+    permissions = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple, label='Role',
+                                            choices=all_permissions, required=True)
 
 
 
