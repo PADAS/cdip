@@ -14,13 +14,15 @@ class OrganizationSerializer(serializers.ModelSerializer):
 class InboundIntegrationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = InboundIntegrationType
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'slug', 'description']
 
 
 class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
+    type_slug = serializers.SlugField(source='type.slug', read_only=True)
+
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token',
+        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token', 'type_slug',
                   'defaultConfiguration']
         read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'defaultConfiguration']
 
@@ -28,13 +30,15 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OutboundIntegrationType
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'slug', 'description']
 
 
 class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
+    type_slug = serializers.SlugField(source='type.slug', read_only=True)
+
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token']
+        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token', 'type_slug']
 
 
 class DeviceSerializer(serializers.ModelSerializer):
