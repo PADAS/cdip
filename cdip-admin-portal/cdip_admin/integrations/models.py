@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from fernet_fields import EncryptedCharField
 from core.models import TimestampedModel
 from organizations.models import Organization, OrganizationGroup
 
@@ -43,8 +44,8 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     state = models.JSONField(default=dict)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
-    password = models.CharField(max_length=200, blank=True)
-    token = models.CharField(max_length=200, blank=True)
+    password = EncryptedCharField(max_length=200, blank=True)
+    token = EncryptedCharField(max_length=200, blank=True)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
@@ -60,8 +61,8 @@ class InboundIntegrationConfiguration(TimestampedModel):
     state = models.JSONField(default=dict)
     # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
-    password = models.CharField(max_length=200, blank=True)
-    token = models.CharField(max_length=200, blank=True)
+    password = EncryptedCharField(max_length=200, blank=True)
+    token = EncryptedCharField(max_length=200, blank=True)
     useDefaultConfiguration = models.BooleanField(default=True)
     defaultConfiguration = models.ManyToManyField(OutboundIntegrationConfiguration)
     useAdvancedConfiguration = models.BooleanField(default=False)

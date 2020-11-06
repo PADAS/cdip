@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: "${KUBERNETES_NAMESPACE}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: airflow
+  template:
+    metadata:
+      labels:
+        name: airflow
+    spec:
+      securityContext:
+        fsGroup: 65533 # to make SSH key readable. 65533 is git-sync user
+      initContainers:
+        - name: init-airflow
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: Always
+          command: ['sh', '-c', "airflow initdb"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/code
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
+          env:
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: cdip-secrets
+                  key: airflow.sql_alchemy_conn
+      containers:
+        - name: git-sync
+          image: k8s.gcr.io/git-sync:v3.1.6
+          args:
+            - "--ssh"
+            - "--repo=git@github.com:PADAS/cdip-downstream.git"
+            - "--dest=cdip-downstream"
+            - "--branch=master"
+            - "--depth=1"
+            - "--wait=30"
+          securityContext:
+            runAsUser: 65533 # git-sync user
+          volumeMounts:
+            - name: git-secret
+              mountPath: /etc/git-secret
+              readOnly: true
+            - name: airflow-dags
+              mountPath: /tmp/git
+        - name: webserver
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: webserver
+              containerPort: 8080
+          args: ["webserver"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/code
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
+          env:
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: cdip-secrets
+                  key: airflow.sql_alchemy_conn
+          envFrom:
+            - configMapRef:
+                name: dags-configmap
+        - name: scheduler
+          image: "${AIRFLOW_IMAGE}"
+          imagePullPolicy: IfNotPresent
+          args: ["scheduler"]
+          volumeMounts:
+            - name: airflow-configmap
+              mountPath: /root/airflow/airflow.cfg
+              subPath: airflow.cfg
+            - name: airflow-dags
+              mountPath: /root/airflow/code
+            - name: airflow-logs
+              mountPath: /root/airflow/logs
+          env:
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: cdip-secrets
+                  key: airflow.sql_alchemy_conn
+          envFrom:
+            - configMapRef:
+                name: dags-configmap
+      volumes:
+        - name: git-secret
+          secret:
+            secretName: git-repo-creds
+            defaultMode: 0400
+        - name: airflow-configmap
+          configMap:
+            name: airflow-configmap
+        - name: airflow-dags
+          persistentVolumeClaim:
+            claimName: "${AIRFLOW_DAGS_VOLUME}"
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: "${AIRFLOW_LOGS_VOLUME}"
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: airflow
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    name: airflow
