@@ -143,8 +143,7 @@ def add_account(user):
         logger.info(f'User created successfully')
         return True
     else:
-        logger.error(f'Error adding account')
-        logger.error(f'[{response.status_code}], {response.text}')
+        logger.error(f'Error adding account: {response.status_code}], {response.text}')
         return False
 
 
@@ -173,15 +172,11 @@ def add_account_roles(roles, user_id):
             logger.info("User roles successfully updated.")
             return True
         else:
-            logger.error(f'Error managing account roles')
-            logger.error(f'[{response.status_code}], {response.text}')
+            logger.error(f'Error managing account roles: {response.status_code}], {response.text}')
             return False
     else:
-        logger.error(f'Error deleting account roles')
-        logger.error(f'[{response.status_code}], {response.text}')
+        logger.error(f'Error deleting account roles: {response.status_code}], {response.text}')
         return False
-
-
 
 
 def update_account(account_info, user_id):
@@ -205,8 +200,7 @@ def update_account(account_info, user_id):
         logger.info(f'User updated successfully')
         return True
     else:
-        logger.error(f'Error updating account')
-        logger.error(f'[{response.status_code}], {response.text}')
+        logger.error(f'Error updating account: {response.status_code}], {response.text}')
         return False
 
 

@@ -19,18 +19,17 @@ grant_types_init = [
 
 
 class ClientForm(forms.Form):
-    name = forms.CharField(max_length=200, required=True)
-    description = forms.CharField(max_length=200, required=True)
-    # tenant = forms.CharField(initial=AUTH0_TENANT, widget=forms.HiddenInput)
-    # grant_types = forms.(widget=forms.HiddenInput, initial=grant_types_init)
-
-    # def __init__(self, *args, **kwargs):
-    #     super(ClientForm, self).__init__(*args, **kwargs)
-    #     self.fields["grant_types"].initial = grant_types_init
+    clientId = forms.CharField(max_length=200, required=True, label="Client ID")
+    rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
+    protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
+    authorizationServicesEnabled = forms.BooleanField(initial=True, widget=forms.HiddenInput)
 
 
 class ClientUpdateForm(forms.Form):
-    name = forms.CharField(max_length=200, required=True)
+    clientId = forms.CharField(max_length=200, required=True, label="Client ID")
+    rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
+    protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
+    authorizationServicesEnabled = forms.BooleanField(initial=True, widget=forms.HiddenInput)
 
 
 class ClientProfileForm(forms.ModelForm):
