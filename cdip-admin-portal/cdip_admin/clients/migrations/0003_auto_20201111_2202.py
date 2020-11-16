@@ -9,7 +9,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0014_merge_20201111_2004'),
+        ('integrations', '0013_inboundintegrationconfiguration_encrypted_password_field'),
         ('clients', '0002_auto_20200827_1718'),
     ]
 
