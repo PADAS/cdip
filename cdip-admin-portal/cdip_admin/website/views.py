@@ -50,14 +50,6 @@ def login_view(request):
     return render(request, 'index.html')
 
 
-# def logout(request):
-#     log_out(request)
-#     return_to = urlencode({'returnTo': request.build_absolute_uri('/')})
-#
-#     logout_url = f'https://{settings.SOCIAL_AUTH_AUTH0_DOMAIN}/v2/logout?client_id={settings.SOCIAL_AUTH_AUTH0_KEY}&{return_to}'
-#     return HttpResponseRedirect(logout_url)
-
-
 @login_required
 def profile(request):
     user = request.user
