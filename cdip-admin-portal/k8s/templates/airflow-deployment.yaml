@@ -97,6 +97,21 @@ spec:
           envFrom:
             - configMapRef:
                 name: dags-configmap
+        - name: telegraf
+          image: telegraf:1.15
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8125
+          volumeMounts:
+            - name: telegraf-config-volume
+              mountPath: "/etc/telegraf/"
+              readOnly: true
+            - name: metrics-writer-credentials
+              mountPath: "/etc/cdip/"
+              readOnly: true
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/cdip/metrics-writer-credentials.json"
       volumes:
         - name: git-secret
           secret:
@@ -111,6 +126,18 @@ spec:
         - name: airflow-logs
           persistentVolumeClaim:
             claimName: "${AIRFLOW_LOGS_VOLUME}"
+        - name: telegraf-config-volume
+          configMap:
+            name: telegraf-configmap
+            items:
+            - key: telegraf_conf
+              path: telegraf.conf
+        - name: metrics-writer-credentials
+          secret:
+            secretName: metrics-writer-credentials
+            items:
+            - key: credentials_json
+              path: metrics-writer-credentials.json
 
 
 ---
