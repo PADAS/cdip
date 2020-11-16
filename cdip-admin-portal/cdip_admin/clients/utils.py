@@ -2,16 +2,20 @@ import requests
 from django.http import JsonResponse
 import logging
 
+from cdip_admin import settings
 from core.utils import get_admin_access_token
 
-AUTH0_DOMAIN = 'what'
-auth0_url = f"https://{AUTH0_DOMAIN}/api/v2/"
+KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
+KEYCLOAK_REALM = settings.KEYCLOAK_REALM
+KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
+KEYCLOAK_ADMIN_CLIENT_UUID = settings.KEYCLOAK_ADMIN_CLIENT_UUID
+KEYCLOAK_ADMIN_API = f'{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/'
 
 logger = logging.getLogger(__name__)
 
 
 def get_clients():
-    url = auth0_url + 'clients'
+    url = KEYCLOAK_ADMIN_API + 'clients'
 
     token = get_admin_access_token()
 
@@ -35,7 +39,7 @@ def get_clients():
 
 
 def get_client(client_id):
-    url = auth0_url + 'clients/' + client_id
+    url = KEYCLOAK_ADMIN_API + 'clients/' + client_id
 
     token = get_admin_access_token()
 
@@ -59,14 +63,7 @@ def get_client(client_id):
 
 
 def add_client(client_info):
-    url = auth0_url + 'clients'
-
-    client_info['grant_types'] = [
-        'authorization_code',
-        'implicit',
-        'refresh_token',
-        'client_credentials'
-    ]
+    url = KEYCLOAK_ADMIN_API + 'clients'
 
     token = get_admin_access_token()
 
@@ -83,14 +80,15 @@ def add_client(client_info):
     response = requests.post(url=url, headers=headers, json=client_info)
 
     if response.status_code == 201:
-        return response.json()
-
+        logger.info(f'Client created successfully')
+        return True
     else:
-        logger.warning(f'[{response.status_code}], {response.text}')
+        logger.error(f'Error adding client: {response.status_code}], {response.text}')
+        return False
 
 
 def update_client(client_info, client_id):
-    url = auth0_url + 'clients/' + client_id
+    url = KEYCLOAK_ADMIN_API + 'clients/' + client_id
 
     token = get_admin_access_token()
 
@@ -104,10 +102,11 @@ def update_client(client_info, client_id):
         "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
     }
 
-    response = requests.patch(url=url, headers=headers, json=client_info)
+    response = requests.put(url=url, headers=headers, json=client_info)
 
-    if response.status_code == 200:
-        return response.json()
-
+    if response.status_code == 204:
+        logger.info(f'Client updated successfully')
+        return True
     else:
-        logger.warning(f'[{response.status_code}], {response.text}')
+        logger.error(f'Error updating client: {response.status_code}], {response.text}')
+        return False
