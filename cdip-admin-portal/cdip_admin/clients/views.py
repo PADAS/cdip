@@ -1,5 +1,7 @@
 import logging
-from django.core.exceptions import ObjectDoesNotExist
+
+from django.contrib.auth.decorators import permission_required
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
 from django.shortcuts import render, redirect, get_object_or_404
 
 # Create your views here.
@@ -10,11 +12,13 @@ from clients.utils import get_clients, get_client, add_client, update_client
 logger = logging.getLogger(__name__)
 
 
+@permission_required('core.admin')
 def client_list(request):
     clients = get_clients()
     return render(request, "clients/client_list.html", {"module": clients})
 
 
+@permission_required('core.admin')
 def client_detail(request, client_id):
     client = get_client(client_id)
 
@@ -36,6 +40,7 @@ def client_detail(request, client_id):
                                                           'profile': profile})
 
 
+@permission_required('core.admin')
 def client_add(request):
 
     if request.method == 'POST':
@@ -43,18 +48,19 @@ def client_add(request):
 
         if form.is_valid():
             data = form.cleaned_data
-            new_client = add_client(data)
+            response = add_client(data)
 
-            if new_client:
-                return redirect('account_detail', client_id=new_client['client_id'])
+            if response:
+                return redirect('client_list')
             else:
-                return redirect("welcome")
+                raise SuspiciousOperation
 
     else:
         form = ClientForm()
         return render(request, "clients/client_add.html", {"form": form})
 
 
+@permission_required('core.admin')
 def client_update(request, client_id):
 
     if request.method == 'POST':
@@ -62,20 +68,23 @@ def client_update(request, client_id):
 
         if form.is_valid():
             data = form.cleaned_data
-            client_info = update_client(data, client_id)
+            response = update_client(data, client_id)
 
-            if client_info:
-                return redirect('client_detail', client_id=client_info['client_id'])
+            if response:
+                return redirect('client_detail', client_id=client_id)
             else:
-                return redirect("welcome")
+                raise SuspiciousOperation
 
     else:
         form = ClientUpdateForm()
         client = get_client(client_id)
-        form.initial['name'] = client["name"]
+        form.initial['clientId'] = client["clientId"]
+        form.initial['rootUrl'] = client["rootUrl"]
+        form.initial['protocol'] = client["protocol"]
         return render(request, "clients/client_update.html", {"form": form, "client_id": client_id})
 
 
+@permission_required('core.admin')
 def client_profile_add(request, client_id):
     if request.method == 'POST':
         profile_form = ClientProfileForm(request.POST)
@@ -93,6 +102,7 @@ def client_profile_add(request, client_id):
         return render(request, "clients/client_profile_add.html", {"client_id": client_id, "profile_form": profile_form})
 
 
+@permission_required('core.admin')
 def client_profile_update(request, client_id):
 
     profile = get_object_or_404(ClientProfile, client_id=client_id)
