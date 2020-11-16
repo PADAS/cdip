@@ -10,10 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .exceptions import TokensExpired
-# from django_keycloak.remote_user import KeycloakRemoteUser
 
-
-# import django_keycloak.services.realm
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +30,6 @@ def get_openid_connect_profile_model():
         raise ImproperlyConfigured(
             "KEYCLOAK_OIDC_PROFILE_MODEL refers to model '%s' that has not "
             "been installed" % settings.KEYCLOAK_OIDC_PROFILE_MODEL)
-
-
-# def get_remote_user_model():
-#     """
-#     Return the User model that is active in this project.
-#     """
-#     if not hasattr(settings, 'KEYCLOAK_REMOTE_USER_MODEL'):
-#         # By default return the standard KeycloakRemoteUser model
-#         return KeycloakRemoteUser
-#
-#     try:
-#         return import_string(settings.KEYCLOAK_REMOTE_USER_MODEL)
-#     except ImportError:
-#         raise ImproperlyConfigured(
-#             "KEYCLOAK_REMOTE_USER_MODEL refers to non-existing class"
-#         )
 
 
 def get_or_create_from_id_token(client, id_token):
@@ -83,19 +64,6 @@ def update_or_create_user_and_oidc_profile(client, id_token_object):
 
     OpenIdConnectProfileModel = get_openid_connect_profile_model()
 
-    # if OpenIdConnectProfileModel.is_remote:
-    #     oidc_profile, _ = OpenIdConnectProfileModel.objects.\
-    #         update_or_create(
-    #             sub=id_token_object['sub'],
-    #             defaults={
-    #                 'realm': client.realm
-    #             }
-    #         )
-    #
-    #     UserModel = get_remote_user_model()
-    #     oidc_profile.user = UserModel(id_token_object)
-    #
-    #     return oidc_profile
 
     with transaction.atomic():
         UserModel = get_user_model()
@@ -118,30 +86,6 @@ def update_or_create_user_and_oidc_profile(client, id_token_object):
         )
 
     return oidc_profile
-
-
-# def get_remote_user_from_profile(oidc_profile):
-#     """
-#
-#     :param oidc_profile:
-#     :return:
-#     """
-#
-#     try:
-#         userinfo = oidc_profile.realm.client.openid_api_client.userinfo(
-#             token=oidc_profile.access_token
-#         )
-#     except KeycloakClientError:
-#         return None
-#
-#     # Get the user from the KEYCLOAK_REMOTE_USER_MODEL in the settings
-#     UserModel = get_remote_user_model()
-#
-#     # Create the object of type UserModel from the constructor of it's class
-#     # as the included details can vary per model
-#     user = UserModel(userinfo)
-#
-#     return user
 
 
 def update_or_create_from_code(code, client, redirect_uri):
