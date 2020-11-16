@@ -8,8 +8,8 @@
         <ul>
             {% for client in module %}
                 <li>
-                    <a href="{% url 'client_detail' client.client_id %}">
-                        {{ client.name }} - {{ client.secret }}
+                    <a href="{% url 'client_detail' client.id %}">
+                         {{ client.clientId }} - {{ client.id }}
                     </a>
                 </li>
             {% endfor %}
