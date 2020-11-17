@@ -6,11 +6,11 @@ from cdip_admin import settings
 logger = logging.getLogger(__name__)
 
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
-KEYCLOAK_ADMIN_REALM = settings.KEYCLOAK_ADMIN_REALM
+KEYCLOAK_REALM = settings.KEYCLOAK_REALM
 KEYCLOAK_ADMIN_CLIENT_ID = settings.KEYCLOAK_ADMIN_CLIENT_ID
 KEYCLOAK_ADMIN_CLIENT_SECRET = settings.KEYCLOAK_ADMIN_CLIENT_SECRET
 
-oauth_token_url = f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_ADMIN_REALM}/protocol/openid-connect/token"
+oauth_token_url = f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
 
 
 def get_admin_access_token():
