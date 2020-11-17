@@ -10,6 +10,7 @@ class AccountForm(forms.Form):
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
     email = forms.EmailField(max_length=200, label='Email', required=True)
+    enabled = forms.CharField(max_length=200, initial='true', widget=forms.HiddenInput)
 
 
 class AccountUpdateForm(forms.Form):
@@ -18,6 +19,7 @@ class AccountUpdateForm(forms.Form):
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
     email = forms.EmailField(max_length=200, label='Email', required=True)
+    enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
 
 
 class AccountProfileForm(forms.ModelForm):
