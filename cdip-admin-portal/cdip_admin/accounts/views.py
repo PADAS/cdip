@@ -11,7 +11,6 @@ from .utils import get_accounts, get_account, add_account, update_account, get_a
 from .models import AccountProfile
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
-KEYCLOAK_ADMIN_CLIENT_UUID = settings.KEYCLOAK_ADMIN_CLIENT_UUID
 
 logger = logging.getLogger(__name__)
 

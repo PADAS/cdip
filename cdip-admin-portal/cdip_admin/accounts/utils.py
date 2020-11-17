@@ -8,7 +8,7 @@ from core.utils import get_admin_access_token
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
 KEYCLOAK_REALM = settings.KEYCLOAK_REALM
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
-KEYCLOAK_ADMIN_CLIENT_UUID = settings.KEYCLOAK_ADMIN_CLIENT_UUID
+KEYCLOAK_CLIENT_UUID = settings.KEYCLOAK_CLIENT_UUID
 KEYCLOAK_ADMIN_API = f'{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/'
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def get_account(user_id):
 
 
 def get_client_roles():
-    url = KEYCLOAK_ADMIN_API + 'clients/' + KEYCLOAK_ADMIN_CLIENT_UUID + '/roles'
+    url = KEYCLOAK_ADMIN_API + 'clients/' + KEYCLOAK_CLIENT_UUID + '/roles'
 
     token = get_admin_access_token()
 
@@ -99,7 +99,7 @@ def get_client_roles():
 
 
 def get_account_roles(user_id):
-    url = KEYCLOAK_ADMIN_API + 'users/' + user_id + '/role-mappings/clients/' + KEYCLOAK_ADMIN_CLIENT_UUID
+    url = KEYCLOAK_ADMIN_API + 'users/' + user_id + '/role-mappings/clients/' + KEYCLOAK_CLIENT_UUID
 
     token = get_admin_access_token()
 
@@ -148,7 +148,7 @@ def add_account(user):
 
 
 def add_account_roles(roles, user_id):
-    url = KEYCLOAK_ADMIN_API + 'users/' + user_id + '/role-mappings/clients/' + KEYCLOAK_ADMIN_CLIENT_UUID
+    url = KEYCLOAK_ADMIN_API + 'users/' + user_id + '/role-mappings/clients/' + KEYCLOAK_CLIENT_UUID
 
     token = get_admin_access_token()
 
