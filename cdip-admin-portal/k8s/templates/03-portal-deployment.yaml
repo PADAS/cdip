@@ -57,7 +57,7 @@ spec:
         - name: DB_HOST
           value: "172.22.160.3"
         - name: DB_NAME
-          value: "dev_cdipdb"
+          value: "cdip_portal_prod01_db"
         - name: DB_USER
           valueFrom:
             secretKeyRef:
