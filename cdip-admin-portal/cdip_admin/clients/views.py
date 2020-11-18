@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
@@ -21,7 +22,7 @@ def client_list(request):
 @permission_required('core.admin')
 def client_detail(request, client_id):
     client = get_client(client_id)
-
+    profiles = ClientProfile.objects.all()
     try:
         profile = ClientProfile.objects.get(client_id=client_id)
     except ObjectDoesNotExist:
@@ -45,19 +46,25 @@ def client_add(request):
 
     if request.method == 'POST':
         form = ClientForm(request.POST)
+        profile_form = ClientProfileForm(request.POST)
 
-        if form.is_valid():
-            data = form.cleaned_data
-            response = add_client(data)
+        if form.is_valid() and profile_form.is_valid():
+            client_info = form.cleaned_data
+            profile_info = profile_form.cleaned_data
+            response = add_client(client_info, profile_info)
 
-            if response:
-                return redirect('client_list')
+            if response is not None:
+                profile_form.cleaned_data['client_id'] = response
+                profile_form.instance.client_id = response
+                profile_form.save()
+                return redirect('client_detail', response)
             else:
                 raise SuspiciousOperation
 
     else:
         form = ClientForm()
-        return render(request, "clients/client_add.html", {"form": form})
+        profile_form = ClientProfileForm()
+        return render(request, "clients/client_add.html", {"form": form, "profile_form": profile_form})
 
 
 @permission_required('core.admin')
@@ -81,6 +88,7 @@ def client_update(request, client_id):
         form.initial['clientId'] = client["clientId"]
         form.initial['rootUrl'] = client["rootUrl"]
         form.initial['protocol'] = client["protocol"]
+        # form.initial['authorizationServicesEnabled'] = client["authorizationServicesEnabled"]
         return render(request, "clients/client_update.html", {"form": form, "client_id": client_id})
 
 
