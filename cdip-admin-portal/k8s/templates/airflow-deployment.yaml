@@ -41,7 +41,7 @@ spec:
             - "--ssh"
             - "--repo=git@github.com:PADAS/cdip-downstream.git"
             - "--dest=cdip-downstream"
-            - "--branch=master"
+            - "--branch=release"
             - "--depth=1"
             - "--wait=30"
           securityContext:
@@ -55,10 +55,17 @@ spec:
         - name: webserver
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: IfNotPresent
+          args: ["webserver"]
           ports:
             - name: webserver
               containerPort: 8080
-          args: ["webserver"]
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - /workspace/healthcheck.py
+            initialDelaySeconds: 10
+            periodSeconds: 10
           volumeMounts:
             - name: airflow-configmap
               mountPath: /root/airflow/airflow.cfg
@@ -80,6 +87,13 @@ spec:
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: IfNotPresent
           args: ["scheduler"]
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - /workspace/healthcheck.py
+            initialDelaySeconds: 10
+            periodSeconds: 10
           volumeMounts:
             - name: airflow-configmap
               mountPath: /root/airflow/airflow.cfg
