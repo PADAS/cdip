@@ -62,9 +62,22 @@ def get_client(client_id):
         logger.warning(f'[{response.status_code}], {response.text}')
 
 
-def add_client(client_info):
+def add_client(client_info, profile_info):
     url = KEYCLOAK_ADMIN_API + 'clients'
+    
+    client_info['clientAuthenticatorType'] = 'client-secret'
+    client_info['serviceAccountsEnabled'] = 'true'
+    client_info['authorizationServicesEnabled'] = 'true'
+    client_info["bearerOnly"] = 'false'
+    client_info["enabled"] = 'true'
+    client_info["publicClient"] = 'false'
 
+    authorizationSettings = {}
+    # authorizationSettings['resources'] = build_client_resources()
+    authorizationSettings['scopes'] = build_client_scopes(profile_info)
+
+    client_info['authorizationSettings'] = authorizationSettings
+    
     token = get_admin_access_token()
 
     if not token:
@@ -80,11 +93,27 @@ def add_client(client_info):
     response = requests.post(url=url, headers=headers, json=client_info)
 
     if response.status_code == 201:
+        location = response.headers['Location']
+        client_id = location.split('/')[-1]
         logger.info(f'Client created successfully')
-        return True
+        return client_id
     else:
         logger.error(f'Error adding client: {response.status_code}], {response.text}')
-        return False
+        return None
+
+
+def build_client_scopes(profile_info):
+    scopes = []
+
+    scope = {'name': 'read', 'displayName': 'read'}
+
+    scopes.append(scope)
+
+    return scopes
+
+
+def build_client_resources():
+    return []
 
 
 def update_client(client_info, client_id):
