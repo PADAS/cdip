@@ -3,6 +3,7 @@ from django.http import JsonResponse
 import logging
 
 from cdip_admin import settings
+from clients.models import AuthorizationScope, InboundClientResource
 from core.utils import get_admin_access_token
 
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
@@ -62,7 +63,7 @@ def get_client(client_id):
         logger.warning(f'[{response.status_code}], {response.text}')
 
 
-def add_client(client_info, profile_info):
+def add_client(client_info, type_id):
     url = KEYCLOAK_ADMIN_API + 'clients'
     
     client_info['clientAuthenticatorType'] = 'client-secret'
@@ -72,9 +73,7 @@ def add_client(client_info, profile_info):
     client_info["enabled"] = 'true'
     client_info["publicClient"] = 'false'
 
-    authorizationSettings = {}
-    # authorizationSettings['resources'] = build_client_resources()
-    authorizationSettings['scopes'] = build_client_scopes(profile_info)
+    authorizationSettings = build_authorization_settings(type_id)
 
     client_info['authorizationSettings'] = authorizationSettings
     
@@ -102,18 +101,28 @@ def add_client(client_info, profile_info):
         return None
 
 
-def build_client_scopes(profile_info):
+def build_authorization_settings(type_id):
+    authorizationSettings = {}
+    resources_config = InboundClientResource.objects.filter(type__id=type_id)
     scopes = []
+    resources = []
+    for resource_config in resources_config:
+        resource = {}
+        resource['name'] = resource_config.resource
+        resource['displayName'] = resource_config.resource
+        resource_scope = []
+        for config in resource_config.scopes.all():
+            scope = {'name': config.scope, 'displayName': config.scope}
+            if scope not in scopes:
+                scopes.append(scope)
+            resource_scope.append(scope)
+        resource['scopes'] = resource_scope
+        resource['type'] = 'urn:***REMOVED***:resources:default'
+        resources.append(resource)
 
-    scope = {'name': 'read', 'displayName': 'read'}
-
-    scopes.append(scope)
-
-    return scopes
-
-
-def build_client_resources():
-    return []
+    authorizationSettings['resources'] = resources
+    authorizationSettings['scopes'] = scopes
+    return authorizationSettings
 
 
 def update_client(client_info, client_id):
