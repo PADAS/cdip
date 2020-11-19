@@ -15,7 +15,7 @@ class ClientProfile(TimestampedModel):
     organizations = models.ManyToManyField(Organization, blank=True)
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.client_id}"
 
 
 class AuthorizationScope(TimestampedModel):

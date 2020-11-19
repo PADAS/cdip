@@ -22,7 +22,7 @@ def client_list(request):
 @permission_required('core.admin')
 def client_detail(request, client_id):
     client = get_client(client_id)
-    profiles = ClientProfile.objects.all()
+
     try:
         profile = ClientProfile.objects.get(client_id=client_id)
     except ObjectDoesNotExist:
@@ -50,8 +50,8 @@ def client_add(request):
 
         if form.is_valid() and profile_form.is_valid():
             client_info = form.cleaned_data
-            profile_info = profile_form.cleaned_data
-            response = add_client(client_info, profile_info)
+            type_id = profile_form.instance.type.id
+            response = add_client(client_info, type_id)
 
             if response is not None:
                 profile_form.cleaned_data['client_id'] = response
