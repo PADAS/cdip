@@ -58,30 +58,17 @@ spec:
           value: "172.22.160.3"
         - name: DB_NAME
           value: "dev_cdipdb"
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: cdip-secrets
-              key: portal.db.username
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: cdip-secrets
-              key: portal.db.password
         - name: DB_PORT
           value: "5432"
         - name: ALLOWED_HOSTS
           value: "${SITE_FQDN}"
         - name: DEBUG
           value: "False"
-        - name: FERNET_KEYS
-          valueFrom:
-            secretKeyRef:
-              name: cdip-secrets
-              key: portal.fernet_keys
         envFrom:
           - configMapRef:
               name: server-configmap
+          - secretRef:
+              name: cdip-secrets
       - name: telegraf
         image: telegraf:1.15
         imagePullPolicy: IfNotPresent
