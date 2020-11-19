@@ -8,9 +8,12 @@ https://docs.djangoproject.com/en/3.0/howto/deployment/wsgi/
 """
 
 import os
+import cdip_admin.logconfiguration
 
 from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
+
+cdip_admin.logconfiguration.init()
 
 application = get_wsgi_application()
