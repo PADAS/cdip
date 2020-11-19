@@ -36,7 +36,7 @@ spec:
                   key: airflow.sql_alchemy_conn
       containers:
         - name: git-sync
-          image: k8s.gcr.io/git-sync:v3.1.6
+          image: k8s.gcr.io/git-sync/git-sync:v3.2.0
           args:
             - "--ssh"
             - "--repo=git@github.com:PADAS/cdip-downstream.git"
@@ -83,6 +83,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: dags-configmap
+            - secretRef:
+                name: cdip-secrets
         - name: scheduler
           image: "${AIRFLOW_IMAGE}"
           imagePullPolicy: IfNotPresent
@@ -111,6 +113,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: dags-configmap
+            - secretRef:
+                name: cdip-secrets
         - name: telegraf
           image: telegraf:1.15
           imagePullPolicy: IfNotPresent

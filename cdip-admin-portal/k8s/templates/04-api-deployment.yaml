@@ -53,10 +53,11 @@ spec:
             memory: "100Mi"
         ports:
           - containerPort: 9999
-        env:
         envFrom:
           - configMapRef:
               name: server-configmap
+          - secretRef:
+              name: cdip-secrets
       - name: telegraf
         image: telegraf:1.15
         ports:
