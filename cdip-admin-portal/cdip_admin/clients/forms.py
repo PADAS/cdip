@@ -22,18 +22,16 @@ class ClientForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
     rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
     protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
-    authorizationServicesEnabled = forms.BooleanField(initial=True, widget=forms.HiddenInput)
 
 
 class ClientUpdateForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
     rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
     protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
-    authorizationServicesEnabled = forms.BooleanField(initial=True, widget=forms.HiddenInput)
 
 
 class ClientProfileForm(forms.ModelForm):
-    client_id = forms.CharField(widget=forms.HiddenInput)
+    client_id = forms.CharField(widget=forms.HiddenInput, required=False)
 
     class Meta:
         model = ClientProfile
