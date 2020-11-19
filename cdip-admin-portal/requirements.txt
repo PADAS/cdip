@@ -36,7 +36,7 @@ drf-jwt==1.13.4           # via -r requirements.in
 ecdsa==0.15               # via -r requirements.in, python-jose
 gunicorn==19.9.0          # via -r requirements.in
 idna==2.10                # via -r requirements.in, requests
-importlib-metadata==1.6.1  # via -r requirements.in
+importlib-metadata==1.6.1  # via -r requirements.in, django-bootstrap4
 itypes==1.2.0             # via coreapi
 jinja2==2.11.2            # via coreschema
 markupsafe==1.1.1         # via jinja2
@@ -51,6 +51,7 @@ pyjwt==1.7.1              # via -r requirements.in, drf-jwt, social-auth-core
 python-dateutil==2.8.1    # via -r requirements.in, croniter
 python-dotenv==0.13.0     # via -r requirements.in
 python-jose==3.1.0        # via -r requirements.in, python-keycloak-client
+python-json-logger==0.1.11  # via -r requirements.in
 python-keycloak-client==0.2.3  # via django-keycloak
 python3-openid==3.2.0     # via -r requirements.in, social-auth-core
 pytz==2020.1              # via -r requirements.in, babel, django
