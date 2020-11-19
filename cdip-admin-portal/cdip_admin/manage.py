@@ -3,12 +3,7 @@
 import os
 import sys
 
-
 import cdip_admin.logconfiguration
-
-# logging.basicConfig(format='%(asctime)s %(message)s',
-#     datefmt='%m/%d/%Y %I:%M:%S %p',
-#     level=logging.os.environ.get('LOGGING_LEVEL', 'INFO'))
 
 cdip_admin.logconfiguration.init()
 
