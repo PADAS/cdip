@@ -1,3 +1,5 @@
+import logging
+
 import json
 import jwt
 from django.contrib.auth import authenticate
@@ -12,6 +14,7 @@ KEYCLOAK_CLIENT_ID = settings.KEYCLOAK_CLIENT_ID
 KEYCLOAK_CLIENT_SECRET = settings.KEYCLOAK_CLIENT_SECRET
 JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs'
 
+logger = logging.getLogger(__name__)
 
 def jwt_get_username_from_payload_handler(payload):
     username = payload.get('sub').replace('|', '.')
@@ -45,7 +48,7 @@ def get_json_web_keyset():
 
     jsonurl = urlopen(JWKS_LOCATION)
     jwks = json.loads(jsonurl.read())
-    print('Fetched Json Web Key Set: %s', jwks)
+
     _json_web_keyset = jwks
 
     return _json_web_keyset
@@ -80,7 +83,7 @@ def parse_jwt_token(jwks, unverified_header, token):
             except jwt.JWTClaimsError:
                 raise
             except Exception as e:
-                print(e)
+                logger.exception('Unexpected error when decoding a JWT')
                 raise
 
             return payload
