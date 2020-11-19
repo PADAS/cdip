@@ -83,7 +83,7 @@ def parse_jwt_token(jwks, unverified_header, token):
             except jwt.JWTClaimsError:
                 raise
             except Exception as e:
-                logger.exception('Unexpecte error when decoding a JWT')
+                logger.exception('Unexpected error when decoding a JWT')
                 raise
 
             return payload
