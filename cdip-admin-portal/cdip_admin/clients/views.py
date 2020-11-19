@@ -88,7 +88,6 @@ def client_update(request, client_id):
         form.initial['clientId'] = client["clientId"]
         form.initial['rootUrl'] = client["rootUrl"]
         form.initial['protocol'] = client["protocol"]
-        # form.initial['authorizationServicesEnabled'] = client["authorizationServicesEnabled"]
         return render(request, "clients/client_update.html", {"form": form, "client_id": client_id})
 
 
