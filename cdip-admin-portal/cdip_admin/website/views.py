@@ -50,32 +50,6 @@ def login_view(request):
     return render(request, 'index.html')
 
 
-@login_required
-def profile(request):
-    user = request.user
-    logger.debug('User: %s (%s)', user, user.id)
-    auth0user = user.social_auth.get(provider='auth0')
-
-    user_profile = []
-
-    try:
-        for org in Organization.objects.filter(user_profile__user=user):
-            user_profile.append(org.name)
-    except UserProfile.DoesNotExist: 
-        logger.debug('User has no UserProfile')
-
-    userdata = {
-        'user_id': auth0user.uid,
-        'name': user.first_name,
-        'picture': auth0user.extra_data['picture'],
-        'organizations': user_profile
-    }
-
-    return render(request, 'website/profile.html', {
-        'auth0User': auth0user,
-        'userdata': json.dumps(userdata, indent=4)
-    })
-
 
 
 

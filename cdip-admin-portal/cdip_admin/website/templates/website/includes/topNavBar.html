@@ -23,9 +23,6 @@
                 {% endif %}
                 {% if request.user.is_authenticated == True %}
                     <li class="nav-item">
-                        <a class="nav-link m-2 menu-item" href="/profile">Profile</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link m-2 menu-item" href="{% url 'keycloak_logout' %}">Log Out</a>
                     </li>
                 {% endif %}
