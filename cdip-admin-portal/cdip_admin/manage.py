@@ -3,6 +3,10 @@
 import os
 import sys
 
+import cdip_admin.logconfiguration
+
+cdip_admin.logconfiguration.init()
+
 
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
