@@ -51,4 +51,4 @@ babel==2.8.0
 django-phonenumber-field==4.0.0
 phonenumbers==8.12.6
 whitenoise==5.2.0
-
+python-json-logger==0.1.11
