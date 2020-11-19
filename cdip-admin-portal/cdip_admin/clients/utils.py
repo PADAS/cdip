@@ -3,7 +3,7 @@ from django.http import JsonResponse
 import logging
 
 from cdip_admin import settings
-from clients.models import AuthorizationScope, InboundClientResource
+from clients.models import InboundClientResource
 from core.utils import get_admin_access_token
 
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
@@ -66,12 +66,7 @@ def get_client(client_id):
 def add_client(client_info, type_id):
     url = KEYCLOAK_ADMIN_API + 'clients'
     
-    client_info['clientAuthenticatorType'] = 'client-secret'
-    client_info['serviceAccountsEnabled'] = 'true'
-    client_info['authorizationServicesEnabled'] = 'true'
-    client_info["bearerOnly"] = 'false'
-    client_info["enabled"] = 'true'
-    client_info["publicClient"] = 'false'
+    client_info = get_default_client_settings(client_info)
 
     authorizationSettings = build_authorization_settings(type_id)
 
@@ -101,6 +96,33 @@ def add_client(client_info, type_id):
         return None
 
 
+def update_client(client_info, client_id):
+    url = KEYCLOAK_ADMIN_API + 'clients/' + client_id
+
+    client_info = get_default_client_settings(client_info)
+
+    token = get_admin_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
+    }
+
+    response = requests.put(url=url, headers=headers, json=client_info)
+
+    if response.status_code == 204:
+        logger.info(f'Client updated successfully')
+        return True
+    else:
+        logger.error(f'Error updating client: {response.status_code}], {response.text}')
+        return False
+
+
 def build_authorization_settings(type_id):
     authorizationSettings = {}
     resources_config = InboundClientResource.objects.filter(type__id=type_id)
@@ -125,26 +147,13 @@ def build_authorization_settings(type_id):
     return authorizationSettings
 
 
-def update_client(client_info, client_id):
-    url = KEYCLOAK_ADMIN_API + 'clients/' + client_id
+def get_default_client_settings(client_info):
 
-    token = get_admin_access_token()
+    client_info['clientAuthenticatorType'] = 'client-secret'
+    client_info['serviceAccountsEnabled'] = 'true'
+    client_info['authorizationServicesEnabled'] = 'true'
+    client_info["bearerOnly"] = 'false'
+    client_info["enabled"] = 'true'
+    client_info["publicClient"] = 'false'
 
-    if not token:
-        logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
-        response.status_code = 403
-        return response
-
-    headers = {
-        "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
-    }
-
-    response = requests.put(url=url, headers=headers, json=client_info)
-
-    if response.status_code == 204:
-        logger.info(f'Client updated successfully')
-        return True
-    else:
-        logger.error(f'Error updating client: {response.status_code}], {response.text}')
-        return False
+    return client_info
