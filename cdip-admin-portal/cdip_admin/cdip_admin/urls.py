@@ -16,7 +16,7 @@ Including another URLconf
 from django.conf.urls import url
 from django.contrib import admin
 from django.urls import path, include
-from website.views import welcome, date, about, index, login_view, logout_view, profile
+from website.views import welcome, date, about, index, login_view, logout_view
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 
@@ -36,7 +36,6 @@ urlpatterns = [
     path('logout', logout_view),
     path('', include('django.contrib.auth.urls')),
     path('', include('social_django.urls')),
-    path('profile/', profile, name='profile'),
 ]
 
 
