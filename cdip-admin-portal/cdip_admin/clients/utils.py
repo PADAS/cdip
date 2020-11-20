@@ -3,6 +3,7 @@ from django.http import JsonResponse
 import logging
 
 from cdip_admin import settings
+from clients.models import InboundClientResource
 from core.utils import get_admin_access_token
 
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
@@ -62,9 +63,15 @@ def get_client(client_id):
         logger.warning(f'[{response.status_code}], {response.text}')
 
 
-def add_client(client_info):
+def add_client(client_info, type_id):
     url = KEYCLOAK_ADMIN_API + 'clients'
+    
+    client_info = get_default_client_settings(client_info)
 
+    authorizationSettings = build_authorization_settings(type_id)
+
+    client_info['authorizationSettings'] = authorizationSettings
+    
     token = get_admin_access_token()
 
     if not token:
@@ -80,15 +87,19 @@ def add_client(client_info):
     response = requests.post(url=url, headers=headers, json=client_info)
 
     if response.status_code == 201:
+        location = response.headers['Location']
+        client_id = location.split('/')[-1]
         logger.info(f'Client created successfully')
-        return True
+        return client_id
     else:
         logger.error(f'Error adding client: {response.status_code}], {response.text}')
-        return False
+        return None
 
 
 def update_client(client_info, client_id):
     url = KEYCLOAK_ADMIN_API + 'clients/' + client_id
+
+    client_info = get_default_client_settings(client_info)
 
     token = get_admin_access_token()
 
@@ -110,3 +121,39 @@ def update_client(client_info, client_id):
     else:
         logger.error(f'Error updating client: {response.status_code}], {response.text}')
         return False
+
+
+def build_authorization_settings(type_id):
+    authorizationSettings = {}
+    resources_config = InboundClientResource.objects.filter(type__id=type_id)
+    scopes = []
+    resources = []
+    for resource_config in resources_config:
+        resource = {}
+        resource['name'] = resource_config.resource
+        resource['displayName'] = resource_config.resource
+        resource_scope = []
+        for config in resource_config.scopes.all():
+            scope = {'name': config.scope, 'displayName': config.scope}
+            if scope not in scopes:
+                scopes.append(scope)
+            resource_scope.append(scope)
+        resource['scopes'] = resource_scope
+        resource['type'] = 'urn:cdip-admin-portal:resources:default'
+        resources.append(resource)
+
+    authorizationSettings['resources'] = resources
+    authorizationSettings['scopes'] = scopes
+    return authorizationSettings
+
+
+def get_default_client_settings(client_info):
+
+    client_info['clientAuthenticatorType'] = 'client-secret'
+    client_info['serviceAccountsEnabled'] = 'true'
+    client_info['authorizationServicesEnabled'] = 'true'
+    client_info["bearerOnly"] = 'false'
+    client_info["enabled"] = 'true'
+    client_info["publicClient"] = 'false'
+
+    return client_info

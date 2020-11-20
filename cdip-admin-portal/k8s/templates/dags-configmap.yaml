@@ -4,12 +4,9 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: dags-configmap
 data:
-  # TODO: read secret from k8s secrets
-
   # Keycloak settings.
   KEYCLOAK_ISSUER: https://cdip-auth.pamdas.org/auth/realms/cdip-prod
   KEYCLOAK_CLIENT_ID: cdip-admin-portal
-  KEYCLOAK_CLIENT_SECRET: b2988bd8-d9b5-4423-bf57-05010569bf94
 
   PORTAL_ENDPOINT: "https://cdip-prod01.pamdas.org"
 

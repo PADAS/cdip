@@ -8,7 +8,7 @@
     <p>Client ID: {{client.id}}</p>
     <p>Root Url: {{ client.rootUrl }}</p>
     {% if profile %}
-        <p>{{ profile.type__name }}</p>
+        <p>{{ profile.type }}</p>
         <pre>{{ organizations }}</pre>
         <a class="btn btn-primary" href="{% url 'client_profile_update' client.id %}" role="button">Update Profile</a>
     {% else %}
