@@ -10,13 +10,3 @@ data:
   SESSION_COOKIE_SECURE: "False"
   TIME_ZONE: "US/Pacific"
   REDIS_HOST: "10.170.75.131"
-  KEYCLOAK_ISSUER: https://cdip-auth.pamdas.org/auth/realms/cdip-dev
-  KEYCLOAK_SERVER: https://cdip-auth.pamdas.org
-  KEYCLOAK_REALM: cdip-dev
-  KEYCLOAK_ADMIN_REALM: cdip-dev
-  KEYCLOAK_CLIENT_ID: cdip-admin-portal
-  # KEYCLOAK_CLIENT_SECRET: moved to k8s secret: cdip-secrets
-  KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
-  # this needs to be the UUID of the client with id KEYCLOAK_CLIENT_ID
-  KEYCLOAK_CLIENT_UUID: 90d34a81-c70c-408b-ad66-7fa1bfe58892
-  # KEYCLOAK_ADMIN_CLIENT_SECRET: moved to k8s secret: cdip-secrets
