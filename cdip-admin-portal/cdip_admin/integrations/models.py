@@ -46,6 +46,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
+    additional = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"

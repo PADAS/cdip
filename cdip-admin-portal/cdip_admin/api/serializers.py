@@ -37,8 +37,9 @@ class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
     type_slug = serializers.SlugField(source='type.slug', read_only=True)
 
     class Meta:
-        model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token', 'type_slug']
+        model = OutboundIntegrationConfiguration
+        fields = ['id', 'type', 'owner', 'endpoint', 'state', 'login', 'password', 'token', 'type_slug',
+                  'additional']
 
 
 class DeviceSerializer(serializers.ModelSerializer):
