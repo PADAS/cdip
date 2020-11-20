@@ -17,8 +17,7 @@ resource "template_dir" "deployments" {
     AIRFLOW_FQDN = var.airflow-fqdn
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
     AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
-
-//    ALLOWED_HOSTS = var.allowed-hosts
+    REALM_SUFFIX=var.realm-suffix
   }
 }
 
@@ -55,6 +54,10 @@ variable "airflow-fqdn" {
 }
 
 variable "api-fqdn" {
+  type = string
+}
+
+variable "realm-suffix" {
   type = string
 }
 

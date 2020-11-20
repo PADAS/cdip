@@ -83,6 +83,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: dags-configmap
+            - configMapRef:
+                name: keycloak-configmap
             - secretRef:
                 name: cdip-secrets
         - name: scheduler
@@ -113,6 +115,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: dags-configmap
+            - configMapRef:
+                name: keycloak-configmap
             - secretRef:
                 name: cdip-secrets
         - name: telegraf
