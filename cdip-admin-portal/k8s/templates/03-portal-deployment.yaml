@@ -67,6 +67,8 @@ spec:
         envFrom:
           - configMapRef:
               name: server-configmap
+          - configMapRef:
+              name: keycloak-configmap
           - secretRef:
               name: cdip-secrets
       - name: telegraf

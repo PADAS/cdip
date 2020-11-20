@@ -1,0 +1,16 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
+  name: keycloak-configmap
+data:
+  KEYCLOAK_ISSUER: https://cdip-auth.pamdas.org/auth/realms/cdip${REALM_SUFFIX}
+  KEYCLOAK_SERVER: https://cdip-auth.pamdas.org
+  KEYCLOAK_REALM: cdip${REALM_SUFFIX}
+  KEYCLOAK_ADMIN_REALM: cdip${REALM_SUFFIX}
+  KEYCLOAK_CLIENT_ID: cdip-admin-portal
+  # KEYCLOAK_CLIENT_SECRET: moved to k8s secret: cdip-secrets
+  KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
+  # this needs to be the UUID of the client with id KEYCLOAK_CLIENT_ID
+  KEYCLOAK_CLIENT_UUID: acf95355-5b2c-474b-99b1-aa85b8e6d65c
+  # KEYCLOAK_ADMIN_CLIENT_SECRET: moved to k8s secret: cdip-secrets
