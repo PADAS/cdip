@@ -9,6 +9,7 @@ resource "template_dir" "deployments" {
   vars = {
     KUBERNETES_NAMESPACE   = var.namespace
     FUNCTIONS_NAMESPACE = var.functions-namespace
+    METRICS-NAMESPACE = var.metrics-namespace
     CDIP_PORTAL_IMAGE = var.cdip_portal_image
     CDIP_API_IMAGE = var.cdip_api_image
     AIRFLOW_IMAGE = var.airflow_image
@@ -27,6 +28,10 @@ variable "namespace" {
 }
 
 variable "functions-namespace" {
+  type    = string
+}
+
+variable "metrics-namespace" {
   type    = string
 }
 
