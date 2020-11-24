@@ -12,3 +12,11 @@ metadata:
   name: ${FUNCTIONS_NAMESPACE}
   labels:
     name: ${FUNCTIONS_NAMESPACE}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${METRICS-NAMESPACE}
+  labels:
+    name: ${METRICS-NAMESPACE}
