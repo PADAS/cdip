@@ -58,4 +58,4 @@ data:
 
         [[outputs.stackdriver]]
           project = "cdip-78ca"
-          namespace = "cdip-v1"
+          namespace = "${KUBERNETES_NAMESPACE}"
