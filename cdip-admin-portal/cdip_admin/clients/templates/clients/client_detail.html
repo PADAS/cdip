@@ -10,9 +10,9 @@
     {% if profile %}
         <p>{{ profile.type }}</p>
         <pre>{{ organizations }}</pre>
-        <a class="btn btn-primary" href="{% url 'client_profile_update' client.id %}" role="button">Update Profile</a>
+        <a class="btn btn-primary" href="{% url 'client_profile_update' client.clientId %}" role="button">Update Profile</a>
     {% else %}
-        <a class="btn btn-primary" href="{% url 'client_profile_add' client.id %}" role="button">Add Profile</a>
+        <a class="btn btn-primary" href="{% url 'client_profile_add' client.clientId %}" role="button">Add Profile</a>
     {% endif %}
     <a class="btn btn-primary" href="{% url 'client_update' client.id %}" role="button">Update</a>
 
