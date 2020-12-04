@@ -53,8 +53,7 @@ def get_user_perms(args):
                     else:
                         permissions.append(p['rsname'])
                 client_id = token['clientId']
-                client = get_client_by_client_id(client_id)
-                arg.session['user_id'] = client[0]['id']
+                arg.session['user_id'] = client_id
                 return permissions
             else:
                 token = jwt_decode_token(arg.user.oidc_profile.access_token)
