@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 # Create your views here.
 from clients.forms import ClientForm, ClientUpdateForm, ClientProfileForm
 from clients.models import ClientProfile
-from clients.utils import get_clients, get_client, add_client, update_client
+from clients.utils import get_clients, get_client, add_client, update_client, get_client_by_client_id
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def client_detail(request, client_id):
     client = get_client(client_id)
 
     try:
-        profile = ClientProfile.objects.get(client_id=client_id)
+        profile = ClientProfile.objects.get(client_id=client['clientId'])
     except ObjectDoesNotExist:
         profile = None
 
@@ -54,8 +54,8 @@ def client_add(request):
             response = add_client(client_info, type_id)
 
             if response is not None:
-                profile_form.cleaned_data['client_id'] = response
-                profile_form.instance.client_id = response
+                profile_form.cleaned_data['client_id'] = client_info['clientId']
+                profile_form.instance.client_id = client_info['clientId']
                 profile_form.save()
                 return redirect('client_detail', response)
             else:
@@ -69,6 +69,7 @@ def client_add(request):
 
 @permission_required('core.admin')
 def client_update(request, client_id):
+    client = get_client(client_id)
 
     if request.method == 'POST':
         form = ClientUpdateForm(request.POST)
@@ -78,17 +79,26 @@ def client_update(request, client_id):
             response = update_client(data, client_id)
 
             if response:
+                try:
+                    profile = ClientProfile.objects.get(client_id=client['clientId'])
+                except ObjectDoesNotExist:
+                    profile = None
+
+                if profile:
+                    profile.client_id = data['clientId']
+                    profile.save()
                 return redirect('client_detail', client_id=client_id)
             else:
                 raise SuspiciousOperation
 
     else:
         form = ClientUpdateForm()
-        client = get_client(client_id)
         form.initial['clientId'] = client["clientId"]
         form.initial['rootUrl'] = client["rootUrl"]
         form.initial['protocol'] = client["protocol"]
-        return render(request, "clients/client_update.html", {"form": form, "client_id": client_id})
+
+        return render(request, "clients/client_update.html", {"form": form,
+                                                              "client_id": client_id})
 
 
 @permission_required('core.admin')
@@ -98,7 +108,9 @@ def client_profile_add(request, client_id):
 
         if profile_form.is_valid():
             profile_form.save()
-            return redirect('client_detail', client_id=client_id)
+            client = get_client_by_client_id(client_id)
+            client_uuid = client[0]['id']
+            return redirect('client_detail', client_id=client_uuid)
         else:
             return render(request, "clients/client_profile_add.html", {"client_id": client_id,
                                                                        "profile_form": profile_form})
@@ -106,7 +118,8 @@ def client_profile_add(request, client_id):
     else:
         profile_form = ClientProfileForm()
         profile_form.initial['client_id'] = client_id
-        return render(request, "clients/client_profile_add.html", {"client_id": client_id, "profile_form": profile_form})
+        return render(request, "clients/client_profile_add.html", {"client_id": client_id,
+                                                                   "profile_form": profile_form})
 
 
 @permission_required('core.admin')
@@ -118,10 +131,12 @@ def client_profile_update(request, client_id):
         profile_form = ClientProfileForm(instance=profile, data=request.POST)
         if profile_form.is_valid():
             profile_form.save()
-            return redirect('client_detail', client_id=client_id)
+            client = get_client_by_client_id(client_id)
+            client_uuid = client[0]['id']
+            return redirect('client_detail', client_id=client_uuid)
         else:
             return render(request, "clients/client_profile_add.html", {"user_id": client_id,
-                                                                         "profile_form": profile_form})
+                                                                       "profile_form": profile_form})
 
     else:
         profile_form = ClientProfileForm()
