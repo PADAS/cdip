@@ -10,7 +10,7 @@ from organizations.models import Organization
 # Create your models here.
 class ClientProfile(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    client_id = models.CharField(max_length=200)
+    client_id = models.CharField(max_length=200, unique=True)
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     organizations = models.ManyToManyField(Organization, blank=True)
 
