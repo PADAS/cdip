@@ -73,7 +73,7 @@ data:
 
     # The executor class that airflow should use. Choices include
     # SequentialExecutor, LocalExecutor, CeleryExecutor, DaskExecutor, KubernetesExecutor
-    executor = LocalExecutor
+    executor = KubernetesExecutor
 
     # The SqlAlchemy connection string to the metadata database.
     # SqlAlchemy supports many different database engine, more information
@@ -120,10 +120,10 @@ data:
     # The amount of parallelism as a setting to the executor. This defines
     # the max number of task instances that should run simultaneously
     # on this airflow installation
-    parallelism = 32
+    parallelism = 4
 
     # The number of task instances allowed to run concurrently by the scheduler
-    dag_concurrency = 16
+    dag_concurrency = 8
 
     # Are DAGs paused by default at creation
     dags_are_paused_at_creation = True
@@ -134,7 +134,7 @@ data:
     # Whether to load the DAG examples that ship with Airflow. It's good to
     # get started, but you probably want to set this to False in a production
     # environment
-    load_examples = False
+    load_examples = True
 
     # Whether to load the default connections that ship with Airflow. It's good to
     # get started, but you probably want to set this to False in a production
@@ -777,22 +777,22 @@ data:
 
     [kubernetes]
     # The repository, tag and imagePullPolicy of the Kubernetes Image for the Worker to Run
-    worker_container_repository =
-    worker_container_tag =
+    worker_container_repository = gcr.io/cdip-78ca/cdip-airflow-1.10.12
+    worker_container_tag = latest
     worker_container_image_pull_policy = IfNotPresent
 
     # If True (default), worker pods will be deleted upon termination
-    delete_worker_pods = True
+    delete_worker_pods = False
 
     # Number of Kubernetes Worker Pod creation calls per scheduler loop
     worker_pods_creation_batch_size = 1
 
     # The Kubernetes namespace where airflow workers should be created. Defaults to ``default``
-    namespace = default
+    namespace = ${KUBERNETES_NAMESPACE}
 
     # The name of the Kubernetes ConfigMap containing the Airflow Configuration (this file)
     # Example: airflow_configmap = airflow-configmap
-    airflow_configmap =
+    airflow_configmap = airflow-configmap
 
     # The name of the Kubernetes ConfigMap containing ``airflow_local_settings.py`` file.
     #
@@ -824,16 +824,16 @@ data:
     dags_in_image = False
 
     # For either git sync or volume mounted DAGs, the worker will look in this subpath for DAGs
-    dags_volume_subpath =
+    # dags_volume_subpath = cdip-downstream/dags
 
     # For DAGs mounted via a volume claim (mutually exclusive with git-sync and host path)
-    dags_volume_claim =
+    # dags_volume_claim = ${AIRFLOW_DAGS_VOLUME}
 
     # For volume mounted logs, the worker will look in this subpath for logs
-    logs_volume_subpath =
+    # logs_volume_subpath = /root/airflow/logs
 
     # A shared volume claim for the logs
-    logs_volume_claim =
+    # logs_volume_claim = ${AIRFLOW_LOGS_VOLUME}
 
     # For DAGs mounted via a hostPath volume (mutually exclusive with volume claim and git-sync)
     # Useful in local environment, discouraged in production
@@ -845,16 +845,16 @@ data:
 
     # A list of configMapsRefs to envFrom. If more than one configMap is
     # specified, provide a comma separated list: configmap_a,configmap_b
-    env_from_configmap_ref =
+    env_from_configmap_ref = dags-configmap,keycloak-configmap
 
     # A list of secretRefs to envFrom. If more than one secret is
     # specified, provide a comma separated list: secret_a,secret_b
-    env_from_secret_ref =
+    env_from_secret_ref = cdip-secrets
 
     # Git credentials and repository for DAGs mounted via Git (mutually exclusive with volume claim)
-    git_repo =
-    git_branch =
-    git_subpath =
+    git_repo = https://github.com/apache/airflow.git
+    git_branch = master
+    git_subpath = airflow/example_dags/
 
     # The specific rev or hash the git_sync init container will checkout
     # This becomes GIT_SYNC_REV environment variable in the git_sync init container for worker pods
@@ -869,7 +869,7 @@ data:
 
     # Mount point of the volume if git-sync is being used.
     # i.e. /Users/rohitc/airflow/dags
-    git_dags_folder_mount_point =
+    git_dags_folder_mount_point = /root/git-sync
 
     # To get Git-sync SSH authentication set up follow this format
     #
@@ -936,7 +936,7 @@ data:
     # Service accounts are required for workers that require access to secrets or cluster resources.
     # See the Kubernetes RBAC documentation for more:
     # https://kubernetes.io/docs/admin/authorization/rbac/
-    worker_service_account_name =
+    worker_service_account_name = airflow
 
     # Any image pull secrets to be given to worker pods, If more than one secret is
     # required, provide a comma separated list: secret_a,secret_b
