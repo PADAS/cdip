@@ -1,6 +1,4 @@
 import logging
-import json
-from django.core.exceptions import ObjectDoesNotExist
 
 from integrations.models import Device, DeviceState
 

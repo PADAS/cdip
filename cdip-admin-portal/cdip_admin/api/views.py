@@ -19,6 +19,7 @@ from accounts.models import AccountProfile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
+from clients.utils import get_client_by_client_id
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import update_device_information
@@ -51,7 +52,8 @@ def get_user_perms(args):
                                 permissions.append(f'{scope}:{p["rsname"]}')
                     else:
                         permissions.append(p['rsname'])
-
+                client_id = token['clientId']
+                arg.session['user_id'] = client_id
                 return permissions
             else:
                 token = jwt_decode_token(arg.user.oidc_profile.access_token)
@@ -61,7 +63,7 @@ def get_user_perms(args):
                         {'roles': []}
                     )['roles']
                 ]
-
+                arg.session['user_id'] = arg.user.username
                 return permissions
 
 
@@ -191,24 +193,24 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
 
-    # def get_queryset(self):
-    #     user_id = self.request.session['user_id']
-    #     if user_id is None:
-    #         logger.warning("Retrieve Inbound Configuration, User Not Logged In")
-    #         raise PermissionDenied
-    #     logger.info("Retrieve Inbound Configuration",
-    #                 extra={"user_id": user_id})
-    #     profile = get_profile(user_id)
-    #     if profile:
-    #         if isinstance(profile, ClientProfile):
-    #             queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
-    #         else:
-    #             queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
-    #     else:
-    #         logger.warning("Retrieve Inbound Configuration, Profile Not Found",
-    #                        extra={"user_id": user_id})
-    #         raise PermissionDenied
-    #     return queryset
+    def get_queryset(self):
+        user_id = self.request.session['user_id']
+        if user_id is None:
+            logger.warning("Retrieve Inbound Configuration, User Not Logged In")
+            raise PermissionDenied
+        logger.info("Retrieve Inbound Configuration",
+                    extra={"user_id": user_id})
+        profile = get_profile(user_id)
+        if profile:
+            if isinstance(profile, ClientProfile):
+                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
+            else:
+                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
+        else:
+            logger.warning("Retrieve Inbound Configuration, Profile Not Found",
+                           extra={"user_id": user_id})
+            raise PermissionDenied
+        return queryset
 
     @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):

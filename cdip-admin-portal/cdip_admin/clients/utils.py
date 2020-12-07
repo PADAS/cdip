@@ -63,6 +63,31 @@ def get_client(client_id):
         logger.warning(f'[{response.status_code}], {response.text}')
 
 
+def get_client_by_client_id(client_id):
+    url = KEYCLOAK_ADMIN_API + 'clients/'
+    params = {'clientId': client_id}
+
+    token = get_admin_access_token()
+
+    if not token:
+        logger.warning('Cannot get a valid access_token.')
+        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response.status_code = 403
+        return response
+
+    headers = {
+        "authorization": f"{token['token_type']} {token['access_token']}"
+    }
+
+    response = requests.get(url=url, headers=headers, params=params, timeout=(2, 10))
+
+    if response.status_code == 200:
+        return response.json()
+
+    else:
+        logger.warning(f'[{response.status_code}], {response.text}')
+
+
 def add_client(client_info, type_id):
     url = KEYCLOAK_ADMIN_API + 'clients'
     
