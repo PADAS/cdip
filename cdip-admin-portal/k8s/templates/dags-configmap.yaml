@@ -10,3 +10,4 @@ data:
   REDIS_HOST: "10.170.75.131"
 
   AIRFLOW__CORE__DAGS_FOLDER: "/root/airflow/code/cdip-downstream/dags"
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:%oczsbO5z3W7EFJnqN^#QhXrCSLrY7tVnPWbuq@172.22.160.3:5432/airflow_db"
