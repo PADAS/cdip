@@ -20,11 +20,3 @@ metadata:
   name: ${METRICS-NAMESPACE}
   labels:
     name: ${METRICS-NAMESPACE}
-
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: airflow-workers
-  labels:
-    name: airflow-workers

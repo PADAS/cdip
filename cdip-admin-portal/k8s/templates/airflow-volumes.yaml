@@ -1,24 +1,184 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "${AIRFLOW_LOGS_VOLUME}"
+  name: "${AIRFLOW_LOGS_VOLUME_CLAIM}"
   namespace: "${KUBERNETES_NAMESPACE}"
 spec:
+  storageClassName: "" # this prevents the default assignment to gce standard storage class.
   accessModes:
-    - ReadWriteOnce  # TODO: need r/w many here? will need non-default storage class
+    - ReadWriteMany
   resources:
     requests:
       storage: 2Gi
 
 ---
+# persistent volumes are not bound to a k8s namespace
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "${AIRFLOW_LOGS_VOLUME}"
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: nfs-server.cdip-v1.svc.cluster.local
+    path: "/exports/logs"
+
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "${AIRFLOW_DAGS_VOLUME}"
+  name: "${AIRFLOW_DAGS_VOLUME_CLAIM}"
   namespace: "${KUBERNETES_NAMESPACE}"
 spec:
+  storageClassName: ""
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteMany
   resources:
     requests:
-      storage: 200Mi
+      storage: 500Mi
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${AIRFLOW_DAGS_VOLUME}
+spec:
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: nfs-server.cdip-v1.svc.cluster.local
+    path: "/exports/dags"
+
+#---
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: glusterfs-sc
+#  namespace: "${KUBERNETES_NAMESPACE}"
+#provisioner: kubernetes.io/glusterfs
+#reclaimPolicy: Retain
+#allowVolumeExpansion: true
+
+# create a disk to reference in the nfs-server before creating the server.
+# the disk name (nfs-disk in the line below) is referenced in the volumes
+# made available to containers in the pod
+# gcloud compute disks create --size=10GB --zone=us-central1-a nfs-disk
+# todo: rather than create a disk, could use a gce standard pv via a pvc?
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: "${KUBERNETES_NAMESPACE}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: nfs-server
+  template:
+    metadata:
+      labels:
+        role: nfs-server
+    spec:
+      containers:
+      - name: nfs-server
+        image: gcr.io/google_containers/volume-nfs:0.8
+        ports:
+          - name: nfs
+            containerPort: 2049
+          - name: mountd
+            containerPort: 20048
+          - name: rpcbind
+            containerPort: 111
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - mountPath: /exports
+            name: nfs-pvc
+      volumes:
+        - name: nfs-pvc
+          gcePersistentDisk:
+            pdName: nfs-disk
+            fsType: ext4
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: "${KUBERNETES_NAMESPACE}"
+spec:
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+  selector:
+    role: nfs-server
+
+
+#---
+#kind: PersistentVolumeClaim
+#apiVersion: v1
+#metadata:
+#  name: nfs-pvc
+#  namespace: "${KUBERNETES_NAMESPACE}"
+#spec:
+#  accessModes:
+#    - ReadWriteMany
+#  storageClassName: ""
+#  resources:
+#    requests:
+#      storage: 1Gi
+#
+#---
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: nfs-pv
+#  namespace: "${KUBERNETES_NAMESPACE}"
+#spec:
+#  capacity:
+#    storage: 1Gi
+#  accessModes:
+#    - ReadWriteMany
+#  nfs:
+#    server: nfs-server.cdip-v1.svc.cluster.local
+#    path: "/"
+#
+#---
+#kind: PersistentVolumeClaim
+#apiVersion: v1
+#metadata:
+#  name: nfs-pvc-100meg
+#  namespace: "${KUBERNETES_NAMESPACE}"
+#spec:
+#  accessModes:
+#    - ReadWriteMany
+#  storageClassName: ""
+#  resources:
+#    requests:
+#      storage: 100Mi
+#
+#---
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: nfs-pv-100meg
+#  namespace: "${KUBERNETES_NAMESPACE}"
+#spec:
+#  capacity:
+#    storage: 100Mi
+#  accessModes:
+#    - ReadWriteMany
+#  nfs:
+#    server: nfs-server.cdip-v1.svc.cluster.local
+#    path: "/exports/dags"
