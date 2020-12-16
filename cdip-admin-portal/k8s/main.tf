@@ -16,6 +16,8 @@ resource "template_dir" "deployments" {
     SITE_FQDN = var.site-fqdn
     API_FQDN = var.api-fqdn
     AIRFLOW_FQDN = var.airflow-fqdn
+    AIRFLOW_DAGS_VOLUME_CLAIM = format("%s-dags-volume-claim", var.namespace)
+    AIRFLOW_LOGS_VOLUME_CLAIM = format("%s-logs-volume-claim", var.namespace)
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
     AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
     REALM_SUFFIX=var.realm-suffix
