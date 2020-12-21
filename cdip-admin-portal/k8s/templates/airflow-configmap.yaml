@@ -27,12 +27,13 @@ data:
 
     # Airflow can store logs remotely in AWS S3, Google Cloud Storage or Elastic Search.
     # Set this to True if you want to enable remote logging.
-    remote_logging = False
+    remote_logging = True
 
     # Users must supply an Airflow connection id that provides access to the storage
     # location.
-    remote_log_conn_id =
-    remote_base_log_folder =
+    # todo: templatize/auto-configure these 2 values below, & the svc account+keyfile.json needed in AF connection
+    remote_log_conn_id = google_cloud_default
+    remote_base_log_folder = ${AIRFLOW_GCS_LOGS_FOLDER}
     encrypt_s3_logs = False
 
     # Logging level
@@ -582,18 +583,6 @@ data:
     # Example: visibility_timeout = 21600
     # visibility_timeout =
 
-    [dask]
-
-    # This section only applies if you are using the DaskExecutor in
-    # [core] section above
-    # The IP address and port of the Dask cluster's scheduler.
-    cluster_address = 127.0.0.1:8786
-
-    # TLS/ SSL settings to access a secured Dask scheduler.
-    tls_ca =
-    tls_cert =
-    tls_key =
-
     [scheduler]
     # Task instances listen for external kill signal (when you clear tasks
     # from the CLI or the UI), this defines the frequency at which they should
@@ -788,12 +777,12 @@ data:
 
     [kubernetes]
     # The repository, tag and imagePullPolicy of the Kubernetes Image for the Worker to Run
-    worker_container_repository = gcr.io/cdip-78ca/cdip-airflow-1.10.12
-    worker_container_tag = latest
+    worker_container_repository = ${AIRFLOW_IMAGE_NAME}
+    worker_container_tag = ${AIRFLOW_IMAGE_TAG}
     worker_container_image_pull_policy = IfNotPresent
 
     # If True (default), worker pods will be deleted upon termination
-    delete_worker_pods = True
+    delete_worker_pods = False
 
     # Number of Kubernetes Worker Pod creation calls per scheduler loop
     worker_pods_creation_batch_size = 1
@@ -820,7 +809,7 @@ data:
     # logs_volume_subpath = /root/airflow/logs
 
     # A shared volume claim for the logs
-    logs_volume_claim = ${AIRFLOW_LOGS_VOLUME_CLAIM}
+    # logs_volume_claim = ${AIRFLOW_LOGS_VOLUME_CLAIM}
 
     # A list of configMapsRefs to envFrom. If more than one configMap is
     # specified, provide a comma separated list: configmap_a,configmap_b

@@ -12,15 +12,17 @@ resource "template_dir" "deployments" {
     METRICS-NAMESPACE = var.metrics-namespace
     CDIP_PORTAL_IMAGE = var.cdip_portal_image
     CDIP_API_IMAGE = var.cdip_api_image
-    AIRFLOW_IMAGE = var.airflow_image
     SITE_FQDN = var.site-fqdn
     API_FQDN = var.api-fqdn
+    REALM_SUFFIX=var.realm-suffix
+    AIRFLOW_IMAGE_NAME = var.airflow-image-name
+    AIRFLOW_IMAGE_TAG = var.airflow-image-tag
     AIRFLOW_FQDN = var.airflow-fqdn
     AIRFLOW_DAGS_VOLUME_CLAIM = format("%s-dags-volume-claim", var.namespace)
     AIRFLOW_LOGS_VOLUME_CLAIM = format("%s-logs-volume-claim", var.namespace)
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
     AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
-    REALM_SUFFIX=var.realm-suffix
+    AIRFLOW_GCS_LOGS_FOLDER = var.airflow-gcs-logs-folder
   }
 }
 
@@ -47,9 +49,14 @@ variable "cdip_api_image" {
   default = "gcr.io/cdip-78ca/cdip-api:latest"
 }
 
-variable "airflow_image" {
+variable "airflow-image-name" {
   type = string
-  default = "gcr.io/cdip-78ca/cdip-airflow-1.10.12:latest"
+  default = "gcr.io/cdip-78ca/cdip-airflow-1.10.12"
+}
+
+variable "airflow-image-tag" {
+  type = string
+  default = "latest"
 }
 
 variable "site-fqdn" {
@@ -68,7 +75,6 @@ variable "realm-suffix" {
   type = string
 }
 
-//variable "allowed-hosts" {
-//  type = list(string)
-//  default = []
-//}
+variable "airflow-gcs-logs-folder" {
+  type = string
+}

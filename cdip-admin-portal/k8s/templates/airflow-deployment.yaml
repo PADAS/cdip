@@ -16,7 +16,7 @@ spec:
       serviceAccountName: airflow-serviceaccount
       initContainers:
         - name: init-airflow
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: Always
           # TODO: create script to do any pre-config for nfs, initial user account, AF connection config
           command: ['sh', '-c', "airflow initdb"]
@@ -25,8 +25,6 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
               readOnly: true
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
           env:
             - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
               valueFrom:
@@ -62,7 +60,7 @@ spec:
               mountPath: /tmp/git
               readOnly: false
         - name: webserver
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
           args: ["webserver"]
           ports:
@@ -82,8 +80,6 @@ spec:
             - name: airflow-dags
               mountPath: /git-sync
               readOnly: true
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
           envFrom:
             - configMapRef:
                 name: dags-configmap
@@ -92,7 +88,7 @@ spec:
             - secretRef:
                 name: cdip-secrets
         - name: scheduler
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
           args: ["scheduler"]
           livenessProbe:
@@ -109,8 +105,6 @@ spec:
             - name: airflow-dags
               mountPath: /git-sync
               readOnly: true
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
           envFrom:
             - configMapRef:
                 name: dags-configmap
@@ -140,9 +134,6 @@ spec:
         - name: airflow-dags
           persistentVolumeClaim:
             claimName: ${AIRFLOW_DAGS_VOLUME_CLAIM}
-        - name: airflow-logs
-          persistentVolumeClaim:
-            claimName: ${AIRFLOW_LOGS_VOLUME_CLAIM}
         - name: telegraf-config-volume
           configMap:
             name: telegraf-configmap
