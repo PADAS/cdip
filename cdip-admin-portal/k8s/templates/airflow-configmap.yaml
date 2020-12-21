@@ -6,6 +6,7 @@ metadata:
 data:
   PORTAL_ENDPOINT: "https://cdip-dev.pamdas.org"
   REDIS_HOST: "10.170.75.131"
+  # NOTE: if using K8s executor make sure the dags_volume_subpath config matches up with subpath (srcroot/...) below
   AIRFLOW__CORE__DAGS_FOLDER: "/git-sync/srcroot/cdip-downstream/dags"
 
 ---
@@ -782,7 +783,7 @@ data:
     worker_container_image_pull_policy = IfNotPresent
 
     # If True (default), worker pods will be deleted upon termination
-    delete_worker_pods = False
+    delete_worker_pods = True
 
     # Number of Kubernetes Worker Pod creation calls per scheduler loop
     worker_pods_creation_batch_size = 1
@@ -800,7 +801,9 @@ data:
     dags_in_image = False
 
     # For either git sync or volume mounted DAGs, the worker will look in this subpath for DAGs
-    dags_volume_subpath = cdip-downstream/dags
+    # NOTE: this subpath should match up with the subpath in AIRFLOW__CORE__DAGS_FOLDER
+    # e.g., the value below matches up with subpath in /git-sync/srcroot/cdip-downstream/dags
+    dags_volume_subpath = srcroot/cdip-downstream/dags
 
     # For DAGs mounted via a volume claim (mutually exclusive with git-sync and host path)
     dags_volume_claim = ${AIRFLOW_DAGS_VOLUME_CLAIM}
@@ -809,7 +812,7 @@ data:
     # logs_volume_subpath = /root/airflow/logs
 
     # A shared volume claim for the logs
-    # logs_volume_claim = ${AIRFLOW_LOGS_VOLUME_CLAIM}
+    # logs_volume_claim =
 
     # A list of configMapsRefs to envFrom. If more than one configMap is
     # specified, provide a comma separated list: configmap_a,configmap_b

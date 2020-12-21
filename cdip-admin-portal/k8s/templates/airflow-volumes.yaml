@@ -40,12 +40,6 @@ spec:
     requests:
       storage: 2Gi
 
-# create a disk to reference in the nfs-server before creating the server.
-# the disk name (nfs-disk in the line below) is referenced in the volumes
-# made available to containers in the pod
-# gcloud compute disks create --size=10GB --zone=us-central1-a nfs-disk
-# todo: rather than create a disk, could use a gce standard pv via a pvc?
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -62,6 +56,15 @@ spec:
       labels:
         role: nfs-server
     spec:
+      initContainers:
+        - name: init-exported-volume
+          image: gcr.io/google_containers/volume-nfs:0.8
+          command: ['mkdir', '-p', '/exports/dags']
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /exports
+              name: exported-volume
       containers:
       - name: nfs-server
         image: gcr.io/google_containers/volume-nfs:0.8
@@ -98,62 +101,3 @@ spec:
       port: 111
   selector:
     role: nfs-server
-
-
-#---
-#kind: PersistentVolumeClaim
-#apiVersion: v1
-#metadata:
-#  name: nfs-pvc
-#  namespace: "${KUBERNETES_NAMESPACE}"
-#spec:
-#  accessModes:
-#    - ReadWriteMany
-#  storageClassName: ""
-#  resources:
-#    requests:
-#      storage: 1Gi
-#
-#---
-#apiVersion: v1
-#kind: PersistentVolume
-#metadata:
-#  name: nfs-pv
-#  namespace: "${KUBERNETES_NAMESPACE}"
-#spec:
-#  capacity:
-#    storage: 1Gi
-#  accessModes:
-#    - ReadWriteMany
-#  nfs:
-#    server: nfs-server.cdip-v1.svc.cluster.local
-#    path: "/"
-#
-#---
-#kind: PersistentVolumeClaim
-#apiVersion: v1
-#metadata:
-#  name: nfs-pvc-100meg
-#  namespace: "${KUBERNETES_NAMESPACE}"
-#spec:
-#  accessModes:
-#    - ReadWriteMany
-#  storageClassName: ""
-#  resources:
-#    requests:
-#      storage: 100Mi
-#
-#---
-#apiVersion: v1
-#kind: PersistentVolume
-#metadata:
-#  name: nfs-pv-100meg
-#  namespace: "${KUBERNETES_NAMESPACE}"
-#spec:
-#  capacity:
-#    storage: 100Mi
-#  accessModes:
-#    - ReadWriteMany
-#  nfs:
-#    server: nfs-server.cdip-v1.svc.cluster.local
-#    path: "/exports/dags"
