@@ -19,9 +19,7 @@ resource "template_dir" "deployments" {
     AIRFLOW_IMAGE_TAG = var.airflow-image-tag
     AIRFLOW_FQDN = var.airflow-fqdn
     AIRFLOW_DAGS_VOLUME_CLAIM = format("%s-dags-volume-claim", var.namespace)
-    AIRFLOW_LOGS_VOLUME_CLAIM = format("%s-logs-volume-claim", var.namespace)
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
-    AIRFLOW_LOGS_VOLUME = format("%s-logs-volume", var.namespace)
     AIRFLOW_GCS_LOGS_FOLDER = var.airflow-gcs-logs-folder
   }
 }

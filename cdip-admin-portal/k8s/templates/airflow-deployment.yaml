@@ -37,11 +37,11 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - "--repo=https://github.com/PADAS/cdip-downstream.git"
+            - "--root=/tmp/git/srcroot"
             - "--dest=cdip-downstream"
             - "--branch=master"
             - "--depth=1"
             - "--wait=30"
-            - "--root=/tmp/git/srcroot"
           env:
             - name: GIT_SYNC_USERNAME
               valueFrom:
