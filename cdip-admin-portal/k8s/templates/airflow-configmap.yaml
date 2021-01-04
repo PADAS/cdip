@@ -645,10 +645,10 @@ data:
     max_tis_per_query = 512
 
     # Statsd (https://github.com/etsy/statsd) integration settings
-    statsd_on = False
-    statsd_host = localhost
+    statsd_on = True
+    statsd_host = cdip-metrics-proxy.metrics.svc.cluster.local
     statsd_port = 8125
-    statsd_prefix = airflow
+    statsd_prefix = cdip-airflow
 
     # If you want to avoid send all the available metrics to StatsD,
     # you can configure an allow list of prefixes to send only the metrics that
