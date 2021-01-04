@@ -112,21 +112,6 @@ spec:
                 name: keycloak-configmap
             - secretRef:
                 name: cdip-secrets
-        - name: telegraf
-          image: telegraf:1.15
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8125
-          volumeMounts:
-            - name: telegraf-config-volume
-              mountPath: "/etc/telegraf/"
-              readOnly: true
-            - name: metrics-writer-credentials
-              mountPath: "/etc/cdip/"
-              readOnly: true
-          env:
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/cdip/metrics-writer-credentials.json"
       volumes:
         - name: airflow-configmap
           configMap:
