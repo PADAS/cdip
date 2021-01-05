@@ -24,4 +24,10 @@ be needed to successfully run the application.
 
         python manage.py compilemessages
 ```
+
++ Setup Dev to Run Https
+    + Run pip install django-sslserver or the requirements-dev.txt file
+    + Add "sslserver" in settings.py or preferably create a local_settings.py and override the settings.py
+    + Run python manage.py runsslserver --settings=cdip_admin.local_settings
+    + Ignore ssl warning or add default Django cert to trusted certs in web browser
     

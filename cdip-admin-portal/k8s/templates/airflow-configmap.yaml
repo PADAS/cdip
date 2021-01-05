@@ -2,6 +2,18 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
+  name: dags-configmap
+data:
+  PORTAL_ENDPOINT: "https://cdip-prod01.pamdas.org"
+  REDIS_HOST: "172.22.161.3"
+  # NOTE: if using K8s executor make sure the dags_volume_subpath config matches up with subpath (srcroot/...) below
+  AIRFLOW__CORE__DAGS_FOLDER: "/git-sync/srcroot/cdip-downstream/dags"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: "${KUBERNETES_NAMESPACE}"
   name: airflow-configmap
 data:
   airflow.cfg: |
@@ -16,12 +28,13 @@ data:
 
     # Airflow can store logs remotely in AWS S3, Google Cloud Storage or Elastic Search.
     # Set this to True if you want to enable remote logging.
-    remote_logging = False
+    remote_logging = True
 
     # Users must supply an Airflow connection id that provides access to the storage
     # location.
-    remote_log_conn_id =
-    remote_base_log_folder =
+    # todo: templatize/auto-configure these 2 values below, & the svc account+keyfile.json needed in AF connection
+    remote_log_conn_id = google_cloud_default
+    remote_base_log_folder = ${AIRFLOW_GCS_LOGS_FOLDER}
     encrypt_s3_logs = False
 
     # Logging level
@@ -73,7 +86,7 @@ data:
 
     # The executor class that airflow should use. Choices include
     # SequentialExecutor, LocalExecutor, CeleryExecutor, DaskExecutor, KubernetesExecutor
-    executor = LocalExecutor
+    executor = KubernetesExecutor
 
     # The SqlAlchemy connection string to the metadata database.
     # SqlAlchemy supports many different database engine, more information
@@ -571,18 +584,6 @@ data:
     # Example: visibility_timeout = 21600
     # visibility_timeout =
 
-    [dask]
-
-    # This section only applies if you are using the DaskExecutor in
-    # [core] section above
-    # The IP address and port of the Dask cluster's scheduler.
-    cluster_address = 127.0.0.1:8786
-
-    # TLS/ SSL settings to access a secured Dask scheduler.
-    tls_ca =
-    tls_cert =
-    tls_key =
-
     [scheduler]
     # Task instances listen for external kill signal (when you clear tasks
     # from the CLI or the UI), this defines the frequency at which they should
@@ -777,8 +778,8 @@ data:
 
     [kubernetes]
     # The repository, tag and imagePullPolicy of the Kubernetes Image for the Worker to Run
-    worker_container_repository =
-    worker_container_tag =
+    worker_container_repository = ${AIRFLOW_IMAGE_NAME}
+    worker_container_tag = ${AIRFLOW_IMAGE_TAG}
     worker_container_image_pull_policy = IfNotPresent
 
     # If True (default), worker pods will be deleted upon termination
@@ -788,35 +789,11 @@ data:
     worker_pods_creation_batch_size = 1
 
     # The Kubernetes namespace where airflow workers should be created. Defaults to ``default``
-    namespace = default
+    namespace = ${KUBERNETES_NAMESPACE}
 
     # The name of the Kubernetes ConfigMap containing the Airflow Configuration (this file)
     # Example: airflow_configmap = airflow-configmap
-    airflow_configmap =
-
-    # The name of the Kubernetes ConfigMap containing ``airflow_local_settings.py`` file.
-    #
-    # For example:
-    #
-    # ``airflow_local_settings_configmap = "airflow-configmap"`` if you have the following ConfigMap.
-    #
-    # ``airflow-configmap.yaml``:
-    #
-    # .. code-block:: yaml
-    #
-    #   ---
-    #   apiVersion: v1
-    #   kind: ConfigMap
-    #   metadata:
-    #     name: airflow-configmap
-    #   data:
-    #     airflow_local_settings.py: |
-    #         def pod_mutation_hook(pod):
-    #             ...
-    #     airflow.cfg: |
-    #         ...
-    # Example: airflow_local_settings_configmap = airflow-configmap
-    airflow_local_settings_configmap =
+    airflow_configmap = airflow-configmap
 
     # For docker image already contains DAGs, this is set to ``True``, and the worker will
     # search for dags in dags_folder,
@@ -824,119 +801,32 @@ data:
     dags_in_image = False
 
     # For either git sync or volume mounted DAGs, the worker will look in this subpath for DAGs
-    dags_volume_subpath =
+    # NOTE: this subpath should match up with the subpath in AIRFLOW__CORE__DAGS_FOLDER
+    # e.g., the value below matches up with subpath in /git-sync/srcroot/cdip-downstream/dags
+    dags_volume_subpath = srcroot/cdip-downstream/dags
 
     # For DAGs mounted via a volume claim (mutually exclusive with git-sync and host path)
-    dags_volume_claim =
+    dags_volume_claim = ${AIRFLOW_DAGS_VOLUME_CLAIM}
 
     # For volume mounted logs, the worker will look in this subpath for logs
-    logs_volume_subpath =
+    # logs_volume_subpath = /root/airflow/logs
 
     # A shared volume claim for the logs
-    logs_volume_claim =
-
-    # For DAGs mounted via a hostPath volume (mutually exclusive with volume claim and git-sync)
-    # Useful in local environment, discouraged in production
-    dags_volume_host =
-
-    # A hostPath volume for the logs
-    # Useful in local environment, discouraged in production
-    logs_volume_host =
+    # logs_volume_claim =
 
     # A list of configMapsRefs to envFrom. If more than one configMap is
     # specified, provide a comma separated list: configmap_a,configmap_b
-    env_from_configmap_ref =
+    env_from_configmap_ref = dags-configmap,keycloak-configmap
 
     # A list of secretRefs to envFrom. If more than one secret is
     # specified, provide a comma separated list: secret_a,secret_b
-    env_from_secret_ref =
-
-    # Git credentials and repository for DAGs mounted via Git (mutually exclusive with volume claim)
-    git_repo =
-    git_branch =
-    git_subpath =
-
-    # The specific rev or hash the git_sync init container will checkout
-    # This becomes GIT_SYNC_REV environment variable in the git_sync init container for worker pods
-    git_sync_rev =
-
-    # Use git_user and git_password for user authentication or git_ssh_key_secret_name
-    # and git_ssh_key_secret_key for SSH authentication
-    git_user =
-    git_password =
-    git_sync_root = /git
-    git_sync_dest = repo
-
-    # Mount point of the volume if git-sync is being used.
-    # i.e. /Users/rohitc/airflow/dags
-    git_dags_folder_mount_point =
-
-    # To get Git-sync SSH authentication set up follow this format
-    #
-    # ``airflow-secrets.yaml``:
-    #
-    # .. code-block:: yaml
-    #
-    #   ---
-    #   apiVersion: v1
-    #   kind: Secret
-    #   metadata:
-    #     name: airflow-secrets
-    #   data:
-    #     # key needs to be gitSshKey
-    #     gitSshKey: <base64_encoded_data>
-    # Example: git_ssh_key_secret_name = airflow-secrets
-    git_ssh_key_secret_name =
-
-    # To get Git-sync SSH authentication set up follow this format
-    #
-    # ``airflow-configmap.yaml``:
-    #
-    # .. code-block:: yaml
-    #
-    #   ---
-    #   apiVersion: v1
-    #   kind: ConfigMap
-    #   metadata:
-    #     name: airflow-configmap
-    #   data:
-    #     known_hosts: |
-    #         github.com ssh-rsa <...>
-    #     airflow.cfg: |
-    #         ...
-    # Example: git_ssh_known_hosts_configmap_name = airflow-configmap
-    git_ssh_known_hosts_configmap_name =
-
-    # To give the git_sync init container credentials via a secret, create a secret
-    # with two fields: GIT_SYNC_USERNAME and GIT_SYNC_PASSWORD (example below) and
-    # add ``git_sync_credentials_secret = <secret_name>`` to your airflow config under the
-    # ``kubernetes`` section
-    #
-    # Secret Example:
-    #
-    # .. code-block:: yaml
-    #
-    #   ---
-    #   apiVersion: v1
-    #   kind: Secret
-    #   metadata:
-    #     name: git-credentials
-    #   data:
-    #     GIT_SYNC_USERNAME: <base64_encoded_git_username>
-    #     GIT_SYNC_PASSWORD: <base64_encoded_git_password>
-    git_sync_credentials_secret =
-
-    # For cloning DAGs from git repositories into volumes: https://github.com/kubernetes/git-sync
-    git_sync_container_repository = k8s.gcr.io/git-sync
-    git_sync_container_tag = v3.1.1
-    git_sync_init_container_name = git-sync-clone
-    git_sync_run_as_user = 65533
+    env_from_secret_ref = cdip-secrets
 
     # The name of the Kubernetes service account to be associated with airflow workers, if any.
     # Service accounts are required for workers that require access to secrets or cluster resources.
     # See the Kubernetes RBAC documentation for more:
     # https://kubernetes.io/docs/admin/authorization/rbac/
-    worker_service_account_name =
+    worker_service_account_name = airflow-serviceaccount
 
     # Any image pull secrets to be given to worker pods, If more than one secret is
     # required, provide a comma separated list: secret_a,secret_b

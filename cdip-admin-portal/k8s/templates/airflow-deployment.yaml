@@ -13,21 +13,18 @@ spec:
       labels:
         name: airflow
     spec:
-      securityContext:
-        fsGroup: 65533 # to make SSH key readable. 65533 is git-sync user
+      serviceAccountName: airflow-serviceaccount
       initContainers:
         - name: init-airflow
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: Always
+          # TODO: create script to do any pre-config for nfs, initial user account, AF connection config
           command: ['sh', '-c', "airflow initdb"]
           volumeMounts:
             - name: airflow-configmap
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
-            - name: airflow-dags
-              mountPath: /root/airflow/code
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
+              readOnly: true
           env:
             - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
               valueFrom:
@@ -37,23 +34,33 @@ spec:
       containers:
         - name: git-sync
           image: k8s.gcr.io/git-sync/git-sync:v3.2.0
+          imagePullPolicy: IfNotPresent
           args:
-            - "--ssh"
-            - "--repo=git@github.com:PADAS/cdip-downstream.git"
+            - "--repo=https://github.com/PADAS/cdip-downstream.git"
+            - "--root=/tmp/git/srcroot"
             - "--dest=cdip-downstream"
             - "--branch=release"
             - "--depth=1"
             - "--wait=30"
+          env:
+            - name: GIT_SYNC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: cdip-secrets
+                  key: GIT_SYNC_USERNAME
+            - name: GIT_SYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cdip-secrets
+                  key: GIT_SYNC_PASSWORD
           securityContext:
-            runAsUser: 65533 # git-sync user
+            runAsUser: 0 # root
           volumeMounts:
-            - name: git-secret
-              mountPath: /etc/git-secret
-              readOnly: true
             - name: airflow-dags
               mountPath: /tmp/git
+              readOnly: false
         - name: webserver
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
           args: ["webserver"]
           ports:
@@ -71,15 +78,8 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/code
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
-          env:
-            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-              valueFrom:
-                secretKeyRef:
-                  name: cdip-secrets
-                  key: airflow.sql_alchemy_conn
+              mountPath: /git-sync
+              readOnly: true
           envFrom:
             - configMapRef:
                 name: dags-configmap
@@ -88,7 +88,7 @@ spec:
             - secretRef:
                 name: cdip-secrets
         - name: scheduler
-          image: "${AIRFLOW_IMAGE}"
+          image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
           args: ["scheduler"]
           livenessProbe:
@@ -103,15 +103,8 @@ spec:
               mountPath: /root/airflow/airflow.cfg
               subPath: airflow.cfg
             - name: airflow-dags
-              mountPath: /root/airflow/code
-            - name: airflow-logs
-              mountPath: /root/airflow/logs
-          env:
-            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-              valueFrom:
-                secretKeyRef:
-                  name: cdip-secrets
-                  key: airflow.sql_alchemy_conn
+              mountPath: /git-sync
+              readOnly: true
           envFrom:
             - configMapRef:
                 name: dags-configmap
@@ -119,41 +112,13 @@ spec:
                 name: keycloak-configmap
             - secretRef:
                 name: cdip-secrets
-        - name: telegraf
-          image: telegraf:1.15
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8125
-          volumeMounts:
-            - name: telegraf-config-volume
-              mountPath: "/etc/telegraf/"
-              readOnly: true
-            - name: metrics-writer-credentials
-              mountPath: "/etc/cdip/"
-              readOnly: true
-          env:
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/cdip/metrics-writer-credentials.json"
       volumes:
-        - name: git-secret
-          secret:
-            secretName: git-repo-creds
-            defaultMode: 0400
         - name: airflow-configmap
           configMap:
             name: airflow-configmap
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: "${AIRFLOW_DAGS_VOLUME}"
-        - name: airflow-logs
-          persistentVolumeClaim:
-            claimName: "${AIRFLOW_LOGS_VOLUME}"
-        - name: telegraf-config-volume
-          configMap:
-            name: telegraf-configmap
-            items:
-            - key: telegraf_conf
-              path: telegraf.conf
+            claimName: ${AIRFLOW_DAGS_VOLUME_CLAIM}
         - name: metrics-writer-credentials
           secret:
             secretName: metrics-writer-credentials
