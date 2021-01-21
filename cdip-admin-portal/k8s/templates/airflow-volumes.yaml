@@ -24,7 +24,7 @@ spec:
   accessModes:
     - ReadWriteMany
   nfs:
-    server: nfs-server.cdip-v1.svc.cluster.local
+    server: nfs-server.${KUBERNETES_NAMESPACE}.svc.cluster.local
     path: "/exports/dags"
 
 ---
