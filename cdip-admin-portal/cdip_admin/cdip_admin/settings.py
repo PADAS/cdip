@@ -39,6 +39,8 @@ ALLOWED_HOSTS = [env.str('ALLOWED_HOSTS', default='localhost')]
 
 STATIC_ROOT = '/var/www/static/'
 
+DEFAULT_PAGINATE_BY = 25
+
 # Application definition
 
 INSTALLED_APPS = [
