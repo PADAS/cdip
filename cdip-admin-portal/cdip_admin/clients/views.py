@@ -63,6 +63,7 @@ def client_add(request):
 
     else:
         form = ClientForm()
+        form.initial['rootUrl'] = request.headers['Host']
         profile_form = ClientProfileForm()
         return render(request, "clients/client_add.html", {"form": form, "profile_form": profile_form})
 
