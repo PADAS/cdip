@@ -10,4 +10,5 @@ urlpatterns = [
     path('update/<str:client_id>', views.client_update, name='client_update'),
     path('profile/add/<str:client_id>', views.client_profile_add, name='client_profile_add'),
     path('profile/update/<str:client_id>', views.client_profile_update, name='client_profile_update'),
+    path('profile/secret/<str:client_id>', views.client_secret, name='client_secret'),
 ]

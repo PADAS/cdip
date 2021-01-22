@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 # Create your views here.
 from clients.forms import ClientForm, ClientUpdateForm, ClientProfileForm
 from clients.models import ClientProfile
-from clients.utils import get_clients, get_client, add_client, update_client, get_client_by_client_id
+from clients.utils import get_clients, get_client, add_client, update_client, get_client_by_client_id, get_client_secret
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,13 @@ def client_detail(request, client_id):
 
     return render(request, "clients/client_detail.html", {"client": client, 'organizations': organizations,
                                                           'profile': profile})
+
+
+@permission_required('core.admin')
+def client_secret(request, client_id):
+    client = get_client_secret(client_id)
+
+    return render(request, "clients/client_secret.html", {"client": client, "client_id": client_id})
 
 
 @permission_required('core.admin')
