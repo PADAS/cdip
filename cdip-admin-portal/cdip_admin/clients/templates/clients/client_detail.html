@@ -15,5 +15,6 @@
         <a class="btn btn-primary" href="{% url 'client_profile_add' client.clientId %}" role="button">Add Profile</a>
     {% endif %}
     <a class="btn btn-primary" href="{% url 'client_update' client.id %}" role="button">Update</a>
+    <a class="btn btn-primary" href="{% url 'client_secret' client.id %}" role="button">Get Credentials</a>
 
 {% endblock %}
