@@ -4,12 +4,12 @@
 
 {% block content %}
 
-    <h1>{{client.clientId}}</h1>
-    <p>Client ID: {{client.id}}</p>
+    <h1>{{client.name}}</h1>
+    <p>Client ID: {{client.clientId}}</p>
     <p>Root Url: {{ client.rootUrl }}</p>
     {% if profile %}
-        <p>{{ profile.type }}</p>
-        <pre>{{ organizations }}</pre>
+        <p>Type: {{ profile.type }}</p>
+        <pre>Organizations: {{ organizations }}</pre>
         <a class="btn btn-primary" href="{% url 'client_profile_update' client.clientId %}" role="button">Update Profile</a>
     {% else %}
         <a class="btn btn-primary" href="{% url 'client_profile_add' client.clientId %}" role="button">Add Profile</a>
