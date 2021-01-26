@@ -20,13 +20,13 @@ grant_types_init = [
 
 class ClientForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
-    rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
+    rootUrl = forms.URLField(max_length=200, required=False, label="Root Url", widget=forms.HiddenInput)
     protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
 
 
 class ClientUpdateForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
-    rootUrl = forms.URLField(max_length=200, required=True, label="Root Url")
+    rootUrl = forms.URLField(max_length=200, required=False, label="Root Url", widget=forms.HiddenInput)
     protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
 
 
