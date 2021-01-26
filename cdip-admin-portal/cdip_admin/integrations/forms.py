@@ -11,11 +11,11 @@ from .models import OutboundIntegrationConfiguration, InboundIntegrationConfigur
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(render_value=True))
+    password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
 
     class Meta:
         model = InboundIntegrationConfiguration
-        exclude = ['id']
+        exclude = ['id', 'useAdvancedConfiguration', 'useDefaultConfiguration']
         widgets = {
             'password': forms.PasswordInput(),
             # 'state': forms.HiddenInput()
@@ -23,7 +23,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
 
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(render_value=True))
+    password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
 
     class Meta:
         model = OutboundIntegrationConfiguration

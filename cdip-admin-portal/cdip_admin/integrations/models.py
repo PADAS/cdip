@@ -11,7 +11,7 @@ from organizations.models import Organization, OrganizationGroup
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200, verbose_name='Type')
-    slug = models.SlugField(max_length=200)
+    slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
 
     def __str__(self):
@@ -24,7 +24,7 @@ class InboundIntegrationType(TimestampedModel):
 class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=200)
+    slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     use_endpoint = models.BooleanField(default=False)
     use_login = models.BooleanField(default=False)
@@ -41,7 +41,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    state = models.JSONField(default=dict)
+    state = models.JSONField(blank=True, null=True)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
@@ -59,7 +59,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     endpoint = models.URLField(blank=True)
-    state = models.JSONField(default=dict)
+    state = models.JSONField(blank=True, null=True)
     # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
