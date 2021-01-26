@@ -8,6 +8,7 @@ from django_tables2.views import SingleTableMixin
 
 import logging
 
+from cdip_admin import settings
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
 from .filters import DeviceStateFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
@@ -15,6 +16,7 @@ from .models import InboundIntegrationType, OutboundIntegrationType \
 from .tables import DeviceStateTable
 
 logger = logging.getLogger(__name__)
+default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
 
 ###
@@ -33,7 +35,7 @@ class DeviceList(PermissionRequiredMixin, ListView):
     queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
                                                       'inbound_configuration__type__name')
     context_object_name = 'devices'
-    paginate_by = 4
+    paginate_by = default_paginate_by
 
 
 ###
@@ -62,7 +64,7 @@ class InboundIntegrationTypeList(PermissionRequiredMixin, ListView):
     template_name = 'integrations/inbound_integration_type_list.html'
     queryset = InboundIntegrationType.objects.get_queryset().order_by('name')
     context_object_name = 'integrations'
-    paginate_by = 2
+    paginate_by = default_paginate_by
 
 
 ###
@@ -79,7 +81,7 @@ class OutboundIntegrationTypeList(PermissionRequiredMixin, ListView):
     template_name = 'integrations/outbound_integration_type_list.html'
     queryset = OutboundIntegrationType.objects.get_queryset().order_by('name')
     context_object_name = 'integrations'
-    paginate_by = 2
+    paginate_by = default_paginate_by
 
 
 ###
@@ -96,7 +98,7 @@ class InboundIntegrationConfigurationList(PermissionRequiredMixin, ListView):
     template_name = 'integrations/inbound_integration_configuration_list.html'
     queryset = InboundIntegrationConfiguration.objects.get_queryset().order_by('id')
     context_object_name = 'integrations'
-    paginate_by = 2
+    paginate_by = default_paginate_by
 
 
 @permission_required('core.admin')
@@ -126,7 +128,7 @@ class OutboundIntegrationConfigurationList(PermissionRequiredMixin, ListView):
     template_name = 'integrations/outbound_integration_configuration_list.html'
     queryset = OutboundIntegrationConfiguration.objects.get_queryset().order_by('id')
     context_object_name = 'integrations'
-    paginate_by = 2
+    paginate_by = default_paginate_by
 
 
 @permission_required('core.admin')
