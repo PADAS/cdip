@@ -11,22 +11,22 @@
 
 ## View Organization <a name="view-organization"></a>
     From the left navigation bar click the 'Organization Information' link.
-![Left Nav](./user_manual_images/view_organization.png)
+![Left Nav](user_manual_images/view_organization.png)
 
 
 
 ## View Inbound Integration Configurations <a name="view-inbound-integration"></a>
 
     To see a list of available inbound integrations 'Inbound Integrations' link.
-![Left Nav](./user_manual_images/view_inbound_integrations.png)
+![Left Nav](user_manual_images/view_inbound_integrations.png)
 
 ## Add a New Inbound Integration Configuration <a name="add-inbound-integration"></a>
 
     1. To add a new inbound integration configuration 'Configure Integration' link.
-![Left Nav](./user_manual_images/view_inbound_integrations.png)
+![Left Nav](user_manual_images/view_inbound_integrations.png)
 
     2. Fill out the form with the appropriate information.
-![Left Nav](./user_manual_images/add_inbound_integration.png)
+![Left Nav](user_manual_images/add_inbound_integration.png)
 
         a. Type - Select the type of Integration you are configuraing. For Example: Savannah Tracker
         b. Owner - Assign who what organization an integration corresponds to. For Example: Grumeti
