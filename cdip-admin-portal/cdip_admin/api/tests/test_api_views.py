@@ -8,6 +8,7 @@ pytestmark = pytest.mark.django_db
 from unittest.mock import patch
 
 from django_keycloak.models import OpenIdConnectProfile, Realm, Server
+from integrations.models import InboundIntegrationType
 
 
 @patch('cdip_admin.utils.decode_token')
@@ -17,12 +18,24 @@ def test_get_integration_type_list(mock_get_user_perms, mock_decode_token, clien
         mock_get_user_perms.return_value = inbound_integration_user.user_permissions
         mock_decode_token.return_value = inbound_integration_user.decoded_jwt
 
+
+        iit = InboundIntegrationType.objects.create(
+            name='Some integration type',
+            slug='some-integration-type',
+            description='Some integration type.'
+
+        )
+
         client.force_login(inbound_integration_user.user)
 
+
         response = client.get(reverse("inboundintegrationtype_list"), HTTP_AUTHORIZATION=f'Bearer {inbound_integration_user.bearer_token}')
-        print(response.json())
-        print('Call count: %s' % (mock_get_user_perms.call_count,))
+        assert mock_get_user_perms.call_count == 1 # Just verifying that permissions mocking is working.
         assert response.status_code == 200
+
+        response = response.json()
+
+        assert str(iit.id) in [x['id'] for x in response]
 
 
 class IntegrationUser(NamedTuple):
