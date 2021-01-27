@@ -16,6 +16,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = InboundIntegrationConfiguration
         exclude = ['id', 'useAdvancedConfiguration', 'useDefaultConfiguration']
+        labels = {'defaultConfiguration': "Destinations"}
         widgets = {
             'password': forms.PasswordInput(),
             # 'state': forms.HiddenInput()
