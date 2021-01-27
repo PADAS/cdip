@@ -26,7 +26,7 @@
 ![Left Nav](user_manual_images/view_inbound_integrations.png)
 
     2. Fill out the form with the appropriate information.
-![Left Nav](user_manual_images/add_inbound_integration.png)
+<img src="user_manual_images/add_inbound_integration.png" width="500" />
 
         a. Type - Select the type of Integration you are configuraing. For Example: Savannah Tracker
         b. Owner - Assign who what organization an integration corresponds to. For Example: Grumeti
