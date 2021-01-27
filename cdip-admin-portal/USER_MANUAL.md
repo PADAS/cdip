@@ -4,6 +4,8 @@
 ## Table of Contents
 1. [View Organization](#view-organization)
 2. [View Inbound Integration Configurations](#view-inbound-integrations)
+    1. [View Inbound Integration Details](#view-inbound-integration-details)
+    2. [View Inbound Integration Credentials](#view-inbound-integration-credentials)
 3. [Add a New Inbound Integration Configuration](#add-inbound-integration)
 4. [Glossary](#glossary)
 
@@ -20,13 +22,21 @@
     To see a list of available inbound integrations 'Inbound Integrations' link.
 ![Left Nav](user_manual_images/view_inbound_integrations.png)
 
+> ### View Inbound Integration Configuration Details <a name="view-inbound-integration-details"></a>
+>   From the Inbound Integrations Page Click the desired integration to view the details.
+> ![Left Nav](user_manual_images/inbound_integrations_list.png)
+
+>> ### View Inbound Integration Configuration Credentials <a name="view-inbound-integration-credentials"></a>
+>>   Click the 'Get Credentials' button from the Inbound Integrations Page
+>> ![Left Nav](user_manual_images/view_inbound_credentials.png)
+
 ## Add a New Inbound Integration Configuration <a name="add-inbound-integration"></a>
 
     1. To add a new inbound integration configuration 'Configure Integration' link.
 ![Left Nav](user_manual_images/view_inbound_integrations.png)
 
     2. Fill out the form with the appropriate information.
-<img src="user_manual_images/add_inbound_integration.png" width="500" />
+![Left Nav](user_manual_images/add_inbound_integration.png)
 
         a. Type - Select the type of Integration you are configuraing. For Example: Savannah Tracker
         b. Owner - Assign who what organization an integration corresponds to. For Example: Grumeti
