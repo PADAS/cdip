@@ -20,7 +20,7 @@ from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
 from clients.utils import get_client_by_client_id
-from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
+from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter, OutboundIntegrationConfigurationFilter
 from .serializers import *
 from .utils import update_device_information
 
@@ -252,6 +252,8 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = OutboundIntegrationConfigurationFilter
 
     @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):

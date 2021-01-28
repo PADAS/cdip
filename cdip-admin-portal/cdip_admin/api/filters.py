@@ -1,6 +1,6 @@
 import django_filters
 
-from integrations.models import InboundIntegrationConfiguration, DeviceState
+from integrations.models import InboundIntegrationConfiguration, DeviceState, OutboundIntegrationConfiguration
 
 
 class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
@@ -26,6 +26,17 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
 
     class Meta:
         model = InboundIntegrationConfiguration
+        fields = ()
+
+
+class OutboundIntegrationConfigurationFilter(django_filters.FilterSet):
+    inbound_integration_id = django_filters.UUIDFilter(
+        field_name='inboundintegrationconfiguration__id',
+        lookup_expr='exact'
+    )
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
         fields = ()
 
 
