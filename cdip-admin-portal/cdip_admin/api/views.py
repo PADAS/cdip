@@ -1,9 +1,8 @@
-import json
 import logging
 from functools import wraps
 
-import jwt
 import rest_framework
+from datadog import statsd
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Window
@@ -13,13 +12,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
-from datadog import statsd
 
 from accounts.models import AccountProfile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
-from clients.utils import get_client_by_client_id
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import update_device_information
@@ -250,8 +247,18 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
 
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
-    queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
+
+    def get_queryset(self):
+        # todo: need to filter queryset based on permissions as well.
+        queryset = OutboundIntegrationConfiguration.objects.all()
+        int_id = self.request.query_params.get('inbound_int_id')
+        if int_id:
+            queryset = OutboundIntegrationConfiguration.objects.filter(
+                inboundintegrationconfiguration__id=int_id).annotate(
+                inbound_type_slug=F('inboundintegrationconfiguration__type__slug'))
+
+        return queryset
 
     @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
