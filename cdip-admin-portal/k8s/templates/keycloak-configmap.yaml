@@ -9,6 +9,7 @@ data:
   KEYCLOAK_REALM: cdip${REALM_SUFFIX}
   KEYCLOAK_ADMIN_REALM: cdip${REALM_SUFFIX}
   KEYCLOAK_CLIENT_ID: ***REMOVED***
+  KEYCLOAK_AUDIENCE: ***REMOVED***
   # KEYCLOAK_CLIENT_SECRET: moved to k8s secret: cdip-secrets
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
   # this needs to be the UUID of the client with id KEYCLOAK_CLIENT_ID
