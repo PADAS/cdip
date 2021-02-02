@@ -6,6 +6,7 @@ metadata:
 data:
   PORTAL_ENDPOINT: "https://cdip-dev.pamdas.org"
   REDIS_HOST: "10.170.75.131"
+  BATCH_SIZE: "100"
   # NOTE: if using K8s executor make sure the dags_volume_subpath config matches up with subpath (srcroot/...) below
   AIRFLOW__CORE__DAGS_FOLDER: "/git-sync/srcroot/cdip-downstream/dags"
 
