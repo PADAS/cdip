@@ -19,7 +19,7 @@ from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
-from .utils import update_device_information
+from .utils import update_device_information, post_device_information
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ class DeviceStateListView(generics.ListAPIView):
 
         queryset = DeviceState.objects.filter(**filter).annotate(
             last_end_state=Window(expression=FirstValue(F('end_state')),
-                                   partition_by=F('device_id'), order_by=[F('created_at').desc(),])
+                                   partition_by=F('device_id'), order_by=[F('created_at').desc()])
                                    ).distinct('device_id')
 
         return queryset
@@ -321,6 +321,14 @@ class DeviceStateListView(generics.ListAPIView):
     @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+
+@api_view(['POST'])
+@permission_classes(['read:inboundintegrationconfiguration', 'core.admin'])
+def update_inbound_integration_state(request, integration_id):
+    if request.method == 'POST':
+        result = post_device_information(request.data, integration_id)
+    return JsonResponse(result)
 
 
 
