@@ -80,10 +80,10 @@ class Device(TimestampedModel):
     outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
 
     def __str__(self):
-        return f"{self.inbound_configuration.type.name} - {self.inbound_configuration.owner.name}"
+        return f"{self.external_id} - {self.inbound_configuration.type.name}"
 
     class Meta:
-        unique_together = ('inbound_configuration', 'external_id')
+        unique_together = ('external_id', 'inbound_configuration')
 
 
 # This is where the information is stored for a specific device
@@ -108,16 +108,16 @@ class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    devices = models.ManyToManyField(Device)
+    devices = models.ManyToManyField(Device, null=True)
     # A Device can have many outbound configurations
-    organization_group = models.ForeignKey(OrganizationGroup, on_delete=models.CASCADE)
+    organization_group = models.ForeignKey(OrganizationGroup, on_delete=models.CASCADE, null=True)
     # startDate and endDate are used when the device group will only be in use for a certain period of time.
-    start_date = models.DateField()
-    end_date = models.DateField()
+    start_date = models.DateField(null=True)
+    end_date = models.DateField(null=True)
     # startTime and endTime are used to limit the share for a specific part of the day
     # Example: Would be for ranger tracking info at night to help APU response
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    start_time = models.TimeField(null=True)
+    end_time = models.TimeField(null=True)
 
 
 # Stores the Device Configuration for a DeviceGroup

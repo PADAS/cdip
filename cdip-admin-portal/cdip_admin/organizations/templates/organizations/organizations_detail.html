@@ -4,7 +4,7 @@
 
 {% block content %}
 
-    <h1>{{module.name}}</h1>
-    <p>{{module.description}}</p>
-
+    <h1>{{organization.name}}</h1>
+    <p>{{organization.description}}</p>
+    <a class="btn btn-primary" href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
 {% endblock %}
