@@ -14,6 +14,7 @@ from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
 from accounts.models import AccountProfile
+from accounts.utils import get_user_profile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
@@ -69,16 +70,6 @@ def get_profile(user_id):
 
     if profile is None:
         profile = get_client_profile(user_id)
-
-    return profile
-
-
-def get_user_profile(user_id):
-
-    try:
-        profile = AccountProfile.objects.get(user_id=user_id)
-    except ObjectDoesNotExist:
-        profile = None
 
     return profile
 
