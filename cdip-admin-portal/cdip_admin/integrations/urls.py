@@ -15,6 +15,9 @@ urlpatterns = [
     path('devices/groups/update/<uuid:device_group_id>',
          views.device_group_update,
          name="device_group_update"),
+    path('devices/groups/management/update/<uuid:device_group_id>',
+         views.device_group_management_update,
+         name="device_group_management_update"),
 
     path('devices/state/', views.DeviceStateList.as_view(), name='device_state_list'),
 

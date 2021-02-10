@@ -9,7 +9,8 @@ from django_tables2.views import SingleTableMixin
 import logging
 
 from cdip_admin import settings
-from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm
+from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
+    DeviceGroupManagementForm
 from .filters import DeviceStateFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
@@ -59,19 +60,30 @@ class DeviceGroupList(PermissionRequiredMixin, ListView):
 @permission_required('core.admin')
 def device_group_add(request):
     if request.method == "POST":
-        form = DeviceGroupForm(request.POST)
+        form = DeviceGroupForm(request.POST, user=request.user)
         if form.is_valid():
             config = form.save()
             return redirect("device_group_detail", config.id)
     else:
-        form = DeviceGroupForm
+        form = DeviceGroupForm(user=request.user)
     return render(request, "integrations/device_group_add.html", {"form": form})
 
 
 @permission_required('core.admin')
 def device_group_update(request, device_group_id):
     device_group = get_object_or_404(DeviceGroup, id=device_group_id)
-    form = DeviceGroupForm(request.POST or None, instance=device_group)
+    form = DeviceGroupForm(request.POST or None, instance=device_group, user=request.user)
+    if form.is_valid():
+        form.save()
+        return redirect("device_group_detail", device_group_id)
+    return render(request, "integrations/device_group_update.html", {"form": form})
+
+
+@permission_required('core.admin')
+def device_group_management_update(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, id=device_group_id)
+    form = DeviceGroupManagementForm(request.POST or None, instance=device_group)
+
     if form.is_valid():
         form.save()
         return redirect("device_group_detail", device_group_id)

@@ -1,7 +1,9 @@
 import requests
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
 import logging
 
+from accounts.models import AccountProfile
 from cdip_admin import settings
 from core.utils import get_admin_access_token
 
@@ -202,6 +204,16 @@ def update_account(account_info, user_id):
     else:
         logger.error(f'Error updating account: {response.status_code}], {response.text}')
         return False
+
+
+def get_user_profile(user_id):
+
+    try:
+        profile = AccountProfile.objects.get(user_id=user_id)
+    except ObjectDoesNotExist:
+        profile = None
+
+    return profile
 
 
 
