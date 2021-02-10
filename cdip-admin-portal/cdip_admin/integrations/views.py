@@ -9,10 +9,10 @@ from django_tables2.views import SingleTableMixin
 import logging
 
 from cdip_admin import settings
-from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
+from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm
 from .filters import DeviceStateFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
-    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
 from .tables import DeviceStateTable
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,46 @@ class DeviceList(PermissionRequiredMixin, ListView):
                                                       'inbound_configuration__type__name')
     context_object_name = 'devices'
     paginate_by = default_paginate_by
+
+
+###
+# Device Group Methods/Classes
+###
+@permission_required('core.admin')
+def device_group_detail(request, module_id):
+    logger.info(f"Request for Device Group: {module_id}")
+    device_group = get_object_or_404(DeviceGroup, pk=module_id)
+    return render(request, "integrations/device_group_detail.html", {"device_group": device_group})
+
+
+class DeviceGroupList(PermissionRequiredMixin, ListView):
+    permission_required = 'core.admin'
+    template_name = 'integrations/device_group_list.html'
+    queryset = DeviceGroup.objects.get_queryset().order_by('name')
+    context_object_name = 'device_groups'
+    paginate_by = default_paginate_by
+
+
+@permission_required('core.admin')
+def device_group_add(request):
+    if request.method == "POST":
+        form = DeviceGroupForm(request.POST)
+        if form.is_valid():
+            config = form.save()
+            return redirect("device_group_detail", config.id)
+    else:
+        form = DeviceGroupForm
+    return render(request, "integrations/device_group_add.html", {"form": form})
+
+
+@permission_required('core.admin')
+def device_group_update(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, id=device_group_id)
+    form = DeviceGroupForm(request.POST or None, instance=device_group)
+    if form.is_valid():
+        form.save()
+        return redirect("device_group_detail", device_group_id)
+    return render(request, "integrations/device_group_update.html", {"form": form})
 
 
 ###
@@ -106,11 +146,21 @@ def inbound_integration_configuration_add(request):
     if request.method == "POST":
         form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect("welcome")
+            config = form.save()
+            return redirect("inbound_integration_configuration_detail", config.id)
     else:
         form = InboundIntegrationConfigurationForm
     return render(request, "integrations/inbound_integration_configuration_add.html", {"form": form})
+
+
+@permission_required('core.admin')
+def inbound_integration_configuration_update(request, configuration_id):
+    configuration = get_object_or_404(InboundIntegrationConfiguration, id=configuration_id)
+    form = InboundIntegrationConfigurationForm(request.POST or None, instance=configuration)
+    if form.is_valid():
+        form.save()
+        return redirect("inbound_integration_configuration_detail", configuration_id)
+    return render(request, "integrations/inbound_integration_configuration_update.html", {"form": form})
 
 
 ###
@@ -136,8 +186,18 @@ def outbound_integration_configuration_add(request):
     if request.method == "POST":
         form = OutboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect("welcome")
+            config = form.save()
+            return redirect("outbound_integration_configuration_detail", config.id)
     else:
         form = OutboundIntegrationConfigurationForm
     return render(request, "integrations/outbound_integration_configuration_add.html", {"form": form})
+
+
+@permission_required('core.admin')
+def outbound_integration_configuration_update(request, configuration_id):
+    configuration = get_object_or_404(OutboundIntegrationConfiguration, id=configuration_id)
+    form = OutboundIntegrationConfigurationForm(request.POST or None, instance=configuration)
+    if form.is_valid():
+        form.save()
+        return redirect("outbound_integration_configuration_detail", configuration_id)
+    return render(request, "integrations/outbound_integration_configuration_update.html", {"form": form})

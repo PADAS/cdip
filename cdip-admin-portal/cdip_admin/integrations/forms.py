@@ -1,13 +1,14 @@
 from django import forms
 
-from .models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
+from .models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration, DeviceGroup
 
 
-# class DeviceGroupForm(forms.ModelForm):
-#     class Meta:
-#         model = DeviceGroup
-#         fields = ('name', 'type', 'organization_group', 'devices', 'configuration',
-#                   'start_date', 'end_date', 'start_time', 'end_time')
+class DeviceGroupForm(forms.ModelForm):
+    class Meta:
+        model = DeviceGroup
+        exclude = ['id']
+        # fields = ('name', 'type', 'organization_group', 'devices', 'configuration',
+        #           'start_date', 'end_date', 'start_time', 'end_time')
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
