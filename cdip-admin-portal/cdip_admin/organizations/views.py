@@ -13,7 +13,6 @@ def organizations_add(request):
         form = OrganizationForm(request.POST)
         if form.is_valid():
             org = form.save()
-            DeviceGroup.objects.create(owner_id=org.id, name="Default")
             return redirect("organizations_detail", org.id)
     else:
         form = OrganizationForm
