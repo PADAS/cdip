@@ -159,7 +159,9 @@ def inbound_integration_configuration_add(request):
         form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             config = form.save()
-            return redirect("inbound_integration_configuration_detail", config.id)
+            name = config.type.name + " - Default"
+            device_group = DeviceGroup.objects.create(owner_id=config.owner.id, name=name, inbound_configuration=config)
+            return redirect("device_group_update", device_group.id)
     else:
         form = InboundIntegrationConfigurationForm
     return render(request, "integrations/inbound_integration_configuration_add.html", {"form": form})
