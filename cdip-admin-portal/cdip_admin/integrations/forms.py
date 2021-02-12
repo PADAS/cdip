@@ -20,7 +20,8 @@ class DeviceGroupForm(forms.ModelForm):
 class DeviceGroupManagementForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
-        exclude = ['id', 'owner', 'organization_group', 'start_date', 'end_date', 'start_time', 'end_time']
+        exclude = ['id', 'name', 'destinations', 'owner',
+                   'organization_group', 'start_date', 'end_date', 'start_time', 'end_time']
 
     def __init__(self, *args, **kwargs):
         super(DeviceGroupManagementForm, self).__init__(*args, **kwargs)

@@ -60,7 +60,6 @@ class InboundIntegrationConfiguration(TimestampedModel):
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     endpoint = models.URLField(blank=True)
     state = models.JSONField(blank=True, null=True)
-    # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
@@ -77,7 +76,7 @@ class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
-    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
+    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration, blank=True)
 
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
@@ -108,7 +107,9 @@ class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    devices = models.ManyToManyField(Device, null=True)
+    inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE, null=True)
+    destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='destinations', blank=True)
+    devices = models.ManyToManyField(Device, blank=True)
     # A Device can have many outbound configurations
     organization_group = models.ForeignKey(OrganizationGroup, on_delete=models.CASCADE, null=True)
     # startDate and endDate are used when the device group will only be in use for a certain period of time.
