@@ -315,10 +315,11 @@ class DeviceStateListView(generics.ListAPIView):
 
 
 @api_view(['POST'])
-@permission_classes(['read:inboundintegrationconfiguration', 'core.admin'])
+@requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
 def update_inbound_integration_state(request, integration_id):
     if request.method == 'POST':
-        result = post_device_information(request.data, integration_id)
+        data = request.data
+        result = post_device_information(data, integration_id)
     return JsonResponse(result)
 
 
