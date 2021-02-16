@@ -41,6 +41,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(blank=True, null=True)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
@@ -58,6 +59,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
     endpoint = models.URLField(blank=True)
     state = models.JSONField(blank=True, null=True)
     login = models.CharField(max_length=200, blank=True)
@@ -91,6 +93,7 @@ class DeviceState(TimestampedModel):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
+    state = models.JSONField(blank=True, null=True)
 
     class Meta:
         indexes = [
