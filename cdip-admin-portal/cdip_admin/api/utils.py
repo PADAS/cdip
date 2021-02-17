@@ -20,16 +20,18 @@ def update_device_information(state, config):
 
 def post_device_information(state, config_id):
     logger.info('Post Device Information')
+
+    config = InboundIntegrationConfiguration.objects.get(id=config_id)
+
+    name = config.type.name + " - Default"
+    device_group, created = DeviceGroup.objects.get_or_create(inbound_configuration=config,
+                                                              defaults=dict(owner_id=config.owner.id, name=name))
+
     for key in state:
         device, created = Device.objects.get_or_create(external_id=key, inbound_configuration_id=config_id)
-        config = InboundIntegrationConfiguration.objects.get(id=config_id)
 
         for item in config.defaultConfiguration.all():
             device.outbound_configuration.add(item)
-
-        name = config.type.name + " - Default"
-        device_group, created = DeviceGroup.objects.get_or_create(inbound_configuration=config,
-                                                                  defaults=dict(owner_id=config.owner.id, name=name))
 
         if device not in device_group.devices.all():
             device_group.devices.add(device)
@@ -37,3 +39,5 @@ def post_device_information(state, config_id):
 
         logger.info('Update the state of the device stream if it has changed.')
         DeviceState.objects.get_or_create(device_id=device.id, state=state[key])
+
+    return device_group.devices.values('id', 'external_id', 'inbound_configuration_id')

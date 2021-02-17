@@ -320,7 +320,8 @@ def update_inbound_integration_state(request, integration_id):
     if request.method == 'POST':
         data = request.data
         result = post_device_information(data, integration_id)
-    return JsonResponse(result)
+        response = list(result)
+        return JsonResponse(response, safe=False)
 
 
 
