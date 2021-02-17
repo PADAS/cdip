@@ -324,6 +324,20 @@ def update_inbound_integration_state(request, integration_id):
         return JsonResponse(response, safe=False)
 
 
+@api_view(['GET'])
+@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
+def get_device_list_by_outbound_configuration(request, integration_id):
+    if request.method == 'GET':
+
+        device_groups = DeviceGroup.objects.filter(destinations__id=integration_id)
+
+        devices = Device.objects.filter(devicegroup__in=device_groups)\
+            .values('id', 'external_id', 'inbound_configuration_id').distinct()
+
+        response = list(devices)
+        return JsonResponse(response, safe=False)
+
+
 
 
 
