@@ -21,6 +21,11 @@ resource "template_dir" "deployments" {
     AIRFLOW_DAGS_VOLUME_CLAIM = format("%s-dags-volume-claim", var.namespace)
     AIRFLOW_DAGS_VOLUME = format("%s-dags-volume", var.namespace)
     AIRFLOW_GCS_LOGS_FOLDER = var.airflow-gcs-logs-folder
+    REDIS_HOST_IPADDRESS = var.redis-host-ipaddress
+    PORTAL_DB_HOST_IPADDRESS = var.portal-db-host-ipaddress
+    PORTAL_DB_NAME = var.portal-db-name
+    GITSYNC_BRANCH_NAME = var.gitsync-branch-name
+    KEYCLOAK_CLIENT_UUID = var.keycloak-client-uuid
   }
 }
 
@@ -74,5 +79,25 @@ variable "realm-suffix" {
 }
 
 variable "airflow-gcs-logs-folder" {
+  type = string
+}
+
+variable "redis-host-ipaddress" {
+  type = string
+}
+
+variable "portal-db-host-ipaddress" {
+  type = string
+}
+
+variable "portal-db-name" {
+  type = string
+}
+
+variable "gitsync-branch-name" {
+  type = string
+}
+
+variable "keycloak-client-uuid" {
   type = string
 }
