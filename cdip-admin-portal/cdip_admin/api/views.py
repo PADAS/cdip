@@ -338,6 +338,31 @@ def get_device_list_by_outbound_configuration(request, integration_id):
         return JsonResponse(response, safe=False)
 
 
+@api_view(['GET'])
+@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
+def get_destinations_for_device(request, device_id):
+    if request.method == 'GET':
+
+        device_groups = DeviceGroup.objects.filter(devices__id=device_id).values('destinations').distinct()
+
+        response = list(device_groups)
+
+        return JsonResponse(response, safe=False)
+
+
+@api_view(['GET'])
+@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
+def get_device_destinations_by_inbound_config(request, integration_id):
+    if request.method == 'GET':
+
+        devices = Device.objects.filter(inbound_configuration__id=integration_id).all()
+        device_groups = DeviceGroup.objects.filter(devices__id=integration_id).values('destinations').distinct()
+
+        response = list(device_groups)
+
+        return JsonResponse(response, safe=False)
+
+
 
 
 
