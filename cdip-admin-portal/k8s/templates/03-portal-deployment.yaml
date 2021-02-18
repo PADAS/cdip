@@ -55,9 +55,9 @@ spec:
           - containerPort: 8000
         env:
         - name: DB_HOST
-          value: "172.22.160.3"
+          value: ${PORTAL_DB_HOST_IPADDRESS}
         - name: DB_NAME
-          value: "dev_cdipdb"
+          value: ${PORTAL_DB_NAME}
         - name: DB_PORT
           value: "5432"
         - name: ALLOWED_HOSTS
