@@ -18,17 +18,15 @@ def update_device_information(state, config):
         DeviceState.objects.get_or_create(device_id=device.id, end_state=state[key])
 
 
-def post_device_information(state, config_id):
+def post_device_information(state, config):
     logger.info('Post Device Information')
-
-    config = InboundIntegrationConfiguration.objects.get(id=config_id)
 
     name = config.type.name + " - Default"
     device_group, created = DeviceGroup.objects.get_or_create(inbound_configuration=config,
                                                               defaults=dict(owner_id=config.owner.id, name=name))
 
     for key in state:
-        device, created = Device.objects.get_or_create(external_id=key, inbound_configuration_id=config_id)
+        device, created = Device.objects.get_or_create(external_id=key, inbound_configuration_id=config.id)
 
         for item in config.defaultConfiguration.all():
             device.outbound_configuration.add(item)
