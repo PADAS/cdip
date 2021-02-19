@@ -9,13 +9,10 @@ from django.db.models import F, Window
 from django.db.models.functions import FirstValue
 from django.http import JsonResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
-from requests import Response
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 
-from accounts.models import AccountProfile
 from accounts.utils import get_user_profile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
@@ -325,7 +322,7 @@ def update_inbound_integration_state(request, integration_id):
 
         try:
             config = InboundIntegrationConfiguration.objects.get(id=integration_id)
-        except ObjectDoesNotExist:
+        except InboundIntegrationConfiguration.DoesNotExist:
             logger.warning("Retrieve Inbound Configuration, Integration Not Found",
                            extra={"integration_id": integration_id})
             raise Http404
