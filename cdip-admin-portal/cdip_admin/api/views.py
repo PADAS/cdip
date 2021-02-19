@@ -349,6 +349,7 @@ def get_device_list_by_outbound_configuration(request, integration_id):
 @api_view(['GET'])
 @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
 def get_destinations_for_device(request, device_id):
+    # TODO: Convert to external_id and inboundconfig_id
     if request.method == 'GET':
 
         device_groups = DeviceGroup.objects.filter(devices__id=device_id).values('destinations').distinct()
@@ -368,6 +369,9 @@ def get_device_destinations_by_inbound_config(request, integration_id):
         response = {}
 
         for device in devices:
+            # [ device1 : "device information"
+            #       destinations: [ 1, 2, 3]
+            # ]
 
             device_groups = DeviceGroup.objects.filter(devices__id=device.id).values('destinations').distinct()
 
