@@ -2,7 +2,7 @@ import logging
 
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render, redirect, get_object_or_404
-from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
+from django.core.exceptions import SuspiciousOperation
 
 from cdip_admin import settings
 from .forms import AccountForm, AccountUpdateForm, AccountProfileForm, AccountRoleForm
@@ -31,7 +31,7 @@ def account_detail(request, user_id):
 
     try:
         profile = AccountProfile.objects.get(user_id=user_id)
-    except ObjectDoesNotExist:
+    except AccountProfile.DoesNotExist:
         profile = None
 
     organizations = []
