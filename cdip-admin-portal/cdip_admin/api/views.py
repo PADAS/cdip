@@ -7,10 +7,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Window
 from django.db.models.functions import FirstValue
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics
+from requests import Response
+from rest_framework import generics, status
 from rest_framework.decorators import permission_classes, api_view
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 
 from accounts.models import AccountProfile
@@ -317,9 +319,18 @@ class DeviceStateListView(generics.ListAPIView):
 @api_view(['POST'])
 @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
 def update_inbound_integration_state(request, integration_id):
+    logger.info(f"Updating Inbound Configuration State, Integration ID {integration_id}")
     if request.method == 'POST':
         data = request.data
-        result = post_device_information(data, integration_id)
+
+        try:
+            config = InboundIntegrationConfiguration.objects.get(id=integration_id)
+        except ObjectDoesNotExist:
+            logger.warning("Retrieve Inbound Configuration, Integration Not Found",
+                           extra={"integration_id": integration_id})
+            raise Http404
+
+        result = post_device_information(data, config)
         response = list(result)
         return JsonResponse(response, safe=False)
 
@@ -356,7 +367,12 @@ def get_device_destinations_by_inbound_config(request, integration_id):
     if request.method == 'GET':
 
         devices = Device.objects.filter(inbound_configuration__id=integration_id).all()
-        device_groups = DeviceGroup.objects.filter(devices__id=integration_id).values('destinations').distinct()
+
+        response = {}
+
+        for device in devices:
+
+            device_groups = DeviceGroup.objects.filter(devices__id=device.id).values('destinations').distinct()
 
         response = list(device_groups)
 
