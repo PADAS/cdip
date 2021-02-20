@@ -11,12 +11,9 @@ class Migration(migrations.Migration):
         for state in DeviceState.objects.all():
             try:
                 state.state = json.loads(state.end_state)
-                state.save()
             except json.decoder.JSONDecodeError as e:
-                print('Cannot convert {} object'.format(state.pk))
-
-    def revert_migration(apps, schema):
-        pass
+                state.state = dict(value=str(state.end_state))
+            state.save()
 
     dependencies = [
         ('integrations', '0020_auto_20210216_1703'),
@@ -25,6 +22,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             code=forward_data_migration,
-            reverse_code=revert_migration
+            reverse_code=migrations.RunPython.noop
         )
     ]
