@@ -237,16 +237,21 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
 
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
+
+    queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
     def get_queryset(self):
         # todo: need to filter queryset based on permissions as well.
         queryset = OutboundIntegrationConfiguration.objects.all()
-        int_id = self.request.query_params.get('inbound_int_id')
-        if int_id:
-            queryset = OutboundIntegrationConfiguration.objects.filter(
-                inboundintegrationconfiguration__id=int_id).annotate(
-                inbound_type_slug=F('inboundintegrationconfiguration__type__slug'))
+        inbound_id = self.request.query_params.get('inbound_id')
+        print(f'QS: {self.request.query_params}')
+        if inbound_id:
+            try:
+                ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
+                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).distinct()
+            except InboundIntegrationConfiguration.DoesNotExist:
+                queryset = queryset.none()
 
         return queryset
 
@@ -257,6 +262,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
 class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Configuration """
+
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
@@ -332,52 +338,31 @@ def update_inbound_integration_state(request, integration_id):
         return JsonResponse(response, safe=False)
 
 
-@api_view(['GET'])
-@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
-def get_device_list_by_outbound_configuration(request, integration_id):
-    if request.method == 'GET':
-
-        device_groups = DeviceGroup.objects.filter(destinations__id=integration_id)
-
-        devices = Device.objects.filter(devicegroup__in=device_groups)\
-            .values('id', 'external_id', 'inbound_configuration_id').distinct()
-
-        response = list(devices)
-        return JsonResponse(response, safe=False)
-
-
-@api_view(['GET'])
-@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
-def get_destinations_for_device(request, device_id):
-    # TODO: Convert to external_id and inboundconfig_id
-    if request.method == 'GET':
-
-        device_groups = DeviceGroup.objects.filter(devices__id=device_id).values('destinations').distinct()
-
-        response = list(device_groups)
-
-        return JsonResponse(response, safe=False)
+# @api_view(['GET'])
+# @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
+# def get_device_list_by_outbound_configuration(request, integration_id):
+#     if request.method == 'GET':
+#
+#         device_groups = DeviceGroup.objects.filter(destinations__id=integration_id)
+#
+#         devices = Device.objects.filter(devicegroup__in=device_groups)\
+#             .values('id', 'external_id', 'inbound_configuration_id').distinct()
+#
+#         response = list(devices)
+#         return JsonResponse(response, safe=False)
 
 
-@api_view(['GET'])
-@requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
-def get_device_destinations_by_inbound_config(request, integration_id):
-    if request.method == 'GET':
-
-        devices = Device.objects.filter(inbound_configuration__id=integration_id).all()
-
-        response = {}
-
-        for device in devices:
-            # [ device1 : "device information"
-            #       destinations: [ 1, 2, 3]
-            # ]
-
-            device_groups = DeviceGroup.objects.filter(devices__id=device.id).values('destinations').distinct()
-
-        response = list(device_groups)
-
-        return JsonResponse(response, safe=False)
+# @api_view(['GET'])
+# @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
+# def get_destinations_for_device(request, device_id):
+#     # TODO: Convert to external_id and inboundconfig_id
+#     if request.method == 'GET':
+#
+#         device_groups = DeviceGroup.objects.filter(devices__id=device_id).values('destinations').distinct()
+#
+#         response = list(device_groups)
+#
+#         return JsonResponse(response, safe=False)
 
 
 
