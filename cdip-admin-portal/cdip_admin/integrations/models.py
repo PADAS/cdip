@@ -65,9 +65,10 @@ class InboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
-    useDefaultConfiguration = models.BooleanField(default=True)
-    defaultConfiguration = models.ManyToManyField(OutboundIntegrationConfiguration)
-    useAdvancedConfiguration = models.BooleanField(default=False)
+    default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
+                                            related_name='inbound_integration_configuration',
+                                            related_query_name='inbound_integration_configurations',
+                                            verbose_name='Default Device Group')
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
@@ -78,7 +79,6 @@ class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
-    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration, blank=True)
 
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
@@ -125,9 +125,3 @@ class DeviceGroup(TimestampedModel):
     end_time = models.TimeField(null=True)
 
 
-# Stores the Device Configuration for a DeviceGroup
-class DeviceGroupConfiguration(TimestampedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200)
-    device_group = models.OneToOneField(Device, on_delete=models.CASCADE)
-    configuration = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='configurations')
