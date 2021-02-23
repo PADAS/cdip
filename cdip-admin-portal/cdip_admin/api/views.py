@@ -245,7 +245,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
         # todo: need to filter queryset based on permissions as well.
         queryset = OutboundIntegrationConfiguration.objects.all()
         inbound_id = self.request.query_params.get('inbound_id')
-        print(f'QS: {self.request.query_params}')
+
         if inbound_id:
             try:
                 ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)

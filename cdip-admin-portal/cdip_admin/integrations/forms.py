@@ -14,7 +14,7 @@ class DeviceGroupForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         self.profile = get_user_profile(self.user.username)
         super(DeviceGroupForm, self).__init__(*args, **kwargs)
-        self.fields['owner'].queryset = Organization.objects.filter(id__in=self.profile.organizations.all())
+        # self.fields['owner'].queryset = Organization.objects.filter(id__in=self.organizations.all())
 
 
 class DeviceGroupManagementForm(forms.ModelForm):
@@ -35,8 +35,8 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        exclude = ['id', 'useAdvancedConfiguration', 'useDefaultConfiguration']
-        labels = {'defaultConfiguration': "Destinations"}
+        exclude = ['id',]
+        labels = {'default_devicegroup': "Default Device Group"}
         widgets = {
             'password': forms.PasswordInput(),
             # 'state': forms.HiddenInput()
