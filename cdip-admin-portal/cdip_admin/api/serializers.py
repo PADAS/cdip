@@ -22,9 +22,8 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ['id', 'type', 'owner', 'name', 'endpoint', 'state', 'login', 'password', 'token', 'type_slug',
-                  'defaultConfiguration']
-        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'defaultConfiguration']
+        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'default_devicegroup']
+        fields = ['state',] + read_only_fields
 
 
 class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
@@ -45,11 +44,10 @@ class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
 class DeviceSerializer(serializers.ModelSerializer):
     inbound_configuration_id = serializers.CharField(source='inbound_configuration.id', read_only=True)
-    outbound_configuration_id = serializers.CharField(source='outbound_configuration.id', read_only=True)
 
     class Meta:
         model = Device
-        fields = ['id', 'external_id', 'inbound_configuration_id', 'outbound_configuration_id']
+        fields = ['id', 'external_id', 'inbound_configuration_id',]
 
 
 class DeviceStateSerializer(serializers.ModelSerializer):
