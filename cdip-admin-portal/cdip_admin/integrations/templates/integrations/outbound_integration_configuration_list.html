@@ -9,7 +9,11 @@
             {% for integration in integrations %}
                 <li>
                     <a href="{% url 'outbound_integration_configuration_detail' integration.id %}">
-                        {{ integration.type.name }} - {{ integration.owner.name }}
+                        {% if integration.name %}
+                            {{ integration.name }}
+                        {% else %}
+                            {{ integration.type.name }} - {{ integration.owner.name }}
+                        {% endif %}
                     </a>
                 </li>
             {% endfor %}
