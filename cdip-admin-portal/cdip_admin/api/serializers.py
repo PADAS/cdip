@@ -56,4 +56,4 @@ class DeviceStateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeviceState
-        fields = ['device_external_id', 'end_state']
+        fields = ['device_external_id', 'state']
