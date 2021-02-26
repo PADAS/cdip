@@ -4,8 +4,8 @@ metadata:
   namespace: "${KUBERNETES_NAMESPACE}"
   name: dags-configmap
 data:
-  PORTAL_ENDPOINT: "https://cdip-dev.pamdas.org"
-  REDIS_HOST: "10.170.75.131"
+  PORTAL_ENDPOINT: "https://${SITE_FQDN}"
+  REDIS_HOST: ${REDIS_HOST_IPADDRESS}
   BATCH_SIZE: "100"
   # NOTE: if using K8s executor make sure the dags_volume_subpath config matches up with subpath (srcroot/...) below
   AIRFLOW__CORE__DAGS_FOLDER: "/git-sync/srcroot/cdip-downstream/dags"
