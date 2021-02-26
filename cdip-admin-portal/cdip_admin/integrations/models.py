@@ -101,7 +101,7 @@ class DeviceState(TimestampedModel):
         ]
 
     def __str__(self):
-        return f"{self.end_state}"
+        return f"{self.state}"
 
 
 # This allows an organization to group a set of devices to send information to a series of outbound configs
