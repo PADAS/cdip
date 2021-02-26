@@ -13,5 +13,5 @@ data:
   # KEYCLOAK_CLIENT_SECRET: moved to k8s secret: cdip-secrets
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
   # this needs to be the UUID of the client with id KEYCLOAK_CLIENT_ID
-  KEYCLOAK_CLIENT_UUID: 90d34a81-c70c-408b-ad66-7fa1bfe58892
+  KEYCLOAK_CLIENT_UUID: ${KEYCLOAK_CLIENT_UUID}
   # KEYCLOAK_ADMIN_CLIENT_SECRET: moved to k8s secret: cdip-secrets
