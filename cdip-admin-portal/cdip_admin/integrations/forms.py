@@ -8,7 +8,7 @@ from .models import OutboundIntegrationConfiguration, InboundIntegrationConfigur
 class DeviceGroupForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
-        exclude = ['id', 'devices', 'organization_group', 'start_date', 'end_date', 'start_time', 'end_time']
+        exclude = ['id', 'devices',]
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -20,8 +20,7 @@ class DeviceGroupForm(forms.ModelForm):
 class DeviceGroupManagementForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
-        exclude = ['id', 'name', 'destinations', 'owner',
-                   'organization_group', 'start_date', 'end_date', 'start_time', 'end_time']
+        exclude = ['id', 'name', 'destinations', 'owner',]
 
     def __init__(self, *args, **kwargs):
         super(DeviceGroupManagementForm, self).__init__(*args, **kwargs)

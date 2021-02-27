@@ -20,7 +20,10 @@ def forward_f(apps, schema_editor):
                                         inbound_configuration=iic,
                                         )
 
+        # Associate exisitng default outbound config with this new Device Group.
         dg.devices.add(*[x for x in Device.objects.filter(inbound_configuration=iic)])
+        for oc in iic.defaultConfiguration.all():
+            dg.destinations.add(oc)
 
 class Migration(migrations.Migration):
 
@@ -30,4 +33,9 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(forward_f, reverse_code=migrations.RunPython.noop),
+
+        migrations.RemoveField(
+            model_name='inboundintegrationconfiguration',
+            name='defaultConfiguration',
+        ),
     ]
