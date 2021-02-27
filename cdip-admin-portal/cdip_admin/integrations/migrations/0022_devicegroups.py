@@ -17,10 +17,6 @@ class Migration(migrations.Migration):
         ),
         migrations.RemoveField(
             model_name='inboundintegrationconfiguration',
-            name='defaultConfiguration',
-        ),
-        migrations.RemoveField(
-            model_name='inboundintegrationconfiguration',
             name='useAdvancedConfiguration',
         ),
         migrations.RemoveField(

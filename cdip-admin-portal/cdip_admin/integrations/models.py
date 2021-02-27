@@ -65,6 +65,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
+
     default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
                                             related_name='inbound_integration_configuration',
                                             related_query_name='inbound_integration_configurations',
@@ -114,14 +115,5 @@ class DeviceGroup(TimestampedModel):
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
-    # A Device can have many outbound configurations
-    organization_group = models.ForeignKey(OrganizationGroup, on_delete=models.CASCADE, null=True)
-    # startDate and endDate are used when the device group will only be in use for a certain period of time.
-    start_date = models.DateField(null=True)
-    end_date = models.DateField(null=True)
-    # startTime and endTime are used to limit the share for a specific part of the day
-    # Example: Would be for ranger tracking info at night to help APU response
-    start_time = models.TimeField(null=True)
-    end_time = models.TimeField(null=True)
 
 
