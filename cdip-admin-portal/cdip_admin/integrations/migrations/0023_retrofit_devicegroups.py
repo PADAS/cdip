@@ -14,7 +14,7 @@ def forward_f(apps, schema_editor):
     for iic in InboundIntegrationConfiguration.objects.all():
 
         # calculate a sensible name
-        name = iic.name or str(iic.id)
+        name = iic.name or f'{iic.type.name}-{iic.owner.name}'
         dg = DeviceGroup.objects.create(name=f'Default Group for {name}',
                                         owner=iic.owner,
                                         inbound_configuration=iic,

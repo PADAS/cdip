@@ -28,14 +28,11 @@ def post_device_information(state, config):
     for key in state:
         device, created = Device.objects.get_or_create(external_id=key, inbound_configuration_id=config.id)
 
-        for item in config.defaultConfiguration.all():
-            device.outbound_configuration.add(item)
-
         if device not in device_group.devices.all():
             device_group.devices.add(device)
             device_group.save()
 
-        logger.info('Update the state of the device stream if it has changed.')
+        logger.debug('Update the state of the device stream if it has changed.')
         DeviceState.objects.get_or_create(device_id=device.id, state=state[key])
 
     return device_group.devices.values('id', 'external_id', 'inbound_configuration_id')

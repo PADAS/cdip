@@ -39,7 +39,7 @@ spec:
             - "--repo=https://github.com/PADAS/cdip-downstream.git"
             - "--root=/tmp/git/srcroot"
             - "--dest=cdip-downstream"
-            - "--branch=master"
+            - "--branch=${GITSYNC_BRANCH_NAME}"
             - "--depth=1"
             - "--wait=30"
           env:
