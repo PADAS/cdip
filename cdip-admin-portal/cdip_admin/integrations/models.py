@@ -111,7 +111,6 @@ class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE, null=True)
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
