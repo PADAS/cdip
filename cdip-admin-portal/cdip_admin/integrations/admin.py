@@ -9,8 +9,12 @@ from .views import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 admin.site.register(InboundIntegrationType)
 admin.site.register(OutboundIntegrationType)
 admin.site.register(Device)
-admin.site.register(DeviceGroup)
 admin.site.register(DeviceState)
+
+
+@admin.register(DeviceGroup)
+class DeviceGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', )
 
 
 @admin.register(InboundIntegrationConfiguration)

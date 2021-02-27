@@ -249,7 +249,8 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
         if inbound_id:
             try:
                 ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
-                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).distinct()
+                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
+                    inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
             except InboundIntegrationConfiguration.DoesNotExist:
                 queryset = queryset.none()
 
