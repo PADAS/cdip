@@ -22,7 +22,8 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'default_devicegroup']
+        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'type_slug',
+                            'default_devicegroup']
         fields = ['state',] + read_only_fields
 
 
@@ -55,4 +56,4 @@ class DeviceStateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeviceState
-        fields = ['device_external_id', 'end_state']
+        fields = ['device_external_id', 'state']
