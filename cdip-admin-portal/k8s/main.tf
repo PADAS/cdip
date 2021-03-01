@@ -31,7 +31,6 @@ resource "template_dir" "deployments" {
 
 variable "namespace" {
   type    = string
-  default = "cdip"
 }
 
 variable "functions-namespace" {
@@ -44,22 +43,18 @@ variable "metrics-namespace" {
 
 variable "cdip_portal_image" {
   type    = string
-  default = "gcr.io/cdip-78ca/cdip-portal:latest"
 }
 
 variable "cdip_api_image" {
   type = string
-  default = "gcr.io/cdip-78ca/cdip-api:latest"
 }
 
 variable "airflow-image-name" {
   type = string
-  default = "gcr.io/cdip-78ca/cdip-airflow-1.10.12"
 }
 
 variable "airflow-image-tag" {
   type = string
-  default = "latest"
 }
 
 variable "site-fqdn" {
