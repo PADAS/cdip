@@ -164,6 +164,8 @@ def inbound_integration_configuration_add(request):
                 device_group = DeviceGroup.objects.create(owner_id=config.owner.id, name=name)
                 config.default_devicegroup = device_group
                 config.save()
+            else:
+                device_group = config.default_devicegroup
             return redirect("device_group_update", device_group.id)
     else:
         form = InboundIntegrationConfigurationForm

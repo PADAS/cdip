@@ -72,7 +72,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
                                             verbose_name='Default Device Group')
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.type.name} - {self.owner.name} - {self.name}"
 
 
 # This is where the information is stored for a specific device
@@ -114,5 +114,8 @@ class DeviceGroup(TimestampedModel):
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.owner.name}"
 
 
