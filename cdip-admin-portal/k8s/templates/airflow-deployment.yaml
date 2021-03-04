@@ -62,10 +62,15 @@ spec:
         - name: webserver
           image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
+#          command: ['sh', '-c', "sleep infinity"]
           args: ["webserver"]
           ports:
             - name: webserver
               containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
           livenessProbe:
             exec:
               command:
@@ -90,7 +95,12 @@ spec:
         - name: scheduler
           image: "${AIRFLOW_IMAGE_NAME}:${AIRFLOW_IMAGE_TAG}"
           imagePullPolicy: IfNotPresent
+#          command: ['sh', '-c', "sleep infinity"]
           args: ["scheduler"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 300Mi
           livenessProbe:
             exec:
               command:
