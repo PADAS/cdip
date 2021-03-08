@@ -41,6 +41,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(blank=True, null=True)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
@@ -58,18 +59,20 @@ class InboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
     endpoint = models.URLField(blank=True)
     state = models.JSONField(blank=True, null=True)
-    # TODO: Move Secrets to a secure location
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
-    useDefaultConfiguration = models.BooleanField(default=True)
-    defaultConfiguration = models.ManyToManyField(OutboundIntegrationConfiguration)
-    useAdvancedConfiguration = models.BooleanField(default=False)
+
+    default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
+                                            related_name='inbound_integration_configuration',
+                                            related_query_name='inbound_integration_configurations',
+                                            verbose_name='Default Device Group')
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.type.name} - {self.owner.name} - {self.name}"
 
 
 # This is where the information is stored for a specific device
@@ -77,13 +80,12 @@ class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
-    outbound_configuration = models.ManyToManyField(OutboundIntegrationConfiguration)
 
     def __str__(self):
-        return f"{self.inbound_configuration.type.name} - {self.inbound_configuration.owner.name}"
+        return f"{self.external_id} - {self.inbound_configuration.type.name}"
 
     class Meta:
-        unique_together = ('inbound_configuration', 'external_id')
+        unique_together = ('external_id', 'inbound_configuration')
 
 
 # This is where the information is stored for a specific device
@@ -92,6 +94,7 @@ class DeviceState(TimestampedModel):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
+    state = models.JSONField(blank=True, null=True)
 
     class Meta:
         indexes = [
@@ -99,7 +102,7 @@ class DeviceState(TimestampedModel):
         ]
 
     def __str__(self):
-        return f"{self.end_state}"
+        return f"{self.state}"
 
 
 # This allows an organization to group a set of devices to send information to a series of outbound configs
@@ -108,21 +111,11 @@ class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    devices = models.ManyToManyField(Device)
-    # A Device can have many outbound configurations
-    organization_group = models.ForeignKey(OrganizationGroup, on_delete=models.CASCADE)
-    # startDate and endDate are used when the device group will only be in use for a certain period of time.
-    start_date = models.DateField()
-    end_date = models.DateField()
-    # startTime and endTime are used to limit the share for a specific part of the day
-    # Example: Would be for ranger tracking info at night to help APU response
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
+                                          related_query_name='devicegroup', blank=True)
+    devices = models.ManyToManyField(Device, blank=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.owner.name}"
 
 
-# Stores the Device Configuration for a DeviceGroup
-class DeviceGroupConfiguration(TimestampedModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200)
-    device_group = models.OneToOneField(Device, on_delete=models.CASCADE)
-    configuration = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='configurations')

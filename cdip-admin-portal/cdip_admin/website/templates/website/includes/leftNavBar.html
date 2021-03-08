@@ -14,6 +14,17 @@
             </li>
         {% endif %}
         {% if perms.core.admin %}
+            <h5>{% trans 'Device Groups' %}</h5>
+            <li>
+                <a href="{% url 'device_group_list' %}">
+                    {% trans 'Device Groups' %}
+                </a>
+                <a href="{% url 'device_group_add' %}">
+                    {% trans 'Add Device Group' %}
+                </a>
+            </li>
+        {% endif %}
+        {% if perms.core.admin %}
             <h5>{% trans 'Device State' %}</h5>
             <li>
                 <a href="{% url 'device_state_list' %}">
@@ -54,6 +65,9 @@
             <li>
                 <a href="{% url 'organizations_list' %}">
                     {% trans 'Organization Information' %}
+                </a>
+                <a href="{% url 'organizations_add' %}">
+                    {% trans 'Add Organization' %}
                 </a>
             </li>
         {% endif %}

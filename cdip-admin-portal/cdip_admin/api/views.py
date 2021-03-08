@@ -7,19 +7,19 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, Window
 from django.db.models.functions import FirstValue
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 
-from accounts.models import AccountProfile
+from accounts.utils import get_user_profile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
-from .utils import update_device_information
+from .utils import post_device_information
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +69,6 @@ def get_profile(user_id):
 
     if profile is None:
         profile = get_client_profile(user_id)
-
-    return profile
-
-
-def get_user_profile(user_id):
-
-    try:
-        profile = AccountProfile.objects.get(user_id=user_id)
-    except ObjectDoesNotExist:
-        profile = None
 
     return profile
 
@@ -234,29 +224,34 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
         data = request.data
         state = data['state']
         item = InboundIntegrationConfiguration.objects.get(id=pk)
-        update_device_information(state, item)
         return response
 
-    # TODO: this doesn't work yet with the savannah function
-    @requires_scope(['patch:inboundintegrationconfiguration', 'core.admin'])
-    def patch(self, request, *args, **kwargs):
-        # TODO: update_device_information takes 2 params
-        update_device_information(self.queryset)
-        return self.partial_update(request, *args, **kwargs)
+    # # TODO: this doesn't work yet with the savannah function
+    # @requires_scope(['patch:inboundintegrationconfiguration', 'core.admin'])
+    # def patch(self, request, *args, **kwargs):
+    #     # TODO: update_device_information takes 2 params
+    #     # update_device_information(self.queryset)
+    #     return self.partial_update(request, *args, **kwargs)
 
 
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
+
+    queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
     def get_queryset(self):
         # todo: need to filter queryset based on permissions as well.
         queryset = OutboundIntegrationConfiguration.objects.all()
-        int_id = self.request.query_params.get('inbound_int_id')
-        if int_id:
-            queryset = OutboundIntegrationConfiguration.objects.filter(
-                inboundintegrationconfiguration__id=int_id).annotate(
-                inbound_type_slug=F('inboundintegrationconfiguration__type__slug'))
+        inbound_id = self.request.query_params.get('inbound_id')
+
+        if inbound_id:
+            try:
+                ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
+                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
+                    inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
+            except InboundIntegrationConfiguration.DoesNotExist:
+                queryset = queryset.none()
 
         return queryset
 
@@ -267,6 +262,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
 class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Configuration """
+
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
 
@@ -312,7 +308,7 @@ class DeviceStateListView(generics.ListAPIView):
 
         queryset = DeviceState.objects.filter(**filter).annotate(
             last_end_state=Window(expression=FirstValue(F('end_state')),
-                                   partition_by=F('device_id'), order_by=[F('created_at').desc(),])
+                                   partition_by=F('device_id'), order_by=[F('created_at').desc()])
                                    ).distinct('device_id')
 
         return queryset
@@ -321,6 +317,26 @@ class DeviceStateListView(generics.ListAPIView):
     @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+
+@api_view(['POST'])
+@requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
+def update_inbound_integration_state(request, integration_id):
+    logger.info(f"Updating Inbound Configuration State, Integration ID {integration_id}")
+    if request.method == 'POST':
+        data = request.data
+
+        try:
+            config = InboundIntegrationConfiguration.objects.get(id=integration_id)
+        except InboundIntegrationConfiguration.DoesNotExist:
+            logger.warning("Retrieve Inbound Configuration, Integration Not Found",
+                           extra={"integration_id": integration_id})
+            raise Http404
+
+        result = post_device_information(data, config)
+        response = list(result)
+        return JsonResponse(response, safe=False)
+
 
 
 
