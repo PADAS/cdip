@@ -11,8 +11,11 @@ urlpatterns = [
 
     path('v1.0/devices', DeviceListView.as_view(), name='device_list_api'),
     path('v1.0/devices/<pk>', DeviceDetailsView.as_view(), name='device_detail_api'),
+    # path('v1.0/devices/<device_id>/destinations', get_destinations_for_device),
+    # path('v1.0/devices/outbound/configuration/<integration_id>', get_device_list_by_outbound_configuration),
 
     path('v1.0/devices/states/', DeviceStateListView.as_view(), name='device_state_list_api'),
+    path('v1.0/devices/states/update/<integration_id>', update_inbound_integration_state),
 
     path('v1.0/organizations', OrganizationsListView.as_view(), name='organization_list'),
     path('v1.0/organizations/<pk>', OrganizationDetailsView.as_view(), name='organization_detail'),

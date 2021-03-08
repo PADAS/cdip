@@ -8,7 +8,9 @@ pytestmark = pytest.mark.django_db
 from unittest.mock import patch
 
 from django_keycloak.models import OpenIdConnectProfile, Realm, Server
-from integrations.models import InboundIntegrationType
+from integrations.models import InboundIntegrationType, DeviceGroup, \
+    OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
+    Organization, Device
 
 
 @patch('cdip_admin.utils.decode_token')
@@ -36,6 +38,84 @@ def test_get_integration_type_list(mock_get_user_perms, mock_decode_token, clien
         response = response.json()
 
         assert str(iit.id) in [x['id'] for x in response]
+
+
+@patch('cdip_admin.utils.decode_token')
+@patch('api.views.get_user_perms')
+def test_get_outbound_by_ibc(mock_get_user_perms, mock_decode_token, client, django_user_model, inbound_integration_user):
+
+        mock_get_user_perms.return_value = inbound_integration_user.user_permissions
+        mock_decode_token.return_value = inbound_integration_user.decoded_jwt
+
+        org = Organization.objects.create(
+            name = 'Some org.'
+        )
+
+        iit = InboundIntegrationType.objects.create(
+            name='Some integration type',
+            slug='some-integration-type',
+            description='Some integration type.'
+
+        )
+        oit = OutboundIntegrationType.objects.create(
+            name='Some destination type',
+            slug='my-dest-slug',
+            description='Some integration type.'
+
+        )
+
+        ii = InboundIntegrationConfiguration.objects.create(
+            type = iit,
+            name = 'some ii',
+            owner = org
+        )
+        oi = OutboundIntegrationConfiguration.objects.create(
+            type = oit,
+            name = 'some oi',
+            owner = org
+        )
+
+        other_oi = OutboundIntegrationConfiguration.objects.create(
+            type = oit,
+            name = 'some other oi',
+            owner = org
+        )
+
+        devicegroup = DeviceGroup.objects.create(
+            name='some device group',
+            owner=org,
+        )
+
+        devicegroup.destinations.add(oi)
+
+        device = Device.objects.create(
+            external_id = 'some-ext-id',
+            inbound_configuration = ii
+        )
+
+        devicegroup.devices.add(device)
+
+
+        # Sanity check on the test data relationships.
+        assert Device.objects.filter(inbound_configuration=ii).exists()
+        assert DeviceGroup.objects.filter(devices__inbound_configuration=ii).exists()
+        assert OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ii).exists()
+
+        client.force_login(inbound_integration_user.user)
+
+        # Get destinations by inbound-id.
+        response = client.get(reverse("outboundintegrationconfiguration_list"),
+                              HTTP_AUTHORIZATION=f'Bearer {inbound_integration_user.bearer_token}',
+                              data={'inbound_id': str(ii.id)})
+
+        assert mock_get_user_perms.call_count == 1 # Just verifying that permissions mocking is working.
+        assert response.status_code == 200
+        response = response.json()
+
+        assert len(response) == 1
+        assert str(oi.id) in [item['id'] for item in response]
+        assert not str(other_oi.id) in [item['id'] for item in response]
+
 
 
 class IntegrationUser(NamedTuple):
