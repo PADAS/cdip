@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Device Group List{% endblock %}
+
+{% block content %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Device Count</th>
+                <th scope="col">Created</th>
+            </tr>
+        </thead>
+        <tbody>
+             {% for device_group in device_groups %}
+                <tr onclick="window.location='{% url 'device_group_detail' device_group.id %}'">
+                    <td>{{ device_group.name }}</td>
+                    <td>{{ device_group.owner.name }}</td>
+                    <td>{{ device_group.devices.all.count }}</td>
+                    <td>{{ device_group.created_at }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+{% endblock %}

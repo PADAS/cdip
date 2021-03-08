@@ -4,10 +4,12 @@
 
 {% block content %}
 
-    <h1>{{module.id}}</h1>
+    <h1>Name: {{module.name}}</h1>
+    <p>{{module.id}}</p>
     <p>Type: {{module.type.name}}</p>
     <p>Owner: {{module.owner.name}}</p>
     <p>Endpoint: {{module.endpoint}}</p>
     <p>Login: {{module.login}}</p>
+    <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_update' module.id %}" role="button">Update</a>
     <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_list' %}" role="button">Back</a>
 {% endblock %}
