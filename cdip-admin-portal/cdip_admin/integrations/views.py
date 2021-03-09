@@ -118,7 +118,6 @@ def inbound_integration_type_add(request):
         if form.is_valid():
             integration_type = form.save()
             return redirect("inbound_integration_type_detail", integration_type.id)
-            #return redirect("inbound_integration_type_update", integration_type.id)
     else:
         form = InboundIntegrationTypeForm
     return render(request, "integrations/inbound_integration_type_add.html", {"form": form})
