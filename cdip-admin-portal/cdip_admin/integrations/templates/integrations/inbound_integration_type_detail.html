@@ -7,5 +7,6 @@
     <h1>{{module.name}}</h1>
     <p>Slug: {{module.slug}}</p>
     <p>Description: {{module.description}}</p>
+    <a class="btn btn-primary" href="{% url 'inbound_integration_type_update' module.id %}" role="button">Update</a>
 
 {% endblock %}
