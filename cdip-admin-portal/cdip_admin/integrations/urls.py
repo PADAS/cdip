@@ -31,6 +31,10 @@ urlpatterns = [
 
     path('integartions/outbound/type/<uuid:module_id>', views.outbound_integration_type_detail,
          name='outbound_integration_type_detail'),
+    path('integrations/outbound/type/add', views.outbound_integration_type_add, name='outbound_integration_type_add'),
+    path('integrations/outbound/type/update/<uuid:outbound_integration_type_id>',
+         views.outbound_integration_type_update,
+         name="outbound_integration_type_update"),
     path('integrations/outbound/type', views.OutboundIntegrationTypeList.as_view(),
          name='outbound_integration_type_list'),
 

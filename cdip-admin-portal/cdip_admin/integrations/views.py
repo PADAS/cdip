@@ -10,7 +10,7 @@ import logging
 
 from cdip_admin import settings
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
-    DeviceGroupManagementForm, InboundIntegrationTypeForm
+    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
 from .filters import DeviceStateFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
@@ -148,6 +148,28 @@ class InboundIntegrationTypeList(PermissionRequiredMixin, ListView):
 def outbound_integration_type_detail(request, module_id):
     integration_module = get_object_or_404(OutboundIntegrationType, pk=module_id)
     return render(request, "integrations/outbound_integration_type_detail.html", {"module": integration_module})
+
+
+@permission_required('core.admin')
+def outbound_integration_type_add(request):
+    if request.method == "POST":
+        form = OutboundIntegrationTypeForm(request.POST)
+        if form.is_valid():
+            integration_type = form.save()
+            return redirect("outbound_integration_type_detail", integration_type.id)
+    else:
+        form = OutboundIntegrationTypeForm
+    return render(request, "integrations/outbound_integration_type_add.html", {"form": form})
+
+
+@permission_required('core.admin')
+def outbound_integration_type_update(request, outbound_integration_type_id):
+    integration_type = get_object_or_404(OutboundIntegrationType, id=outbound_integration_type_id)
+    form = OutboundIntegrationTypeForm(request.POST or None, instance=integration_type)
+    if form.is_valid():
+        form.save()
+        return redirect("outbound_integration_type_detail", outbound_integration_type_id)
+    return render(request, "integrations/outbound_integration_type_update.html", {"form": form})
 
 
 class OutboundIntegrationTypeList(PermissionRequiredMixin, ListView):
