@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags %}
+
+{% block title %}Update Outbound Integration Type{% endblock %}
+
+{% block content %}
+    <form method="post">
+        <h1>Outbound Integration Type</h1>
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type="submit" class="btn btn-success">Save</button>
+    </form>
+{% endblock %}

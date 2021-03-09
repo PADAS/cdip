@@ -5,6 +5,7 @@
 {% block content %}
 
     <h2>Outbound Integration Types</h2>
+        <a class="btn btn-primary" href="{% url 'outbound_integration_type_add' %}" role="button">+ Add</a>
         <ul>
             {% for integration in integrations %}
                 <li>
