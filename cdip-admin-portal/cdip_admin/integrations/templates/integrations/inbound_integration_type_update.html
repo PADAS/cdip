@@ -2,11 +2,11 @@
 
 {% load crispy_forms_tags %}
 
-{% block title %}Update Integration Type{% endblock %}
+{% block title %}Update Inbound Integration Type{% endblock %}
 
 {% block content %}
     <form method="post">
-        <h1>Device Group</h1>
+        <h1>Inbound Integration Type</h1>
         {% csrf_token %}
         {{ form|crispy }}
         <button type="submit" class="btn btn-success">Save</button>
