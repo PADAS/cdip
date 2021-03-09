@@ -3,8 +3,7 @@
 {% block title %}Device Group: {{device_group.name}}{% endblock %}
 
 {% block content %}
-
-    <h1>{{device_group.name}}</h1>
+    <h3>{{device_group.name}}</h3>
     <p>{{device_group.owner.name}}</p>
     <a class="btn btn-primary" href="{% url 'device_group_update' device_group.id %}" role="button">Update</a>
     <a class="btn btn-primary" href="{% url 'device_group_management_update' device_group.id %}" role="button">Manage Devices</a>
