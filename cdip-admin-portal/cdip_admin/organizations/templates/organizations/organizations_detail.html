@@ -4,7 +4,7 @@
 
 {% block content %}
 
-    <h1>{{organization.name}}</h1>
+    <h3>{{organization.name}}</h3>
     <p>{{organization.description}}</p>
     <a class="btn btn-primary" href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
 {% endblock %}
