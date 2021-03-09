@@ -5,6 +5,9 @@
 {% block content %}
 
     <h2>Inbound Integration Types</h2>
+        <div class="d-flex flex-grow-1">
+            <a class="btn btn-primary" href="{% url 'inbound_integration_type_add' %}" role="button">+ Add Type</a>
+        </div>
         <ul>
             {% for integration in integrations %}
                 <li>
