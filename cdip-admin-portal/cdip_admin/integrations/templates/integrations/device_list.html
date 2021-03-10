@@ -22,8 +22,16 @@
             {% for device in devices %}
             <tr onclick="window.location='{% url 'device_detail' device.id %}'">
                 <td>{{ device.external_id }}</td>
-                <td>{{ device.inbound_configuration.owner.name }}</td>
-                <td>{{ device.inbound_configuration.type.name }}</td>
+                <td>
+                    <a href="{% url 'organizations_detail' device.inbound_configuration.owner.id %}">
+                        {{ device.inbound_configuration.owner.name }}
+                    </a>
+                </td>
+                <td>
+                    <a href="{% url 'inbound_integration_type_detail' device.inbound_configuration.type.id %}">
+                        {{ device.inbound_configuration.type.name }}
+                    </a>
+                </td>
                 <td>{{ device.created_at }}</td>
             </tr>
             {% endfor %}

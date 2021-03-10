@@ -6,8 +6,12 @@
 
     <h3>Name: {{module.name}}</h3>
     <p>{{module.id}}</p>
-    <p>Type: {{module.type.name}}</p>
-    <p>Owner: {{module.owner.name}}</p>
+    <p>
+        Type: <a href="{% url 'outbound_integration_type_detail' module.type.id %}"> {{module.type.name}} </a>
+    </p>
+    <p>
+        Owner: <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
+    </p>
     <p>Endpoint: {{module.endpoint}}</p>
     <p>Login: {{module.login}}</p>
     <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_update' module.id %}" role="button">Update</a>
