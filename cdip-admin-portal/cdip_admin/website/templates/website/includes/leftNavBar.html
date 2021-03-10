@@ -6,74 +6,53 @@
     </div>
     <ul class="list-unstyled components">
         {% if perms.core.admin %}
-            <h5>{% trans 'Devices' %}</h5>
+            <h5>{% trans 'Integrations' %}</h5>
             <li>
+                <a href="{% url 'inbound_integration_type_list' %}">
+                    {% trans 'Inbound Types' %}
+                </a>
+                <a href="{% url 'inbound_integration_configuration_list' %}">
+                    {% trans 'Inbound Integrations' %}
+                </a>
+                <a href="{% url 'outbound_integration_type_list' %}">
+                    {% trans 'Outbound Types' %}
+                </a>
+                <a href="{% url 'outbound_integration_configuration_list' %}">
+                    {% trans 'Outbound Integrations' %}
+                </a>
                 <a href="{% url 'device_list' %}">
                     {% trans 'Devices' %}
                 </a>
-            </li>
-        {% endif %}
-        {% if perms.core.admin %}
-            <h5>{% trans 'Device Groups' %}</h5>
-            <li>
                 <a href="{% url 'device_group_list' %}">
                     {% trans 'Device Groups' %}
                 </a>
             </li>
         {% endif %}
+
         {% if perms.core.admin %}
-            <h5>{% trans 'Device State' %}</h5>
+            <h5>{% trans 'Reporting' %}</h5>
             <li>
                 <a href="{% url 'device_state_list' %}">
                     {% trans 'Device States' %}
                 </a>
             </li>
         {% endif %}
+
+
         {% if perms.core.admin %}
-            <h5>{% trans 'Inbound Integrations' %}</h5>
-            <li>
-                <a href="{% url 'inbound_integration_type_list' %}">
-                    {% trans 'Type Descriptions' %}
-                </a>
-                <a href="{% url 'inbound_integration_configuration_list' %}">
-                    {% trans 'Inbound Integrations' %}
-                </a>
-            </li>
-        {% endif %}
-        {% if perms.core.admin %}
-            <h5>{% trans 'Outbound Integrations' %}</h5>
-            <li>
-                <a href="{% url 'outbound_integration_type_list' %}">
-                    {% trans 'Type Descriptions' %}
-                </a>
-                <a href="{% url 'outbound_integration_configuration_list' %}">
-                    {% trans 'Outbound Integrations' %}
-                </a>
-            </li>
-        {% endif %}
-        {% if perms.core.admin %}
-            <h5>{% trans 'Organizations' %}</h5>
+            <h5>{% trans 'Administration' %}</h5>
             <li>
                 <a href="{% url 'organizations_list' %}">
                     {% trans 'Organization Information' %}
                 </a>
-            </li>
-        {% endif %}
-        {% if perms.core.admin %}
-            <h5>{% trans 'Accounts' %}</h5>
-            <li>
                 <a href="{% url 'account_list' %}">
                     {% trans 'Accounts Information' %}
                 </a>
-            </li>
-        {% endif %}
-        {% if perms.core.admin %}
-            <h5>{% trans 'Clients' %}</h5>
-            <li>
                 <a href="{% url 'client_list' %}">
                     {% trans 'Client Information' %}
                 </a>
             </li>
         {% endif %}
+
     </ul>
 </div>
