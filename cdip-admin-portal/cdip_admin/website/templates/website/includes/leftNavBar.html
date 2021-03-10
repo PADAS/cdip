@@ -19,9 +19,6 @@
                 <a href="{% url 'device_group_list' %}">
                     {% trans 'Device Groups' %}
                 </a>
-                <a href="{% url 'device_group_add' %}">
-                    {% trans 'Add Device Group' %}
-                </a>
             </li>
         {% endif %}
         {% if perms.core.admin %}
@@ -41,9 +38,6 @@
                 <a href="{% url 'inbound_integration_configuration_list' %}">
                     {% trans 'Inbound Integrations' %}
                 </a>
-                <a href="{% url 'inbound_integration_configuration_add' %}">
-                    {% trans 'Add Inbound Integration' %}
-                </a>
             </li>
         {% endif %}
         {% if perms.core.admin %}
@@ -55,9 +49,6 @@
                 <a href="{% url 'outbound_integration_configuration_list' %}">
                     {% trans 'Outbound Integrations' %}
                 </a>
-                <a href="{% url 'outbound_integration_configuration_add' %}">
-                    {% trans 'Add Outbound Integration' %}
-                </a>
             </li>
         {% endif %}
         {% if perms.core.admin %}
@@ -65,9 +56,6 @@
             <li>
                 <a href="{% url 'organizations_list' %}">
                     {% trans 'Organization Information' %}
-                </a>
-                <a href="{% url 'organizations_add' %}">
-                    {% trans 'Add Organization' %}
                 </a>
             </li>
         {% endif %}
@@ -77,9 +65,6 @@
                 <a href="{% url 'account_list' %}">
                     {% trans 'Accounts Information' %}
                 </a>
-                <a href="{% url 'account_add' %}">
-                    {% trans 'Add Account' %}
-                </a>
             </li>
         {% endif %}
         {% if perms.core.admin %}
@@ -87,9 +72,6 @@
             <li>
                 <a href="{% url 'client_list' %}">
                     {% trans 'Client Information' %}
-                </a>
-                <a href="{% url 'client_add' %}">
-                    {% trans 'Add Client' %}
                 </a>
             </li>
         {% endif %}
