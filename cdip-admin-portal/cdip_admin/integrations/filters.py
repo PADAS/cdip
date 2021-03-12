@@ -4,6 +4,12 @@ from integrations.models import DeviceState, DeviceGroup, Device
 
 
 def get_choices(model, field):
+    """Get choices for a ChoiceFilter dropdown
+
+    Keyword arguments:
+    model -- the model to access values on
+    field -- the field relative to the model we want to populate dropdown from
+    """
     choices = []
     for k in model.objects.values_list(field).distinct():
         choices.append((k[0], k[0]))
@@ -23,11 +29,6 @@ class DeviceStateFilter(django_filters.FilterSet):
         field_name='device__inbound_configuration__owner__name',
         empty_label='All Owners',
     )
-
-    # organization = django_filters.ModelChoiceFilter(
-    #     field_name='device__inbound_configuration__owner__name',
-    #     queryset=DeviceState.device.get_queryset().model.inbound_configuration.get_queryset().model.owner.get_queryset()
-    # )
 
     inbound_config_type_name = django_filters.ChoiceFilter(
         choices=get_choices(DeviceState, 'device__inbound_configuration__type__name'),
