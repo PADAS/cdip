@@ -2,7 +2,8 @@ from django import forms
 
 from accounts.utils import get_user_profile
 from organizations.models import Organization
-from .models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration, DeviceGroup, Device
+from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
+    InboundIntegrationType, DeviceGroup, Device
 
 
 class DeviceGroupForm(forms.ModelForm):
@@ -42,6 +43,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         }
 
 
+class InboundIntegrationTypeForm(forms.ModelForm):
+
+    class Meta:
+        model = InboundIntegrationType
+        exclude = ['id']
+
+
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
 
@@ -51,3 +59,9 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
         widgets = {
             'password': forms.PasswordInput(),
         }
+
+class OutboundIntegrationTypeForm(forms.ModelForm):
+
+    class Meta:
+        model = OutboundIntegrationType
+        exclude = ['id']
