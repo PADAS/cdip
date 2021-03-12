@@ -6,10 +6,17 @@
 
 {% block content %}
     {% if filter %}
+    <div class="row">
+        <div class="col-lg-9">
+            <h2>Device States</h2>
+        </div>
+    </div>
+    <div>
         <form action="" method="get" class="form form-inline">
             {% bootstrap_form filter.form layout='inline' %}
             {% bootstrap_button 'filter' %}
         </form>
+    </div>
     {% endif %}
     {% render_table table %}
 
