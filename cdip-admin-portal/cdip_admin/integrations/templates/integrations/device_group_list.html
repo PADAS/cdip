@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load bootstrap4 %}
 
 {% block title %}Device Group List{% endblock %}
 
@@ -14,6 +15,14 @@
             {% endif %}
         </div>
     </div>
+    {% if filter %}
+    <div>
+        <form action="" method="get" class="form form-inline">
+            {% bootstrap_form filter.form layout='inline' %}
+            {% bootstrap_button 'filter' %}
+        </form>
+    </div>
+    {% endif %}
     <div class="row">
         <table class="table">
             <thead>
