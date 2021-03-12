@@ -11,7 +11,7 @@ import logging
 from cdip_admin import settings
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
-from .filters import DeviceStateFilter, DeviceGroupFilter
+from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
 from .tables import DeviceStateTable
@@ -30,13 +30,15 @@ def device_detail(request, module_id):
     return render(request, "integrations/device_detail.html", {"device": device})
 
 
-class DeviceList(PermissionRequiredMixin, ListView):
+class DeviceList(PermissionRequiredMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_list.html'
     queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
                                                       'inbound_configuration__type__name')
     context_object_name = 'devices'
     paginate_by = default_paginate_by
+    filterset_class = DeviceFilter
+
 
 
 ###
@@ -97,8 +99,9 @@ def device_group_management_update(request, device_group_id):
 class DeviceStateList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     model = DeviceState
-    table_class = DeviceStateTable
     template_name = 'integrations/device_state_list.html'
+    context_object_name = 'device_states'
+    paginate_by = default_paginate_by
     filterset_class = DeviceStateFilter
 
 
