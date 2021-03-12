@@ -37,11 +37,7 @@
                  {% for device_group in device_groups %}
                     <tr onclick="window.location='{% url 'device_group_detail' device_group.id %}'">
                         <td>{{ device_group.name }}</td>
-                        <td>
-                            <a href="{% url 'organizations_detail' device_group.owner.id %}">
-                                {{ device_group.owner.name }}
-                            </a>
-                        </td>
+                        <td>{{ device_group.owner.name }}</td>
                         <td>{{ device_group.devices.all.count }}</td>
                         <td>{{ device_group.created_at }}</td>
                     </tr>
