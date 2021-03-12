@@ -4,7 +4,15 @@
 
 {% block content %}
 
-    <h2>Outbound Integration Configuration</h2>
+    <div class="row">
+        <div class="col-lg-9">
+            <h2>Outbound Integration Configuration</h2>
+        </div>
+        {% if perms.core.admin %}
+            <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_add' %}" role="button">+ Add</a>
+        {% endif %}
+    </div>
+    <div class="row">
         <ul>
             {% for integration in integrations %}
                 <li>
@@ -18,5 +26,6 @@
                 </li>
             {% endfor %}
         </ul>
+    </div>
 
 {% endblock %}
