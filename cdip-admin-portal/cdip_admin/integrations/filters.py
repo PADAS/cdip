@@ -18,6 +18,17 @@ def get_choices(model, field):
 
 class DeviceStateFilter(django_filters.FilterSet):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # try to dynamically load new choices for drop downs
+        try:
+            self.filters['organization'].extra['choices'] = \
+                get_choices(DeviceState, 'device__inbound_configuration__owner__name')
+            self.filters['inbound_config_type_name'].extra['choices'] = \
+                get_choices(DeviceState, 'device__inbound_configuration__type__name')
+        except (KeyError, AttributeError):
+            pass
+
     external_id = django_filters.CharFilter(
         field_name='device__external_id',
         lookup_expr='icontains',
@@ -43,12 +54,20 @@ class DeviceStateFilter(django_filters.FilterSet):
 
 class DeviceGroupFilter(django_filters.FilterSet):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # try to dynamically load new choices for drop downs
+        try:
+            self.filters['organization'].extra['choices'] = \
+                get_choices(DeviceGroup, 'owner__name')
+        except (KeyError, AttributeError):
+            pass
+
     device_group = django_filters.CharFilter(
         field_name='name',
         lookup_expr='icontains',
         label='Name'
     )
-
 
     organization = django_filters.ChoiceFilter(
         choices=get_choices(DeviceGroup, 'owner__name'),
@@ -62,6 +81,17 @@ class DeviceGroupFilter(django_filters.FilterSet):
 
 
 class DeviceFilter(django_filters.FilterSet):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # try to dynamically load new choices for drop downs
+        try:
+            self.filters['organization'].extra['choices'] = \
+                get_choices(DeviceGroup, 'inbound_configuration__owner__name')
+            self.filters['inbound_config_type_name'].extra['choices'] = \
+                get_choices(DeviceGroup, 'inbound_configuration__type__name')
+        except (KeyError, AttributeError):
+            pass
 
     organization = django_filters.ChoiceFilter(
         choices=get_choices(Device, 'inbound_configuration__owner__name'),
