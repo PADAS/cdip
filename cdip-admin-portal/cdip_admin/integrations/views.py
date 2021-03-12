@@ -14,7 +14,7 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 from .filters import DeviceStateFilter, DeviceGroupFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
-from .tables import DeviceStateTable, DeviceGroupTable
+from .tables import DeviceStateTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
