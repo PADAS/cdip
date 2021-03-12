@@ -11,10 +11,10 @@ import logging
 from cdip_admin import settings
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
-from .filters import DeviceStateFilter
+from .filters import DeviceStateFilter, DeviceGroupFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
-from .tables import DeviceStateTable
+from .tables import DeviceStateTable, DeviceGroupTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -49,12 +49,13 @@ def device_group_detail(request, module_id):
     return render(request, "integrations/device_group_detail.html", {"device_group": device_group})
 
 
-class DeviceGroupList(PermissionRequiredMixin, ListView):
+class DeviceGroupList(PermissionRequiredMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_group_list.html'
     queryset = DeviceGroup.objects.get_queryset().order_by('name')
     context_object_name = 'device_groups'
     paginate_by = default_paginate_by
+    filterset_class = DeviceGroupFilter
 
 
 @permission_required('core.admin')
