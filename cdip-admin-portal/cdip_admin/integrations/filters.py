@@ -87,9 +87,9 @@ class DeviceFilter(django_filters.FilterSet):
         # try to dynamically load new choices for drop downs
         try:
             self.filters['organization'].extra['choices'] = \
-                get_choices(DeviceGroup, 'inbound_configuration__owner__name')
+                get_choices(Device, 'inbound_configuration__owner__name')
             self.filters['inbound_config_type_name'].extra['choices'] = \
-                get_choices(DeviceGroup, 'inbound_configuration__type__name')
+                get_choices(Device, 'inbound_configuration__type__name')
         except (KeyError, AttributeError):
             pass
 
