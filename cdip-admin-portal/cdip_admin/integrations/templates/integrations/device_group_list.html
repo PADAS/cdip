@@ -18,8 +18,8 @@
     {% if filter %}
     <div>
         <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' %}
-            {% bootstrap_button 'filter' %}
+            {% bootstrap_form filter.form layout='inline' form_group_class='spacing-wrapper' %}
+            {% bootstrap_button 'filter' extra_classes='spacing-wrapper' %}
         </form>
     </div>
     {% endif %}
