@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
 {% load bootstrap4 %}
+{% load static %}
 
 {% block title %}Devices{% endblock %}
 
@@ -17,27 +19,13 @@
         </form>
     </div>
     {% endif %}
-    <div class="row">
-        <table class="table table-hover">
-            <thead>
-            <tr>
-                <th scope="col">External ID</th>
-                <th scope="col">Owner</th>
-                <th scope="col">Type</th>
-                <th scope="col">Created</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for device in devices %}
-            <tr onclick="window.location='{% url 'device_detail' device.id %}'">
-                <td>{{ device.external_id }}</td>
-                <td>{{ device.inbound_configuration.owner.name }}</td>
-                <td>{{ device.inbound_configuration.type.name }}</td>
-                <td>{{ device.created_at }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="device-table"
+            data-row-attribute="device-id"
+            data-url="/integrations/devices/"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
 
 {% endblock %}
