@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
 {% load bootstrap4 %}
+{% load static %}
 
 {% block title %}Device State List{% endblock %}
 
@@ -18,29 +20,13 @@
         </form>
     </div>
     {% endif %}
-    <div class="row">
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th scope="col">External id</th>
-                    <th scope="col">Owner</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">State</th>
-                    <th scope="col">Created at</th>
-                </tr>
-            </thead>
-            <tbody>
-                 {% for device_state in device_states %}
-                    <tr onclick="window.location='{% url 'device_detail' device_state.device.id %}'">
-                        <td>{{ device_state.device.external_id }}</td>
-                        <td>{{ device_state.device.inbound_configuration.owner.name }}</td>
-                        <td>{{ device_state.device.inbound_configuration.type.name }}</td>
-                        <td>{{ device_state.state }}</td>
-                        <td>{{ device_state.created_at }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="device-state-table"
+            data-row-attribute="device-id"
+            data-url="/integrations/devices/"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
 
 {% endblock %}
