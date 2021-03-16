@@ -14,7 +14,7 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
-from .tables import DeviceStateTable
+from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -30,15 +30,12 @@ def device_detail(request, module_id):
     return render(request, "integrations/device_detail.html", {"device": device})
 
 
-class DeviceList(PermissionRequiredMixin, FilterView):
+class DeviceList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_list.html'
-    queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
-                                                      'inbound_configuration__type__name')
-    context_object_name = 'devices'
+    table_class = DeviceTable
     paginate_by = default_paginate_by
     filterset_class = DeviceFilter
-
 
 
 ###
@@ -51,11 +48,10 @@ def device_group_detail(request, module_id):
     return render(request, "integrations/device_group_detail.html", {"device_group": device_group})
 
 
-class DeviceGroupList(PermissionRequiredMixin, FilterView):
+class DeviceGroupList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_group_list.html'
-    queryset = DeviceGroup.objects.get_queryset().order_by('name')
-    context_object_name = 'device_groups'
+    table_class = DeviceGroupTable
     paginate_by = default_paginate_by
     filterset_class = DeviceGroupFilter
 
@@ -96,11 +92,11 @@ def device_group_management_update(request, device_group_id):
 ###
 # DeviceState Methods/Classes
 ###
+
 class DeviceStateList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
-    model = DeviceState
+    table_class = DeviceStateTable
     template_name = 'integrations/device_state_list.html'
-    context_object_name = 'device_states'
     paginate_by = default_paginate_by
     filterset_class = DeviceStateFilter
 
