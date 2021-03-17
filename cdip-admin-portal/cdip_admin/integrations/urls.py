@@ -7,7 +7,7 @@ urlpatterns = [
          name='device_detail'),
     path('devices', views.DeviceList.as_view(), name='device_list'),
 
-    path('devices/groups/<uuid:module_id>', views.device_group_detail,
+    path('devices/groups/<uuid:module_id>', views.DeviceGroupDetail.as_view(),
          name='device_group_detail'),
     path('devices/groups', views.DeviceGroupList.as_view(), name='device_group_list'),
     path('devices/groups/add', views.device_group_add,
