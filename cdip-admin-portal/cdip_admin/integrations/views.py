@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import ListView
+from django.views.generic import ListView, DetailView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 
@@ -13,7 +13,7 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
 from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
-    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup
 from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable
 
 logger = logging.getLogger(__name__)
@@ -41,19 +41,26 @@ class DeviceList(PermissionRequiredMixin, SingleTableMixin, FilterView):
 ###
 # Device Group Methods/Classes
 ###
-@permission_required('core.admin')
-def device_group_detail(request, module_id):
-    logger.info(f"Request for Device Group: {module_id}")
-    device_group = get_object_or_404(DeviceGroup, pk=module_id)
-    return render(request, "integrations/device_group_detail.html", {"device_group": device_group})
-
-
 class DeviceGroupList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_group_list.html'
     table_class = DeviceGroupTable
     paginate_by = default_paginate_by
     filterset_class = DeviceGroupFilter
+
+
+class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
+    permission_required = 'core.admin'
+    template_name = 'integrations/device_group_detail.html'
+    model = DeviceGroup
+    table_class = DeviceTable
+    paginate_by = default_paginate_by
+
+    def get_object(self):
+        return get_object_or_404(DeviceGroup, pk=self.kwargs.get("module_id"))
+
+    def get_table_data(self):
+        return self.get_object().devices
 
 
 @permission_required('core.admin')
