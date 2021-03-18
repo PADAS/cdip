@@ -2,19 +2,20 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import ListView
+from django.views.generic import ListView, DetailView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
+from django.urls import reverse
 
 import logging
 
 from cdip_admin import settings
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
-from .filters import DeviceStateFilter
+from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
-    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceState, DeviceGroup
-from .tables import DeviceStateTable
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup
+from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -30,31 +31,55 @@ def device_detail(request, module_id):
     return render(request, "integrations/device_detail.html", {"device": device})
 
 
-class DeviceList(PermissionRequiredMixin, ListView):
+class DeviceList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_list.html'
-    queryset = Device.objects.get_queryset().order_by('inbound_configuration__owner__name',
-                                                      'inbound_configuration__type__name')
-    context_object_name = 'devices'
+    table_class = DeviceTable
     paginate_by = default_paginate_by
+    filterset_class = DeviceFilter
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
 
 
 ###
 # Device Group Methods/Classes
 ###
-@permission_required('core.admin')
-def device_group_detail(request, module_id):
-    logger.info(f"Request for Device Group: {module_id}")
-    device_group = get_object_or_404(DeviceGroup, pk=module_id)
-    return render(request, "integrations/device_group_detail.html", {"device_group": device_group})
-
-
-class DeviceGroupList(PermissionRequiredMixin, ListView):
+class DeviceGroupList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
     template_name = 'integrations/device_group_list.html'
-    queryset = DeviceGroup.objects.get_queryset().order_by('name')
-    context_object_name = 'device_groups'
+    table_class = DeviceGroupTable
     paginate_by = default_paginate_by
+    filterset_class = DeviceGroupFilter
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_group_list')
+        context["base_url"] = base_url
+        return context
+
+
+class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
+    permission_required = 'core.admin'
+    template_name = 'integrations/device_group_detail.html'
+    model = DeviceGroup
+    table_class = DeviceTable
+    paginate_by = default_paginate_by
+
+    def get_object(self):
+        return get_object_or_404(DeviceGroup, pk=self.kwargs.get("module_id"))
+
+    def get_table_data(self):
+        return self.get_object().devices
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
 
 
 @permission_required('core.admin')
@@ -93,12 +118,19 @@ def device_group_management_update(request, device_group_id):
 ###
 # DeviceState Methods/Classes
 ###
+
 class DeviceStateList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     permission_required = 'core.admin'
-    model = DeviceState
     table_class = DeviceStateTable
     template_name = 'integrations/device_state_list.html'
+    paginate_by = default_paginate_by
     filterset_class = DeviceStateFilter
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
 
 
 ###

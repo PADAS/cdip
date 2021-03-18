@@ -1,23 +1,32 @@
 {% extends "base.html" %}
 {% load render_table from django_tables2 %}
 {% load bootstrap4 %}
+{% load static %}
 
 {% block title %}Device State List{% endblock %}
 
 {% block content %}
-    {% if filter %}
+
     <div class="row">
         <div class="col-lg-9">
             <h2>Device States</h2>
         </div>
     </div>
+    {% if filter %}
     <div>
         <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' %}
-            {% bootstrap_button 'filter' %}
+            {% bootstrap_form filter.form layout='inline' form_group_class='spacing-wrapper' %}
+            {% bootstrap_button 'filter' extra_classes='spacing-wrapper' %}
         </form>
     </div>
     {% endif %}
     {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="device-state-table"
+            data-row-attribute="device-id"
+            data-url="{{ base_url }}"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
 
 {% endblock %}

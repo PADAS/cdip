@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
+{% load static %}
 
 {% block title %}Device Group List{% endblock %}
 
@@ -14,31 +17,21 @@
             {% endif %}
         </div>
     </div>
-    <div class="row">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Owner</th>
-                    <th scope="col">Device Count</th>
-                    <th scope="col">Created</th>
-                </tr>
-            </thead>
-            <tbody>
-                 {% for device_group in device_groups %}
-                    <tr onclick="window.location='{% url 'device_group_detail' device_group.id %}'">
-                        <td>{{ device_group.name }}</td>
-                        <td>
-                            <a href="{% url 'organizations_detail' device_group.owner.id %}">
-                                {{ device_group.owner.name }}
-                            </a>
-                        </td>
-                        <td>{{ device_group.devices.all.count }}</td>
-                        <td>{{ device_group.created_at }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if filter %}
+    <div>
+        <form action="" method="get" class="form form-inline">
+            {% bootstrap_form filter.form layout='inline' form_group_class='spacing-wrapper' %}
+            {% bootstrap_button 'filter' extra_classes='spacing-wrapper' %}
+        </form>
     </div>
+    {% endif %}
+    {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="device-group-table"
+            data-row-attribute="device-group-id"
+            data-url="{{ base_url }}"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
 
 {% endblock %}
