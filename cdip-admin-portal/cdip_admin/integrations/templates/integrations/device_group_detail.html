@@ -1,11 +1,22 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
+{% load static %}
 
-{% block title %}Device Group: {{device_group.name}}{% endblock %}
+{% block title %}Device Group: {{object.name}}{% endblock %}
 
 {% block content %}
-    <h3>{{device_group.name}}</h3>
-    <p>{{device_group.owner.name}}</p>
-    <a class="btn btn-primary" href="{% url 'device_group_update' device_group.id %}" role="button">Update</a>
-    <a class="btn btn-primary" href="{% url 'device_group_management_update' device_group.id %}" role="button">Manage Devices</a>
+    <h3>{{object.name}}</h3>
+    <p>{{object.owner.name}}</p>
+    <a class="btn btn-primary" href="{% url 'device_group_update' object.id %}" role="button">Update</a>
+    <a class="btn btn-primary" href="{% url 'device_group_management_update' object.id %}" role="button">Manage Devices</a>
     <a class="btn btn-primary" href="{% url 'device_group_list' %}" role="button">Back</a>
+    {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="device-table"
+            data-row-attribute="device-id"
+            data-url="{{ base_url }}"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
 {% endblock %}
