@@ -85,7 +85,8 @@ class Device(TimestampedModel):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
 
     class Meta:
-        unique_together = ('external_id', 'inbound_configuration')
+        ordering = ('inbound_configuration', 'external_id')
+        unique_together = ('inbound_configuration', 'external_id')
 
 
 # This is where the information is stored for a specific device
