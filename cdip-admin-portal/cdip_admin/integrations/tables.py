@@ -19,11 +19,11 @@ class DeviceStateTable(tables.Table):
 
 
 class DeviceGroupTable(tables.Table):
-    count = tables.Column(accessor="devices__all", verbose_name="Device Count")
+    count = tables.Column(accessor="devices", verbose_name="Device Count")
     created = tables.Column(accessor="created_at", verbose_name="Created")
 
     def render_count(self, value):
-        return value.count()
+        return value.all().count()
 
     class Meta:
         model = DeviceGroup
