@@ -14,6 +14,7 @@
     </p>
     <p>Endpoint: {{module.endpoint}}</p>
     <p>Login: {{module.login}}</p>
+    <p>Enabled: {{ module.enabled }}</p>
     <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_update' module.id %}" role="button">Update</a>
     <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_list' %}" role="button">Back</a>
 
