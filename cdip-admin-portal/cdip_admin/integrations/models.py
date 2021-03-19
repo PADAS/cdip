@@ -14,6 +14,9 @@ class InboundIntegrationType(TimestampedModel):
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ('name',)
+
     def __str__(self):
         return f"{self.name}"
 
@@ -30,6 +33,9 @@ class OutboundIntegrationType(TimestampedModel):
     use_login = models.BooleanField(default=False)
     use_password = models.BooleanField(default=False)
     use_token = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ('name',)
 
     def __str__(self):
         return f"{self.name}"
@@ -49,6 +55,9 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     token = EncryptedCharField(max_length=200, blank=True)
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name}"
@@ -103,6 +112,7 @@ class DeviceState(TimestampedModel):
         indexes = [
             models.Index(fields=['device', 'created_at']),
         ]
+        ordering = ('device', '-created_at')
 
     def __str__(self):
         return f"{self.state}"
@@ -117,6 +127,9 @@ class DeviceGroup(TimestampedModel):
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
+
+    class Meta:
+        ordering = ('name',)
 
     def __str__(self):
         return f"{self.name} - {self.owner.name}"
