@@ -1,67 +1,40 @@
+from django.utils.translation import ugettext_lazy as _
+
 import django_filters
 
-from integrations.models import DeviceState, DeviceGroup, Device
-
-
-def get_choices(model, field):
-    """Get choices for a ChoiceFilter dropdown
-
-    Keyword arguments:
-    model -- the model to access values on
-    field -- the field relative to the model we want to populate dropdown from
-    """
-    choices = []
-    for k in model.objects.values_list(field).distinct():
-        choices.append((k[0], k[0]))
-    return choices
+from integrations.models import DeviceState, DeviceGroup, Device, Organization, InboundIntegrationType
 
 
 class DeviceStateFilter(django_filters.FilterSet):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # try to dynamically load new choices for drop downs
-        try:
-            self.filters['organization'].extra['choices'] = \
-                get_choices(DeviceState, 'device__inbound_configuration__owner__name')
-            self.filters['inbound_config_type_name'].extra['choices'] = \
-                get_choices(DeviceState, 'device__inbound_configuration__type__name')
-        except (KeyError, AttributeError):
-            pass
-
     external_id = django_filters.CharFilter(
         field_name='device__external_id',
         lookup_expr='icontains',
-        label="External ID"
+        label=_('External ID'),
     )
 
-    organization = django_filters.ChoiceFilter(
-        choices=get_choices(DeviceState, 'device__inbound_configuration__owner__name'),
-        field_name='device__inbound_configuration__owner__name',
-        empty_label='All Owners',
+    organization = django_filters.ModelChoiceFilter(
+        queryset = Organization.objects.all().order_by('name'),
+        field_name='device__inbound_configuration__owner',
+        to_field_name='name',
+        empty_label=_('All Owners'),
+        distinct=True,
     )
 
-    inbound_config_type_name = django_filters.ChoiceFilter(
-        choices=get_choices(DeviceState, 'device__inbound_configuration__type__name'),
-        field_name='device__inbound_configuration__type__name',
-        empty_label='All Types',
+    inbound_config_type = django_filters.ModelChoiceFilter(
+        queryset=InboundIntegrationType.objects.all().order_by('name'),
+        field_name='device__inbound_configuration__type',
+        to_field_name='name',
+        empty_label=_('All Types'),
+        distinct=True,
     )
 
     class Meta:
         model = DeviceState
-        fields = ()
+        fields = ('organization', 'inbound_config_type', 'external_id',)
 
 
 class DeviceGroupFilter(django_filters.FilterSet):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # try to dynamically load new choices for drop downs
-        try:
-            self.filters['organization'].extra['choices'] = \
-                get_choices(DeviceGroup, 'owner__name')
-        except (KeyError, AttributeError):
-            pass
 
     device_group = django_filters.CharFilter(
         field_name='name',
@@ -69,42 +42,44 @@ class DeviceGroupFilter(django_filters.FilterSet):
         label='Name'
     )
 
-    organization = django_filters.ChoiceFilter(
-        choices=get_choices(DeviceGroup, 'owner__name'),
-        field_name='owner__name',
-        empty_label='All Owners',
+    organization = django_filters.ModelChoiceFilter(
+        queryset = Organization.objects.all().order_by('name'),
+        field_name='owner',
+        to_field_name='name',
+        empty_label=_('All Owners'),
+        distinct=True,
     )
 
     class Meta:
         model = DeviceGroup
-        fields = ()
+        fields = ('organization', 'device_group',)
 
 
 class DeviceFilter(django_filters.FilterSet):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # try to dynamically load new choices for drop downs
-        try:
-            self.filters['organization'].extra['choices'] = \
-                get_choices(Device, 'inbound_configuration__owner__name')
-            self.filters['inbound_config_type_name'].extra['choices'] = \
-                get_choices(Device, 'inbound_configuration__type__name')
-        except (KeyError, AttributeError):
-            pass
 
-    organization = django_filters.ChoiceFilter(
-        choices=get_choices(Device, 'inbound_configuration__owner__name'),
-        field_name='inbound_configuration__owner__name',
-        empty_label='All Owners',
+    external_id = django_filters.CharFilter(
+        field_name='external_id',
+        lookup_expr='icontains',
+        label=_('External ID')
     )
 
-    inbound_config_type_name = django_filters.ChoiceFilter(
-        choices=get_choices(Device, 'inbound_configuration__type__name'),
-        field_name='inbound_configuration__type__name',
-        empty_label='All Types',
+    organization = django_filters.ModelChoiceFilter(
+        queryset = Organization.objects.all().order_by('name'),
+        field_name='inbound_configuration__owner',
+        to_field_name='name',
+        empty_label=_('All Owners'),
+        distinct=True,
     )
+
+    inbound_config_type = django_filters.ModelChoiceFilter(
+        queryset = InboundIntegrationType.objects.all().order_by('name'),
+        field_name='inbound_configuration__type',
+        to_field_name='name',
+        empty_label=_('All Types'),
+        distinct=True,
+     )
 
     class Meta:
         model = Device
-        fields = ()
+        fields = ('organization', 'inbound_config_type', 'external_id',)
