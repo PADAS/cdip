@@ -3,7 +3,7 @@ from django.contrib import admin
 from .models import OutboundIntegrationType, InboundIntegrationType, OutboundIntegrationConfiguration, \
     InboundIntegrationConfiguration, Device, DeviceGroup, DeviceState
 
-from .views import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
+from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
 
 # Register your models here.
 admin.site.register(InboundIntegrationType)
