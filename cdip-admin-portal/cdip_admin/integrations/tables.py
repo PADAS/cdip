@@ -1,6 +1,6 @@
 import django_tables2 as tables
 
-from .models import DeviceState, DeviceGroup, Device
+from .models import DeviceState, DeviceGroup, Device, InboundIntegrationConfiguration, OutboundIntegrationConfiguration
 
 
 class DeviceStateTable(tables.Table):
@@ -48,4 +48,27 @@ class DeviceTable(tables.Table):
         sequence = ('external_id', 'inbound_configuration__owner__name',
                   'inbound_configuration__type__name', 'created')
         order_by = '-created'
+
+
+class InboundIntegrationConfigurationTable(tables.Table):
+
+    class Meta:
+        model = InboundIntegrationConfiguration
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('name', 'type__name', 'owner__name', 'endpoint', 'state', 'enabled')
+        row_attrs = {"inbound-config-id": lambda record: record.id}
+        attrs = {"class": "table table-hover", "id": "inbound-config-table"}
+        order_by = 'type__name'
+
+
+class OutboundIntegrationConfigurationTable(tables.Table):
+    type = tables.Column(accessor="type__name", verbose_name="Type")
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('name', 'type', 'owner__name', 'endpoint', 'state', 'enabled')
+        row_attrs = {"outbound-config-id": lambda record: record.id}
+        attrs = {"class": "table table-hover", "id": "outbound-config-table"}
+        order_by = 'type__name'
 
