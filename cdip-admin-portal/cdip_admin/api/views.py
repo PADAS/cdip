@@ -190,9 +190,10 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
         profile = get_profile(user_id)
         if profile:
             if isinstance(profile, ClientProfile):
-                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
+                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id, enabled=True)
             else:
-                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
+                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all(),
+                                                                          enabled=True)
         else:
             logger.warning("Retrieve Inbound Configuration, Profile Not Found",
                            extra={"user_id": user_id})
@@ -248,7 +249,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
         if inbound_id:
             try:
                 ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
-                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
+                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc, enabled=True).annotate(
                     inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
             except InboundIntegrationConfiguration.DoesNotExist:
                 queryset = queryset.none()

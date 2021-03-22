@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0026_device_index_updates'),
+        ('integrations', '0027_integrations_meta_options'),
     ]
 
     operations = [
