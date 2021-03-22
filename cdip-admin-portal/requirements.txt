@@ -106,9 +106,7 @@ idna==2.10
     #   -r requirements.in
     #   requests
 importlib-metadata==1.6.1
-    # via
-    #   -r requirements.in
-    #   django-bootstrap4
+    # via -r requirements.in
 itypes==1.2.0
     # via coreapi
 jinja2==2.11.2
