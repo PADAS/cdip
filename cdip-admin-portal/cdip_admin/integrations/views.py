@@ -5,6 +5,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
+from django.urls import reverse
 
 import logging
 
@@ -37,6 +38,12 @@ class DeviceList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     paginate_by = default_paginate_by
     filterset_class = DeviceFilter
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
+
 
 ###
 # Device Group Methods/Classes
@@ -47,6 +54,12 @@ class DeviceGroupList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     table_class = DeviceGroupTable
     paginate_by = default_paginate_by
     filterset_class = DeviceGroupFilter
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_group_list')
+        context["base_url"] = base_url
+        return context
 
 
 class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
@@ -61,6 +74,12 @@ class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
 
     def get_table_data(self):
         return self.get_object().devices
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
 
 
 @permission_required('core.admin')
@@ -106,6 +125,12 @@ class DeviceStateList(PermissionRequiredMixin, SingleTableMixin, FilterView):
     template_name = 'integrations/device_state_list.html'
     paginate_by = default_paginate_by
     filterset_class = DeviceStateFilter
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('device_list')
+        context["base_url"] = base_url
+        return context
 
 
 ###
