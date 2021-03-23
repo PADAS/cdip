@@ -55,7 +55,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('name', 'type__name', 'owner__name', 'endpoint', 'state', 'enabled')
+        fields = ('name', 'type__name', 'owner__name', 'endpoint', 'enabled')
         row_attrs = {"inbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
         order_by = 'type__name'
@@ -67,7 +67,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = OutboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('name', 'type', 'owner__name', 'endpoint', 'state', 'enabled')
+        fields = ('name', 'type', 'owner__name', 'endpoint', 'enabled')
         row_attrs = {"outbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = 'type__name'
