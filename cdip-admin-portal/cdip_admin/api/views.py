@@ -175,7 +175,7 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations
     """
-    queryset = InboundIntegrationConfiguration.objects.all()
+    queryset = InboundIntegrationConfiguration.objects.filter(enabled=True).all()
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
@@ -190,10 +190,9 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
         profile = get_profile(user_id)
         if profile:
             if isinstance(profile, ClientProfile):
-                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id, enabled=True)
+                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
             else:
-                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all(),
-                                                                          enabled=True)
+                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
         else:
             logger.warning("Retrieve Inbound Configuration, Profile Not Found",
                            extra={"user_id": user_id})
@@ -243,13 +242,13 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     def get_queryset(self):
         # todo: need to filter queryset based on permissions as well.
-        queryset = OutboundIntegrationConfiguration.objects.all()
+        queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
         inbound_id = self.request.query_params.get('inbound_id')
 
         if inbound_id:
             try:
                 ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
-                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc, enabled=True).annotate(
+                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
                     inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
             except InboundIntegrationConfiguration.DoesNotExist:
                 queryset = queryset.none()
