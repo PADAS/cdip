@@ -54,6 +54,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
     additional = models.JSONField(default=dict, blank=True)
+    enabled = models.BooleanField(default=True)
 
     class Meta:
         ordering = ('name',)
@@ -74,6 +75,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
+    enabled = models.BooleanField(default=True)
 
     default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
                                             related_name='inbound_integration_configuration',

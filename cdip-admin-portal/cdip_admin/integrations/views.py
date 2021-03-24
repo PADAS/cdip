@@ -15,7 +15,8 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup
-from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable
+from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundIntegrationConfigurationTable, \
+    OutboundIntegrationConfigurationTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -221,12 +222,18 @@ def inbound_integration_configuration_detail(request, module_id):
     return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration_module})
 
 
-class InboundIntegrationConfigurationList(PermissionRequiredMixin, ListView):
+class InboundIntegrationConfigurationList(PermissionRequiredMixin, SingleTableMixin, ListView):
     permission_required = 'core.admin'
+    table_class = InboundIntegrationConfigurationTable
     template_name = 'integrations/inbound_integration_configuration_list.html'
     queryset = InboundIntegrationConfiguration.objects.get_queryset().order_by('id')
-    context_object_name = 'integrations'
     paginate_by = default_paginate_by
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('inbound_integration_configuration_list')
+        context["base_url"] = base_url
+        return context
 
 
 @permission_required('core.admin')
@@ -268,12 +275,18 @@ def outbound_integration_configuration_detail(request, module_id):
                   {"module": integration_module})
 
 
-class OutboundIntegrationConfigurationList(PermissionRequiredMixin, ListView):
+class OutboundIntegrationConfigurationList(PermissionRequiredMixin, SingleTableMixin, ListView):
     permission_required = 'core.admin'
+    table_class = OutboundIntegrationConfigurationTable
     template_name = 'integrations/outbound_integration_configuration_list.html'
     queryset = OutboundIntegrationConfiguration.objects.get_queryset().order_by('id')
-    context_object_name = 'integrations'
     paginate_by = default_paginate_by
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_url = reverse('outbound_integration_configuration_list')
+        context["base_url"] = base_url
+        return context
 
 
 @permission_required('core.admin')

@@ -175,7 +175,7 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations
     """
-    queryset = InboundIntegrationConfiguration.objects.all()
+    queryset = InboundIntegrationConfiguration.objects.filter(enabled=True).all()
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
@@ -242,7 +242,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     def get_queryset(self):
         # todo: need to filter queryset based on permissions as well.
-        queryset = OutboundIntegrationConfiguration.objects.all()
+        queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
         inbound_id = self.request.query_params.get('inbound_id')
 
         if inbound_id:
