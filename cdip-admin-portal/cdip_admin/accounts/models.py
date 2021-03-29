@@ -5,7 +5,7 @@ from organizations.models import Organization
 
 
 class AccountProfileOrganization(models.Model):
-    account_profile = models.ForeignKey('AccountProfile', on_delete=models.CASCADE)
+    accountprofile = models.ForeignKey('AccountProfile', on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     role = models.CharField(max_length=200, default='viewer')
 
