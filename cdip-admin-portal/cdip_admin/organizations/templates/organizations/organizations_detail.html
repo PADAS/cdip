@@ -6,5 +6,6 @@
 
     <h3>{{organization.name}}</h3>
     <p>{{organization.description}}</p>
-    <a class="btn btn-primary" href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
+    <a class="btn btn-primary {% if not perms.organizations.change_organization %} disabled {% endif %}"
+       href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
 {% endblock %}
