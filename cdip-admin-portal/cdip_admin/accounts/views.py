@@ -3,12 +3,13 @@ import logging
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation
+from django.forms import modelformset_factory
 
 from cdip_admin import settings
 from .forms import AccountForm, AccountUpdateForm, AccountProfileForm, AccountRoleForm
 from .utils import get_accounts, get_account, add_account, update_account, get_account_roles, add_account_roles, \
     get_client_roles
-from .models import AccountProfile
+from .models import AccountProfile, AccountProfileOrganization
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
@@ -94,21 +95,42 @@ def account_update(request, user_id):
         return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
 
+# @permission_required('core.admin')
+# def account_profile_add(request, user_id):
+#     if request.method == 'POST':
+#         profile_form = AccountProfileForm(request.POST)
+#
+#         if profile_form.is_valid():
+#             profile_form.save()
+#             return redirect('account_detail', user_id=user_id)
+#         else:
+#             return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
+#                                                                          "profile_form": profile_form})
+#
+#     else:
+#         profile_form = AccountProfileForm()
+#         profile_form.initial['user_id'] = user_id
+#         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
+
+ProfileFormSet = modelformset_factory(AccountProfileOrganization, fields=('organization', 'role'), extra=1)
+
 @permission_required('core.admin')
 def account_profile_add(request, user_id):
     if request.method == 'POST':
-        profile_form = AccountProfileForm(request.POST)
-
+        profile_form = ProfileFormSet(request.POST)
         if profile_form.is_valid():
-            profile_form.save()
+            instances = profile_form.save(commit=False)
+            profile = AccountProfile.objects.create(user_id=user_id)
+            for instance in instances:
+                instance.accountprofile_id = profile.id
+                instance.save()
             return redirect('account_detail', user_id=user_id)
         else:
             return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
                                                                          "profile_form": profile_form})
 
     else:
-        profile_form = AccountProfileForm()
-        profile_form.initial['user_id'] = user_id
+        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
 
@@ -117,8 +139,12 @@ def account_profile_update(request, user_id):
     profile = get_object_or_404(AccountProfile, user_id=user_id)
 
     if request.method == 'POST':
-        profile_form = AccountProfileForm(instance=profile, data=request.POST)
+        profile_form = ProfileFormSet(request.POST)
         if profile_form.is_valid():
+            instances = profile_form.save(commit=False)
+            for instance in instances:
+                instance.accountprofile_id = profile.id
+                instance.save()
             profile_form.save()
             return redirect('account_detail', user_id=user_id)
         else:
@@ -126,11 +152,7 @@ def account_profile_update(request, user_id):
                                                                          "profile_form": profile_form})
 
     else:
-        profile_form = AccountProfileForm()
-
-        profile_form.initial['id'] = profile.id
-        profile_form.initial['user_id'] = profile.user_id
-        profile_form.initial['organizations'] = profile.organizations.all()
+        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id))
 
         return render(request, "accounts/account_profile_update.html",
                       {"profile_form": profile_form, "user_id": user_id})

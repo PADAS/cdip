@@ -1,8 +1,9 @@
 from django import forms
 from django.contrib.auth.models import Permission
 
-from accounts.models import AccountProfile
+from accounts.models import AccountProfile, AccountProfileOrganization
 from core.models import Task
+from organizations.models import Organization
 
 
 class AccountForm(forms.Form):
@@ -24,6 +25,10 @@ class AccountUpdateForm(forms.Form):
 
 class AccountProfileForm(forms.ModelForm):
     user_id = forms.CharField(widget=forms.HiddenInput)
+    organizations = forms.ModelMultipleChoiceField(
+        queryset=Organization.objects.all(),
+    )
+    role = forms.CharField()
 
     class Meta:
         model = AccountProfile
