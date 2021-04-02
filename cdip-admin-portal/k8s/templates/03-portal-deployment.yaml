@@ -28,7 +28,7 @@ spec:
       containers:
       - image: "${CDIP_PORTAL_IMAGE}"
         imagePullPolicy: Always
-        name: cdip-portal
+        name: main
         livenessProbe:
           httpGet:
             path: /api/v1.0/public
@@ -36,8 +36,8 @@ spec:
             httpHeaders:
               - name: Host
                 value: "${SITE_FQDN}"
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 120
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /api/v1.0/public
@@ -45,8 +45,8 @@ spec:
             httpHeaders:
               - name: Host
                 value: "${SITE_FQDN}"
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 120
+          periodSeconds: 10
         resources:
           requests:
             cpu: "100m"
