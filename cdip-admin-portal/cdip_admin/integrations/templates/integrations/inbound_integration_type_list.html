@@ -8,7 +8,8 @@
             <h2>Inbound Integration Types</h2>
         </div>
         <div class="col-lg-3">
-            <a class="btn btn-primary" href="{% url 'inbound_integration_type_add' %}" role="button">+ Add</a>
+            <a class="btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
+               href="{% url 'inbound_integration_type_add' %}" role="button">+ Add</a>
         </div>
     </div>
     <div class="row">
