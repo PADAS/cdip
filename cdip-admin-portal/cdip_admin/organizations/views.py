@@ -1,8 +1,7 @@
 from django.contrib.auth.decorators import permission_required
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from rest_framework import permissions
 from django.core.exceptions import PermissionDenied
 
 from .forms import OrganizationForm
@@ -30,17 +29,9 @@ class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
     model = Organization
     permission_required = 'organizations.change_organization'
 
-    def can_update(self, obj):
-        account_profile_id = AccountProfile.objects.only('id').get(user_id=self.request.user.username).id
-        account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
-        role = account_organizations.only('role').get(organization_id=obj.id).role
-        if role == 'admin':
-            return True
-        return False
-
     def get_object(self):
         organization = get_object_or_404(Organization, pk=self.kwargs.get("organization_id"))
-        if not self.can_update(organization):
+        if not IsOrganizationAdmin.has_object_permission(None, self.request, None, organization):
             raise PermissionDenied
         return organization
 
@@ -57,30 +48,19 @@ class OrganizationDetailView(PermissionRequiredMixin, DetailView):
         return get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
 
 
-def get_organizations_for_user(user):
-    organizations = []
-    account_profiles = AccountProfile.objects.filter(user_id=user.username)
-    for account in account_profiles:
-        for organization in account.organizations.values_list('name', flat=True):
-            organizations.append(organization)
-    return organizations
-
-
-class OrganizationsListView(ListView):
+class OrganizationsListView(LoginRequiredMixin, ListView):
     template_name = 'organizations/organizations_list.html'
     queryset = Organization.objects.get_queryset().order_by('name')
     context_object_name = 'organizations'
 
     def get_queryset(self):
         qs = super(OrganizationsListView, self).get_queryset()
-        if not self.request.user.groups.values_list('name', flat=True).filter(name='GlobalAdmin').exists():
-            return self.filter_queryset_for_user(qs, self.request.user)
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name')
         else:
             return qs
 
-    def filter_queryset_for_user(self, qs, user):
-        organizations = get_organizations_for_user(user)
-        return qs.filter(name__in=organizations)
+
 
 
 
