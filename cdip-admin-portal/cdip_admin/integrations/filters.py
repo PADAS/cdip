@@ -2,7 +2,25 @@ from django.utils.translation import ugettext_lazy as _
 
 import django_filters
 
+from core.permissions import IsGlobalAdmin, IsOrganizationAdmin
 from integrations.models import DeviceState, DeviceGroup, Device, Organization, InboundIntegrationType
+
+
+def organization_filter(request):
+    qs = Organization.objects.order_by('name')
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        return IsOrganizationAdmin.filter_queryset_for_user(qs, request.user, 'name')
+    return qs
+
+
+def type_filter(request):
+    org_qs = Organization.objects.order_by('name')
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        org_qs = IsOrganizationAdmin.filter_queryset_for_user(org_qs, request.user, 'name')
+    # set the type filter options to the types relevant to the organizations that user is member of
+    type_qs = DeviceState.objects.filter(device__inbound_configuration__owner__in=org_qs).values_list(
+        'device__inbound_configuration__type__name', flat=True).distinct().order_by()
+    return type_qs
 
 
 class DeviceStateFilter(django_filters.FilterSet):
@@ -14,24 +32,33 @@ class DeviceStateFilter(django_filters.FilterSet):
     )
 
     organization = django_filters.ModelChoiceFilter(
-        queryset = Organization.objects.all().order_by('name'),
+        queryset=organization_filter,
         field_name='device__inbound_configuration__owner',
         to_field_name='name',
-        empty_label=_('All Owners'),
+        empty_label=_('Owners'),
         distinct=True,
     )
 
     inbound_config_type = django_filters.ModelChoiceFilter(
-        queryset=InboundIntegrationType.objects.all().order_by('name'),
+        queryset=type_filter,
         field_name='device__inbound_configuration__type',
         to_field_name='name',
-        empty_label=_('All Types'),
+        empty_label=_('Types'),
         distinct=True,
     )
 
     class Meta:
         model = DeviceState
         fields = ('organization', 'inbound_config_type', 'external_id',)
+
+    @property
+    def qs(self):
+        qs = DeviceState.objects.all()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user,
+                                                                'device__inbound_configuration__owner__name')
+        else:
+            return qs
 
 
 class DeviceGroupFilter(django_filters.FilterSet):
@@ -43,16 +70,25 @@ class DeviceGroupFilter(django_filters.FilterSet):
     )
 
     organization = django_filters.ModelChoiceFilter(
-        queryset = Organization.objects.all().order_by('name'),
+        queryset=organization_filter,
         field_name='owner',
         to_field_name='name',
-        empty_label=_('All Owners'),
+        empty_label=_('Owners'),
         distinct=True,
     )
 
     class Meta:
         model = DeviceGroup
         fields = ('organization', 'device_group',)
+
+    @property
+    def qs(self):
+        qs = DeviceGroup.objects.all()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user,
+                                                                'owner__name')
+        else:
+            return qs
 
 
 class DeviceFilter(django_filters.FilterSet):

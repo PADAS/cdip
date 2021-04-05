@@ -15,6 +15,8 @@ KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 logger = logging.getLogger(__name__)
 
+ProfileFormSet = modelformset_factory(AccountProfileOrganization, fields=('organization', 'role'), extra=1)
+
 
 # Create your views here.
 @permission_required('core.admin')
@@ -94,25 +96,6 @@ def account_update(request, user_id):
 
         return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
-
-# @permission_required('core.admin')
-# def account_profile_add(request, user_id):
-#     if request.method == 'POST':
-#         profile_form = AccountProfileForm(request.POST)
-#
-#         if profile_form.is_valid():
-#             profile_form.save()
-#             return redirect('account_detail', user_id=user_id)
-#         else:
-#             return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
-#                                                                          "profile_form": profile_form})
-#
-#     else:
-#         profile_form = AccountProfileForm()
-#         profile_form.initial['user_id'] = user_id
-#         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
-
-ProfileFormSet = modelformset_factory(AccountProfileOrganization, fields=('organization', 'role'), extra=1)
 
 @permission_required('core.admin')
 def account_profile_add(request, user_id):

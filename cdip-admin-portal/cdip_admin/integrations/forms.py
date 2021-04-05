@@ -1,6 +1,7 @@
 from django import forms
 
 from accounts.utils import get_user_profile
+from core.permissions import IsGlobalAdmin, IsOrganizationAdmin
 from organizations.models import Organization
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
     InboundIntegrationType, DeviceGroup, Device
@@ -11,11 +12,15 @@ class DeviceGroupForm(forms.ModelForm):
         model = DeviceGroup
         exclude = ['id', 'devices',]
 
-    def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
-        self.profile = get_user_profile(self.user.username)
+    def __init__(self, *args, request=None, **kwargs):
         super(DeviceGroupForm, self).__init__(*args, **kwargs)
-        # self.fields['owner'].queryset = Organization.objects.filter(id__in=self.organizations.all())
+        if self.instance:
+            qs = Organization.objects.all()
+            if not IsGlobalAdmin.has_permission(None, request, None):
+                self.fields['owner'].queryset = IsOrganizationAdmin.\
+                    filter_queryset_for_user(qs, request.user, 'name')
+            else:
+                self.fields['owner'].queryset = qs
 
 
 class DeviceGroupManagementForm(forms.ModelForm):
@@ -59,6 +64,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
         widgets = {
             'password': forms.PasswordInput(),
         }
+
 
 class OutboundIntegrationTypeForm(forms.ModelForm):
 
