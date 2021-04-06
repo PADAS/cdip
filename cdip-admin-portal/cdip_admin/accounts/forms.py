@@ -4,6 +4,7 @@ from django.contrib.auth.models import Permission
 from accounts.models import AccountProfile, AccountProfileOrganization
 from core.models import Task
 from organizations.models import Organization
+from django.forms.models import BaseModelFormSet
 
 
 class AccountForm(forms.Form):
@@ -23,25 +24,13 @@ class AccountUpdateForm(forms.Form):
     enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
 
 
-class AccountProfileForm(forms.ModelForm):
-    user_id = forms.CharField(widget=forms.HiddenInput)
-    organizations = forms.ModelMultipleChoiceField(
-        queryset=Organization.objects.all(),
-    )
-    role = forms.CharField()
+class AccountProfileFormSet(BaseModelFormSet):
+    def __init__(self, *args, **kwargs):
+        form_kwargs = kwargs.pop('form_kwargs', None)
+        super(AccountProfileFormSet, self).__init__(*args, **kwargs)
 
-    class Meta:
-        model = AccountProfile
-        exclude = ['id']
-
-
-class AccountProfileUpdateForm(forms.ModelForm):
-    id = forms.UUIDField(widget=forms.HiddenInput)
-    user_id = forms.CharField(widget=forms.HiddenInput)
-
-    class Meta:
-        model = AccountProfile
-        fields = ['id', 'user_id', 'organizations']
+        for form in self.forms:
+            form.fields['organization'].queryset = form_kwargs['qs']
 
 
 class AccountRoleForm(forms.Form):
@@ -49,6 +38,9 @@ class AccountRoleForm(forms.Form):
     all_permissions = Task._meta.permissions
     permissions = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple, label='Role',
                                             choices=all_permissions, required=True)
+
+
+
 
 
 
