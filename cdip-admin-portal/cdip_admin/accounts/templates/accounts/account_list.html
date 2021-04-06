@@ -14,7 +14,7 @@
     </div>
     <div class="row">
         <ul>
-            {% for user in module %}
+            {% for user in accounts %}
                 <li>
                     <a href="{% url 'account_detail' user.id %}">
                         {{ user.lastName }}, {{ user.firstName }} - {{ user.email }}
