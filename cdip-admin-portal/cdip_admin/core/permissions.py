@@ -23,7 +23,10 @@ class IsOrganizationAdmin(permissions.BasePermission):
     @staticmethod
     def get_organizations_for_user(user, admin_only):
         organizations = []
-        account_profile_id = AccountProfile.objects.only('id').get(user_id=user.username).id
+        try:
+            account_profile_id = AccountProfile.objects.only('id').get(user_id=user.username).id
+        except AccountProfile.DoesNotExist:
+            return organizations
         if admin_only:
             account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id,
                                                                               role='admin')
