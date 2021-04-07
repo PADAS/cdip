@@ -1,9 +1,5 @@
 from django import forms
-from django.contrib.auth.models import Permission
-
-from accounts.models import AccountProfile, AccountProfileOrganization
 from core.models import Task
-from organizations.models import Organization
 from django.forms.models import BaseModelFormSet
 
 
@@ -29,8 +25,9 @@ class AccountProfileFormSet(BaseModelFormSet):
         form_kwargs = kwargs.pop('form_kwargs', None)
         super(AccountProfileFormSet, self).__init__(*args, **kwargs)
 
-        for form in self.forms:
-            form.fields['organization'].queryset = form_kwargs['qs']
+        if form_kwargs:
+            for form in self.forms:
+                form.fields['organization'].queryset = form_kwargs['qs']
 
 
 class AccountRoleForm(forms.Form):

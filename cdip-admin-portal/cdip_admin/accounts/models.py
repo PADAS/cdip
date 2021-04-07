@@ -3,11 +3,16 @@ from django.db import models
 
 from organizations.models import Organization
 
+ROLE_CHOICES = (
+    ('admin', 'admin'),
+    ('viewer', 'viewer'),
+)
+
 
 class AccountProfileOrganization(models.Model):
     accountprofile = models.ForeignKey('AccountProfile', on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    role = models.CharField(max_length=200, default='viewer')
+    role = models.CharField(max_length=200, choices=ROLE_CHOICES, default='viewer')
 
 
 # Create your models here.
