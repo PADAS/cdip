@@ -53,7 +53,7 @@ class DeviceStateFilter(django_filters.FilterSet):
 
     @property
     def qs(self):
-        qs = DeviceState.objects.all()
+        qs = super().qs
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user,
                                                                 'device__inbound_configuration__owner__name')
@@ -83,7 +83,7 @@ class DeviceGroupFilter(django_filters.FilterSet):
 
     @property
     def qs(self):
-        qs = DeviceGroup.objects.all()
+        qs = super().qs
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user,
                                                                 'owner__name')
@@ -92,7 +92,6 @@ class DeviceGroupFilter(django_filters.FilterSet):
 
 
 class DeviceFilter(django_filters.FilterSet):
-
 
     external_id = django_filters.CharFilter(
         field_name='external_id',
