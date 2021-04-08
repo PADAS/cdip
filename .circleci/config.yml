@@ -32,13 +32,15 @@ executors:
           password: $DOCKERHUB_PASSWORD
 
 jobs:
-  build_cdip_api:
+  build_cdip_portal_image:
     executor: 'gcloud'
     steps:
       - 'setup_remote_docker'
       - 'docker_login'
       - 'checkout'
-      - run: 'cd ***REMOVED*** && make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
+      - run:
+          name: "Build and Push Image"
+          command: 'cd ***REMOVED*** && make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
 
 #  trigger_downstream:
 #    executor: 'gcloud'
@@ -51,5 +53,5 @@ workflows:
   version: 2
   docker_build_workflow:
     jobs:
-      - build_cdip_api
+      - build_cdip_portal_image
 
