@@ -28,7 +28,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '^$pu=5yw^4cl1&7e#89&-&8*&_*&_hwas*fv!h-=zsl6j2hg0b'
-SECRET_KEY = env("SECRET_KEY")
+SECRET_KEY = env.str("SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
 FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -68,14 +68,14 @@ INSTALLED_APPS = [
 
 LOGIN_URL = 'keycloak_login'
 KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
-KEYCLOAK_ISSUER = env('KEYCLOAK_ISSUER')
-KEYCLOAK_SERVER = env('KEYCLOAK_SERVER')
-KEYCLOAK_REALM = env('KEYCLOAK_REALM')
-KEYCLOAK_CLIENT_ID = env('KEYCLOAK_CLIENT_ID')
-KEYCLOAK_CLIENT_SECRET = env('KEYCLOAK_CLIENT_SECRET')
-KEYCLOAK_ADMIN_CLIENT_ID = env('KEYCLOAK_ADMIN_CLIENT_ID')
-KEYCLOAK_CLIENT_UUID = env('KEYCLOAK_CLIENT_UUID')
-KEYCLOAK_ADMIN_CLIENT_SECRET = env('KEYCLOAK_ADMIN_CLIENT_SECRET')
+KEYCLOAK_ISSUER = env.str('KEYCLOAK_ISSUER', "https://cdip-auth.pamdas.org/auth/realms/cdip-dev")
+KEYCLOAK_SERVER = env.str('KEYCLOAK_SERVER', "https://cdip-auth.pamdas.org")
+KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
+KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "cdip-admin-portal")
+KEYCLOAK_CLIENT_SECRET = env.str('KEYCLOAK_CLIENT_SECRET', "something-fancy")
+KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "admin-cli")
+KEYCLOAK_CLIENT_UUID = env.str('KEYCLOAK_CLIENT_UUID', "90d34a81-c70c-408b-ad66-7fa1bfe58892")
+KEYCLOAK_ADMIN_CLIENT_SECRET = env.str('KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
 KEYCLOAK_PERMISSIONS_METHOD = "role"
 
@@ -90,8 +90,8 @@ JWT_AUTH = {
     'JWT_DECODE_HANDLER':
         'cdip_admin.utils.jwt_decode_token',
     'JWT_ALGORITHM': 'RS256',
-    'JWT_AUDIENCE': env('JWT_AUDIENCE'),
-    'JWT_ISSUER': env('JWT_ISSUER'),
+    'JWT_AUDIENCE': env.str('JWT_AUDIENCE', ""),
+    'JWT_ISSUER': env.str('JWT_ISSUER', ""),
     'JWT_AUTH_HEADER_PREFIX': 'Bearer',
 }
 
@@ -160,11 +160,11 @@ WSGI_APPLICATION = 'cdip_admin.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT'),
+        'NAME': env.str('DB_NAME', "cdip_portaldb"),
+        'USER': env.str('DB_USER', "cdip_dbuser"),
+        'PASSWORD': env.str('DB_PASSWORD', "cdip_dbpassword"),
+        'HOST': env.str('DB_HOST', "cdip_dbhost"),
+        'PORT': env.str('DB_PORT', "5432"),
     }
 }
 
