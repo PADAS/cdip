@@ -20,16 +20,6 @@ class AccountUpdateForm(forms.Form):
     enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
 
 
-class AccountProfileFormSet(BaseModelFormSet):
-    def __init__(self, *args, **kwargs):
-        form_kwargs = kwargs.pop('form_kwargs', None)
-        super(AccountProfileFormSet, self).__init__(*args, **kwargs)
-
-        if form_kwargs:
-            for form in self.forms:
-                form.fields['organization'].queryset = form_kwargs['qs']
-
-
 class AccountRoleForm(forms.Form):
     user_id = forms.CharField(widget=forms.HiddenInput)
     all_permissions = Task._meta.permissions
