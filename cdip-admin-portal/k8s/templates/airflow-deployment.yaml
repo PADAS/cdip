@@ -76,7 +76,7 @@ spec:
               command:
                 - python3
                 - /workspace/healthcheck.py
-            initialDelaySeconds: 10
+            initialDelaySeconds: 180
             periodSeconds: 10
           volumeMounts:
             - name: airflow-configmap
@@ -106,7 +106,7 @@ spec:
               command:
                 - python3
                 - /workspace/healthcheck.py
-            initialDelaySeconds: 10
+            initialDelaySeconds: 180
             periodSeconds: 10
           volumeMounts:
             - name: airflow-configmap
