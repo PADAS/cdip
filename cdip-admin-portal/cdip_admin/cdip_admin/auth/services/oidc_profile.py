@@ -104,11 +104,16 @@ def update_or_create_from_code(code, client, redirect_uri):
     # Define "initiate_time" before getting the access token to calculate
     # before which time it expires.
     initiate_time = timezone.now()
-    token_response = client.openid_api_client.authorization_code(
-        code=code, redirect_uri=redirect_uri)
-
-    return _update_or_create(client=client, token_response=token_response,
-                             initiate_time=initiate_time)
+    try:
+        logger.info('Get token using code: %s, redirect_uri: %s', code, redirect_uri)
+        token_response = client.openid_api_client.authorization_code(
+            code=code, redirect_uri=redirect_uri)
+    except Exception as e:
+        logger.exception('Failed to get token for auth-code: %s', code)
+        raise
+    else:
+        return _update_or_create(client=client, token_response=token_response,
+                                 initiate_time=initiate_time)
 
 
 def update_or_create_from_password_credentials(username, password, client):
