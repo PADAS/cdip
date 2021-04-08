@@ -82,8 +82,13 @@ class AccountsAddView(LoginRequiredMixin, FormView):
     def post(self, request, *args, **kwargs):
         form = AccountForm(request.POST)
         if form.is_valid():
-            account = form.save()
-            return redirect("account_detail", account.id)
+            data = form.cleaned_data
+            response = add_account(data)
+
+            if response:
+                return redirect('account_list')
+            else:
+                raise SuspiciousOperation
 
     def get(self, request, *args, **kwargs):
         form = AccountForm()
@@ -146,7 +151,7 @@ def account_profile_add(request, user_id):
         qs = Organization.objects.all()
         if not IsGlobalAdmin.has_permission(None, request, None):
             qs = IsOrganizationAdmin.filter_queryset_for_user(Organization.objects.all(), request.user, 'name', True)
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none(), form_kwargs={"qs": qs})
+        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
 
@@ -164,8 +169,8 @@ def account_profile_update(request, user_id):
             profile_form.save()
             return redirect('account_detail', user_id=user_id)
         else:
-            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
-                                                                         "profile_form": profile_form})
+            return render(request, "accounts/account_profile_update.html", {"user_id": user_id,
+                                                                            "profile_form": profile_form})
 
     else:
         qs = Organization.objects.all()
