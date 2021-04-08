@@ -10,7 +10,7 @@ from django.views.generic import ListView, FormView, UpdateView
 from cdip_admin import settings
 from core.permissions import IsOrganizationAdmin, IsGlobalAdmin
 from organizations.models import Organization
-from .forms import AccountForm, AccountUpdateForm, AccountRoleForm, AccountProfileFormSet
+from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
 from .utils import get_accounts, get_account, add_account, update_account, get_account_roles, add_account_roles, \
     get_client_roles
 from .models import AccountProfile, AccountProfileOrganization
@@ -19,7 +19,7 @@ KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 logger = logging.getLogger(__name__)
 
-ProfileFormSet = modelformset_factory(AccountProfileOrganization, formset=AccountProfileFormSet,
+ProfileFormSet = modelformset_factory(AccountProfileOrganization,
                                       fields=('organization', 'role'), extra=1)
 
 
@@ -169,11 +169,27 @@ def account_profile_update(request, user_id):
 
     else:
         qs = Organization.objects.all()
+        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id))
         if not IsGlobalAdmin.has_permission(None, request, None):
             qs = IsOrganizationAdmin.filter_queryset_for_user(qs, request.user, 'name', True)
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id),
-                                      form_kwargs={"qs": qs})
-
+            for form in profile_form.forms:
+                org_bound_field = form['organization']
+                org_field_val = org_bound_field.form.initial.get(org_bound_field.name, '')
+                org_choice_field = form.fields['organization']
+                role_choice_field = form.fields['role']
+                # if form is not an empty form
+                if org_field_val:
+                    org_name = Organization.objects.get(id=org_field_val)
+                    # disable form fields if user is not admin of the set organization
+                    if org_name not in qs:
+                        org_choice_field.disabled = True
+                        role_choice_field.disabled = True
+                    # otherwise restrict organization options
+                    else:
+                        org_choice_field.queryset = qs
+                # restrict the organizations options on empty form
+                else:
+                    org_choice_field.queryset = qs
         return render(request, "accounts/account_profile_update.html",
                       {"profile_form": profile_form, "user_id": user_id})
 
