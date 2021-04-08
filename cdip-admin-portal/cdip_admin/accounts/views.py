@@ -182,8 +182,8 @@ def account_profile_update(request, user_id):
                     org_name = Organization.objects.get(id=org_field_val)
                     # disable form fields if user is not admin of the set organization
                     if org_name not in qs:
-                        org_choice_field.disabled = True
-                        role_choice_field.disabled = True
+                        org_choice_field.widget.attrs['readonly'] = True
+                        role_choice_field.widget.attrs['readonly'] = True
                     # otherwise restrict organization options
                     else:
                         org_choice_field.queryset = qs
