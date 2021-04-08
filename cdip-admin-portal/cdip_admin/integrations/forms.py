@@ -47,6 +47,16 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             # 'state': forms.HiddenInput()
         }
 
+    def __init__(self, *args, request=None, **kwargs):
+        super(DeviceGroupForm, self).__init__(*args, **kwargs)
+        if self.instance:
+            qs = Organization.objects.all()
+            if not IsGlobalAdmin.has_permission(None, request, None):
+                self.fields['owner'].queryset = IsOrganizationAdmin.\
+                    filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
+            else:
+                self.fields['owner'].queryset = qs
+
 
 class InboundIntegrationTypeForm(forms.ModelForm):
 
