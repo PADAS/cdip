@@ -146,7 +146,7 @@ def account_profile_add(request, user_id):
         qs = Organization.objects.all()
         if not IsGlobalAdmin.has_permission(None, request, None):
             qs = IsOrganizationAdmin.filter_queryset_for_user(Organization.objects.all(), request.user, 'name', True)
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none(), form_kwargs={"qs": qs})
+        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
 
