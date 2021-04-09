@@ -31,8 +31,9 @@ class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
 
     def get_object(self):
         organization = get_object_or_404(Organization, pk=self.kwargs.get("organization_id"))
-        if not IsOrganizationAdmin.has_object_permission(None, self.request, None, organization):
-            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationAdmin.has_object_permission(None, self.request, None, organization):
+                raise PermissionDenied
         return organization
 
     def get_success_url(self):
