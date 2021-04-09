@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied
 from .forms import OrganizationForm
 from .models import Organization
 from accounts.models import AccountProfile, AccountProfileOrganization
-from core.permissions import IsGlobalAdmin, IsOrganizationAdmin
+from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from django.views.generic import ListView, DetailView, UpdateView
 
 
@@ -32,7 +32,7 @@ class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
     def get_object(self):
         organization = get_object_or_404(Organization, pk=self.kwargs.get("organization_id"))
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            if not IsOrganizationAdmin.has_object_permission(None, self.request, None, organization):
+            if not IsOrganizationMember.has_object_permission(None, self.request, None, organization):
                 raise PermissionDenied
         return organization
 
@@ -57,7 +57,7 @@ class OrganizationsListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = super(OrganizationsListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name')
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name')
         else:
             return qs
 

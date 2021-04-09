@@ -1,7 +1,7 @@
 from django import forms
 
 from accounts.utils import get_user_profile
-from core.permissions import IsGlobalAdmin, IsOrganizationAdmin
+from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
     InboundIntegrationType, DeviceGroup, Device
@@ -17,7 +17,7 @@ class DeviceGroupForm(forms.ModelForm):
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields['owner'].queryset = IsOrganizationAdmin.\
+                self.fields['owner'].queryset = IsOrganizationMember.\
                     filter_queryset_for_user(qs, request.user, 'name')
             else:
                 self.fields['owner'].queryset = qs
@@ -52,7 +52,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields['owner'].queryset = IsOrganizationAdmin. \
+                self.fields['owner'].queryset = IsOrganizationMember. \
                     filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
@@ -80,7 +80,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields['owner'].queryset = IsOrganizationAdmin. \
+                self.fields['owner'].queryset = IsOrganizationMember. \
                     filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
