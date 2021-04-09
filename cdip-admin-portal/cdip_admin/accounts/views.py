@@ -8,7 +8,7 @@ from django.forms import modelformset_factory
 from django.views.generic import ListView, FormView, UpdateView
 
 from cdip_admin import settings
-from core.permissions import IsOrganizationAdmin, IsGlobalAdmin
+from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
 from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
 from .utils import get_accounts, get_account, add_account, update_account, get_account_roles, add_account_roles, \
@@ -45,7 +45,7 @@ class AccountsListView(LoginRequiredMixin, ListView):
             apo_qs = AccountProfileOrganization.objects.all().filter(accountprofile__id__in=account_ids)
             org_qs = apo_qs.values_list('organization', flat=True).distinct()
             # filter those organizations based on what current user is allowed to see
-            org_qs = IsOrganizationAdmin.filter_queryset_for_user(org_qs, self.request.user, 'organization__name')
+            org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, self.request.user, 'organization__name')
             # filter our account organization profile queryset by those allowed organizations
             apo_qs = apo_qs.filter(organization__in=org_qs)
             # get back to valid account profiles by filtering against the list of valid account profile ids
@@ -94,8 +94,8 @@ class AccountsAddView(LoginRequiredMixin, FormView):
         form = AccountForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
-            if not IsOrganizationAdmin.filter_queryset_for_user(Organization.objects.all(),
-                                                                self.request.user, 'name', True):
+            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
+                                                                 self.request.user, 'name', True):
                 raise PermissionDenied
         return render(request, "accounts/account_add.html", {'form': form})
 
@@ -150,7 +150,7 @@ def account_profile_add(request, user_id):
     else:
         qs = Organization.objects.all()
         if not IsGlobalAdmin.has_permission(None, request, None):
-            qs = IsOrganizationAdmin.filter_queryset_for_user(Organization.objects.all(), request.user, 'name', True)
+            qs = IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(), request.user, 'name', True)
         profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
@@ -176,7 +176,7 @@ def account_profile_update(request, user_id):
         qs = Organization.objects.all()
         profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id))
         if not IsGlobalAdmin.has_permission(None, request, None):
-            qs = IsOrganizationAdmin.filter_queryset_for_user(qs, request.user, 'name', True)
+            qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, 'name', True)
             for form in profile_form.forms:
                 org_bound_field = form['organization']
                 org_field_val = org_bound_field.form.initial.get(org_bound_field.name, '')
