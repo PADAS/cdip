@@ -7,7 +7,7 @@ from organizations.models import Organization
 class AccountProfileOrganization(models.Model):
     accountprofile = models.ForeignKey('AccountProfile', on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    role = models.CharField(max_length=200, choices=[(tag, tag.value) for tag in RoleChoices], default='viewer')
+    role = models.CharField(max_length=200, choices=[(tag.value, tag.value) for tag in RoleChoices], default='viewer')
 
 
 # Create your models here.
