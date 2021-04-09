@@ -83,16 +83,43 @@ class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
         return context
 
 
-@permission_required('integrations.add_devicegroup', raise_exception=True)
-def device_group_add(request):
-    if request.method == "POST":
-        form = DeviceGroupForm(request.POST, user=request.user)
+def filter_device_group_form_fields(form, user):
+    # owner restricted to admin role
+    form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
+                                                                                  user,
+                                                                                  'name',
+                                                                                  True)
+    # destinations open to viewer roles
+    des_qs = form.fields['destinations'].queryset
+    org_qs = Organization.objects.filter(id__in=des_qs.values_list('owner', flat=True))
+    org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
+    form.fields['destinations'].queryset = form.fields['destinations'].queryset. \
+        filter(owner__in=org_qs)
+    return form
+
+
+class DeviceGroupAddView(PermissionRequiredMixin, FormView):
+    template_name = 'integrations/device_group_add.html'
+    form_class = DeviceGroupForm
+    model = DeviceGroup
+    permission_required = 'integrations.add_devicegroup'
+
+    def post(self, request, *args, **kwargs):
+        form = DeviceGroupForm(request.POST)
         if form.is_valid():
             config = form.save()
             return redirect("device_group_detail", config.id)
-    else:
-        form = DeviceGroupForm(user=request.user)
-    return render(request, "integrations/device_group_add.html", {"form": form})
+
+    def get_form(self, form_class=None):
+        form = DeviceGroupForm()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            # can only add if you are an admin of at least one organization
+            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
+                                                                 self.request.user, 'name', True):
+                raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form = filter_device_group_form_fields(form, self.request.user)
+        return form
 
 
 class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
@@ -104,13 +131,15 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
-        form = form_class(request=request, instance=self.object)
+        form = form_class(instance=self.object)
+        form = filter_device_group_form_fields(form, self.request.user)
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_object(self):
         device_group = get_object_or_404(DeviceGroup, pk=self.kwargs.get("device_group_id"))
-        if not IsOrganizationMember.has_object_permission(None, self.request, None, device_group.owner):
-            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.has_object_permission(None, self.request, None, device_group.owner):
+                raise PermissionDenied
         return device_group
 
     def get_success_url(self):
@@ -269,8 +298,9 @@ class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateV
     def get_object(self):
         configuration = get_object_or_404(InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
         qs = Organization.objects.filter(name=configuration.owner.name)
-        if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
-            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
+                raise PermissionDenied
         return configuration
 
     def get(self, request, *args, **kwargs):
@@ -346,8 +376,9 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     def get_object(self):
         configuration = get_object_or_404(OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
         qs = Organization.objects.filter(name=configuration.owner.name)
-        if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
-            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
+                raise PermissionDenied
         return configuration
 
     def get(self, request, *args, **kwargs):
