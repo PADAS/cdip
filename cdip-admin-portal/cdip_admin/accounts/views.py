@@ -33,7 +33,6 @@ class AccountsListView(LoginRequiredMixin, ListView):
         qs = super(AccountsListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             account_ids = []
-            # create a queryset of account profiles based on ids
             for user_profile in qs:
                 try:
                     account_profile = AccountProfile.objects.get(user_id=user_profile['id'])
@@ -41,17 +40,14 @@ class AccountsListView(LoginRequiredMixin, ListView):
                     account_profile = None
                 if account_profile is not None:
                     account_ids.append(account_profile.id)
-            # get the distinct organizations that are mapped to those profiles
+
             apo_qs = AccountProfileOrganization.objects.all().filter(accountprofile__id__in=account_ids)
             org_qs = apo_qs.values_list('organization', flat=True).distinct()
-            # filter those organizations based on what current user is allowed to see
             org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, self.request.user, 'organization__name')
-            # filter our account organization profile queryset by those allowed organizations
             apo_qs = apo_qs.filter(organization__in=org_qs)
-            # get back to valid account profiles by filtering against the list of valid account profile ids
             ap_qs = AccountProfile.objects.filter(id__in=apo_qs.values_list('accountprofile_id', flat=True))
             filtered_qs = []
-            # loop through our original list of users and only include accounts we deem viewable
+
             for user_profile in qs:
                 pass
                 if ap_qs.filter(user_id=user_profile['id']).exists():
@@ -121,8 +117,7 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
         account_form = AccountUpdateForm()
         user_id = self.kwargs.get("user_id")
         account = get_account(user_id)
-        # if not IsOrganizationAdmin.has_object_permission(None, self.request, None, organization):
-        #     raise PermissionDenied
+
         account_form.initial['firstName'] = account["firstName"]
         account_form.initial['lastName'] = account["lastName"]
         account_form.initial['username'] = account["username"]
@@ -189,6 +184,10 @@ def account_profile_update(request, user_id):
                     if org_name not in qs:
                         org_choice_field.widget.attrs['readonly'] = True
                         role_choice_field.widget.attrs['readonly'] = True
+                        # org_choice_field.widget.attrs['disabled'] = True
+                        # org_choice_field.widget.attrs['required'] = False
+                        # role_choice_field.widget.attrs['disabled'] = True
+                        # role_choice_field.widget.attrs['required'] = False
                     # otherwise restrict organization options
                     else:
                         org_choice_field.queryset = qs
