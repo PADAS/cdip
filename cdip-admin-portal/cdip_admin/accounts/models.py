@@ -1,18 +1,13 @@
 import uuid
 from django.db import models
 
+from core.enums import RoleChoices
 from organizations.models import Organization
-
-ROLE_CHOICES = (
-    ('admin', 'admin'),
-    ('viewer', 'viewer'),
-)
-
 
 class AccountProfileOrganization(models.Model):
     accountprofile = models.ForeignKey('AccountProfile', on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    role = models.CharField(max_length=200, choices=ROLE_CHOICES, default='viewer')
+    role = models.CharField(max_length=200, choices=[(tag, tag.value) for tag in RoleChoices], default='viewer')
 
 
 # Create your models here.
