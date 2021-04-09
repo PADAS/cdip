@@ -2,7 +2,8 @@ from django.urls import path
 
 from . import views
 from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegrationConfigurationUpdateView, \
-    DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView
+    DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView, \
+    DeviceGroupAddView
 
 urlpatterns = [
     path('devices/<uuid:module_id>', views.device_detail,
@@ -12,7 +13,7 @@ urlpatterns = [
     path('devices/groups/<uuid:module_id>', views.DeviceGroupDetail.as_view(),
          name='device_group_detail'),
     path('devices/groups', views.DeviceGroupListView.as_view(), name='device_group_list'),
-    path('devices/groups/add', views.device_group_add,
+    path('devices/groups/add', DeviceGroupAddView.as_view(),
          name="device_group_add"),
     path('devices/groups/update/<uuid:device_group_id>',
          DeviceGroupUpdateView.as_view(),
