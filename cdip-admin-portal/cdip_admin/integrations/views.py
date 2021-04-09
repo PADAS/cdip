@@ -10,7 +10,7 @@ from django.urls import reverse
 import logging
 
 from cdip_admin import settings
-from core.permissions import IsGlobalAdmin, IsOrganizationAdmin
+from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
@@ -109,7 +109,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
 
     def get_object(self):
         device_group = get_object_or_404(DeviceGroup, pk=self.kwargs.get("device_group_id"))
-        if not IsOrganizationAdmin.has_object_permission(None, self.request, None, device_group.owner):
+        if not IsOrganizationMember.has_object_permission(None, self.request, None, device_group.owner):
             raise PermissionDenied
         return device_group
 
@@ -253,10 +253,10 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form.fields['owner'].queryset = IsOrganizationAdmin.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                         self.request.user,
+            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
+                                                                                          self.request.user,
                                                                                          'name',
-                                                                                         True)
+                                                                                          True)
         return form
 
 
@@ -269,13 +269,14 @@ class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateV
     def get_object(self):
         configuration = get_object_or_404(InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
         qs = Organization.objects.filter(name=configuration.owner.name)
-        if not IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
+        if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
             raise PermissionDenied
         return configuration
 
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
+        # needed for model form field filtering
         form = form_class(request=request, instance=self.object)
         return self.render_to_response(self.get_context_data(form=form))
 
@@ -299,7 +300,7 @@ class InboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMix
     def get_queryset(self):
         qs = super(InboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
         else:
             return qs
 
@@ -329,10 +330,10 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
     def get_form(self, form_class=None):
         form = OutboundIntegrationConfigurationForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form.fields['owner'].queryset = IsOrganizationAdmin.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                         self.request.user,
+            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
+                                                                                          self.request.user,
                                                                                          'name',
-                                                                                         True)
+                                                                                          True)
         return form
 
 
@@ -345,13 +346,14 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     def get_object(self):
         configuration = get_object_or_404(OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
         qs = Organization.objects.filter(name=configuration.owner.name)
-        if not IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
+        if not IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
             raise PermissionDenied
         return configuration
 
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
+        # needed for model form field filtering
         form = form_class(request=request, instance=self.object)
         return self.render_to_response(self.get_context_data(form=form))
 
@@ -375,6 +377,6 @@ class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMi
     def get_queryset(self):
         qs = super(OutboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
         else:
             return qs

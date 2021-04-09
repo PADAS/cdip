@@ -9,7 +9,7 @@ class IsGlobalAdmin(permissions.BasePermission):
         return request.user.groups.values_list('name', flat=True).filter(name='GlobalAdmin').exists()
 
 
-class IsOrganizationAdmin(permissions.BasePermission):
+class IsOrganizationMember(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         account_profile_id = AccountProfile.objects.only('id').get(user_id=request.user.username).id
         account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
@@ -20,6 +20,12 @@ class IsOrganizationAdmin(permissions.BasePermission):
             return True
         return False
 
+    '''
+    Returns the organizations a user is mapped to
+
+    user: user whose roles we filter against
+    admin_only: specifies whether we filter the qs down to admin roles only
+    '''
     @staticmethod
     def get_organizations_for_user(user, admin_only):
         organizations = []
@@ -36,9 +42,17 @@ class IsOrganizationAdmin(permissions.BasePermission):
             organizations.append(account.organization.name)
         return organizations
 
+    '''
+    Filters a queryset based on a users organization role mapping
+    
+    qs: the queryset to filter
+    user: user whose roles we filter against
+    name_path: the accessor path to the name property on the Organization model
+    admin_only: specifies whether we filter the qs down to admin roles only
+    '''
     @staticmethod
     def filter_queryset_for_user(qs, user, name_path, admin_only=False):
         filter_string = name_path + '__in'
-        organizations = IsOrganizationAdmin.get_organizations_for_user(user, admin_only)
+        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only)
         return qs.filter(**{filter_string: organizations})
 
