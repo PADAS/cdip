@@ -6,6 +6,7 @@ from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import DeviceState, DeviceGroup, Device, Organization, InboundIntegrationType
 
 
+# set the organization filter options to the organizations that user is member of
 def organization_filter(request):
     qs = Organization.objects.order_by('name')
     if not IsGlobalAdmin.has_permission(None, request, None):
@@ -13,13 +14,13 @@ def organization_filter(request):
     return qs
 
 
+# set the type filter options to the types relevant to the organizations that user is member of
 def type_filter(request):
-    org_qs = Organization.objects.order_by('name')
+    type_qs = InboundIntegrationType.objects.all()
     if not IsGlobalAdmin.has_permission(None, request, None):
-        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, request.user, 'name')
-    # set the type filter options to the types relevant to the organizations that user is member of
-    type_qs = DeviceState.objects.filter(device__inbound_configuration__owner__in=org_qs).values_list(
-        'device__inbound_configuration__type__name', flat=True).distinct().order_by()
+        org_qs = IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(), request.user, 'name')
+        types = Device.objects.filter(inbound_configuration__owner__in=org_qs).values_list('inbound_configuration__type')
+        type_qs = type_qs.filter(inboundintegrationconfiguration__type__in=types).distinct()
     return type_qs
 
 
@@ -56,7 +57,7 @@ class DeviceStateFilter(django_filters.FilterSet):
         qs = super().qs
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
-                                                                'device__inbound_configuration__owner__name')
+                                                                 'device__inbound_configuration__owner__name')
         else:
             return qs
 
@@ -86,7 +87,7 @@ class DeviceGroupFilter(django_filters.FilterSet):
         qs = super().qs
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
-                                                                'owner__name')
+                                                                 'owner__name')
         else:
             return qs
 
@@ -100,21 +101,30 @@ class DeviceFilter(django_filters.FilterSet):
     )
 
     organization = django_filters.ModelChoiceFilter(
-        queryset = Organization.objects.all().order_by('name'),
+        queryset=organization_filter,
         field_name='inbound_configuration__owner',
         to_field_name='name',
-        empty_label=_('All Owners'),
+        empty_label=_('Owners'),
         distinct=True,
     )
 
     inbound_config_type = django_filters.ModelChoiceFilter(
-        queryset = InboundIntegrationType.objects.all().order_by('name'),
+        queryset=type_filter,
         field_name='inbound_configuration__type',
         to_field_name='name',
-        empty_label=_('All Types'),
+        empty_label=_('Types'),
         distinct=True,
      )
 
     class Meta:
         model = Device
         fields = ('organization', 'inbound_config_type', 'external_id',)
+
+    @property
+    def qs(self):
+        qs = super().qs
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
+                                                                 'inbound_configuration__owner__name')
+        else:
+            return qs

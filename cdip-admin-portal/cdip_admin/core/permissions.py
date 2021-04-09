@@ -7,7 +7,7 @@ from core.enums import RoleChoices, DjangoGroups
 
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.groups.values_list('name', flat=True).filter(name=DjangoGroups.GLOBAL_ADMIN).exists()
+        return request.user.groups.values_list('name', flat=True).filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
 
 
 class IsOrganizationMember(permissions.BasePermission):
@@ -15,9 +15,9 @@ class IsOrganizationMember(permissions.BasePermission):
         account_profile_id = AccountProfile.objects.only('id').get(user_id=request.user.username).id
         account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
         role = account_organizations.only('role').get(organization_id=obj.id).role
-        if request.method in SAFE_METHODS and role in (RoleChoices.ADMIN, RoleChoices.VIEWER):
+        if request.method in SAFE_METHODS and role in (RoleChoices.ADMIN.value, RoleChoices.VIEWER.value):
             return True
-        elif request.method not in SAFE_METHODS and role == RoleChoices.ADMIN:
+        elif request.method not in SAFE_METHODS and role == RoleChoices.ADMIN.value:
             return True
         return False
 
@@ -36,7 +36,7 @@ class IsOrganizationMember(permissions.BasePermission):
             return organizations
         if admin_only:
             account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id,
-                                                                              role=RoleChoices.ADMIN)
+                                                                              role=RoleChoices.ADMIN.value)
         else:
             account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
         for account in account_organizations:
