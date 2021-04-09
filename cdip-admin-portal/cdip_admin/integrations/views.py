@@ -27,15 +27,14 @@ default_paginate_by = settings.DEFAULT_PAGINATE_BY
 ###
 # Device Methods/Classes
 ###
-@permission_required('core.admin')
+@permission_required('integrations.view_device')
 def device_detail(request, module_id):
     logger.info(f"Request for Device: {module_id}")
     device = get_object_or_404(Device, pk=module_id)
     return render(request, "integrations/device_detail.html", {"device": device})
 
 
-class DeviceList(PermissionRequiredMixin, SingleTableMixin, FilterView):
-    permission_required = 'core.admin'
+class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = 'integrations/device_list.html'
     table_class = DeviceTable
     paginate_by = default_paginate_by
@@ -113,8 +112,6 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         if not IsOrganizationAdmin.has_object_permission(None, self.request, None, device_group.owner):
             raise PermissionDenied
         return device_group
-
-
 
     def get_success_url(self):
         return reverse('device_group_detail', kwargs={'module_id': self.kwargs.get("device_group_id")})
@@ -271,9 +268,16 @@ class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateV
 
     def get_object(self):
         configuration = get_object_or_404(InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
-        if not IsOrganizationAdmin.has_object_permission(None, self.request, None, configuration.owner):
+        qs = Organization.objects.filter(name=configuration.owner.name)
+        if not IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
             raise PermissionDenied
         return configuration
+
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(request=request, instance=self.object)
+        return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
         return reverse('inbound_integration_configuration_detail',
@@ -340,13 +344,20 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
 
     def get_object(self):
         configuration = get_object_or_404(OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
-        if not IsOrganizationAdmin.has_object_permission(None, self.request, None, configuration.owner):
+        qs = Organization.objects.filter(name=configuration.owner.name)
+        if not IsOrganizationAdmin.filter_queryset_for_user(qs, self.request.user, 'name', admin_only=True):
             raise PermissionDenied
         return configuration
 
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(request=request, instance=self.object)
+        return self.render_to_response(self.get_context_data(form=form))
+
     def get_success_url(self):
         return reverse('outbound_integration_configuration_detail',
-                       kwargs={'configuration_id': self.kwargs.get("configuration_id")})
+                       kwargs={'module_id': self.kwargs.get("configuration_id")})
 
 
 class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, ListView):
