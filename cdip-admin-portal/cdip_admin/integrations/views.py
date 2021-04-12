@@ -132,7 +132,8 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         form_class = self.get_form_class()
         self.object = self.get_object()
         form = form_class(instance=self.object)
-        form = filter_device_group_form_fields(form, self.request.user)
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form = filter_device_group_form_fields(form, self.request.user)
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_object(self):
