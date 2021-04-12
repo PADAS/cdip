@@ -91,7 +91,7 @@ def device_group_add(request):
             config = form.save()
             return redirect("device_group_detail", config.id)
     else:
-        form = DeviceGroupForm(user=request.user)
+        form = DeviceGroupForm()
     return render(request, "integrations/device_group_add.html", {"form": form})
 
 
