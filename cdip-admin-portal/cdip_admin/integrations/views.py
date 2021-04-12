@@ -85,16 +85,23 @@ class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
 
 def filter_device_group_form_fields(form, user):
     # owner restricted to admin role
-    form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                  user,
-                                                                                  'name',
-                                                                                  True)
+    if form.fields.get('owner'):
+        form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
+                                                                                      user,
+                                                                                      'name',
+                                                                                      True)
     # destinations open to viewer roles
-    des_qs = form.fields['destinations'].queryset
-    org_qs = Organization.objects.filter(id__in=des_qs.values_list('owner', flat=True))
-    org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
-    form.fields['destinations'].queryset = form.fields['destinations'].queryset. \
-        filter(owner__in=org_qs)
+    if form.fields.get('destinations'):
+        des_qs = form.fields['destinations'].queryset
+        org_qs = Organization.objects.filter(id__in=des_qs.values_list('owner', flat=True))
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
+        form.fields['destinations'].queryset = des_qs.filter(owner__in=org_qs)
+
+    if form.fields.get('devices'):
+        dev_qs = form.fields['devices'].queryset
+        org_qs = Organization.objects.filter(id__in=dev_qs.values_list('inbound_configuration__owner', flat=True))
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
+        form.fields['devices'].queryset = dev_qs.filter(inbound_configuration__owner__in=org_qs)
     return form
 
 
@@ -147,15 +154,26 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         return reverse('device_group_detail', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
-@permission_required('core.admin')
-def device_group_management_update(request, device_group_id):
-    device_group = get_object_or_404(DeviceGroup, id=device_group_id)
-    form = DeviceGroupManagementForm(request.POST or None, instance=device_group)
+class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
+    template_name = 'integrations/device_group_update.html'
+    form_class = DeviceGroupManagementForm
+    model = DeviceGroup
 
-    if form.is_valid():
-        form.save()
-        return redirect("device_group_detail", device_group_id)
-    return render(request, "integrations/device_group_update.html", {"form": form})
+    def get_object(self):
+        device_group = get_object_or_404(DeviceGroup, pk=self.kwargs.get("device_group_id"))
+        return device_group
+
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        # needed for model form field filtering
+        form = form_class(instance=self.object)
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form = filter_device_group_form_fields(form, self.request.user)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_success_url(self):
+        return reverse('device_group_detail', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
 ###
