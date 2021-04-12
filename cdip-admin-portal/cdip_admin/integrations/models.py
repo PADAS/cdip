@@ -60,7 +60,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         ordering = ('name',)
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.type.name} - {self.owner.name} - {self.name}"
 
 
 # This is the information for a given configuration this will include a specific organizations account information
