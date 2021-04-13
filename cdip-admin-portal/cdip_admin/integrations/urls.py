@@ -3,7 +3,7 @@ from django.urls import path
 from . import views
 from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegrationConfigurationUpdateView, \
     DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView, \
-    DeviceGroupAddView
+    DeviceGroupAddView, DeviceGroupManagementUpdateView
 
 urlpatterns = [
     path('devices/<uuid:module_id>', views.device_detail,
@@ -19,7 +19,7 @@ urlpatterns = [
          DeviceGroupUpdateView.as_view(),
          name="device_group_update"),
     path('devices/groups/management/update/<uuid:device_group_id>',
-         views.device_group_management_update,
+         DeviceGroupManagementUpdateView.as_view(),
          name="device_group_management_update"),
 
     path('devices/state/', views.DeviceStateList.as_view(), name='device_state_list'),
