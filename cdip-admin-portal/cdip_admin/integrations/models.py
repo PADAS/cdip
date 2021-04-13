@@ -56,6 +56,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
 
+
     class Meta:
         ordering = ('name',)
 
@@ -92,6 +93,10 @@ class Device(TimestampedModel):
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
 
+    @property
+    def owner(self):
+        return self.inbound_configuration.owner
+
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
 
@@ -107,6 +112,10 @@ class DeviceState(TimestampedModel):
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
     state = models.JSONField(blank=True, null=True)
+
+    @property
+    def owner(self):
+        return self.device.inbound_configuration.owner
 
     class Meta:
         indexes = [
