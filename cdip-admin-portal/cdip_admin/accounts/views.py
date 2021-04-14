@@ -143,9 +143,6 @@ def account_profile_add(request, user_id):
                                                                          "profile_form": profile_form})
 
     else:
-        qs = Organization.objects.all()
-        if not IsGlobalAdmin.has_permission(None, request, None):
-            qs = IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(), request.user, 'name', True)
         profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
@@ -185,8 +182,8 @@ def account_profile_update(request, user_id):
                         org_choice_field.widget.attrs['readonly'] = True
                         role_choice_field.widget.attrs['readonly'] = True
                         # org_choice_field.widget.attrs['disabled'] = True
-                        # org_choice_field.widget.attrs['required'] = False
                         # role_choice_field.widget.attrs['disabled'] = True
+                        # org_choice_field.widget.attrs['required'] = False
                         # role_choice_field.widget.attrs['required'] = False
                     # otherwise restrict organization options
                     else:
@@ -196,42 +193,3 @@ def account_profile_update(request, user_id):
                     org_choice_field.queryset = qs
         return render(request, "accounts/account_profile_update.html",
                       {"profile_form": profile_form, "user_id": user_id})
-
-
-@permission_required('core.admin')
-def account_role_add(request, user_id):
-    logger.info('Manage account roles')
-    user_roles = get_account_roles(user_id)
-    if request.method == 'POST':
-        account_role_form = AccountRoleForm(request.POST)
-        client_roles = get_client_roles()
-        if account_role_form.is_valid():
-            data = account_role_form.cleaned_data
-            permissions = data['permissions']
-
-            if permissions:
-                update_roles = []
-
-                for perm in data['permissions']:
-                    role = next((x for x in client_roles if x['name'] == 'core.' + perm), None)
-
-                    if role is not None:
-                        update_roles.append(role)
-
-            response = add_account_roles(update_roles, user_id)
-
-            if response:
-                return redirect('account_detail', user_id=user_id)
-            else:
-                raise SuspiciousOperation
-
-    else:
-        roles = []
-        for role in user_roles:
-            role_name = role['name'].replace("core.", "")
-            roles.append(role_name)
-        account_role_form = AccountRoleForm()
-        account_role_form.initial['permissions'] = roles
-        account_role_form.initial['user_id'] = user_id
-        return render(request, "accounts/account_role_add.html", {"account_role_form": account_role_form,
-                                                                  "user_id": user_id})
