@@ -1,11 +1,8 @@
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
 from rest_framework.permissions import SAFE_METHODS
 
 from accounts.models import AccountProfile, AccountProfileOrganization
 from core.enums import RoleChoices, DjangoGroups
-from integrations.models import InboundIntegrationConfiguration, OutboundIntegrationConfiguration
-from organizations.models import Organization
 
 
 class IsGlobalAdmin(permissions.BasePermission):
@@ -70,8 +67,11 @@ class IsOrganizationMember(permissions.BasePermission):
     '''
     @staticmethod
     def is_object_owner(user, obj):
-        if not obj.__getattribute__('owner'):
-            return False
+        try:
+            obj.__getattribute__('owner')
+        except AttributeError:
+            # return true for objects that dont have owners
+            return True
         organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=True)
         return organizations.__contains__(obj.owner.name)
 
@@ -83,8 +83,11 @@ class IsOrganizationMember(permissions.BasePermission):
     '''
     @staticmethod
     def is_object_viewer(user, obj):
-        if not obj.__getattribute__('owner'):
-            return False
+        try:
+            obj.__getattribute__('owner')
+        except AttributeError:
+            # return true for objects that dont have owners
+            return True
         organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=False)
         return organizations.__contains__(obj.owner.name)
 
