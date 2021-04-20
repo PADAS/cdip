@@ -295,6 +295,7 @@ class DeviceListView(generics.ListAPIView):
 
 class DeviceStateListView(generics.ListAPIView):
     """ Returns Device States -- Latest state for each device. """
+
     queryset = DeviceState.objects.all()
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
@@ -306,10 +307,7 @@ class DeviceStateListView(generics.ListAPIView):
             'device__inbound_configuration__id': self.args['inbound_config_id']
         } if self.args else {}
 
-        queryset = DeviceState.objects.filter(**filter).annotate(
-            last_end_state=Window(expression=FirstValue(F('end_state')),
-                                   partition_by=F('device_id'), order_by=[F('created_at').desc()])
-                                   ).distinct('device_id')
+        queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
 
         return queryset
 
