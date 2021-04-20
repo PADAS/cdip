@@ -32,7 +32,7 @@ class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
     def get_object(self):
         organization = get_object_or_404(Organization, pk=self.kwargs.get("organization_id"))
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            if not IsOrganizationMember.has_object_permission(None, self.request, None, organization):
+            if not IsOrganizationMember.is_object_owner(self.request.user, organization):
                 raise PermissionDenied
         return organization
 
