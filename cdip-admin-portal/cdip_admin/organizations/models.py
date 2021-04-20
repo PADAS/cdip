@@ -15,6 +15,10 @@ class Organization(TimestampedModel):
     name = models.CharField(max_length=200, verbose_name='Owner', unique=True)
     description = models.TextField(blank=True)
 
+    @property
+    def owner(self):
+        return self
+
     def __str__(self):
         return f"{self.name}"
 
