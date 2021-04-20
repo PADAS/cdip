@@ -117,7 +117,7 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
 AUTHENTICATION_BACKENDS = {
     'django.contrib.auth.backends.ModelBackend',
     'django.contrib.auth.backends.RemoteUserBackend',
-    'cdip_admin.auth.backends.KeycloakAuthorizationCodeBackend',
+    'cdip_admin.auth.backends.SimpleUserInfoBackend',
 }
 
 MIDDLEWARE = [
@@ -127,11 +127,12 @@ MIDDLEWARE = [
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django_keycloak.middleware.BaseKeycloakMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'cdip_admin.auth.middleware.AuthenticationMiddleware',
+    'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
 ]
 
 ROOT_URLCONF = 'cdip_admin.urls'

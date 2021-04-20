@@ -7,19 +7,21 @@ from core.enums import RoleChoices, DjangoGroups
 
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.groups.values_list('name', flat=True).filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
+        return request.user.groups.filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
+
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
 
 
 class IsOrganizationMember(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists()
+
     def has_object_permission(self, request, view, obj):
-        account_profile_id = AccountProfile.objects.only('id').get(user_id=request.user.username).id
-        account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
-        role = account_organizations.only('role').get(organization_id=obj.id).role
-        if request.method in SAFE_METHODS and role in (RoleChoices.ADMIN.value, RoleChoices.VIEWER.value):
-            return True
-        elif request.method not in SAFE_METHODS and role == RoleChoices.ADMIN.value:
-            return True
-        return False
+        if request.method in SAFE_METHODS:
+            return self.is_object_viewer(request.user, obj)
+        else:
+            return self.is_object_owner(request.user, obj)
 
     '''
     Returns the organizations a user is mapped to
@@ -56,4 +58,37 @@ class IsOrganizationMember(permissions.BasePermission):
         filter_string = name_path + '__in'
         organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only)
         return qs.filter(**{filter_string: organizations})
+
+    '''
+    Determines if the passed in user has write permission on the passed in object
+
+    user: user whose roles we filter against
+    obj: object to inspect, requires "owner" property
+    '''
+    @staticmethod
+    def is_object_owner(user, obj):
+        try:
+            obj.__getattribute__('owner')
+        except AttributeError:
+            # return true for objects that dont have owners
+            return True
+        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=True)
+        return organizations.__contains__(obj.owner.name)
+
+    '''
+    Determines if the passed in user has read permission on the passed in object
+
+    user: user whose roles we filter against
+    obj: object to inspect, requires "owner" property
+    '''
+    @staticmethod
+    def is_object_viewer(user, obj):
+        try:
+            obj.__getattribute__('owner')
+        except AttributeError:
+            # return true for objects that dont have owners
+            return True
+        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=False)
+        return organizations.__contains__(obj.owner.name)
+
 
