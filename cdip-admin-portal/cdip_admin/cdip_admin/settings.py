@@ -34,9 +34,13 @@ FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
-# ALLOWED_HOSTS = ['35.192.111.237']
-ALLOWED_HOSTS = [env.str('ALLOWED_HOSTS', default='localhost')]
+# Defaults are sensible for local development.
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', 'portal-127.0.0.1.nip.io',])
+
+# Tell Django to use Host forwarded from proxy or gateway)
 USE_X_FORWARDED_HOST=True
+
+# Set forwarded protocol header (Override this in you local dev if using http.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 STATIC_ROOT = '/var/www/static/'
