@@ -190,7 +190,7 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
-    permission_classes = [IsServiceAccount]
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get_queryset(self):
         queryset = self.queryset
@@ -310,11 +310,14 @@ class DeviceStateListView(generics.ListAPIView):
 
     def get_queryset(self):
 
-        filter = {
-            'device__inbound_configuration__id': self.args['inbound_config_id']
-        } if self.args else {}
+        # filter = {
+        #     'device__inbound_configuration__id': self.args['inbound_config_id']
+        # } if self.args else {}
 
-        queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+        # queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+
+        queryset = super().get_queryset()
+
         is_service_account = 'client_id' in self.request.session
         if not IsGlobalAdmin.has_permission(None, self.request, None) and not is_service_account:
             queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,

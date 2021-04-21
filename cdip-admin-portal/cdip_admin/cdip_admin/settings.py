@@ -115,8 +115,8 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
 ]
 
 AUTHENTICATION_BACKENDS = {
-    'django.contrib.auth.backends.ModelBackend',
     'django.contrib.auth.backends.RemoteUserBackend',
+    'django.contrib.auth.backends.ModelBackend',
     'cdip_admin.auth.backends.SimpleUserInfoBackend',
 }
 
@@ -131,8 +131,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'cdip_admin.auth.middleware.AuthenticationMiddleware',
     'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
+    'cdip_admin.auth.middleware.AuthenticationMiddleware',
 ]
 
 ROOT_URLCONF = 'cdip_admin.urls'
