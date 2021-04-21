@@ -9,9 +9,11 @@ from django.db.models import F, Window
 from django.db.models.functions import FirstValue
 from django.http import JsonResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import APIException, status
 
 from accounts.utils import get_user_profile
 from cdip_admin import settings
@@ -300,6 +302,11 @@ class DeviceListView(generics.ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
+class MissingArgumentException(APIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = _('Missing arguments.')
+    default_code = 'error'
+
 class DeviceStateListView(generics.ListAPIView):
     """ Returns Device States -- Latest state for each device. """
     queryset = DeviceState.objects.all()
@@ -310,10 +317,15 @@ class DeviceStateListView(generics.ListAPIView):
 
     def get_queryset(self):
 
-        filter = {
-            'device__inbound_configuration__id': self.request.query_params['inbound_config_id']
-        } if self.args else {}
+        inbound_config_id = self.request.query_params.get('inbound_config_id', None)
+        if not inbound_config_id:
+            raise MissingArgumentException(detail=_('"inbound_config_id" is required.'),)
 
+        filter = {
+            'device__inbound_configuration__id': inbound_config_id
+        }
+
+        # TODO: Consider returning a NotFound if the inbound_config_id is not found.
         queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
 
         return queryset
