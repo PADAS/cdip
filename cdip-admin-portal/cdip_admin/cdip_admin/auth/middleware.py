@@ -72,7 +72,7 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
         # getting passed in the headers, then the correct user is already
         # persisted in the session and we don't need to continue.
         if request.user.is_authenticated:
-            if request.user.get_username() == request.user.get_username():
+            if request.user.get_username() == username:
                 return
             else:
                 # An authenticated user is associated with the request, but
