@@ -310,30 +310,14 @@ class DeviceStateListView(generics.ListAPIView):
 
     def get_queryset(self):
 
-        # filter = {
-        #     'device__inbound_configuration__id': self.args['inbound_config_id']
-        # } if self.args else {}
-
-        # queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
-
-        queryset = super().get_queryset()
-
-        is_service_account = 'client_id' in self.request.session
-        if not IsGlobalAdmin.has_permission(None, self.request, None) and not is_service_account:
-            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
-                                                                     'device__inbound_configuration__owner__name')
-
-        ds_filter = {
+        filter = {
             'device__inbound_configuration__id': self.request.query_params['inbound_config_id']
-        } if self.request.query_params else {}
+        } if self.args else {}
 
-        queryset = queryset.filter(**ds_filter).annotate(
-            last_end_state=Window(expression=FirstValue(F('end_state')),
-                                  partition_by=F('device_id'), order_by=[F('created_at').desc()])
-        )
+        queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+
         return queryset
 
-    # @service_accessible()
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
