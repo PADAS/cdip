@@ -79,9 +79,9 @@ class IsOrganizationMember(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
-            return self.is_object_viewer(request.user, obj)
+            return IsOrganizationMember.is_object_viewer(request.user, obj)
         else:
-            return self.is_object_owner(request.user, obj)
+            return IsOrganizationMember.is_object_owner(request.user, obj)
 
     '''
     Returns the organizations a user is mapped to

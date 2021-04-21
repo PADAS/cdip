@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.translation import ugettext_lazy as _
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import APIException, status
 
@@ -116,7 +117,6 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
                                                                          'owner__name')
         return queryset
 
-    # @service_accessible()
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -129,14 +129,27 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
     """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get(self, request, *args, **kwargs):
+        integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
+        self.permission_checks(request, integration)
         return self.retrieve(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
+        integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
+        self.permission_checks(request, integration)
         response = self.update(request, *args, **kwargs)
         return response
+
+    def permission_checks(self, request, integration):
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if IsOrganizationMember.has_permission(None, request, None):
+                if not IsOrganizationMember.has_object_permission(None, request, self, integration):
+                    raise PermissionDenied
+            elif IsServiceAccount.has_permission(None, request, None):
+                if not IsServiceAccount.has_object_permission(None, request, self, integration):
+                    raise PermissionDenied
 
     # # TODO: this doesn't work yet with the savannah function
     # @requires_scope(['patch:inboundintegrationconfiguration', 'core.admin'])
