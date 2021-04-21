@@ -18,12 +18,15 @@
             <ul class="navbar-nav ml-auto flex-nowrap">
                 {% if request.user.is_authenticated == False %}
                     <li class="nav-item">
-                        <a class="nav-link m-2 menu-item" href="{% url 'keycloak_login' %}">Log In</a>
+                        <a class="nav-link m-2 menu-item" href="/">Local login is not implemented</a>
                     </li>
                 {% endif %}
                 {% if request.user.is_authenticated == True %}
                     <li class="nav-item">
-                        <a class="nav-link m-2 menu-item" href="{% url 'keycloak_logout' %}">Log Out</a>
+                        <a class="nav-link m-2 menu-item" href="/admin/">Admin</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link m-2 menu-item" href="{% url 'logout' %}">Log Out</a>
                     </li>
                 {% endif %}
             </ul>
