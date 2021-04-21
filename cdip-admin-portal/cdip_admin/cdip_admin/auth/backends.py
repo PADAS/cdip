@@ -7,9 +7,6 @@ from clients.models import ClientProfile
 
 class SimpleUserInfoBackend(ModelBackend):
     def authenticate(self, request, user_info=None, **kwargs):
-        if not request:
-            # unsure why this happens
-            return
         try:
             if not user_info:
                 header = request.META.get('HTTP_X_USERINFO')
