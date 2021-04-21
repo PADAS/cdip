@@ -1,7 +1,9 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
 from rest_framework.permissions import SAFE_METHODS
 
 from accounts.models import AccountProfile, AccountProfileOrganization
+from clients.models import ClientProfile
 from core.enums import RoleChoices, DjangoGroups
 
 
@@ -21,7 +23,54 @@ class IsServiceAccount(permissions.BasePermission):
             return False
 
     def has_object_permission(self, request, view, obj):
-        return self.has_permission(request, view)
+        client_id = IsServiceAccount.get_client_id(request)
+        return IsServiceAccount.is_object_owner(client_id, obj)
+
+    '''
+    Returns the client id if one exists in the session
+
+    request: request to pull client_id off of
+    '''
+    @staticmethod
+    def get_client_id(request):
+        try:
+            client_id = request.session['client_id']
+        except:
+            client_id = None
+
+        return client_id
+
+    '''
+    Returns the client profile
+
+    client_id: key to client profile
+    '''
+    @staticmethod
+    def get_client_profile(client_id):
+        try:
+            profile = ClientProfile.objects.get(client_id=client_id)
+        except ObjectDoesNotExist:
+            profile = None
+
+        return profile
+
+    '''
+    Returns the client profile
+
+    client_id: key to client profile
+    '''
+    @staticmethod
+    def is_object_owner(client_id, obj):
+        try:
+            obj.__getattribute__('type')
+        except AttributeError:
+            # can only determine client permissions on objects that have integration types
+            return False
+        client_profile = IsServiceAccount.get_client_profile(client_id)
+        if client_profile:
+            return client_profile.type_id == obj.type.id
+        else:
+            return False
 
 
 class IsOrganizationMember(permissions.BasePermission):

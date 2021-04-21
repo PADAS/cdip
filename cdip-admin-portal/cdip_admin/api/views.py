@@ -15,10 +15,6 @@ from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import APIException, status
 
-from accounts.utils import get_user_profile
-from cdip_admin import settings
-from cdip_admin.utils import jwt_decode_token
-from clients.models import ClientProfile
 from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccount
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
@@ -32,92 +28,6 @@ logger = logging.getLogger(__name__)
 def public(request):
     statsd.increment('portal.healthcheck')
     return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
-
-
-# def get_user_perms(args):
-#     """Obtains the Access Token from the Authorization Header
-#     """
-#     for arg in args:
-#         if isinstance(arg, rest_framework.request.Request):
-#             if arg.auth:
-#                 permissions = []
-#                 token = jwt_decode_token(arg.auth.decode('ascii'))
-#                 for p in token['authorization'].get('permissions', []):
-#                     if 'scopes' in p:
-#                         for scope in p['scopes']:
-#                             if '.' in p['rsname']:
-#                                 app, model = p['rsname'].split('.', 1)
-#                                 permissions.append(f'{app}.{scope}.{model}')
-#                             else:
-#                                 permissions.append(f'{scope}:{p["rsname"]}')
-#                     else:
-#                         permissions.append(p['rsname'])
-#                 client_id = token['clientId']
-#                 arg.session['user_id'] = client_id
-#                 return permissions
-#             else:
-#                 token = jwt_decode_token(arg.user.oidc_profile.access_token)
-#                 permissions = [
-#                     role for role in token['resource_access'].get(
-#                         settings.KEYCLOAK_CLIENT_ID,
-#                         {'roles': []}
-#                     )['roles']
-#                 ]
-#                 arg.session['user_id'] = arg.user.username
-#                 return permissions
-
-
-def get_profile(user_id):
-    profile = get_user_profile(user_id)
-
-    if profile is None:
-        profile = get_client_profile(user_id)
-
-    return profile
-
-
-def get_client_profile(user_id):
-
-    try:
-        profile = ClientProfile.objects.get(client_id=user_id)
-    except ObjectDoesNotExist:
-        profile = None
-
-    return profile
-
-
-# def requires_scope(required_scope: list) -> list:
-#     """Determines if the required scope is present in the Access Token
-#     Args:
-#         required_scope (str): The scope required to access the resource
-#     """
-#     def require_scope(f):
-#         @wraps(f)
-#         def decorated(*args, **kwargs):
-#             token_scopes = get_user_perms(args)
-#             for token_scope in token_scopes:
-#                 if token_scope in required_scope:
-#                     return f(*args, **kwargs)
-#             response = JsonResponse({'message': 'You don\'t have access to this resource'})
-#             response.status_code = 403
-#             return response
-#         return decorated
-#     return require_scope
-
-
-# def service_accessible():
-#     def get_client_id(f):
-#         @wraps(f)
-#         def decorated(*args, **kwargs):
-#             for arg in args:
-#                 if isinstance(arg, rest_framework.request.Request):
-#                     if arg.auth:
-#                         token = jwt_decode_token(arg.auth.decode('ascii'))
-#                         client_id = token['clientId']
-#                         arg.session['client_id'] = client_id
-#             return f(*args, **kwargs)
-#         return decorated
-#     return get_client_id
 
 
 class OrganizationsListView(generics.ListAPIView):
@@ -196,9 +106,9 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = self.queryset
-        if 'client_id' in self.request.session:
-            client_id = self.request.session['client_id']
-            client_profile = get_client_profile(client_id)
+        if IsServiceAccount.has_permission(None, self.request, None):
+            client_id = IsServiceAccount.get_client_id(self.request)
+            client_profile = IsServiceAccount.get_client_profile(client_id)
             queryset = queryset.filter(type_id=client_profile.type.id)
         else:
             if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -307,6 +217,13 @@ class MissingArgumentException(APIException):
     default_detail = _('Missing arguments.')
     default_code = 'error'
 
+
+class ResourceNotFoundException(APIException):
+    status_code = status.HTTP_404_NOT_FOUND
+    default_detail = _('Resource not found.')
+    default_code = 'error'
+
+
 class DeviceStateListView(generics.ListAPIView):
     """ Returns Device States -- Latest state for each device. """
     queryset = DeviceState.objects.all()
@@ -321,12 +238,24 @@ class DeviceStateListView(generics.ListAPIView):
         if not inbound_config_id:
             raise MissingArgumentException(detail=_('"inbound_config_id" is required.'),)
 
+        try:
+            inbound_config = InboundIntegrationConfiguration.objects.get(id=inbound_config_id)
+        except InboundIntegrationConfiguration.DoesNotExist:
+            raise ResourceNotFoundException
+
+        if IsServiceAccount.has_permission(None, self.request, None):
+            if not IsServiceAccount.has_object_permission(None, self.request, self, inbound_config):
+                raise PermissionDenied
+
         filter = {
             'device__inbound_configuration__id': inbound_config_id
         }
 
-        # TODO: Consider returning a NotFound if the inbound_config_id is not found.
         queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+
+        if IsOrganizationMember.has_permission(None, self.request, None):
+            IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
+                                                          'device__inbound_configuration__owner__name')
 
         return queryset
 
