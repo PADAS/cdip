@@ -58,17 +58,17 @@ INSTALLED_APPS = [
     'organizations',
     'accounts',
     'clients',
-    'social_django',
-    'django_keycloak.apps.KeycloakAppConfig',
+    # 'social_django',
+    # 'django_keycloak.apps.KeycloakAppConfig',
     'phonenumber_field',
     'rest_framework',
     'rest_framework_swagger',
     "bootstrap4",
 ]
 
-LOGIN_URL = 'keycloak_login'
-KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
-KEYCLOAK_ISSUER = env.str('KEYCLOAK_ISSUER', "https://cdip-auth.pamdas.org/auth/realms/cdip-dev")
+# LOGIN_URL = 'keycloak_login'
+# KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
+# KEYCLOAK_ISSUER = env.str('KEYCLOAK_ISSUER', "https://cdip-auth.pamdas.org/auth/realms/cdip-dev")
 KEYCLOAK_SERVER = env.str('KEYCLOAK_SERVER', "https://cdip-auth.pamdas.org")
 KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
 KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "***REMOVED***")
@@ -77,7 +77,7 @@ KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "***REMOVED***")
 KEYCLOAK_CLIENT_UUID = env.str('KEYCLOAK_CLIENT_UUID', "***REMOVED***")
 KEYCLOAK_ADMIN_CLIENT_SECRET = env.str('KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
-KEYCLOAK_PERMISSIONS_METHOD = "role"
+# KEYCLOAK_PERMISSIONS_METHOD = "role"
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
