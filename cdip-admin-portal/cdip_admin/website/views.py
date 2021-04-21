@@ -40,8 +40,9 @@ def index(request):
 
 def logout_view(request):
     logout(request)
-    # Redirect to a success page.
-    return render(request, 'index.html')
+
+    # Redirect to a URL that's Kong OIDC plugin to logout the user from the OP
+    return redirect('/oidc-logout')
 
 
 def login_view(request):
