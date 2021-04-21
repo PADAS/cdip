@@ -13,6 +13,25 @@ class IsGlobalAdmin(permissions.BasePermission):
         return self.has_permission(request, view)
 
 
+class IsServiceAccount(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if 'client_id' in request.session:
+            return True
+        else:
+            return False
+        # try:
+        #     client_id = request.session['client_id']
+        #     if client_id:
+        #         return True
+        # except AttributeError:
+        #     return False
+        # else:
+        #     return False
+
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
+
+
 class IsOrganizationMember(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists()
