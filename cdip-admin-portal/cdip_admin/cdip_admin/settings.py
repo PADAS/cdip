@@ -36,6 +36,8 @@ DEBUG = env.bool("DEBUG", default=False)
 
 # ALLOWED_HOSTS = ['35.192.111.237']
 ALLOWED_HOSTS = [env.str('ALLOWED_HOSTS', default='localhost')]
+USE_X_FORWARDED_HOST=True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 STATIC_ROOT = '/var/www/static/'
 
