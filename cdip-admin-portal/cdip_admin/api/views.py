@@ -17,6 +17,7 @@ from accounts.utils import get_user_profile
 from cdip_admin import settings
 from cdip_admin.utils import jwt_decode_token
 from clients.models import ClientProfile
+from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccount
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
 from .serializers import *
 from .utils import post_device_information
@@ -31,37 +32,37 @@ def public(request):
     return JsonResponse({'message': 'Hello from a public endpoint! You don\'t need to be authenticated to see this.'})
 
 
-def get_user_perms(args):
-    """Obtains the Access Token from the Authorization Header
-    """
-    for arg in args:
-        if isinstance(arg, rest_framework.request.Request):
-            if arg.auth:
-                permissions = []
-                token = jwt_decode_token(arg.auth.decode('ascii'))
-                for p in token['authorization'].get('permissions', []):
-                    if 'scopes' in p:
-                        for scope in p['scopes']:
-                            if '.' in p['rsname']:
-                                app, model = p['rsname'].split('.', 1)
-                                permissions.append(f'{app}.{scope}.{model}')
-                            else:
-                                permissions.append(f'{scope}:{p["rsname"]}')
-                    else:
-                        permissions.append(p['rsname'])
-                client_id = token['clientId']
-                arg.session['user_id'] = client_id
-                return permissions
-            else:
-                token = jwt_decode_token(arg.user.oidc_profile.access_token)
-                permissions = [
-                    role for role in token['resource_access'].get(
-                        settings.KEYCLOAK_CLIENT_ID,
-                        {'roles': []}
-                    )['roles']
-                ]
-                arg.session['user_id'] = arg.user.username
-                return permissions
+# def get_user_perms(args):
+#     """Obtains the Access Token from the Authorization Header
+#     """
+#     for arg in args:
+#         if isinstance(arg, rest_framework.request.Request):
+#             if arg.auth:
+#                 permissions = []
+#                 token = jwt_decode_token(arg.auth.decode('ascii'))
+#                 for p in token['authorization'].get('permissions', []):
+#                     if 'scopes' in p:
+#                         for scope in p['scopes']:
+#                             if '.' in p['rsname']:
+#                                 app, model = p['rsname'].split('.', 1)
+#                                 permissions.append(f'{app}.{scope}.{model}')
+#                             else:
+#                                 permissions.append(f'{scope}:{p["rsname"]}')
+#                     else:
+#                         permissions.append(p['rsname'])
+#                 client_id = token['clientId']
+#                 arg.session['user_id'] = client_id
+#                 return permissions
+#             else:
+#                 token = jwt_decode_token(arg.user.oidc_profile.access_token)
+#                 permissions = [
+#                     role for role in token['resource_access'].get(
+#                         settings.KEYCLOAK_CLIENT_ID,
+#                         {'roles': []}
+#                     )['roles']
+#                 ]
+#                 arg.session['user_id'] = arg.user.username
+#                 return permissions
 
 
 def get_profile(user_id):
@@ -83,51 +84,61 @@ def get_client_profile(user_id):
     return profile
 
 
-def requires_scope(required_scope: list) -> list:
-    """Determines if the required scope is present in the Access Token
-    Args:
-        required_scope (str): The scope required to access the resource
-    """
-    def require_scope(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            token_scopes = get_user_perms(args)
-            for token_scope in token_scopes:
-                if token_scope in required_scope:
-                    return f(*args, **kwargs)
-            response = JsonResponse({'message': 'You don\'t have access to this resource'})
-            response.status_code = 403
-            return response
-        return decorated
-    return require_scope
+# def requires_scope(required_scope: list) -> list:
+#     """Determines if the required scope is present in the Access Token
+#     Args:
+#         required_scope (str): The scope required to access the resource
+#     """
+#     def require_scope(f):
+#         @wraps(f)
+#         def decorated(*args, **kwargs):
+#             token_scopes = get_user_perms(args)
+#             for token_scope in token_scopes:
+#                 if token_scope in required_scope:
+#                     return f(*args, **kwargs)
+#             response = JsonResponse({'message': 'You don\'t have access to this resource'})
+#             response.status_code = 403
+#             return response
+#         return decorated
+#     return require_scope
+
+
+# def service_accessible():
+#     def get_client_id(f):
+#         @wraps(f)
+#         def decorated(*args, **kwargs):
+#             for arg in args:
+#                 if isinstance(arg, rest_framework.request.Request):
+#                     if arg.auth:
+#                         token = jwt_decode_token(arg.auth.decode('ascii'))
+#                         client_id = token['clientId']
+#                         arg.session['client_id'] = client_id
+#             return f(*args, **kwargs)
+#         return decorated
+#     return get_client_id
 
 
 class OrganizationsListView(generics.ListAPIView):
     """ Returns List of Organizations """
     serializer_class = OrganizationSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
     def get_queryset(self):
-        user_id = self.request.session['user_id']
-
-        profile = get_profile(user_id)
-
-        if profile.organizations:
-            queryset = Organization.objects.filter(id__in=profile.organizations.all())
-        else:
-            raise PermissionDenied
+        user = self.request.user
+        queryset = Organization.objects.all()
+        if not IsGlobalAdmin.has_permission(None, self.request, self):
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user, 'name')
         return queryset
 
-    @requires_scope(['read:organizations', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
 
 class OrganizationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Organization """
-    queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:organizations', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -136,8 +147,8 @@ class InboundIntegrationTypeListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Types """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:inboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -146,8 +157,8 @@ class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Inbound Integration Type """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:inboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -156,8 +167,8 @@ class OutboundIntegrationTypeListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Types """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:outboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -166,8 +177,8 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Type """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:outboundintegrationtype', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -179,27 +190,21 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
+    permission_classes = [IsServiceAccount]
 
     def get_queryset(self):
-        user_id = self.request.session['user_id']
-        if user_id is None:
-            logger.warning("Retrieve Inbound Configuration, User Not Logged In")
-            raise PermissionDenied
-        logger.info("Retrieve Inbound Configuration",
-                    extra={"user_id": user_id})
-        profile = get_profile(user_id)
-        if profile:
-            if isinstance(profile, ClientProfile):
-                queryset = InboundIntegrationConfiguration.objects.filter(type_id=profile.type.id)
-            else:
-                queryset = InboundIntegrationConfiguration.objects.filter(owner__id__in=profile.organizations.all())
+        queryset = self.queryset
+        if 'client_id' in self.request.session:
+            client_id = self.request.session['client_id']
+            client_profile = get_client_profile(client_id)
+            queryset = queryset.filter(type_id=client_profile.type.id)
         else:
-            logger.warning("Retrieve Inbound Configuration, Profile Not Found",
-                           extra={"user_id": user_id})
-            raise PermissionDenied
+            if not IsGlobalAdmin.has_permission(None, self.request, None):
+                queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
+                                                                         'owner__name')
         return queryset
 
-    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
+    # @service_accessible()
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -212,18 +217,13 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
     """
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @requires_scope(['update:inboundintegrationconfiguration', 'core.admin'])
     def put(self, request, *args, **kwargs):
-        pk = kwargs['pk']
         response = self.update(request, *args, **kwargs)
-        data = request.data
-        state = data['state']
-        item = InboundIntegrationConfiguration.objects.get(id=pk)
         return response
 
     # # TODO: this doesn't work yet with the savannah function
@@ -239,12 +239,15 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
     def get_queryset(self):
-        # todo: need to filter queryset based on permissions as well.
         queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
-        inbound_id = self.request.query_params.get('inbound_id')
 
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user, 'owner__name')
+
+        inbound_id = self.request.query_params.get('inbound_id')
         if inbound_id:
             try:
                 ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
@@ -255,7 +258,6 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
         return queryset
 
-    @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -265,8 +267,8 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    @requires_scope(['read:outboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -275,31 +277,36 @@ class DeviceDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of a Device """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    # TODO: Create New Permission Set for Device Management
-    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
 
 class DeviceListView(generics.ListAPIView):
     """ Returns List of Devices """
-    queryset = Device.objects.all()
     serializer_class = DeviceSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
-    # TODO: Create New Permission Set for Device Management
-    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Device.objects.all()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user,
+                                                                     'inbound_configuration__owner__name')
+        return queryset
+
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
 
 class DeviceStateListView(generics.ListAPIView):
     """ Returns Device States -- Latest state for each device. """
-
     queryset = DeviceState.objects.all()
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get_queryset(self):
 
@@ -308,17 +315,27 @@ class DeviceStateListView(generics.ListAPIView):
         } if self.args else {}
 
         queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+        is_service_account = 'client_id' in self.request.session
+        if not IsGlobalAdmin.has_permission(None, self.request, None) and not is_service_account:
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
+                                                                     'device__inbound_configuration__owner__name')
 
+        ds_filter = {
+            'device__inbound_configuration__id': self.request.query_params['inbound_config_id']
+        } if self.request.query_params else {}
+
+        queryset = queryset.filter(**ds_filter).annotate(
+            last_end_state=Window(expression=FirstValue(F('end_state')),
+                                  partition_by=F('device_id'), order_by=[F('created_at').desc()])
+        )
         return queryset
 
-    # TODO: Create New Permission Set for Device Management
-    @requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
+    # @service_accessible()
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
 
 @api_view(['POST'])
-@requires_scope(['read:inboundintegrationconfiguration', 'core.admin'])
 def update_inbound_integration_state(request, integration_id):
     logger.info(f"Updating Inbound Configuration State, Integration ID {integration_id}")
     if request.method == 'POST':
