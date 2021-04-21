@@ -133,8 +133,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
     'cdip_admin.auth.middleware.AuthenticationMiddleware',
+    'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
 ]
 
 ROOT_URLCONF = 'cdip_admin.urls'
