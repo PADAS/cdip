@@ -19,14 +19,6 @@ class IsServiceAccount(permissions.BasePermission):
             return True
         else:
             return False
-        # try:
-        #     client_id = request.session['client_id']
-        #     if client_id:
-        #         return True
-        # except AttributeError:
-        #     return False
-        # else:
-        #     return False
 
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)
