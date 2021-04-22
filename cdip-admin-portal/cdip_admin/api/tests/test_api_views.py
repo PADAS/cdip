@@ -5,7 +5,8 @@ import pytest
 from django.contrib.auth.models import Group
 from django.urls import reverse
 
-from core.enums import DjangoGroups
+from accounts.models import AccountProfileOrganization, AccountProfile
+from core.enums import DjangoGroups, RoleChoices
 
 pytestmark = pytest.mark.django_db
 from unittest.mock import patch
@@ -15,7 +16,7 @@ from integrations.models import InboundIntegrationType, DeviceGroup, \
     Organization, Device
 
 
-def test_get_integration_type_list(client, inbound_integration_user):
+def test_get_integration_type_list(client, global_admin_user):
 
         iit = InboundIntegrationType.objects.create(
             name='Some integration type',
@@ -24,7 +25,7 @@ def test_get_integration_type_list(client, inbound_integration_user):
 
         )
 
-        client.force_login(inbound_integration_user.user)
+        client.force_login(global_admin_user.user)
 
         response = client.get(reverse("inboundintegrationtype_list"))
 
@@ -35,7 +36,7 @@ def test_get_integration_type_list(client, inbound_integration_user):
         assert str(iit.id) in [x['id'] for x in response]
 
 
-def test_get_outbound_by_ibc(client, inbound_integration_user):
+def test_get_outbound_by_ibc(client, global_admin_user):
 
         org = Organization.objects.create(
             name = 'Some org.'
@@ -91,7 +92,7 @@ def test_get_outbound_by_ibc(client, inbound_integration_user):
         assert DeviceGroup.objects.filter(devices__inbound_configuration=ii).exists()
         assert OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ii).exists()
 
-        client.force_login(inbound_integration_user.user)
+        client.force_login(global_admin_user.user)
 
         # Get destinations by inbound-id.
         response = client.get(reverse("outboundintegrationconfiguration_list"),
@@ -105,13 +106,73 @@ def test_get_outbound_by_ibc(client, inbound_integration_user):
         assert not str(other_oi.id) in [item['id'] for item in response]
 
 
-class IntegrationUser(NamedTuple):
+def test_get_organizations_list_organization_member_viewer(client, organization_member_user):
+    org1 = Organization.objects.create(
+        name='Some org1'
+    )
+
+    org2 = Organization.objects.create(
+        name='Some org2'
+    )
+
+    ap = AccountProfile.objects.create(
+        user_id=organization_member_user.user.username
+    )
+
+    apo = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org1,
+        role=RoleChoices.VIEWER
+    )
+
+    # Sanity check on the test data relationships.
+    assert Organization.objects.filter(id=org1.id).exists()
+    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
+    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+
+    client.force_login(organization_member_user.user)
+
+    # Get organizations list
+    response = client.get(reverse("organization_list"))
+
+    assert response.status_code == 200
+    response = response.json()
+
+    # should receive the organization user is viewer of
+    assert len(response) == 1
+
+
+def test_get_organizations_list_global_admin(client, global_admin_user):
+    org1 = Organization.objects.create(
+        name='Some org1'
+    )
+
+    org2 = Organization.objects.create(
+        name='Some org2'
+    )
+
+    # Sanity check on the test data relationships.
+    assert Organization.objects.filter(id=org1.id).exists()
+
+    client.force_login(global_admin_user.user)
+
+    # Get organizations list
+    response = client.get(reverse("organization_list"))
+
+    assert response.status_code == 200
+    response = response.json()
+
+    # global admins should receive all organizations even without a profile
+    assert len(response) == 2
+
+
+class User(NamedTuple):
     user: Any = None
     user_info: str = ''
 
 
 @pytest.fixture
-def inbound_integration_user(db, django_user_model):
+def global_admin_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
     user_const = dict(last_name='Owen', first_name='Harry')
 
@@ -124,7 +185,27 @@ def inbound_integration_user(db, django_user_model):
     group.save()
     user.groups.add(group)
 
-    iu = IntegrationUser(user_info={'sub': user_id},
+    iu = User(user_info={'sub': user_id},
+                         user=user)
+
+    return iu
+
+
+@pytest.fixture
+def organization_member_user(db, django_user_model):
+    password = django_user_model.objects.make_random_password()
+    user_const = dict(last_name='Owen', first_name='Harry')
+
+    user_id = str(uuid.uuid4())
+    user = django_user_model.objects.create_superuser(
+        user_id, 'harry.owen@vulcan.com', password,
+        **user_const)
+    group_name = DjangoGroups.ORGANIZATION_MEMBER.value
+    group = Group(name=group_name)
+    group.save()
+    user.groups.add(group)
+
+    iu = User(user_info={'sub': user_id},
                          user=user)
 
     return iu
