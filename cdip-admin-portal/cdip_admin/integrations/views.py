@@ -9,6 +9,8 @@ from django.urls import reverse
 
 import logging
 
+import random
+
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
@@ -23,6 +25,8 @@ from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundInte
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
+def random_string(n=4):
+    return ''.join(random.sample([chr(x) for x in range(97, 97+26)], n))
 
 ###
 # Device Methods/Classes
@@ -289,7 +293,10 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
         if form.is_valid():
             config: InboundIntegrationConfiguration = form.save()
             if not config.default_devicegroup:
-                name = config.type.name + " - Default"
+
+                if not config.name:
+                    config.name = f'{config.type.name} ({random_string()})'
+                name = config.name + " - Default Group"
                 device_group = DeviceGroup.objects.create(owner_id=config.owner.id, name=name)
                 config.default_devicegroup = device_group
                 config.save()
