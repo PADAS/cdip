@@ -84,7 +84,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
                                             verbose_name='Default Device Group')
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name} - {self.name}"
+        return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
 
 
 # This is where the information is stored for a specific device
