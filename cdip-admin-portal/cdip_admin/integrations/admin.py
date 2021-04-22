@@ -9,18 +9,36 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 admin.site.register(InboundIntegrationType)
 admin.site.register(OutboundIntegrationType)
 admin.site.register(Device)
-admin.site.register(DeviceState)
+@admin.register(DeviceState)
+class DeviceStateAdmin(admin.ModelAdmin):
+    list_display = ('device', '_external_id', '_owner')
+    list_filter = ('device__inbound_configuration__name' , 'device__inbound_configuration__owner',)
+    def _external_id(self, obj):
+        return obj.device.external_id
+    _external_id.short_description = 'Device ID'
+
+    def _owner(self, obj):
+        return obj.device.inbound_configuration.owner
+
+    _owner.short_description = 'Owner'
 
 
 @admin.register(DeviceGroup)
 class DeviceGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', )
+    list_display = ('name', 'owner',)
+    list_filter = ('owner',)
 
 
 @admin.register(InboundIntegrationConfiguration)
 class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = InboundIntegrationConfigurationForm
+
+    list_display = ('name', 'type', 'owner','enabled',)
+
+    list_filter = ('type', 'owner', 'enabled',)
+
+    list_editable = ('enabled',)
 
 
 @admin.register(OutboundIntegrationConfiguration)
