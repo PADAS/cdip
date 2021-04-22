@@ -11,8 +11,12 @@ admin.site.register(OutboundIntegrationType)
 admin.site.register(Device)
 @admin.register(DeviceState)
 class DeviceStateAdmin(admin.ModelAdmin):
-    list_display = ('device', '_external_id', '_owner')
+    list_display = ('device', '_external_id', '_owner', 'created_at',)
     list_filter = ('device__inbound_configuration__name' , 'device__inbound_configuration__owner',)
+    search_fields = ('device__external_id', 'device__inbound_configuration__name', )
+
+    date_hierarchy = 'created_at'
+    
     def _external_id(self, obj):
         return obj.device.external_id
     _external_id.short_description = 'Device ID'
