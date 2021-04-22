@@ -8,9 +8,15 @@ from clients.models import ClientProfile
 class SimpleUserInfoBackend(ModelBackend):
     def authenticate(self, request, user_info=None, **kwargs):
         try:
+
             if not user_info:
-                header = request.META.get('HTTP_X_USERINFO')
-                user_info = self.get_user_info(header=header)
+
+                if hasattr(request, 'META'):
+                    header = request.META.get('HTTP_X_USERINFO')
+                    user_info = self.get_user_info(header=header)
+                else:
+                    return None
+
             username = user_info.get('username') if user_info else None
             client_id = user_info.get('client_id') if user_info else None
             if username:
