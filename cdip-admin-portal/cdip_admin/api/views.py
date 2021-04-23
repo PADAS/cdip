@@ -99,14 +99,13 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
 class InboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Configurations
     """
-    queryset = InboundIntegrationConfiguration.objects.filter(enabled=True).all()
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
     permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get_queryset(self):
-        queryset = self.queryset
+        queryset = InboundIntegrationConfiguration.objects.filter(enabled=True).all()
         if IsServiceAccount.has_permission(None, self.request, None):
             client_id = IsServiceAccount.get_client_id(self.request)
             client_profile = IsServiceAccount.get_client_profile(client_id)
