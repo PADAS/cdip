@@ -151,7 +151,6 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
                     raise PermissionDenied
 
     # # TODO: this doesn't work yet with the savannah function
-    # @requires_scope(['patch:inboundintegrationconfiguration', 'core.admin'])
     # def patch(self, request, *args, **kwargs):
     #     # TODO: update_device_information takes 2 params
     #     # update_device_information(self.queryset)

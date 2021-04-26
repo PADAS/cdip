@@ -207,6 +207,40 @@ def test_get_organizations_list_global_admin(client, global_admin_user):
 
 def test_get_inbound_integration_configuration_list_client_user(client, client_user):
 
+    # arrange client profile that will map to this client
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org = Organization.objects.create(
+        name='Some org.'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org,
+    )
+
+    # arrange data we want to check is not in the response
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org,
+    )
+
+    client_profile = ClientProfile.objects.create(client_id='test-function',
+                                                  type=iit)
+
     client.force_login(client_user.user)
 
     # Get inbound integration configuration list
@@ -217,12 +251,133 @@ def test_get_inbound_integration_configuration_list_client_user(client, client_u
 
     assert len(response) == 1
 
+    assert str(ii.id) in [item['id'] for item in response]
+    assert str(o_iit.id) not in [item['id'] for item in response]
+
+def test_get_inbound_integration_configurations_detail_client_user(client, client_user):
+
+    # arrange client profile that will map to this client
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org = Organization.objects.create(
+        name='Some org.'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org,
+    )
+
+    # arrange data we want to check is not in the response
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org,
+    )
+
+    client_profile = ClientProfile.objects.create(client_id='test-function',
+                                                  type=iit)
+
+    client.force_login(client_user.user)
+
+    # Get inbound integration configuration detail
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
+                          HTTP_X_USERINFO=client_user.user_info)
+
+    assert response.status_code == 200
+    response = response.json()
+
+    assert response['id'] == str(ii.id)
+
+    # Get inbound integration configuration detail for other type
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
+                          HTTP_X_USERINFO=client_user.user_info)
+
+    # expect permission denied since this client is not configured for that type
+    assert response.status_code == 403
+
+def test_put_inbound_integration_configurations_detail_client_user(client, client_user):
+
+    # arrange client profile that will map to this client
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org = Organization.objects.create(
+        name='Some org.'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org,
+    )
+
+    # arrange data we want to check is not in the response
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org,
+    )
+
+    client_profile = ClientProfile.objects.create(client_id='test-function',
+                                                  type=iit)
+
+    client.force_login(client_user.user)
+
+    state = "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
+    ii_update = {'state': state}
+
+    # Test update of inbound integration configuration detail state
+    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
+                          data=json.dumps(ii_update),
+                          content_type='application/json',
+                          HTTP_X_USERINFO=client_user.user_info)
+
+    assert response.status_code == 200
+    response = response.json()
+
+    assert response['state'] == state
+
+    # Test update of inbound integration configuration detail state on different type
+    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
+                          data=json.dumps(ii_update),
+                          content_type='application/json',
+                          HTTP_X_USERINFO=client_user.user_info)
+
+    # expect permission denied since this client is not configured for that type
+    assert response.status_code == 403
+
 
 class User(NamedTuple):
     user: Any = None
     user_info: bytes = None
 
 
+'''
+Provisions a django user that is enrolled in the django group "Global Admin"
+'''
 @pytest.fixture
 def global_admin_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
@@ -248,6 +403,9 @@ def global_admin_user(db, django_user_model):
     return u
 
 
+'''
+Provisions a django user that is enrolled in the django group "Organization Member"
+'''
 @pytest.fixture
 def organization_member_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
@@ -273,6 +431,12 @@ def organization_member_user(db, django_user_model):
     return u
 
 
+'''
+Provisions a django user that simulates a service account or "client". Proper user info is added so that requests can be
+made with header "HTTP_X_USERINFO" so that our middleware and backend appropriately add the client_id to the requests 
+session, allowing the permissions checks to pass for IsServiceAccount. The associated client profile and 
+dependent objects related to that client are also created here. 
+'''
 @pytest.fixture
 def client_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
@@ -290,27 +454,6 @@ def client_user(db, django_user_model):
     user = django_user_model.objects.create_superuser(
         user_id, username, password,
         **user_const)
-
-    # arrange client profile that will map to this client
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org,
-        enabled=True
-    )
-
-    client_profile = ClientProfile.objects.create(client_id=client_id,
-                                                  type=iit)
 
     u = User(user_info=x_user_info,
               user=user)
