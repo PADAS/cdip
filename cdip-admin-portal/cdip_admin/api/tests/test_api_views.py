@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from integrations.models import InboundIntegrationType, DeviceGroup, \
     OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
-    Organization, Device
+    Organization, Device, DeviceState
 
 
 def test_get_integration_type_list(client, global_admin_user):
@@ -254,6 +254,7 @@ def test_get_inbound_integration_configuration_list_client_user(client, client_u
     assert str(ii.id) in [item['id'] for item in response]
     assert str(o_iit.id) not in [item['id'] for item in response]
 
+
 def test_get_inbound_integration_configurations_detail_client_user(client, client_user):
 
     # arrange client profile that will map to this client
@@ -307,6 +308,7 @@ def test_get_inbound_integration_configurations_detail_client_user(client, clien
 
     # expect permission denied since this client is not configured for that type
     assert response.status_code == 403
+
 
 def test_put_inbound_integration_configurations_detail_client_user(client, client_user):
 
@@ -368,6 +370,75 @@ def test_put_inbound_integration_configurations_detail_client_user(client, clien
 
     # expect permission denied since this client is not configured for that type
     assert response.status_code == 403
+
+
+def test_get_device_state_list_client_user(client, client_user):
+
+    # arrange client profile that will map to this client
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org = Organization.objects.create(
+        name='Some org.'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org,
+    )
+
+    client_profile = ClientProfile.objects.create(client_id='test-function',
+                                                  type=iit)
+
+    device = Device.objects.create(
+        external_id='some-ext-id',
+        inbound_configuration=ii
+    )
+
+    device_state = DeviceState.objects.create(
+        device = device,
+    )
+
+    # arrange data we want to check is not in the response
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org,
+    )
+
+    o_device = Device.objects.create(
+        external_id='some-o-ext-id',
+        inbound_configuration=o_ii
+    )
+
+    o_device_state = DeviceState.objects.create(
+        device=o_device,
+    )
+
+    client.force_login(client_user.user)
+
+    # Test update of inbound integration configuration detail state
+    url = "%s?inbound_config_id=%s" % (reverse("device_state_list_api"), str(ii.id))
+    response = client.get(url, HTTP_X_USERINFO=client_user.user_info)
+
+    assert response.status_code == 200
+    response = response.json()
+
+    assert len(response) == 1
+
+    assert str(device.external_id) in [item['device_external_id'] for item in response]
+    assert str(o_device.external_id) not in [item['device_external_id'] for item in response]
 
 
 class User(NamedTuple):
