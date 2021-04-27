@@ -310,6 +310,84 @@ def test_get_inbound_integration_configurations_detail_client_user(client, clien
     assert response.status_code == 403
 
 
+def test_get_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user):
+
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org1 = Organization.objects.create(
+        name='Some org.'
+    )
+
+    org2 = Organization.objects.create(
+        name='Some org2'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org1,
+    )
+
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org2,
+    )
+
+    ap = AccountProfile.objects.create(
+        user_id=organization_member_user.user.username
+    )
+
+    apo = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org1,
+        role=RoleChoices.VIEWER
+    )
+
+    apo2 = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org2,
+        role=RoleChoices.ADMIN
+    )
+
+    # Sanity check on the test data relationships.
+    assert Organization.objects.filter(id=org1.id).exists()
+    assert Organization.objects.filter(id=org2.id).exists()
+    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
+    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+
+    client.force_login(organization_member_user.user)
+
+    # Get inbound integration configuration detail
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}))
+
+    # confirm viewer role passes object permission check
+    assert response.status_code == 200
+    response = response.json()
+
+    assert response['id'] == str(ii.id)
+
+    # Get inbound integration configuration detail for other type
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}))
+
+    # confirm admin role passes object permission check
+    assert response.status_code == 200
+
+    response = response.json()
+    assert response['id'] == str(o_ii.id)
+
+
 def test_put_inbound_integration_configurations_detail_client_user(client, client_user):
 
     # arrange client profile that will map to this client
@@ -370,6 +448,90 @@ def test_put_inbound_integration_configurations_detail_client_user(client, clien
 
     # expect permission denied since this client is not configured for that type
     assert response.status_code == 403
+
+
+def test_put_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user):
+
+    iit = InboundIntegrationType.objects.create(
+        name='Some integration type',
+        slug='some-integration-type',
+        description='Some integration type.'
+    )
+
+    org1 = Organization.objects.create(
+        name='Some org.'
+    )
+
+    org2 = Organization.objects.create(
+        name='Some org2'
+    )
+
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name='some ii',
+        owner=org1,
+    )
+
+    o_iit = InboundIntegrationType.objects.create(
+        name='Some other integration type',
+        slug='some-other-integration-type',
+        description='Some other integration type.'
+    )
+
+
+    o_ii = InboundIntegrationConfiguration.objects.create(
+        type=o_iit,
+        name='some other ii',
+        owner=org2,
+    )
+
+    ap = AccountProfile.objects.create(
+        user_id=organization_member_user.user.username
+    )
+
+    apo = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org1,
+        role=RoleChoices.VIEWER
+    )
+
+    apo2 = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org2,
+        role=RoleChoices.ADMIN
+    )
+
+    # Sanity check on the test data relationships.
+    assert Organization.objects.filter(id=org1.id).exists()
+    assert Organization.objects.filter(id=org2.id).exists()
+    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
+    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+
+    client.force_login(organization_member_user.user)
+
+    # Get inbound integration configuration detail
+    state = "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
+    ii_update = {'state': state}
+
+    # Test update of inbound integration configuration detail state
+    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
+                          data=json.dumps(ii_update),
+                          content_type='application/json')
+
+    # confirm viewer role does not pass object permission check
+    assert response.status_code == 403
+
+
+    # confirm admin role passes object permission check
+    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
+                          data=json.dumps(ii_update),
+                          content_type='application/json')
+
+    # confirm admin role passes object permission check
+    assert response.status_code == 200
+
+    response = response.json()
+    assert response['state'] == state
 
 
 def test_get_device_state_list_client_user(client, client_user):
