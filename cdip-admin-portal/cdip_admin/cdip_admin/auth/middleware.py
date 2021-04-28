@@ -10,6 +10,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import SimpleLazyObject
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def get_user(request):
     if not hasattr(request, '_cached_user'):
@@ -60,7 +64,7 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
                 user_info = base64.b64decode(user_info)
                 user_info = json.loads(user_info)
                 username = user_info['username']
-                print(user_info)
+                logger.debug('User-info: %s', user_info)
         except KeyError:
             # If specified header doesn't exist then remove any existing
             # authenticated remote-user, or return (leaving request.user set to

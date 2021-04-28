@@ -6,10 +6,19 @@ from accounts.models import AccountProfile, AccountProfileOrganization
 from clients.models import ClientProfile
 from core.enums import RoleChoices, DjangoGroups
 
+import logging
+logger = logging.getLogger(__name__)
 
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.groups.filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
+
+        val = request.user.groups.filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
+
+        if logger.isEnabledFor(logging.DEBUG):
+            group_names = ','.join([group.name for group in request.user.groups.all()])
+            logger.debug('IsGlobalAdmin=%s checked for user.username: %s, groups: %s', val, request.user, group_names)
+
+        return val
 
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)
