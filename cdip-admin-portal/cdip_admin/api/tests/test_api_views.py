@@ -30,7 +30,7 @@ def test_get_integration_type_list(client, global_admin_user):
 
         client.force_login(global_admin_user.user)
 
-        response = client.get(reverse("inboundintegrationtype_list"))
+        response = client.get(reverse("inboundintegrationtype_list"), HTTP_X_USERINFO=global_admin_user.user_info)
 
         assert response.status_code == 200
 
@@ -99,7 +99,8 @@ def test_get_outbound_by_ibc(client, global_admin_user):
 
         # Get destinations by inbound-id.
         response = client.get(reverse("outboundintegrationconfiguration_list"),
-                              data={'inbound_id': str(ii.id)})
+                              data={'inbound_id': str(ii.id)},
+                              HTTP_X_USERINFO=global_admin_user.user_info)
 
         assert response.status_code == 200
         response = response.json()
@@ -136,7 +137,7 @@ def test_get_organizations_list_organization_member_viewer(client, organization_
     client.force_login(organization_member_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"))
+    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info)
 
     assert response.status_code == 200
     response = response.json()
@@ -172,7 +173,7 @@ def test_get_organizations_list_organization_member_admin(client, organization_m
     client.force_login(organization_member_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"))
+    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info)
 
     assert response.status_code == 200
     response = response.json()
@@ -196,7 +197,7 @@ def test_get_organizations_list_global_admin(client, global_admin_user):
     client.force_login(global_admin_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"))
+    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=global_admin_user.user_info)
 
     assert response.status_code == 200
     response = response.json()
@@ -370,7 +371,8 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     client.force_login(organization_member_user.user)
 
     # Get inbound integration configuration detail
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}))
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
+                          HTTP_X_USERINFO=organization_member_user.user_info)
 
     # confirm viewer role passes object permission check
     assert response.status_code == 200
@@ -379,7 +381,8 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     assert response['id'] == str(ii.id)
 
     # Get inbound integration configuration detail for other type
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}))
+    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
+                          HTTP_X_USERINFO=organization_member_user.user_info)
 
     # confirm admin role passes object permission check
     assert response.status_code == 200
@@ -516,7 +519,8 @@ def test_put_inbound_integration_configurations_detail_organization_member_hybri
     # Test update of inbound integration configuration detail state
     response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
                           data=json.dumps(ii_update),
-                          content_type='application/json')
+                          content_type='application/json',
+                          HTTP_X_USERINFO=organization_member_user.user_info)
 
     # confirm viewer role does not pass object permission check
     assert response.status_code == 403
@@ -525,7 +529,8 @@ def test_put_inbound_integration_configurations_detail_organization_member_hybri
     # confirm admin role passes object permission check
     response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
                           data=json.dumps(ii_update),
-                          content_type='application/json')
+                          content_type='application/json',
+                          HTTP_X_USERINFO=organization_member_user.user_info)
 
     # confirm admin role passes object permission check
     assert response.status_code == 200
