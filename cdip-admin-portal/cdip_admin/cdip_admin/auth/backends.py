@@ -4,6 +4,9 @@ from django.contrib.auth.backends import *
 
 from clients.models import ClientProfile
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SimpleUserInfoBackend(ModelBackend):
     def authenticate(self, request, user_info=None, **kwargs):
@@ -18,9 +21,18 @@ class SimpleUserInfoBackend(ModelBackend):
                     return None
 
             username = user_info.get('username') if user_info else None
+            email = user_info.get('email')
+
+            if not email or not '@' in email:
+                email = userame if '@' in username else f'{username}@sintegrate.org'
+
+
             client_id = user_info.get('client_id') if user_info else None
             if username:
-                user = UserModel.objects.get(email=username)
+                user, created = UserModel.objects.get_or_create(username=username,
+                                                       defaults={'email': email})
+
+
             if client_id:
                 try:
                     client_profile = ClientProfile.objects.get(client_id=client_id)
@@ -28,10 +40,10 @@ class SimpleUserInfoBackend(ModelBackend):
                         request.session['client_id'] = client_id
                 except ClientProfile.DoesNotExist:
                     pass
-        except UserModel.DoesNotExist:
+        except Exception as e:
             # Run the default password hasher once to reduce the timing
             # difference between an existing and a nonexistent user (#20760).
-            user = UserModel.objects.create(email=username, username=username)
+            logger.exception('Failure in remote user backend. user_info: %s', user_info)
         else:
             if self.user_can_authenticate(user):
                 return user
