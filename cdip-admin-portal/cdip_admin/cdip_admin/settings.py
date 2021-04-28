@@ -64,8 +64,6 @@ INSTALLED_APPS = [
     'organizations',
     'accounts',
     'clients',
-    # 'social_django',
-    # 'django_keycloak.apps.KeycloakAppConfig',
     'phonenumber_field',
     'rest_framework',
     'rest_framework_swagger',
@@ -83,30 +81,16 @@ KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "admin-cli")
 KEYCLOAK_CLIENT_UUID = env.str('KEYCLOAK_CLIENT_UUID', "90d34a81-c70c-408b-ad66-7fa1bfe58892")
 KEYCLOAK_ADMIN_CLIENT_SECRET = env.str('KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
-# KEYCLOAK_PERMISSIONS_METHOD = "role"
-
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
-
-JWT_AUTH = {
-    'JWT_PAYLOAD_GET_USERNAME_HANDLER':
-        'cdip_admin.utils.jwt_get_username_from_payload_handler',
-    'JWT_DECODE_HANDLER':
-        'cdip_admin.utils.jwt_decode_token',
-    'JWT_ALGORITHM': 'RS256',
-    'JWT_AUDIENCE': env.str('JWT_AUDIENCE', ""),
-    'JWT_ISSUER': env.str('JWT_ISSUER', ""),
-    'JWT_AUTH_HEADER_PREFIX': 'Bearer',
-}
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),
@@ -114,14 +98,8 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }
 
-SOCIAL_AUTH_AUTH0_SCOPE = [
-    'openid',
-    'profile',
-    'email'
-]
 
 AUTHENTICATION_BACKENDS = {
-    'django.contrib.auth.backends.RemoteUserBackend',
     'django.contrib.auth.backends.ModelBackend',
     'cdip_admin.auth.backends.SimpleUserInfoBackend',
 }
@@ -134,7 +112,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.RemoteUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'cdip_admin.auth.middleware.AuthenticationMiddleware',

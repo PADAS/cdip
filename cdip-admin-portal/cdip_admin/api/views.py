@@ -163,7 +163,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get_queryset(self):
         queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
@@ -191,7 +191,7 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -201,7 +201,7 @@ class DeviceDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of a Device """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
