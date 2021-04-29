@@ -24,7 +24,7 @@ class SimpleUserInfoBackend(ModelBackend):
             email = user_info.get('email')
 
             if not email or not '@' in email:
-                email = userame if '@' in username else f'{username}@sintegrate.org'
+                email = username if '@' in username else f'{username}@sintegrate.org'
 
 
             client_id = user_info.get('client_id') if user_info else None
