@@ -19,105 +19,48 @@ from integrations.models import InboundIntegrationType, DeviceGroup, \
     Organization, Device, DeviceState
 
 
-def test_get_integration_type_list(client, global_admin_user):
+def test_get_integration_type_list(client, global_admin_user, setup_data):
+    iit = setup_data["iit1"]
 
-        iit = InboundIntegrationType.objects.create(
-            name='Some integration type',
-            slug='some-integration-type',
-            description='Some integration type.'
+    client.force_login(global_admin_user.user)
 
-        )
+    response = client.get(reverse("inboundintegrationtype_list"), HTTP_X_USERINFO=global_admin_user.user_info)
 
-        client.force_login(global_admin_user.user)
+    assert response.status_code == 200
 
-        response = client.get(reverse("inboundintegrationtype_list"), HTTP_X_USERINFO=global_admin_user.user_info)
+    response = response.json()
 
-        assert response.status_code == 200
-
-        response = response.json()
-
-        assert str(iit.id) in [x['id'] for x in response]
+    assert str(iit.id) in [x['id'] for x in response]
 
 
-def test_get_outbound_by_ibc(client, global_admin_user):
+def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
+    ii = setup_data["ii1"]
+    oi = setup_data["oi1"]
+    other_oi = setup_data["oi2"]
 
-        org = Organization.objects.create(
-            name = 'Some org.'
-        )
+    # Sanity check on the test data relationships.
+    assert Device.objects.filter(inbound_configuration=ii).exists()
+    assert DeviceGroup.objects.filter(devices__inbound_configuration=ii).exists()
+    assert OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ii).exists()
 
-        iit = InboundIntegrationType.objects.create(
-            name='Some integration type',
-            slug='some-integration-type',
-            description='Some integration type.'
+    client.force_login(global_admin_user.user)
 
-        )
-        oit = OutboundIntegrationType.objects.create(
-            name='Some destination type',
-            slug='my-dest-slug',
-            description='Some integration type.'
+    # Get destinations by inbound-id.
+    response = client.get(reverse("outboundintegrationconfiguration_list"),
+                          data={'inbound_id': str(ii.id)},
+                          HTTP_X_USERINFO=global_admin_user.user_info)
 
-        )
+    assert response.status_code == 200
+    response = response.json()
 
-        ii = InboundIntegrationConfiguration.objects.create(
-            type = iit,
-            name = 'some ii',
-            owner = org
-        )
-        oi = OutboundIntegrationConfiguration.objects.create(
-            type = oit,
-            name = 'some oi',
-            owner = org
-        )
-
-        other_oi = OutboundIntegrationConfiguration.objects.create(
-            type = oit,
-            name = 'some other oi',
-            owner = org
-        )
-
-        devicegroup = DeviceGroup.objects.create(
-            name='some device group',
-            owner=org,
-        )
-
-        devicegroup.destinations.add(oi)
-
-        device = Device.objects.create(
-            external_id = 'some-ext-id',
-            inbound_configuration = ii
-        )
-
-        devicegroup.devices.add(device)
+    assert len(response) == 1
+    assert str(oi.id) in [item['id'] for item in response]
+    assert not str(other_oi.id) in [item['id'] for item in response]
 
 
-        # Sanity check on the test data relationships.
-        assert Device.objects.filter(inbound_configuration=ii).exists()
-        assert DeviceGroup.objects.filter(devices__inbound_configuration=ii).exists()
-        assert OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ii).exists()
-
-        client.force_login(global_admin_user.user)
-
-        # Get destinations by inbound-id.
-        response = client.get(reverse("outboundintegrationconfiguration_list"),
-                              data={'inbound_id': str(ii.id)},
-                              HTTP_X_USERINFO=global_admin_user.user_info)
-
-        assert response.status_code == 200
-        response = response.json()
-
-        assert len(response) == 1
-        assert str(oi.id) in [item['id'] for item in response]
-        assert not str(other_oi.id) in [item['id'] for item in response]
-
-
-def test_get_organizations_list_organization_member_viewer(client, organization_member_user):
-    org1 = Organization.objects.create(
-        name='Some org1'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
+def test_get_organizations_list_organization_member_viewer(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -146,14 +89,9 @@ def test_get_organizations_list_organization_member_viewer(client, organization_
     assert len(response) == 1
 
 
-def test_get_organizations_list_organization_member_admin(client, organization_member_user):
-    org1 = Organization.objects.create(
-        name='Some org1'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
+def test_get_organizations_list_organization_member_admin(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -182,18 +120,7 @@ def test_get_organizations_list_organization_member_admin(client, organization_m
     assert len(response) == 1
 
 
-def test_get_organizations_list_global_admin(client, global_admin_user):
-    org1 = Organization.objects.create(
-        name='Some org1'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
-
-    # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-
+def test_get_organizations_list_global_admin(client, global_admin_user, setup_data):
     client.force_login(global_admin_user.user)
 
     # Get organizations list
@@ -203,44 +130,17 @@ def test_get_organizations_list_global_admin(client, global_admin_user):
     response = response.json()
 
     # global admins should receive all organizations even without a profile
-    assert len(response) == 2
+    assert len(response) == Organization.objects.count()
 
 
-def test_get_inbound_integration_configuration_list_client_user(client, client_user):
+def test_get_inbound_integration_configuration_list_client_user(client, client_user, setup_data):
 
-    # arrange client profile that will map to this client
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org,
-    )
-
-    # arrange data we want to check is not in the response
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org,
-    )
+    iit1 = setup_data["iit1"]
+    ii = setup_data["ii1"]
+    o_ii = setup_data["ii2"]
 
     client_profile = ClientProfile.objects.create(client_id='test-function',
-                                                  type=iit)
+                                                  type=iit1)
 
     client.force_login(client_user.user)
 
@@ -250,44 +150,19 @@ def test_get_inbound_integration_configuration_list_client_user(client, client_u
     assert response.status_code == 200
     response = response.json()
 
-    assert len(response) == 1
+    assert len(response) == InboundIntegrationConfiguration.objects.filter(type=iit1).count()
 
     assert str(ii.id) in [item['id'] for item in response]
-    assert str(o_iit.id) not in [item['id'] for item in response]
+
+    # confirm integration of different type not present in results
+    assert str(o_ii.id) not in [item['id'] for item in response]
 
 
-def test_get_inbound_integration_configurations_detail_client_user(client, client_user):
+def test_get_inbound_integration_configurations_detail_client_user(client, client_user, setup_data):
 
-    # arrange client profile that will map to this client
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org,
-    )
-
-    # arrange data we want to check is not in the response
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org,
-    )
+    iit = setup_data["iit1"]
+    ii = setup_data["ii1"]
+    o_ii = setup_data["ii2"]
 
     client_profile = ClientProfile.objects.create(client_id='test-function',
                                                   type=iit)
@@ -311,40 +186,12 @@ def test_get_inbound_integration_configurations_detail_client_user(client, clien
     assert response.status_code == 403
 
 
-def test_get_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user):
+def test_get_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user, setup_data):
 
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org1 = Organization.objects.create(
-        name='Some org.'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org1,
-    )
-
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org2,
-    )
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
+    ii = setup_data["ii1"]
+    o_ii = setup_data["ii2"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -363,8 +210,6 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     )
 
     # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-    assert Organization.objects.filter(id=org2.id).exists()
     assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
     assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
 
@@ -391,38 +236,12 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     assert response['id'] == str(o_ii.id)
 
 
-def test_put_inbound_integration_configurations_detail_client_user(client, client_user):
+def test_put_inbound_integration_configurations_detail_client_user(client, client_user, setup_data):
 
     # arrange client profile that will map to this client
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org,
-    )
-
-    # arrange data we want to check is not in the response
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org,
-    )
+    iit = setup_data["iit1"]
+    ii = setup_data["ii1"]
+    o_ii = setup_data["ii2"]
 
     client_profile = ClientProfile.objects.create(client_id='test-function',
                                                   type=iit)
@@ -453,40 +272,12 @@ def test_put_inbound_integration_configurations_detail_client_user(client, clien
     assert response.status_code == 403
 
 
-def test_put_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user):
+def test_put_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
+    ii = setup_data["ii1"]
+    o_ii = setup_data["ii2"]
 
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org1 = Organization.objects.create(
-        name='Some org.'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org1,
-    )
-
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org2,
-    )
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -505,8 +296,6 @@ def test_put_inbound_integration_configurations_detail_organization_member_hybri
     )
 
     # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-    assert Organization.objects.filter(id=org2.id).exists()
     assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
     assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
 
@@ -539,59 +328,17 @@ def test_put_inbound_integration_configurations_detail_organization_member_hybri
     assert response['state'] == state
 
 
-def test_get_device_state_list_client_user(client, client_user):
+def test_get_device_state_list_client_user(client, client_user, setup_data):
 
     # arrange client profile that will map to this client
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org,
-    )
+    iit = setup_data["iit1"]
+    ii = setup_data["ii1"]
+    device = setup_data["d1"]
+    o_device = setup_data["d2"]
 
     client_profile = ClientProfile.objects.create(client_id='test-function',
                                                   type=iit)
 
-    device = Device.objects.create(
-        external_id='some-ext-id',
-        inbound_configuration=ii
-    )
-
-    device_state = DeviceState.objects.create(
-        device = device,
-    )
-
-    # arrange data we want to check is not in the response
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org,
-    )
-
-    o_device = Device.objects.create(
-        external_id='some-o-ext-id',
-        inbound_configuration=o_ii
-    )
-
-    o_device_state = DeviceState.objects.create(
-        device=o_device,
-    )
 
     client.force_login(client_user.user)
 
