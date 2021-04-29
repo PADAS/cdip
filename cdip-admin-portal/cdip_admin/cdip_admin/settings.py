@@ -70,9 +70,7 @@ INSTALLED_APPS = [
     "bootstrap4",
 ]
 
-# LOGIN_URL = 'keycloak_login'
-# KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
-# KEYCLOAK_ISSUER = env.str('KEYCLOAK_ISSUER', "https://cdip-auth.pamdas.org/auth/realms/cdip-dev")
+
 KEYCLOAK_SERVER = env.str('KEYCLOAK_SERVER', "https://cdip-auth.pamdas.org")
 KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
 KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "***REMOVED***")
@@ -86,11 +84,13 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
+
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'cdip_admin.auth.authentication.SimpleUserInfoAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),

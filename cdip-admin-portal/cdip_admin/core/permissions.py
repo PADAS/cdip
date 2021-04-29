@@ -26,10 +26,7 @@ class IsGlobalAdmin(permissions.BasePermission):
 
 class IsServiceAccount(permissions.BasePermission):
     def has_permission(self, request, view):
-        if 'client_id' in request.session:
-            return True
-        else:
-            return False
+        return request.session and 'client_id' in request.session
 
     def has_object_permission(self, request, view, obj):
         client_id = IsServiceAccount.get_client_id(request)
@@ -44,10 +41,9 @@ class IsServiceAccount(permissions.BasePermission):
     def get_client_id(request):
         try:
             client_id = request.session['client_id']
+            return client_id
         except:
-            client_id = None
-
-        return client_id
+            pass
 
     '''
     Returns the client profile
@@ -58,10 +54,9 @@ class IsServiceAccount(permissions.BasePermission):
     def get_client_profile(client_id):
         try:
             profile = ClientProfile.objects.get(client_id=client_id)
-        except ObjectDoesNotExist:
-            profile = None
-
-        return profile
+            return profile
+        except ClientProfile.DoesNotExist:
+            pass
 
     '''
     Returns the client profile
