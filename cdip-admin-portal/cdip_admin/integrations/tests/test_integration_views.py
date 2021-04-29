@@ -15,12 +15,6 @@ from organizations.models import Organization
 
 
 def test_get_integration_type_list(client, global_admin_user):
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-
-    )
 
     client.force_login(global_admin_user.user)
 
@@ -30,26 +24,10 @@ def test_get_integration_type_list(client, global_admin_user):
 
     response = response.json()
 
-    assert InboundIntegrationType.objects.count() == len(response)
+    assert len(response) == InboundIntegrationType.objects.count()
 
 
 def test_get_integration_configuration_list_global_admin(client, global_admin_user):
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-
-    )
-
-    org = Organization.objects.create(
-        name='Some org.'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org
-    )
 
     client.force_login(global_admin_user.user)
 
@@ -61,38 +39,8 @@ def test_get_integration_configuration_list_global_admin(client, global_admin_us
     assert list(response.context['inboundintegrationconfiguration_list']) == list(InboundIntegrationConfiguration.objects.all())
 
 
-def test_get_integration_configuration_list_organization_member_viewer(client, organization_member_user):
-    iit = InboundIntegrationType.objects.create(
-        name='Some integration type',
-        slug='some-integration-type',
-        description='Some integration type.'
-    )
-
-    org1 = Organization.objects.create(
-        name='Some org.'
-    )
-
-    org2 = Organization.objects.create(
-        name='Some org2'
-    )
-
-    ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name='some ii',
-        owner=org1,
-    )
-
-    o_iit = InboundIntegrationType.objects.create(
-        name='Some other integration type',
-        slug='some-other-integration-type',
-        description='Some other integration type.'
-    )
-
-    o_ii = InboundIntegrationConfiguration.objects.create(
-        type=o_iit,
-        name='some other ii',
-        owner=org2,
-    )
+def test_get_integration_configuration_list_organization_member_viewer(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -105,8 +53,6 @@ def test_get_integration_configuration_list_organization_member_viewer(client, o
     )
 
     # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-    assert Organization.objects.filter(id=org2.id).exists()
     assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
     assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
 
@@ -119,3 +65,38 @@ def test_get_integration_configuration_list_organization_member_viewer(client, o
     # confirm result set is filtered queryset based on organization profile
     assert list(response.context['inboundintegrationconfiguration_list']) == list(InboundIntegrationConfiguration.objects.filter(owner=org1))
 
+
+def test_add_outbound_integration_configuration_organization_member_hybrid(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
+
+    ap = AccountProfile.objects.create(
+        user_id=organization_member_user.user.username
+    )
+
+    apo1 = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org1,
+        role=RoleChoices.VIEWER
+    )
+
+    apo2 = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org2,
+        role=RoleChoices.ADMIN
+    )
+
+    # Sanity check on the test data relationships.
+    assert Organization.objects.filter(id=org1.id).exists()
+    assert Organization.objects.filter(id=org2.id).exists()
+    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
+    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+
+    client.force_login(organization_member_user.user)
+
+    response = client.get(reverse("outbound_integration_configuration_add"), follow=True, HTTP_X_USERINFO=organization_member_user.user_info)
+
+    assert response.status_code == 200
+
+    # confirm result set is filtered queryset based on organization profile
+    # assert list(response.context['inboundintegrationconfiguration_list']) == list(InboundIntegrationConfiguration.objects.filter(owner=org1))
