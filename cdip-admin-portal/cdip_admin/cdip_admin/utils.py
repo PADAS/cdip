@@ -16,12 +16,6 @@ JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid
 
 logger = logging.getLogger(__name__)
 
-def jwt_get_username_from_payload_handler(payload):
-    username = payload.get('sub').replace('|', '.')
-    authenticate(remote_user=username)
-    return username
-
-
 def jwt_decode_token(token):
 
     return decode_token(token)

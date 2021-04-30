@@ -56,11 +56,12 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
 
+
     class Meta:
         ordering = ('name',)
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name}"
+        return f"{self.type.name} - {self.owner.name} - {self.name}"
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -83,7 +84,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
                                             verbose_name='Default Device Group')
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name} - {self.name}"
+        return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
 
 
 # This is where the information is stored for a specific device
@@ -91,6 +92,10 @@ class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
+
+    @property
+    def owner(self):
+        return self.inbound_configuration.owner
 
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
@@ -107,6 +112,10 @@ class DeviceState(TimestampedModel):
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
     state = models.JSONField(blank=True, null=True)
+
+    @property
+    def owner(self):
+        return self.device.inbound_configuration.owner
 
     class Meta:
         indexes = [

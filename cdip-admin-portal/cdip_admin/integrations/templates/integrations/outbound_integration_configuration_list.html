@@ -11,9 +11,8 @@
         <div class="col-lg-9">
             <h2>Outbound Integration Configuration</h2>
         </div>
-        {% if perms.core.admin %}
-            <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_add' %}" role="button">+ Add</a>
-        {% endif %}
+        <a class="btn btn-primary {% if not perms.integrations.add_outboundintegrationconfiguration %} disabled {% endif %}"
+               href="{% url 'outbound_integration_configuration_add' %}" role="button">+ Add</a>
     </div>
     {% render_table table %}
     <script type="text/javascript"
