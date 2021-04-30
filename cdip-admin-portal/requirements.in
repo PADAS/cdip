@@ -19,6 +19,7 @@ django-environ==0.4.5
 django-filter==2.3.0
 django-keycloak==0.1.1
 django-rbac==0.9
+git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f#egg=django-rest-swagger
 django-rest-swagger==2.2.0
 django-scopes==1.2.0
 django-tables2==2.3.1

@@ -23,7 +23,6 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', welcome, name='welcome'),
-    url(r'^keycloak/', include('django_keycloak.urls')),
     path('date', date),
     path('about', about, name='about'),
     path('integrations/', include('integrations.urls')),
@@ -32,8 +31,8 @@ urlpatterns = [
     path('clients/', include('clients.urls')),
     path('api/', include('api.urls')),
     path('', index),
-    path('login', login_view),
-    path('logout', logout_view),
+    path('login/?', login_view),
+    path('logout/', logout_view),
     path('', include('django.contrib.auth.urls')),
     path('', include('social_django.urls')),
 ]

@@ -1,13 +1,17 @@
 from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import FormView
+from django.urls import reverse
+from django.core.exceptions import PermissionDenied
 
-from integrations.models import DeviceGroup
 from .forms import OrganizationForm
-from .models import Organization, UserProfile
+from .models import Organization
+from accounts.models import AccountProfile, AccountProfileOrganization
+from core.permissions import IsGlobalAdmin, IsOrganizationMember
+from django.views.generic import ListView, DetailView, UpdateView
 
 
-@permission_required('core.admin')
+@permission_required('organizations.add_organization', raise_exception=True)
 def organizations_add(request):
     if request.method == "POST":
         form = OrganizationForm(request.POST)
@@ -19,26 +23,46 @@ def organizations_add(request):
     return render(request, "organizations/organizations_add.html", {"form": form})
 
 
-# Create your views here.
-@permission_required('core.admin')
-def organizations_detail(request, module_id):
-    organization = get_object_or_404(Organization, pk=module_id)
-    return render(request, "organizations/organizations_detail.html", {"organization": organization})
+class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = 'organizations/organizations_update.html'
+    form_class = OrganizationForm
+    model = Organization
+    permission_required = 'organizations.change_organization'
+
+    def get_object(self):
+        organization = get_object_or_404(Organization, pk=self.kwargs.get("organization_id"))
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, organization):
+                raise PermissionDenied
+        return organization
+
+    def get_success_url(self):
+        return reverse('organizations_detail', kwargs={'module_id': self.kwargs.get("organization_id")})
 
 
-@permission_required('core.admin')
-def organizations_list(request):
-    organizations = Organization.objects.all()
-    return render(request, "organizations/organizations_list.html",
-                  {"organizations": organizations})
+class OrganizationDetailView(PermissionRequiredMixin, DetailView):
+    template_name = 'organizations/organizations_detail.html'
+    model = Organization
+    permission_required = 'organizations.view_organization'
+
+    def get_object(self):
+        return get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
 
 
-@permission_required('core.admin')
-def organizations_update(request, organization_id):
-    organization = get_object_or_404(Organization, id=organization_id)
-    form = OrganizationForm(request.POST or None, instance=organization)
-    if form.is_valid():
-        form.save()
-        return redirect("organizations_detail", organization_id)
-    return render(request, "organizations/organizations_update.html", {"form": form})
+class OrganizationsListView(LoginRequiredMixin, ListView):
+    template_name = 'organizations/organizations_list.html'
+    queryset = Organization.objects.get_queryset().order_by('name')
+    context_object_name = 'organizations'
+
+    def get_queryset(self):
+        qs = super(OrganizationsListView, self).get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'name')
+        else:
+            return qs
+
+
+
+
+
 
