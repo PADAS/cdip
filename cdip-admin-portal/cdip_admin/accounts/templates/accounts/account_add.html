@@ -9,7 +9,7 @@
 
     <form action="{% url 'account_add' %}" method="POST">
         {% csrf_token %}
-        {{ account_form|crispy }}
+        {{ form |crispy }}
     <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
 
 </form>

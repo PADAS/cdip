@@ -7,6 +7,7 @@
     <h3>{{module.name}}</h3>
     <p>Slug: {{module.slug}}</p>
     <p>Description: {{module.description}}</p>
-    <a class="btn btn-primary" href="{% url 'inbound_integration_type_update' module.id %}" role="button">Update</a>
+    <a class="btn btn-primary {% if not perms.integrations.change_inboundintegrationtype %} disabled {% endif %}"
+       href="{% url 'inbound_integration_type_update' module.id %}" role="button">Update</a>
 
 {% endblock %}

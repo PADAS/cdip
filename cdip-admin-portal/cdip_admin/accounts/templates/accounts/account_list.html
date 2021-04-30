@@ -8,13 +8,11 @@
         <div class="col-lg-9">
             <h2>Accounts</h2>
         </div>
-        {% if perms.core.admin %}
-            <a class="btn btn-primary" href="{% url 'account_add' %}" role="button">+ Add</a>
-        {% endif %}
+        <a class="btn btn-primary" href="{% url 'account_add' %}" role="button">+ Add</a>
     </div>
     <div class="row">
         <ul>
-            {% for user in module %}
+            {% for user in accounts %}
                 <li>
                     <a href="{% url 'account_detail' user.id %}">
                         {{ user.lastName }}, {{ user.firstName }} - {{ user.email }}

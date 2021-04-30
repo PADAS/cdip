@@ -8,7 +8,7 @@
             <h2>Outbound Integration Types</h2>
         </div>
         <div class="col-lg-3">
-            <a class="btn btn-primary" href="{% url 'outbound_integration_type_add' %}" role="button">+ Add</a>
+            <a class="btn btn-primary {% if not perms.integrations.add_outboundintegrationtype %} disabled {% endif %}" href="{% url 'outbound_integration_type_add' %}" role="button">+ Add</a>
         </div>
     </div>
     <div class="row">

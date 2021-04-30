@@ -1,26 +1,29 @@
 import logging
-import uuid
 
-from django.contrib.auth.decorators import permission_required
-from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation, PermissionDenied
 from django.shortcuts import render, redirect, get_object_or_404
 
 # Create your views here.
 from clients.forms import ClientForm, ClientUpdateForm, ClientProfileForm
 from clients.models import ClientProfile
 from clients.utils import get_clients, get_client, add_client, update_client, get_client_by_client_id, get_client_secret
+from core.permissions import IsGlobalAdmin
 
 logger = logging.getLogger(__name__)
 
 
-@permission_required('core.admin')
 def client_list(request):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
+
     clients = get_clients()
     return render(request, "clients/client_list.html", {"module": clients})
 
 
-@permission_required('core.admin')
 def client_detail(request, client_id):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
+
     client = get_client(client_id)
 
     try:
@@ -41,15 +44,18 @@ def client_detail(request, client_id):
                                                           'profile': profile})
 
 
-@permission_required('core.admin')
 def client_secret(request, client_id):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
+
     client = get_client_secret(client_id)
 
     return render(request, "clients/client_secret.html", {"client": client, "client_id": client_id})
 
 
-@permission_required('core.admin')
 def client_add(request):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
 
     if request.method == 'POST':
         form = ClientForm(request.POST)
@@ -75,8 +81,10 @@ def client_add(request):
         return render(request, "clients/client_add.html", {"form": form, "profile_form": profile_form})
 
 
-@permission_required('core.admin')
 def client_update(request, client_id):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
+
     client = get_client(client_id)
 
     if request.method == 'POST':
@@ -109,8 +117,10 @@ def client_update(request, client_id):
                                                               "client_id": client_id})
 
 
-@permission_required('core.admin')
 def client_profile_add(request, client_id):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
+
     if request.method == 'POST':
         profile_form = ClientProfileForm(request.POST)
 
@@ -130,8 +140,9 @@ def client_profile_add(request, client_id):
                                                                    "profile_form": profile_form})
 
 
-@permission_required('core.admin')
 def client_profile_update(request, client_id):
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        raise PermissionDenied
 
     profile = get_object_or_404(ClientProfile, client_id=client_id)
 

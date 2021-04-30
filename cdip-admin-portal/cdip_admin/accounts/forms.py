@@ -1,8 +1,6 @@
 from django import forms
-from django.contrib.auth.models import Permission
-
-from accounts.models import AccountProfile
 from core.models import Task
+from django.forms.models import BaseModelFormSet
 
 
 class AccountForm(forms.Form):
@@ -22,28 +20,14 @@ class AccountUpdateForm(forms.Form):
     enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
 
 
-class AccountProfileForm(forms.ModelForm):
-    user_id = forms.CharField(widget=forms.HiddenInput)
-
-    class Meta:
-        model = AccountProfile
-        exclude = ['id']
-
-
-class AccountProfileUpdateForm(forms.ModelForm):
-    id = forms.UUIDField(widget=forms.HiddenInput)
-    user_id = forms.CharField(widget=forms.HiddenInput)
-
-    class Meta:
-        model = AccountProfile
-        fields = ['id', 'user_id', 'organizations']
-
-
 class AccountRoleForm(forms.Form):
     user_id = forms.CharField(widget=forms.HiddenInput)
     all_permissions = Task._meta.permissions
     permissions = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple, label='Role',
                                             choices=all_permissions, required=True)
+
+
+
 
 
 
