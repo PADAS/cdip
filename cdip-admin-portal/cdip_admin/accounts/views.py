@@ -6,13 +6,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation, PermissionDenied
 from django.forms import modelformset_factory
 from django.views.generic import ListView, FormView, UpdateView
+from django.contrib.auth.models import User
 
 from cdip_admin import settings
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
 from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
-from .utils import get_accounts, get_account, add_account, update_account, get_account_roles, add_account_roles, \
-    get_client_roles
 from .models import AccountProfile, AccountProfileOrganization
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
@@ -25,34 +24,20 @@ ProfileFormSet = modelformset_factory(AccountProfileOrganization,
 
 class AccountsListView(LoginRequiredMixin, ListView):
     template_name = 'accounts/account_list.html'
-    queryset = accounts = get_accounts()
+    queryset = User.objects.filter(email__contains='@').order_by('last_name')
     context_object_name = 'accounts'
     logger.info('Getting account list')
 
     def get_queryset(self):
-        qs = super(AccountsListView, self).get_queryset()
+        qs = super().get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            account_ids = []
-            for user_profile in qs:
-                try:
-                    account_profile = AccountProfile.objects.get(user_id=user_profile['id'])
-                except AccountProfile.DoesNotExist:
-                    account_profile = None
-                if account_profile is not None:
-                    account_ids.append(account_profile.id)
-
-            apo_qs = AccountProfileOrganization.objects.all().filter(accountprofile__id__in=account_ids)
-            org_qs = apo_qs.values_list('organization', flat=True).distinct()
-            org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, self.request.user, 'organization__name')
-            apo_qs = apo_qs.filter(organization__in=org_qs)
-            ap_qs = AccountProfile.objects.filter(id__in=apo_qs.values_list('accountprofile_id', flat=True))
-            filtered_qs = []
-
-            for user_profile in qs:
-                pass
-                if ap_qs.filter(user_id=user_profile['id']).exists():
-                    filtered_qs.append(user_profile)
-            return filtered_qs
+            user_orgs = IsOrganizationMember.get_organizations_for_user(self.request.user, admin_only=False)
+            aco = AccountProfileOrganization.objects.filter(organization__name__in=user_orgs)
+            apo_ids = aco.values_list('accountprofile_id', flat=True)
+            ap = AccountProfile.objects.filter(id__in=apo_ids)
+            uids = ap.values_list('user_id', flat=True)
+            qs = qs.filter(username__in=uids)
+            return qs
         else:
             return qs
 
@@ -60,15 +45,15 @@ class AccountsListView(LoginRequiredMixin, ListView):
 @permission_required('accounts.view_accountprofile')
 def account_detail(request, user_id):
     logger.info('Getting account detail')
-    account = get_account(user_id)
-    account_profiles = None
+    user = User.objects.get(username=user_id)
     try:
         profile = AccountProfile.objects.get(user_id=user_id)
         account_profiles = AccountProfileOrganization.objects.filter(accountprofile_id=profile.id)
     except AccountProfile.DoesNotExist:
         profile = None
+        account_profiles = None
 
-    return render(request, "accounts/account_detail.html", {"account": account, "profile": profile,
+    return render(request, "accounts/account_detail.html", {"user": user, "profile": profile,
                                                             "account_profiles": account_profiles})
 
 
