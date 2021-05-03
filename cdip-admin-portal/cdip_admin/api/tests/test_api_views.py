@@ -1,9 +1,4 @@
-import base64
-import uuid
-from typing import NamedTuple, Any
-
 import pytest
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework.utils import json
 
@@ -60,7 +55,6 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
 
 def test_get_organizations_list_organization_member_viewer(client, organization_member_user, setup_data):
     org1 = setup_data["org1"]
-    org2 = setup_data["org2"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -86,12 +80,11 @@ def test_get_organizations_list_organization_member_viewer(client, organization_
     response = response.json()
 
     # should receive the organization user is viewer of
-    assert len(response) == 1
+    assert len(response) == Organization.objects.filter(id=org1.id).count()
 
 
 def test_get_organizations_list_organization_member_admin(client, organization_member_user, setup_data):
     org1 = setup_data["org1"]
-    org2 = setup_data["org2"]
 
     ap = AccountProfile.objects.create(
         user_id=organization_member_user.user.username
@@ -117,7 +110,7 @@ def test_get_organizations_list_organization_member_admin(client, organization_m
     response = response.json()
 
     # should receive the organization user is admin of
-    assert len(response) == 1
+    assert len(response) == Organization.objects.filter(id=org1.id).count()
 
 
 def test_get_organizations_list_global_admin(client, global_admin_user, setup_data):
