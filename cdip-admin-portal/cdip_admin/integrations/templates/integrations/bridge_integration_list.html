@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
+{% load static %}
+
+{% block title %}Bridge Integrations{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col-lg-9">
+            <h2>Bridge Integrations</h2>
+        </div>
+
+        <a class="btn btn-primary {% if not perms.integrations.add_bridgeintegration %} disabled {% endif %}"
+       href="{% url 'bridge_integration_add' %}" role="button">+ Add</a>
+
+    </div>
+    {% render_table table %}
+    <script type="text/javascript"
+            id="row-click-handler"
+            data-table-id="bridge-config-table"
+            data-row-attribute="bridge-config-id"
+            data-url="{{ base_url }}"
+            src="{% static 'website/js/cdip.custom.js' %}">
+    </script>
+
+{% endblock %}

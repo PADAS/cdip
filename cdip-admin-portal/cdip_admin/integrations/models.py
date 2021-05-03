@@ -41,6 +41,18 @@ class OutboundIntegrationType(TimestampedModel):
         return f"{self.name}"
 
 
+class BridgeIntegrationType(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    name = models.CharField(max_length=200, verbose_name='Type')
+    slug = models.SlugField(max_length=200, unique=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ('name',)
+
+    def __str__(self):
+        return f"{self.name}"
+
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
 class OutboundIntegrationConfiguration(TimestampedModel):
@@ -85,6 +97,21 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
     def __str__(self):
         return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
+
+# This is the information for a given configuration this will include a specific organizations account information
+# Or organization specific information
+class BridgeIntegration(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    type = models.ForeignKey(BridgeIntegrationType, on_delete=models.CASCADE)
+    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
+    state = models.JSONField(blank=True, null=True)
+    additional = models.JSONField(default=dict, blank=True)
+    enabled = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
+
 
 
 # This is where the information is stored for a specific device
