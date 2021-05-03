@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import OutboundIntegrationType, InboundIntegrationType, OutboundIntegrationConfiguration, \
-    InboundIntegrationConfiguration, Device, DeviceGroup, DeviceState
+    InboundIntegrationConfiguration, Device, DeviceGroup, DeviceState, BridgeIntegrationType, BridgeIntegration
 
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
 
@@ -49,3 +49,12 @@ class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
 class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = OutboundIntegrationConfigurationForm
+
+@admin.register(BridgeIntegrationType)
+class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
+
+    list_display = ('name',)
+
+@admin.register(BridgeIntegration)
+class BridgeIntegrationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'owner')

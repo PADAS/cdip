@@ -1,6 +1,8 @@
 import logging
 import requests
 
+import rest_framework.request
+
 from cdip_admin import settings
 
 logger = logging.getLogger(__name__)
@@ -29,3 +31,14 @@ def get_admin_access_token():
     else:
         logger.warning(f'[{response.status_code}], {response.text}')
 
+
+def add_base_url(request, url):
+    if url and not url.startswith('http'):
+        if not url.startswith('/'):
+            url = '/' + url
+
+        if isinstance(request, rest_framework.request.Request):
+            request = request._request
+
+        url = request.build_absolute_uri(url)
+    return url

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Bridge: {{module.id}}{% endblock %}
+
+{% block content %}
+
+    <h3>Name: {{module.name}}</h3>
+    <p>{{module.id}}</p>
+    <p>
+        Type: <a href="{% url 'bridge_integration_view' module.type.id %}"> {{module.type.name}} </a>
+    </p>
+    <p>
+        Owner: <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
+    </p>
+    <p>Endpoint: {{module.state}}</p>
+
+    <p>Enabled: {{ module.enabled }}</p>
+
+    <a class="btn btn-primary" href="{% url 'bridge_integration_update' module.id %}" role="button">Update</a>
+    <a class="btn btn-primary" href="{% url 'bridge_integration_list' %}" role="button">Back</a>
+
+{% endblock %}
