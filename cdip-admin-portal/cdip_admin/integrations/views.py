@@ -15,12 +15,12 @@ from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
-    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm
+    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm
 from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
 from .models import InboundIntegrationType, OutboundIntegrationType \
-    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup
+    , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup, BridgeIntegration
 from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundIntegrationConfigurationTable, \
-    OutboundIntegrationConfigurationTable
+    OutboundIntegrationConfigurationTable, BridgeIntegrationTable
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -434,3 +434,75 @@ class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMi
             return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
         else:
             return qs
+
+
+class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, ListView):
+    table_class = BridgeIntegrationTable
+    template_name = 'integrations/bridge_integration_list.html'
+    queryset = BridgeIntegration.objects.get_queryset().order_by('name')
+    paginate_by = default_paginate_by
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['base_url'] = reverse('bridge_integration_list')
+        return context
+
+    def get_querset(self):
+        qs = super(BridgeIntegrationListView, self).get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+        else:
+            return qs
+
+@permission_required('integrations.view_bridgeintegration', raise_exception=True)
+def bridge_integration_view(request, module_id):
+    bridge = get_object_or_404(BridgeIntegration, pk=module_id)
+    return render(request, "integrations/bridge_integration_view.html",
+                  {"module": bridge})
+
+class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
+    template_name = 'integrations/bridge_integration_add.html'
+    form_class = BridgeIntegrationForm
+    model = BridgeIntegration
+    permission_required = 'integrations.add_bridgeintegration'
+
+    def post(self, request, *args, **kwargs):
+        form = BridgeIntegrationForm(request.POST)
+        if form.is_valid():
+            config = form.save()
+            return redirect("bridge_integration_view", config.id)
+
+    def get_form(self, form_class=None):
+        form = BridgeIntegrationForm()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
+                                                                                          self.request.user,
+                                                                                         'name',
+                                                                                          True)
+        return form
+
+
+class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = 'integrations/bridge_integration_update.html'
+    form_class = BridgeIntegrationForm
+    model = BridgeIntegration
+    permission_required = 'integrations.change_bridgeintegration'
+
+    def get_object(self):
+        configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, configuration):
+                raise PermissionDenied
+        return configuration
+
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        # needed for model form field filtering
+        form = form_class(request=request, instance=self.object)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_success_url(self):
+        return reverse('bridge_integration_view',
+                       kwargs={'module_id': self.kwargs.get("id")})
+

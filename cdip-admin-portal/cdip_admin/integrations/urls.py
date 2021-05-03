@@ -3,7 +3,8 @@ from django.urls import path
 from . import views
 from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegrationConfigurationUpdateView, \
     DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView, \
-    DeviceGroupAddView, DeviceGroupManagementUpdateView
+    DeviceGroupAddView, DeviceGroupManagementUpdateView, BridgeIntegrationListView, BridgeIntegrationAddView, \
+    BridgeIntegrationUpdateView
 
 urlpatterns = [
     path('devices/<uuid:module_id>', views.device_detail,
@@ -61,4 +62,15 @@ urlpatterns = [
     path('integrations/outbound/configuration/update/<uuid:configuration_id>',
          OutboundIntegrationConfigurationUpdateView.as_view(),
          name="outbound_integration_configuration_update"),
+
+    path('integrations/bridge', views.BridgeIntegrationListView.as_view(),
+         name="bridge_integration_list"),
+    path('integrations/bridge/<uuid:module_id>', views.bridge_integration_view,
+         name="bridge_integration_view"),
+    path('integrations/bridge/add', BridgeIntegrationAddView.as_view(),
+         name="bridge_integration_add"),
+    path('integrations/bridge/<uuid:configuration_id>/update',
+         BridgeIntegrationUpdateView.as_view(),
+         name="bridge_integration_update"),
+
 ]
