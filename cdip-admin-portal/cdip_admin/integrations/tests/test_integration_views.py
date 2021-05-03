@@ -6,7 +6,7 @@ from accounts.models import AccountProfile, AccountProfileOrganization
 from core.enums import DjangoGroups, RoleChoices
 from integrations import models
 from integrations.models import InboundIntegrationType, InboundIntegrationConfiguration, \
-    OutboundIntegrationConfiguration, OutboundIntegrationType
+    OutboundIntegrationConfiguration, OutboundIntegrationType, Device, DeviceGroup
 from organizations.models import Organization
 
 # Inbound Integration Tests
@@ -279,7 +279,8 @@ def test_add_outbound_integration_configuration_organization_member_hybrid(clien
 
     client.force_login(organization_member_user.user)
 
-    response = client.get(reverse("outbound_integration_configuration_add"), follow=True, HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.get(reverse("outbound_integration_configuration_add"), follow=True,
+                          HTTP_X_USERINFO=organization_member_user.user_info)
 
     assert response.status_code == 200
 
@@ -312,3 +313,84 @@ def test_add_outbound_integration_configuration_organization_member_hybrid(clien
     # assert OutboundIntegrationConfiguration.objects.filter(name=oi.name).exists()
 
 #TODO: OutboundIntegrationConfigurationUpdateView
+
+# Device Tests
+
+def test_get_device_detail_global_admin(client, global_admin_user, setup_data):
+
+    d = setup_data["d1"]
+
+    client.force_login(global_admin_user.user)
+
+    response = client.get(reverse("device_detail", kwargs={'module_id': d.id}),
+                          HTTP_X_USERINFO=global_admin_user.user_info)
+
+    assert response.status_code == 200
+
+    response.context["device"].id == d.id
+
+
+def test_get_device_detail_organization_member(client, organization_member_user, setup_data):
+
+    d = setup_data["d1"]
+
+    client.force_login(organization_member_user.user)
+
+    response = client.get(reverse("device_detail", kwargs={'module_id': d.id}),
+                          HTTP_X_USERINFO=organization_member_user.user_info)
+
+    assert response.status_code == 200
+
+    response.context["device"].id == d.id
+
+
+def test_device_list_global_admin(client, global_admin_user):
+
+    client.force_login(global_admin_user.user)
+
+    response = client.get(reverse("device_list"), HTTP_X_USERINFO=global_admin_user.user_info)
+
+    assert response.status_code == 200
+
+    # confirm result set is unfiltered
+    assert list(response.context['device_list']) == list(Device.objects.all())
+
+
+def test_device_group_list_global_admin(client, global_admin_user):
+
+    client.force_login(global_admin_user.user)
+
+    response = client.get(reverse("device_group_list"), follow=True,
+                          HTTP_X_USERINFO=global_admin_user.user_info)
+
+    assert response.status_code == 200
+
+    assert list(response.context["filter"].qs) == list(DeviceGroup.objects.all())
+
+
+def test_device_group_list_organization_member_viewer(client, organization_member_user, setup_data):
+    org1 = setup_data["org1"]
+
+    ap = AccountProfile.objects.create(
+        user_id=organization_member_user.user.username
+    )
+
+    apo = AccountProfileOrganization.objects.create(
+        accountprofile=ap,
+        organization=org1,
+        role=RoleChoices.VIEWER
+    )
+
+    # Sanity check on the test data relationships.
+    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
+    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+
+    client.force_login(organization_member_user.user)
+
+    response = client.get(reverse("device_group_list"), follow=True,
+                          HTTP_X_USERINFO=organization_member_user.user_info)
+
+    assert response.status_code == 200
+
+    # confirm result set is filtered queryset based on organization profile
+    assert list(response.context["filter"].qs) == list(DeviceGroup.objects.filter(owner=org1))
