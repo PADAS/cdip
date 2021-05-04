@@ -6,12 +6,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation, PermissionDenied
 from django.forms import modelformset_factory
 from django.views.generic import ListView, FormView, UpdateView
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 from cdip_admin import settings
+from core.enums import RoleChoices, DjangoGroups
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
-from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
+from .forms import AccountForm, AccountUpdateForm
 from .models import AccountProfile, AccountProfileOrganization
 from .utils import add_account
 
@@ -65,21 +66,51 @@ class AccountsAddView(LoginRequiredMixin, FormView):
         form = AccountForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            response = add_account(data)
 
-            if response:
-                return redirect('account_list')
-            else:
-                raise SuspiciousOperation
+            email = data["email"]
+            first_name = data["firstName"]
+            last_name = data["firstName"]
+            org_id = data["organization"]
+            role = data["role"]
+            username = email
+
+            try:
+                user = User.objects.get(email=email)
+                if not user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists():
+                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                    user.groups.add(group_id)
+
+            except User.DoesNotExist:
+                # create keycloak user
+                response = add_account(data)
+                # create django user
+                if response:
+                    user = User.objects.create(email=email, username=username, first_name=first_name, last_name=last_name)
+                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                    user.groups.add(group_id)
+                else:
+                    raise SuspiciousOperation
+
+            account_profile, created = AccountProfile.objects.get_or_create(user_id=email)
+            apo, created = AccountProfileOrganization.objects.get_or_create(accountprofile_id=account_profile.id,
+                                                                            organization_id=org_id,
+                                                                            role=role)
+            return redirect('organizations_detail', module_id=org_id)
+        else:
+            raise SuspiciousOperation
+
 
     def get(self, request, *args, **kwargs):
         form = AccountForm()
+        org_id = self.kwargs.get("org_id")
+        form.initial["organization"] = org_id
+        form.initial["role"] = RoleChoices.VIEWER
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
             if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
                                                                  self.request.user, 'name', True):
                 raise PermissionDenied
-        return render(request, "accounts/account_add.html", {'form': form})
+        return render(request, "accounts/account_add.html", {'form': form, 'org_id': org_id})
 
 
 class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
@@ -130,7 +161,7 @@ def account_profile_add(request, user_id):
                                                                          "profile_form": profile_form})
 
     else:
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
+        profile_form = AccountForm
         return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
 
 

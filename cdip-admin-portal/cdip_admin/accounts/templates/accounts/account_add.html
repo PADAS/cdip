@@ -7,7 +7,7 @@
 
 {% block content %}
 
-    <form action="{% url 'account_add' %}" method="POST">
+    <form action="{% url 'account_add' org_id %}" method="POST">
         {% csrf_token %}
         {{ form |crispy }}
     <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
