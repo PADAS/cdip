@@ -180,29 +180,29 @@ def add_account(user):
 #         return False
 #
 #
-def update_account(account_info, user_id):
-    url = KEYCLOAK_ADMIN_API + 'users/' + user_id
-
-    token = get_admin_access_token()
-
-    if not token:
-        logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
-        response.status_code = 403
-        return response
-
-    headers = {
-        "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
-    }
-
-    response = requests.put(url=url, headers=headers, json=account_info)
-
-    if response.status_code == 204:
-        logger.info(f'User updated successfully')
-        return True
-    else:
-        logger.error(f'Error updating account: {response.status_code}], {response.text}')
-        return False
+# def update_account(account_info, user_id):
+#     url = KEYCLOAK_ADMIN_API + 'users/' + user_id
+#
+#     token = get_admin_access_token()
+#
+#     if not token:
+#         logger.warning('Cannot get a valid access_token.')
+#         response = JsonResponse({'message': 'You don\'t have access to this resource'})
+#         response.status_code = 403
+#         return response
+#
+#     headers = {
+#         "authorization": f"{token['token_type']} {token['access_token']}", 'Content-type': 'application/json'
+#     }
+#
+#     response = requests.put(url=url, headers=headers, json=account_info)
+#
+#     if response.status_code == 204:
+#         logger.info(f'User updated successfully')
+#         return True
+#     else:
+#         logger.error(f'Error updating account: {response.status_code}], {response.text}')
+#         return False
 
 def get_user_profile(user_id):
 
