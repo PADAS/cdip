@@ -7,8 +7,7 @@ class AccountForm(forms.Form):
     firstName = forms.CharField(max_length=200, label='First Name', required=True)
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
-    email = forms.EmailField(max_length=200, label='Email', required=True)
-    enabled = forms.CharField(max_length=200, initial='true', widget=forms.HiddenInput)
+    # email = forms.EmailField(max_length=200, label='Email', required=True)
 
 
 class AccountUpdateForm(forms.Form):
@@ -16,8 +15,7 @@ class AccountUpdateForm(forms.Form):
     firstName = forms.CharField(max_length=200, label='First Name', required=True)
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
-    email = forms.EmailField(max_length=200, label='Email', required=True)
-    enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
+    # email = forms.EmailField(max_length=200, label='Email', required=True)
 
 
 class AccountRoleForm(forms.Form):

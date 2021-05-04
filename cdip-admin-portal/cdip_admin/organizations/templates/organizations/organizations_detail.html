@@ -4,8 +4,25 @@
 
 {% block content %}
 
-    <h3>{{organization.name}}</h3>
+    <h3>Organization: {{organization.name}}</h3>
     <p>{{organization.description}}</p>
     <a class="btn btn-primary {% if not perms.organizations.change_organization %} disabled {% endif %}"
        href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
+    <div class="row">
+        <div class="col-lg-9">
+            <h2>Accounts</h2>
+        </div>
+        <a class="btn btn-primary" href="{% url 'account_add' %}" role="button">+ Add</a>
+    </div>
+    <div class="row">
+        <ul>
+            {% for user in accounts %}
+                <li>
+                    <a href="{% url 'account_detail' user.username %}">
+                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
 {% endblock %}

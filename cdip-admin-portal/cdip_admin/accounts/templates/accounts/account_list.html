@@ -14,9 +14,11 @@
         <ul>
             {% for user in accounts %}
                 <li>
-                    <a href="{% url 'account_detail' user.username %}">
-                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }}
-                    </a>
+                    {% if user.username %}
+                        <a href="{% url 'account_detail' user.username %}">
+                            {{ user.last_name }}, {{ user.first_name }} - {{ user.email }}
+                        </a>
+                    {% endif %}
                 </li>
             {% endfor %}
         </ul>
