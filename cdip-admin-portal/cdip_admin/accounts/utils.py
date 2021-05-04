@@ -124,6 +124,12 @@ def get_account(user_id):
 
 
 def add_account(user):
+
+    # remove properties keycloak does not expect and enable user
+    user.pop('role')
+    user.pop('organization')
+    user["enabled"] = True
+
     url = KEYCLOAK_ADMIN_API + 'users'
 
     token = get_admin_access_token()
