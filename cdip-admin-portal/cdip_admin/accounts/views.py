@@ -13,7 +13,7 @@ from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
 from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
 from .models import AccountProfile, AccountProfileOrganization
-from .utils import add_account, get_account, update_account
+from .utils import add_account
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
@@ -83,32 +83,33 @@ class AccountsAddView(LoginRequiredMixin, FormView):
 
 
 class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'organizations/organizations_update.html'
+    template_name = 'accounts/account_update.html'
     form_class = AccountUpdateForm
     permission_required = 'accounts.change_accountprofile'
 
     def post(self, request, *args, **kwargs):
-        account_form = AccountUpdateForm(request.POST)
         user_id = self.kwargs.get("user_id")
+        user = get_object_or_404(User, email=user_id)
+        account_form = AccountUpdateForm(request.POST)
+
         if account_form.is_valid():
             data = account_form.cleaned_data
-            response = update_account(data, user_id)
-
-            if response:
-                return redirect('account_detail', user_id=user_id)
-            else:
-                raise SuspiciousOperation
+            user.first_name = data["firstName"]
+            user.last_name = data["lastName"]
+            user.username = data["username"]
+            user.save()
+            return redirect('account_detail', user_id=user_id)
+        else:
+            raise SuspiciousOperation
 
     def get(self, request, *args, **kwargs):
         account_form = AccountUpdateForm()
         user_id = self.kwargs.get("user_id")
-        account = get_account(user_id)
+        user = get_object_or_404(User, email=user_id)
 
-        account_form.initial['firstName'] = account["firstName"]
-        account_form.initial['lastName'] = account["lastName"]
-        account_form.initial['username'] = account["username"]
-        account_form.initial['email'] = account["email"]
-        account_form.initial['enabled'] = account["enabled"]
+        account_form.initial['firstName'] = user.first_name
+        account_form.initial['lastName'] = user.last_name
+        account_form.initial['username'] = user.username
 
         return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
