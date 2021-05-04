@@ -9,6 +9,7 @@ from core.enums import RoleChoices, DjangoGroups
 import logging
 logger = logging.getLogger(__name__)
 
+
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
 

@@ -47,9 +47,7 @@ class OrganizationDetailListView(PermissionRequiredMixin, ListView):
     permission_required = 'organizations.view_organization'
 
     def get_queryset(self):
-        # if not IsGlobalAdmin.has_permission(None, self.request, None):
         org = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
-        # user_orgs = IsOrganizationMember.get_organizations_for_user(self.request.user, admin_only=False)
         aco = AccountProfileOrganization.objects.filter(organization__id=org.id)
         apo_ids = aco.values_list('accountprofile_id', flat=True)
         ap = AccountProfile.objects.filter(id__in=apo_ids)
@@ -58,11 +56,12 @@ class OrganizationDetailListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
-        context['organization'] = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
+        org = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
+        can_invite = IsGlobalAdmin.has_permission(None, self.request, None) or \
+                     IsOrganizationMember.is_object_owner(self.request.user, org)
+        context['organization'] = org
+        context['can_invite'] = can_invite
         return context
-
-    # def get_object(self):
-    #     return get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
 
 
 class OrganizationsListView(LoginRequiredMixin, ListView):

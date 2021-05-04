@@ -12,7 +12,8 @@
         <div class="col-lg-9">
             <h2>Accounts</h2>
         </div>
-        <a class="btn btn-primary" href="{% url 'account_add' %}" role="button">+ Add</a>
+        <a class="btn btn-primary {% if not can_invite %} disabled {% endif %}"
+           href="{% url 'account_add' organization.id%}" role="button">+ Add</a>
     </div>
     <div class="row">
         <ul>
