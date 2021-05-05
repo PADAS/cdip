@@ -12,7 +12,7 @@ from cdip_admin import settings
 from core.enums import RoleChoices, DjangoGroups
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
-from .forms import AccountForm, AccountUpdateForm
+from .forms import AccountForm, AccountUpdateForm, AccountProfileForm
 from .models import AccountProfile, AccountProfileOrganization
 from .utils import add_account
 
@@ -145,69 +145,40 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
         return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
 
-@permission_required('accounts.add_accountprofile')
-def account_profile_add(request, user_id):
-    if request.method == 'POST':
-        profile_form = ProfileFormSet(request.POST)
+class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = 'accounts/account_profile_update.html'
+    form_class = AccountProfileForm
+    permission_required = 'accounts.change_accountprofile'
+
+    def post(self, request, *args, **kwargs):
+        org_id = self.kwargs.get("org_id")
+        user_id = self.kwargs.get("user_id")
+        ap = AccountProfile.objects.get(user_id=user_id)
+        acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
+        aco = acos.get(organization_id=org_id)
+        profile_form = AccountProfileForm(request.POST)
+
         if profile_form.is_valid():
-            instances = profile_form.save(commit=False)
-            profile = AccountProfile.objects.create(user_id=user_id)
-            for instance in instances:
-                instance.accountprofile_id = profile.id
-                instance.save()
-            return redirect('account_detail', user_id=user_id)
+            data = profile_form.cleaned_data
+            aco.role = data["role"]
+            aco.save()
+            return redirect('organizations_detail', module_id=org_id)
         else:
-            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
-                                                                         "profile_form": profile_form})
+            raise SuspiciousOperation
 
-    else:
-        profile_form = AccountForm
-        return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
+    def get(self, request, *args, **kwargs):
+        profile_form = AccountProfileForm()
+        org_id = self.kwargs.get("org_id")
+        user_id = self.kwargs.get("user_id")
+        user = get_object_or_404(User, email=user_id)
+        org = Organization.objects.get(id=org_id)
+        ap = AccountProfile.objects.get(user_id=user_id)
+        acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
+        aco = acos.get(organization_id=org_id)
 
+        profile_form.initial['role'] = aco.role
+        profile_form.initial['organization'] = aco.organization.id
 
-@permission_required('accounts.change_accountprofile')
-def account_profile_update(request, user_id):
-    profile = get_object_or_404(AccountProfile, user_id=user_id)
-
-    if request.method == 'POST':
-        profile_form = ProfileFormSet(request.POST)
-        if profile_form.is_valid():
-            instances = profile_form.save(commit=False)
-            for instance in instances:
-                instance.accountprofile_id = profile.id
-                instance.save()
-            profile_form.save()
-            return redirect('account_detail', user_id=user_id)
-        else:
-            return render(request, "accounts/account_profile_update.html", {"user_id": user_id,
-                                                                            "profile_form": profile_form})
-
-    else:
-        qs = Organization.objects.all()
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id))
-        if not IsGlobalAdmin.has_permission(None, request, None):
-            qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, 'name', True)
-            for form in profile_form.forms:
-                org_bound_field = form['organization']
-                org_field_val = org_bound_field.form.initial.get(org_bound_field.name, '')
-                org_choice_field = form.fields['organization']
-                role_choice_field = form.fields['role']
-                # if form is not an empty form
-                if org_field_val:
-                    org_name = Organization.objects.get(id=org_field_val)
-                    # disable form fields if user is not admin of the set organization
-                    if org_name not in qs:
-                        org_choice_field.widget.attrs['readonly'] = True
-                        role_choice_field.widget.attrs['readonly'] = True
-                        # org_choice_field.widget.attrs['disabled'] = True
-                        # role_choice_field.widget.attrs['disabled'] = True
-                        # org_choice_field.widget.attrs['required'] = False
-                        # role_choice_field.widget.attrs['required'] = False
-                    # otherwise restrict organization options
-                    else:
-                        org_choice_field.queryset = qs
-                # restrict the organizations options on empty form
-                else:
-                    org_choice_field.queryset = qs
-        return render(request, "accounts/account_profile_update.html",
-                      {"profile_form": profile_form, "user_id": user_id})
+        return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form,
+                                                                        "user": user,
+                                                                        "organization": org})

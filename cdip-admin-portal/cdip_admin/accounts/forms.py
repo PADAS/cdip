@@ -11,7 +11,6 @@ class AccountForm(forms.Form):
     firstName = forms.CharField(max_length=200, label='First Name', required=False)
     lastName = forms.CharField(max_length=200, label='Last Name', required=False)
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
-    # username = forms.CharField(max_length=200, label='User Name', required=False)
 
 
 
@@ -20,7 +19,11 @@ class AccountUpdateForm(forms.Form):
     firstName = forms.CharField(max_length=200, label='First Name', required=True)
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
-    # email = forms.EmailField(max_length=200, label='Email', required=True)
+
+
+class AccountProfileForm(forms.Form):
+    role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
+    organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
 
 
