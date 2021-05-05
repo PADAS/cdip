@@ -69,7 +69,7 @@ urlpatterns = [
          name="bridge_integration_view"),
     path('integrations/bridge/add', BridgeIntegrationAddView.as_view(),
          name="bridge_integration_add"),
-    path('integrations/bridge/<uuid:configuration_id>/update',
+    path('integrations/bridge/<uuid:id>/update',
          BridgeIntegrationUpdateView.as_view(),
          name="bridge_integration_update"),
 
