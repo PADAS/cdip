@@ -17,10 +17,10 @@
     </div>
     <div class="row">
         <ul>
-            {% for user in accounts %}
+            {% for user, role in accounts %}
                 <li>
                     <a href="{% url 'account_detail' user.username %}">
-                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }}
+                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }} - {{ role }}
                     </a>
                 </li>
             {% endfor %}

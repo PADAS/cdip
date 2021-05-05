@@ -52,7 +52,12 @@ class OrganizationDetailListView(PermissionRequiredMixin, ListView):
         apo_ids = aco.values_list('accountprofile_id', flat=True)
         ap = AccountProfile.objects.filter(id__in=apo_ids)
         uids = ap.values_list('user_id', flat=True)
-        return User.objects.filter(username__in=uids)
+        users = User.objects.filter(username__in=uids)
+        accounts = []
+        for user in users:
+            role = aco.get(accountprofile_id=ap.get(user_id=user.username).id).role
+            accounts.append((user, role))
+        return accounts
 
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
