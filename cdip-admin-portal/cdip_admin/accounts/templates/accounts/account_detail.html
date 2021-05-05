@@ -11,9 +11,6 @@
         {% for account_profile in account_profiles %}
             <li>{{ account_profile.organization }} : {{ account_profile.role }}</li>
         {% endfor %}
-        <a class="btn btn-primary" href="{% url 'account_profile_update' user.username %}" role="button">Update Profile</a>
-    {% else %}
-        <a class="btn btn-primary" href="{% url 'account_profile_add' user.username %}" role="button">Add Profile</a>
     {% endif %}
     <a class="btn btn-primary" href="{% url 'account_update' user.username %}" role="button">Update Account</a>
 
