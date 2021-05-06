@@ -62,10 +62,10 @@ class OrganizationDetailListView(PermissionRequiredMixin, ListView):
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
         org = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
-        can_invite = IsGlobalAdmin.has_permission(None, self.request, None) or \
+        is_owner = IsGlobalAdmin.has_permission(None, self.request, None) or \
                      IsOrganizationMember.is_object_owner(self.request.user, org)
         context['organization'] = org
-        context['can_invite'] = can_invite
+        context['is_owner'] = is_owner
         return context
 
 

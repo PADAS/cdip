@@ -168,6 +168,7 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
             raise SuspiciousOperation
 
     def get(self, request, *args, **kwargs):
+
         profile_form = AccountProfileForm()
         org_id = self.kwargs.get("org_id")
         user_id = self.kwargs.get("user_id")
@@ -176,6 +177,11 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
         ap = AccountProfile.objects.get(user_id=user_id)
         acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
         aco = acos.get(organization_id=org_id)
+
+        # Only allow organization owners to change roles
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, org):
+                raise PermissionDenied
 
         profile_form.initial['role'] = aco.role
         profile_form.initial['organization'] = aco.organization.id
