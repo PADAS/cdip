@@ -8,6 +8,5 @@ urlpatterns = [
     path('', AccountsListView.as_view(), name='account_list'),
     path('add/<str:org_id>', AccountsAddView.as_view(), name='account_add'),
     path('update/<str:user_id>', AccountsUpdateView.as_view(), name='account_update'),
-    # path('profile/add/<str:user_id>', views.account_profile_add, name='account_profile_add'),
     path('profile/update/<str:org_id>/<str:user_id>', AccountProfileUpdateView.as_view(), name='account_profile_update'),
 ]
