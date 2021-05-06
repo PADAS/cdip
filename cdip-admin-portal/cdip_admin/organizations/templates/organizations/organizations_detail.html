@@ -19,7 +19,7 @@
         <ul>
             {% for user, role in accounts %}
                 <li>
-                    <a href="{% url 'account_profile_update' organization.id user.username %}">
+                    <a href="{% url 'account_profile_update' organization.id user.id %}">
                         {{ user.last_name }}, {{ user.first_name }} - {{ user.email }} - {{ role }}
                     </a>
                 </li>

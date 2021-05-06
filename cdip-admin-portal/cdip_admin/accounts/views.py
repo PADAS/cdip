@@ -47,7 +47,7 @@ class AccountsListView(LoginRequiredMixin, ListView):
 @permission_required('accounts.view_accountprofile')
 def account_detail(request, user_id):
     logger.info('Getting account detail')
-    user = User.objects.get(username=user_id)
+    user = User.objects.get(id=user_id)
     try:
         profile = AccountProfile.objects.get(user_id=user_id)
         account_profiles = AccountProfileOrganization.objects.filter(accountprofile_id=profile.id)
@@ -91,7 +91,8 @@ class AccountsAddView(LoginRequiredMixin, FormView):
                 else:
                     raise SuspiciousOperation
 
-            account_profile, created = AccountProfile.objects.get_or_create(user_id=email)
+            account_profile, created = AccountProfile.objects.get_or_create(user_id=user.id,
+                                                                            defaults={'user_username': user.username})
             apo, created = AccountProfileOrganization.objects.get_or_create(accountprofile_id=account_profile.id,
                                                                             organization_id=org_id,
                                                                             role=role)
@@ -120,7 +121,7 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
 
     def post(self, request, *args, **kwargs):
         user_id = self.kwargs.get("user_id")
-        user = get_object_or_404(User, email=user_id)
+        user = get_object_or_404(User, id=user_id)
         account_form = AccountUpdateForm(request.POST)
 
         if account_form.is_valid():
@@ -136,7 +137,7 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
     def get(self, request, *args, **kwargs):
         account_form = AccountUpdateForm()
         user_id = self.kwargs.get("user_id")
-        user = get_object_or_404(User, email=user_id)
+        user = get_object_or_404(User, id=user_id)
 
         account_form.initial['firstName'] = user.first_name
         account_form.initial['lastName'] = user.last_name
@@ -170,7 +171,7 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
         profile_form = AccountProfileForm()
         org_id = self.kwargs.get("org_id")
         user_id = self.kwargs.get("user_id")
-        user = get_object_or_404(User, email=user_id)
+        user = get_object_or_404(User, id=user_id)
         org = Organization.objects.get(id=org_id)
         ap = AccountProfile.objects.get(user_id=user_id)
         acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)

@@ -13,7 +13,6 @@ class AccountForm(forms.Form):
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
 
-
 class AccountUpdateForm(forms.Form):
     all_permissions = Task._meta.permissions
     firstName = forms.CharField(max_length=200, label='First Name', required=True)

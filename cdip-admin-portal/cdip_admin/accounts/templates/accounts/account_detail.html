@@ -12,7 +12,7 @@
             <li>{{ account_profile.organization }} : {{ account_profile.role }}</li>
         {% endfor %}
     {% endif %}
-    <a class="btn btn-primary" href="{% url 'account_update' user.username %}" role="button">Update Account</a>
+    <a class="btn btn-primary" href="{% url 'account_update' user.id %}" role="button">Update Account</a>
 
 
 {% endblock %}
