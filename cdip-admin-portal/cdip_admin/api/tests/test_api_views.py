@@ -4,6 +4,7 @@ from rest_framework.utils import json
 
 from accounts.models import AccountProfileOrganization, AccountProfile
 from clients.models import ClientProfile
+from conftest import setup_account_profile_mapping
 from core.enums import DjangoGroups, RoleChoices
 
 pytestmark = pytest.mark.django_db
@@ -56,20 +57,8 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
 def test_get_organizations_list_organization_member_viewer(client, organization_member_user, setup_data):
     org1 = setup_data["org1"]
 
-    ap = AccountProfile.objects.create(
-        user_id=organization_member_user.user.username
-    )
-
-    apo = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org1,
-        role=RoleChoices.VIEWER
-    )
-
-    # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
-    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER)}
+    setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
@@ -86,20 +75,8 @@ def test_get_organizations_list_organization_member_viewer(client, organization_
 def test_get_organizations_list_organization_member_admin(client, organization_member_user, setup_data):
     org1 = setup_data["org1"]
 
-    ap = AccountProfile.objects.create(
-        user_id=organization_member_user.user.username
-    )
-
-    apo = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org1,
-        role=RoleChoices.ADMIN
-    )
-
-    # Sanity check on the test data relationships.
-    assert Organization.objects.filter(id=org1.id).exists()
-    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
-    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.ADMIN)}
+    setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
@@ -186,25 +163,9 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    ap = AccountProfile.objects.create(
-        user_id=organization_member_user.user.username
-    )
-
-    apo = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org1,
-        role=RoleChoices.VIEWER
-    )
-
-    apo2 = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org2,
-        role=RoleChoices.ADMIN
-    )
-
-    # Sanity check on the test data relationships.
-    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
-    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER),
+                               (organization_member_user.user, org2, RoleChoices.ADMIN)}
+    setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
@@ -271,26 +232,9 @@ def test_put_inbound_integration_configurations_detail_organization_member_hybri
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-
-    ap = AccountProfile.objects.create(
-        user_id=organization_member_user.user.username
-    )
-
-    apo = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org1,
-        role=RoleChoices.VIEWER
-    )
-
-    apo2 = AccountProfileOrganization.objects.create(
-        accountprofile=ap,
-        organization=org2,
-        role=RoleChoices.ADMIN
-    )
-
-    # Sanity check on the test data relationships.
-    assert AccountProfile.objects.filter(user_id=organization_member_user.user.username).exists()
-    assert AccountProfileOrganization.objects.filter(accountprofile=ap).exists()
+    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER),
+                               (organization_member_user.user, org2, RoleChoices.ADMIN)}
+    setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
