@@ -1,10 +1,9 @@
 from django import forms
 
-from accounts.utils import get_user_profile
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
-    InboundIntegrationType, DeviceGroup, Device
+    InboundIntegrationType, DeviceGroup
 
 
 class DeviceGroupForm(forms.ModelForm):
