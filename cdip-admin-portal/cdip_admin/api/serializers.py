@@ -57,3 +57,19 @@ class DeviceStateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceState
         fields = ['device_external_id', 'state']
+
+from django.urls import reverse
+from core.utils import add_base_url
+class BridgeSerializer(serializers.ModelSerializer):
+
+    href = serializers.SerializerMethodField('_href')
+
+    def _href(self, obj):
+        request = self.context['request']
+        obj_path = reverse('bridge-integration-view', kwargs={'pk': obj.id})
+        return add_base_url(request, obj_path)
+
+
+    class Meta:
+        model = BridgeIntegration
+        fields = '__all__'

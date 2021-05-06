@@ -38,5 +38,7 @@ urlpatterns = [
     path('v1.0/integrations/outbound/configurations/<pk>', OutboundIntegrationConfigurationDetailsView.as_view(),
          name='outboundintegrationconfigurations_detail'),
 
+    path('v1.0/integrations/bridges', BridgeIntegrationListView.as_view(), name='bridge_integration-list-view'),
+    path('v1.0/integrations/bridges/<pk>', BridgeIntegrationView.as_view(), name='bridge-integration-view'),
     url(r'^docs/', schema_view),
 ]

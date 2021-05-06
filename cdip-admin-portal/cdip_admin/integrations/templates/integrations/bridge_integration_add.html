@@ -2,11 +2,11 @@
 
 {% load crispy_forms_tags %}
 
-{% block title %}Add Inbound Integration Configuration{% endblock %}
+{% block title %}Add Bridge Integration{% endblock %}
 
 {% block content %}
     <form method="post">
         {% csrf_token %}
         {% crispy form %}
-     </form>
+    </form>
 {% endblock %}

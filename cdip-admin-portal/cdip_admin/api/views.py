@@ -223,6 +223,30 @@ class DeviceListView(generics.ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
+class BridgeIntegrationListView(generics.ListAPIView):
+
+    serializer_class = BridgeSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount ]
+    queryset = BridgeIntegration.objects.all()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user, 'owner__name')
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class BridgeIntegrationView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = BridgeSerializer
+    permission_classes = [IsGlobalAdmin| IsOrganizationMember | IsServiceAccount ]
+    queryset = BridgeIntegration.objects.all()
+
+
 class MissingArgumentException(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = _('Missing arguments.')
