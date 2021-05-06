@@ -1,7 +1,6 @@
 import django_tables2 as tables
 
-from .models import DeviceState, DeviceGroup, Device, InboundIntegrationConfiguration, OutboundIntegrationConfiguration
-
+from .models import DeviceState, DeviceGroup, Device, InboundIntegrationConfiguration,OutboundIntegrationConfiguration, BridgeIntegration
 
 class DeviceStateTable(tables.Table):
     created = tables.Column(accessor="created_at", verbose_name="Created")
@@ -72,3 +71,13 @@ class OutboundIntegrationConfigurationTable(tables.Table):
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = 'type__name'
 
+class BridgeIntegrationTable(tables.Table):
+    type = tables.Column(accessor="type__name", verbose_name="Type")
+
+    class Meta:
+        model = BridgeIntegration
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ('name', 'type', 'owner__name', 'enabled')
+        row_attrs = {"bridge-config-id": lambda record: record.id}
+        attrs = {"class": "table table-hover", "id": "bridge-config-table"}
+        order_by = 'type__name'
