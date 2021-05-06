@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth.models import Group
 from rest_framework.utils import json
 
+from accounts.models import AccountProfile, AccountProfileOrganization
 from core.enums import DjangoGroups
 from integrations.models import InboundIntegrationType, OutboundIntegrationType, InboundIntegrationConfiguration, \
     OutboundIntegrationConfiguration, DeviceGroup, Device, DeviceState
@@ -29,13 +30,15 @@ Provisions a django user that is enrolled in the django group "Global Admin"
 def global_admin_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
     user_const = dict(last_name='Owen', first_name='Harry')
-    user_id = str(uuid.uuid4())
     email = 'harry.owen@vulcan.com'
+    username = email
+
     user = django_user_model.objects.create_superuser(
-        user_id, email, password,
+        username, email, password,
         **user_const)
-    user_info = {'sub': user_id,
-                 'username': user_id,
+
+    user_info = {'sub': user.id,
+                 'username': username,
                  'email': email}
 
     x_user_info = base64.b64encode(json.dumps(user_info).encode("utf-8"))
@@ -58,13 +61,15 @@ Provisions a django user that is enrolled in the django group "Organization Memb
 def organization_member_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
     user_const = dict(last_name='Owen', first_name='Harry')
-    user_id = str(uuid.uuid4())
     email = 'harry.owen@vulcan.com'
+    username = email
+
     user = django_user_model.objects.create_superuser(
-        user_id, email, password,
+        username, email, password,
         **user_const)
-    user_info = {'sub': user_id,
-                 'username': user_id,
+
+    user_info = {'sub': user.id,
+                 'username': username,
                  'email': email}
 
 
@@ -92,18 +97,18 @@ def client_user(db, django_user_model):
     password = django_user_model.objects.make_random_password()
     user_const = dict(last_name='Owen', first_name='Harry')
     username = 'service-account-test-function'
-    user_id = str(uuid.uuid4())
+    email = 'service-account-test-function@sintegrate.org'
     client_id = 'test-function'
 
-    user_info = {'sub': user_id,
+    user = django_user_model.objects.create_superuser(
+        username, email, password,
+        **user_const)
+
+    user_info = {'sub': user.id,
                  'client_id': client_id,
                  'username': username}
 
     x_user_info = base64.b64encode(json.dumps(user_info).encode("utf-8"))
-
-    user = django_user_model.objects.create_superuser(
-        user_id, username, password,
-        **user_const)
 
     u = User(user_info=x_user_info,
               user=user)
@@ -223,3 +228,16 @@ def setup_data(db, django_user_model):
                "ds2": ds2}
 
     return objects
+
+
+def setup_account_profile_mapping(mapping):
+    for user, org, role in mapping:
+        ap, created = AccountProfile.objects.get_or_create(
+            user=user
+        )
+
+        apo = AccountProfileOrganization.objects.create(
+            accountprofile=ap,
+            organization=org,
+            role=role
+        )

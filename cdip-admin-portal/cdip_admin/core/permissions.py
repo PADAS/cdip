@@ -98,7 +98,7 @@ class IsOrganizationMember(permissions.BasePermission):
     def get_organizations_for_user(user, admin_only):
         organizations = []
         try:
-            account_profile_id = AccountProfile.objects.only('id').get(user_id=user.username).id
+            account_profile_id = AccountProfile.objects.only('id').get(user__id=user.id).id
         except AccountProfile.DoesNotExist:
             return organizations
         if admin_only:

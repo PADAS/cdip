@@ -31,7 +31,7 @@ class SimpleUserInfoBackend(ModelBackend):
             client_id = user_info.get('client_id') if user_info else None
             if email:
                 user, created = UserModel.objects.get_or_create(email=email,
-                                                       defaults={'username': username})
+                                                                defaults={'username': username})
 
 
             if client_id:
