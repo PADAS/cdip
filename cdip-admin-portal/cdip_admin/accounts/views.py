@@ -20,9 +20,6 @@ KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 logger = logging.getLogger(__name__)
 
-ProfileFormSet = modelformset_factory(AccountProfileOrganization,
-                                      fields=('organization', 'role'), extra=1)
-
 
 def get_accounts_in_user_organization(user):
     """
