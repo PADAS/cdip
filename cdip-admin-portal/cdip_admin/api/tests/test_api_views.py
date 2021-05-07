@@ -2,17 +2,15 @@ import pytest
 from django.urls import reverse
 from rest_framework.utils import json
 
-from accounts.models import AccountProfileOrganization, AccountProfile
 from clients.models import ClientProfile
 from conftest import setup_account_profile_mapping
-from core.enums import DjangoGroups, RoleChoices
+from core.enums import RoleChoices
 
 pytestmark = pytest.mark.django_db
-from unittest.mock import patch
 
-from integrations.models import InboundIntegrationType, DeviceGroup, \
-    OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
-    Organization, Device, DeviceState
+from integrations.models import DeviceGroup, \
+    OutboundIntegrationConfiguration, InboundIntegrationConfiguration, \
+    Organization, Device
 
 
 def test_get_integration_type_list(client, global_admin_user, setup_data):

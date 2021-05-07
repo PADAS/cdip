@@ -3,7 +3,7 @@ import uuid
 from typing import NamedTuple, Any
 
 import pytest
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 
 from accounts.models import AccountProfile, AccountProfileOrganization
@@ -13,12 +13,7 @@ from integrations.models import InboundIntegrationType, OutboundIntegrationType,
 from organizations.models import Organization
 
 
-class User(NamedTuple):
-    user: Any = None
-    user_info: bytes = None
-
-
-class User(NamedTuple):
+class RemoteUser(NamedTuple):
     user: Any = None
     user_info: bytes = None
 
@@ -48,8 +43,8 @@ def global_admin_user(db, django_user_model):
     user.groups.add(group)
     user.save()
 
-    u = User(user_info=x_user_info,
-             user=user)
+    u = RemoteUser(user_info=x_user_info,
+                   user=user)
 
     return u
 
@@ -80,8 +75,8 @@ def organization_member_user(db, django_user_model):
     user.groups.add(group)
     user.save()
 
-    u = User(user_info=x_user_info,
-             user=user)
+    u = RemoteUser(user_info=x_user_info,
+                   user=user)
 
     return u
 
@@ -110,8 +105,8 @@ def client_user(db, django_user_model):
 
     x_user_info = base64.b64encode(json.dumps(user_info).encode("utf-8"))
 
-    u = User(user_info=x_user_info,
-              user=user)
+    u = RemoteUser(user_info=x_user_info,
+                   user=user)
 
     return u
 
@@ -211,6 +206,9 @@ def setup_data(db, django_user_model):
         device=d2,
     )
 
+    u1 = User.objects.create(username="user1", email="user1@sintegrate.org")
+    u2 = User.objects.create(username="user2", email="user2@sintegrate.org")
+
     objects = {"org1": org1,
                "org2": org2,
                "iit1": iit1,
@@ -225,7 +223,9 @@ def setup_data(db, django_user_model):
                "d1": d1,
                "d2": d2,
                "ds1": ds1,
-               "ds2": ds2}
+               "ds2": ds2,
+               "u1": u1,
+               "u2": u2}
 
     return objects
 
