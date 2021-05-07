@@ -137,6 +137,13 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
     def post(self, request, *args, **kwargs):
         user_id = self.kwargs.get("user_id")
         user = get_object_or_404(User, id=user_id)
+
+        # check that requesting user has permission to update this account
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            accounts = get_accounts_in_user_organization(request.user)
+            if user.id not in accounts:
+                raise PermissionDenied
+
         account_form = AccountUpdateForm(request.POST)
 
         if account_form.is_valid():
@@ -175,6 +182,13 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
     def post(self, request, *args, **kwargs):
         org_id = self.kwargs.get("org_id")
         user_id = self.kwargs.get("user_id")
+        org = Organization.objects.get(id=org_id)
+
+        # Only allow organization owners to change roles
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, org):
+                raise PermissionDenied
+
         ap = AccountProfile.objects.get(user_id=user_id)
         acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
         aco = acos.get(organization_id=org_id)
