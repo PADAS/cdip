@@ -1,3 +1,5 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Submit
 from django import forms
 
 from core.enums import RoleChoices
@@ -12,6 +14,9 @@ class AccountForm(forms.Form):
     lastName = forms.CharField(max_length=200, label='Last Name', required=False)
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Submit', css_class='btn-primary'))
+
 
 class AccountUpdateForm(forms.Form):
     all_permissions = Task._meta.permissions
@@ -19,10 +24,16 @@ class AccountUpdateForm(forms.Form):
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
 
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
+
 
 class AccountProfileForm(forms.Form):
     role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
+
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
 
 
 
