@@ -73,4 +73,8 @@ urlpatterns = [
          BridgeIntegrationUpdateView.as_view(),
          name="bridge_integration_update"),
 
+    path('integrations/bridge/<uuid:id>/generateconsumer',
+         views.generate_consumer,
+         name="bridge_generate_consumer")
+
 ]

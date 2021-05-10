@@ -84,6 +84,8 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
+KONG_PROXY_URL = 'http://kong-proxy.kong.svc.cluster.local:8001/consumers'
+
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (

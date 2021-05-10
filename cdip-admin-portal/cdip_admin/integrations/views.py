@@ -1,3 +1,6 @@
+import base64
+
+import requests as requests
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
@@ -10,6 +13,8 @@ from django.urls import reverse
 import logging
 
 import random
+
+from rest_framework.utils import json
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -24,6 +29,8 @@ from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundInte
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
+
+KONG_PROXY_URL = settings.KONG_PROXY_URL
 
 def random_string(n=4):
     return ''.join(random.sample([chr(x) for x in range(97, 97+26)], n))
@@ -454,11 +461,13 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, ListView):
         else:
             return qs
 
+
 @permission_required('integrations.view_bridgeintegration', raise_exception=True)
 def bridge_integration_view(request, module_id):
     bridge = get_object_or_404(BridgeIntegration, pk=module_id)
     return render(request, "integrations/bridge_integration_view.html",
                   {"module": bridge})
+
 
 class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     template_name = 'integrations/bridge_integration_add.html'
@@ -505,4 +514,76 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('bridge_integration_view',
                        kwargs={'module_id': self.kwargs.get("id")})
+
+
+class ConsumerCreationError(Exception):
+    """Raised when consumer fails to create"""
+    def __init__(self, message="Failed to Create API Consumer"):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f'{self.message}'
+
+
+def generate_consumer(request, id):
+    bridge = get_object_or_404(BridgeIntegration, pk=id)
+    url = "http://kong-proxy-127.0.0.1.nip.io/consumers"
+    keys_route = "key-auth"
+    test_url = KONG_PROXY_URL
+    bridge_id = str(bridge.id)
+
+    if bridge.consumer_id:
+        # consumer has already been generated, lets get it
+        get_url = f'{url}/{bridge.consumer_id}'
+        response = requests.get(get_url)
+        consumer = response.json()
+        custom_id = consumer['custom_id']
+        consumer_id = consumer['id']
+        json_blob = custom_id.encode('utf-8')
+        json_blob = base64.b64decode(json_blob)
+        json_blob = json_blob.decode('utf-8')
+        json_blob = json.loads(json_blob)
+        integration_ids = json_blob['integration_ids']
+
+        # check consumer is valid for this integration
+        if bridge_id not in integration_ids:
+            raise PermissionDenied
+
+        api_key_url = f'{url}/{consumer_id}/{keys_route}'
+        response = requests.get(api_key_url)
+        api_keys = response.json()['data']
+
+
+    else:
+        json_blob = {"integration_ids": [bridge_id]}
+        json_blob = json.dumps(json_blob)
+        json_blob = json_blob.encode('utf-8')
+        custom_id = base64.b64encode(json_blob)
+
+        post_data = {'username': bridge.name,
+                     'custom_id': custom_id}
+
+        response = requests.post(url, data=post_data)
+
+        if not response.ok:
+            raise ConsumerCreationError
+
+        content = json.loads(response.content)
+        consumer_id = content["id"]
+
+        api_key_url = f'{url}/{consumer_id}/{keys_route}'
+
+        response = requests.post(api_key_url)
+
+        if not response.ok:
+            raise ConsumerCreationError
+            # TODO: delete consumer if api key creation fails?
+
+        bridge.consumer_id = consumer_id
+        bridge.save()
+
+    return render(request, "integrations/bridge_generate_consumer.html",
+                  {"module": bridge,
+                   "api_keys": api_keys})
 
