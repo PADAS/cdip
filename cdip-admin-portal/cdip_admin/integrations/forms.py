@@ -191,6 +191,7 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
         model = OutboundIntegrationType
         exclude = ['id']
 
+
 class BridgeIntegrationForm(forms.ModelForm):
 
     class Meta:
@@ -215,3 +216,13 @@ class BridgeIntegrationForm(forms.ModelForm):
     helper = FormHelper()
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
     helper.form_method = 'POST'
+
+
+class KeyAuthForm(forms.Form):
+    widgets = {
+        'additional': FormattedJsonFieldWidget(),
+        'state': FormattedJsonFieldWidget(),
+    }
+
+    # helper = FormHelper()
+    # helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
