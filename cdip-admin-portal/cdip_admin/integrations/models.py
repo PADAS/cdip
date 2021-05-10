@@ -108,6 +108,7 @@ class BridgeIntegration(TimestampedModel):
     state = models.JSONField(blank=True, null=True)
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
+    consumer_id = models.CharField(max_length=200, blank=True)
 
     class Meta:
         ordering = ('name',)
