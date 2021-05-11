@@ -219,10 +219,5 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 
 class KeyAuthForm(forms.Form):
-    widgets = {
-        'additional': FormattedJsonFieldWidget(),
-        'state': FormattedJsonFieldWidget(),
-    }
+    key = forms.CharField(label="API Key", max_length=100, widget=PeekabooTextInput, required=False)
 
-    # helper = FormHelper()
-    # helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
