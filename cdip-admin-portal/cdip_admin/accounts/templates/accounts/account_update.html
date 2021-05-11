@@ -9,9 +9,7 @@
 
     <form action="{% url 'account_update' user_id %}" method="POST">
         {% csrf_token %}
-        {{ account_form|crispy }}
-        {{ profile_form|crispy }}
-        <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
+        {% crispy account_form %}
     </form>
 
 {% endblock %}

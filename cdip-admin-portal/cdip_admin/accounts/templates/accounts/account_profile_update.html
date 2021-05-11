@@ -6,11 +6,10 @@
 {% block title %}{% trans 'Update Account Profile' %}{% endblock %}
 
 {% block content %}
-
-    <form action="{% url 'account_profile_update' user_id %}" method="POST">
+    <h3>Organization: {{organization.name}} , User: {{ user.username }}</h3>
+    <form action="{% url 'account_profile_update' organization.id user.id %}" method="POST">
         {% csrf_token %}
-        {{ profile_form|crispy }}
-        <button type="submit"  class="btn btn-success">{% trans 'Submit' %}</button>
+        {% crispy profile_form %}
     </form>
 
 {% endblock %}

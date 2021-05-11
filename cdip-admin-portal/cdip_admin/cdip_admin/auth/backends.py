@@ -8,6 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class SimpleUserInfoBackend(ModelBackend):
     def authenticate(self, request, user_info=None, **kwargs):
         try:
@@ -20,17 +21,17 @@ class SimpleUserInfoBackend(ModelBackend):
                 else:
                     return None
 
-            username = user_info.get('username') if user_info else None
             email = user_info.get('email')
+            username = user_info.get('username') if user_info else None
 
             if not email or not '@' in email:
                 email = username if '@' in username else f'{username}@sintegrate.org'
 
 
             client_id = user_info.get('client_id') if user_info else None
-            if username:
-                user, created = UserModel.objects.get_or_create(username=username,
-                                                       defaults={'email': email})
+            if email:
+                user, created = UserModel.objects.get_or_create(email=email,
+                                                                defaults={'username': username})
 
 
             if client_id:

@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.core.exceptions import PermissionDenied
@@ -40,13 +41,32 @@ class OrganizationUpdateView(PermissionRequiredMixin, UpdateView):
         return reverse('organizations_detail', kwargs={'module_id': self.kwargs.get("organization_id")})
 
 
-class OrganizationDetailView(PermissionRequiredMixin, DetailView):
+class OrganizationDetailListView(PermissionRequiredMixin, ListView):
     template_name = 'organizations/organizations_detail.html'
-    model = Organization
+    context_object_name = 'accounts'
     permission_required = 'organizations.view_organization'
 
-    def get_object(self):
-        return get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
+    def get_queryset(self):
+        org = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
+        aco = AccountProfileOrganization.objects.filter(organization__id=org.id)
+        apo_ids = aco.values_list('accountprofile_id', flat=True)
+        ap = AccountProfile.objects.filter(id__in=apo_ids)
+        uids = ap.values_list('user_id', flat=True)
+        users = User.objects.filter(id__in=uids)
+        accounts = []
+        for user in users:
+            role = aco.get(accountprofile_id=ap.get(user_id=user.id).id).role
+            accounts.append((user, role))
+        return accounts
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(*args, **kwargs)
+        org = get_object_or_404(Organization, pk=self.kwargs.get("module_id"))
+        is_owner = IsGlobalAdmin.has_permission(None, self.request, None) or \
+                     IsOrganizationMember.is_object_owner(self.request.user, org)
+        context['organization'] = org
+        context['is_owner'] = is_owner
+        return context
 
 
 class OrganizationsListView(LoginRequiredMixin, ListView):
