@@ -1,21 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Account: {{account.lastName}}{% endblock %}
+{% block title %}Account: {{user.last_name}}{% endblock %}
 
 {% block content %}
 
-    <h3>{{account.lastName}}, {{account.firstName}}</h3>
-    <h3>{{account.username}}</h3>
-    <p>{{account.email}}</p>
+    <h3>{{user.last_name}}, {{user.first_name}}</h3>
+    <h3>{{user.username}}</h3>
+    <p>{{user.email}}</p>
     {% if profile %}
         {% for account_profile in account_profiles %}
             <li>{{ account_profile.organization }} : {{ account_profile.role }}</li>
         {% endfor %}
-        <a class="btn btn-primary" href="{% url 'account_profile_update' account.id %}" role="button">Update Profile</a>
-    {% else %}
-        <a class="btn btn-primary" href="{% url 'account_profile_add' account.id %}" role="button">Add Profile</a>
     {% endif %}
-    <a class="btn btn-primary" href="{% url 'account_update' account.id %}" role="button">Update Account</a>
+    <a class="btn btn-primary" href="{% url 'account_update' user.id %}" role="button">Update Account</a>
 
 
 {% endblock %}

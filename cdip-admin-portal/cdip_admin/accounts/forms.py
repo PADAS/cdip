@@ -1,14 +1,21 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Submit
 from django import forms
+
+from core.enums import RoleChoices
 from core.models import Task
 from django.forms.models import BaseModelFormSet
 
 
 class AccountForm(forms.Form):
-    firstName = forms.CharField(max_length=200, label='First Name', required=True)
-    lastName = forms.CharField(max_length=200, label='Last Name', required=True)
-    username = forms.CharField(max_length=200, label='User Name', required=True)
     email = forms.EmailField(max_length=200, label='Email', required=True)
-    enabled = forms.CharField(max_length=200, initial='true', widget=forms.HiddenInput)
+    role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
+    firstName = forms.CharField(max_length=200, label='First Name', required=False)
+    lastName = forms.CharField(max_length=200, label='Last Name', required=False)
+    organization = forms.CharField(widget=forms.HiddenInput, required=True)
+
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Submit', css_class='btn-primary'))
 
 
 class AccountUpdateForm(forms.Form):
@@ -16,15 +23,17 @@ class AccountUpdateForm(forms.Form):
     firstName = forms.CharField(max_length=200, label='First Name', required=True)
     lastName = forms.CharField(max_length=200, label='Last Name', required=True)
     username = forms.CharField(max_length=200, label='User Name', required=True)
-    email = forms.EmailField(max_length=200, label='Email', required=True)
-    enabled = forms.CharField(max_length=200, widget=forms.HiddenInput)
+
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
 
 
-class AccountRoleForm(forms.Form):
-    user_id = forms.CharField(widget=forms.HiddenInput)
-    all_permissions = Task._meta.permissions
-    permissions = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple, label='Role',
-                                            choices=all_permissions, required=True)
+class AccountProfileForm(forms.Form):
+    role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
+    organization = forms.CharField(widget=forms.HiddenInput, required=True)
+
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
 
 
 
