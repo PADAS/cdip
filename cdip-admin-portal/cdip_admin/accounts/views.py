@@ -6,53 +6,46 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation, PermissionDenied
 from django.forms import modelformset_factory
 from django.views.generic import ListView, FormView, UpdateView
+from django.contrib.auth.models import User, Group
 
 from cdip_admin import settings
+from core.enums import RoleChoices, DjangoGroups
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
-from .forms import AccountForm, AccountUpdateForm, AccountRoleForm
-from .utils import get_accounts, get_account, add_account, update_account, get_account_roles, add_account_roles, \
-    get_client_roles
+from .forms import AccountForm, AccountUpdateForm, AccountProfileForm
 from .models import AccountProfile, AccountProfileOrganization
+from .utils import add_account
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 logger = logging.getLogger(__name__)
 
-ProfileFormSet = modelformset_factory(AccountProfileOrganization,
-                                      fields=('organization', 'role'), extra=1)
+
+def get_accounts_in_user_organization(user):
+    """
+    Based on a given user, return all user accounts that are members of the same organizations
+    regardless of role
+    """
+    user_orgs = IsOrganizationMember.get_organizations_for_user(user, admin_only=False)
+    aco = AccountProfileOrganization.objects.filter(organization__name__in=user_orgs)
+    apo_ids = aco.values_list('accountprofile_id', flat=True)
+    ap = AccountProfile.objects.filter(id__in=apo_ids)
+    accounts = ap.values_list('user_id', flat=True)
+    return accounts
 
 
 class AccountsListView(LoginRequiredMixin, ListView):
     template_name = 'accounts/account_list.html'
-    queryset = accounts = get_accounts()
+    queryset = User.objects.filter(email__contains='@').order_by('last_name')
     context_object_name = 'accounts'
     logger.info('Getting account list')
 
     def get_queryset(self):
-        qs = super(AccountsListView, self).get_queryset()
+        qs = super().get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            account_ids = []
-            for user_profile in qs:
-                try:
-                    account_profile = AccountProfile.objects.get(user_id=user_profile['id'])
-                except AccountProfile.DoesNotExist:
-                    account_profile = None
-                if account_profile is not None:
-                    account_ids.append(account_profile.id)
-
-            apo_qs = AccountProfileOrganization.objects.all().filter(accountprofile__id__in=account_ids)
-            org_qs = apo_qs.values_list('organization', flat=True).distinct()
-            org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, self.request.user, 'organization__name')
-            apo_qs = apo_qs.filter(organization__in=org_qs)
-            ap_qs = AccountProfile.objects.filter(id__in=apo_qs.values_list('accountprofile_id', flat=True))
-            filtered_qs = []
-
-            for user_profile in qs:
-                pass
-                if ap_qs.filter(user_id=user_profile['id']).exists():
-                    filtered_qs.append(user_profile)
-            return filtered_qs
+            accounts = get_accounts_in_user_organization(self.request.user)
+            qs = qs.filter(id__in=accounts)
+            return qs
         else:
             return qs
 
@@ -60,15 +53,22 @@ class AccountsListView(LoginRequiredMixin, ListView):
 @permission_required('accounts.view_accountprofile')
 def account_detail(request, user_id):
     logger.info('Getting account detail')
-    account = get_account(user_id)
-    account_profiles = None
+    user = User.objects.get(id=user_id)
+
+    # check that requesting user has permission to view this account
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        accounts = get_accounts_in_user_organization(request.user)
+        if user.id not in accounts:
+            raise PermissionDenied
+
     try:
         profile = AccountProfile.objects.get(user_id=user_id)
         account_profiles = AccountProfileOrganization.objects.filter(accountprofile_id=profile.id)
     except AccountProfile.DoesNotExist:
         profile = None
+        account_profiles = None
 
-    return render(request, "accounts/account_detail.html", {"account": account, "profile": profile,
+    return render(request, "accounts/account_detail.html", {"user": user, "profile": profile,
                                                             "account_profiles": account_profiles})
 
 
@@ -79,117 +79,145 @@ class AccountsAddView(LoginRequiredMixin, FormView):
         form = AccountForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            response = add_account(data)
 
-            if response:
-                return redirect('account_list')
-            else:
-                raise SuspiciousOperation
+            email = data["email"]
+            first_name = data["firstName"]
+            last_name = data["firstName"]
+            org_id = data["organization"]
+            role = data["role"]
+            username = email
+
+            try:
+                user = User.objects.get(email=email)
+                if not user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists():
+                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                    user.groups.add(group_id)
+
+            except User.DoesNotExist:
+                # create keycloak user
+                response = add_account(data)
+                # create django user
+                if response:
+                    user = User.objects.create(email=email, username=username, first_name=first_name, last_name=last_name)
+                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                    user.groups.add(group_id)
+                else:
+                    raise SuspiciousOperation
+
+            account_profile, created = AccountProfile.objects.get_or_create(user_id=user.id,
+                                                                            defaults={'user_username': user.username})
+            apo, created = AccountProfileOrganization.objects.get_or_create(accountprofile_id=account_profile.id,
+                                                                            organization_id=org_id,
+                                                                            role=role)
+            return redirect('organizations_detail', module_id=org_id)
+        else:
+            raise SuspiciousOperation
 
     def get(self, request, *args, **kwargs):
         form = AccountForm()
+        org_id = self.kwargs.get("org_id")
+        org = Organization.objects.get(id=org_id)
+        form.initial["organization"] = org_id
+        form.initial["role"] = RoleChoices.VIEWER
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            # can only add if you are an admin of at least one organization
-            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
-                                                                 self.request.user, 'name', True):
+            # can only add if you are an admin of this organization
+            if not IsOrganizationMember.is_object_owner(request.user, org):
                 raise PermissionDenied
-        return render(request, "accounts/account_add.html", {'form': form})
+        return render(request, "accounts/account_add.html", {'form': form, 'org_id': org_id})
 
 
 class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'organizations/organizations_update.html'
+    template_name = 'accounts/account_update.html'
     form_class = AccountUpdateForm
     permission_required = 'accounts.change_accountprofile'
 
     def post(self, request, *args, **kwargs):
-        account_form = AccountUpdateForm(request.POST)
         user_id = self.kwargs.get("user_id")
+        user = get_object_or_404(User, id=user_id)
+
+        # check that requesting user has permission to update this account
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            accounts = get_accounts_in_user_organization(request.user)
+            if user.id not in accounts:
+                raise PermissionDenied
+
+        account_form = AccountUpdateForm(request.POST)
+
         if account_form.is_valid():
             data = account_form.cleaned_data
-            response = update_account(data, user_id)
-
-            if response:
-                return redirect('account_detail', user_id=user_id)
-            else:
-                raise SuspiciousOperation
+            user.first_name = data["firstName"]
+            user.last_name = data["lastName"]
+            user.username = data["username"]
+            user.save()
+            return redirect('account_detail', user_id=user_id)
+        else:
+            raise SuspiciousOperation
 
     def get(self, request, *args, **kwargs):
         account_form = AccountUpdateForm()
         user_id = self.kwargs.get("user_id")
-        account = get_account(user_id)
+        user = get_object_or_404(User, id=user_id)
 
-        account_form.initial['firstName'] = account["firstName"]
-        account_form.initial['lastName'] = account["lastName"]
-        account_form.initial['username'] = account["username"]
-        account_form.initial['email'] = account["email"]
-        account_form.initial['enabled'] = account["enabled"]
+        # check that requesting user has permission to update this account
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            accounts = get_accounts_in_user_organization(request.user)
+            if user.id not in accounts:
+                raise PermissionDenied
+
+        account_form.initial['firstName'] = user.first_name
+        account_form.initial['lastName'] = user.last_name
+        account_form.initial['username'] = user.username
 
         return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
 
 
-@permission_required('accounts.add_accountprofile')
-def account_profile_add(request, user_id):
-    if request.method == 'POST':
-        profile_form = ProfileFormSet(request.POST)
+class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = 'accounts/account_profile_update.html'
+    form_class = AccountProfileForm
+    permission_required = 'accounts.change_accountprofile'
+
+    def post(self, request, *args, **kwargs):
+        org_id = self.kwargs.get("org_id")
+        user_id = self.kwargs.get("user_id")
+        org = Organization.objects.get(id=org_id)
+
+        # Only allow organization owners to change roles
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, org):
+                raise PermissionDenied
+
+        ap = AccountProfile.objects.get(user_id=user_id)
+        acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
+        aco = acos.get(organization_id=org_id)
+        profile_form = AccountProfileForm(request.POST)
+
         if profile_form.is_valid():
-            instances = profile_form.save(commit=False)
-            profile = AccountProfile.objects.create(user_id=user_id)
-            for instance in instances:
-                instance.accountprofile_id = profile.id
-                instance.save()
-            return redirect('account_detail', user_id=user_id)
+            data = profile_form.cleaned_data
+            aco.role = data["role"]
+            aco.save()
+            return redirect('organizations_detail', module_id=org_id)
         else:
-            return render(request, "accounts/account_profile_add.html", {"user_id": user_id,
-                                                                         "profile_form": profile_form})
+            raise SuspiciousOperation
 
-    else:
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.none())
-        return render(request, "accounts/account_profile_add.html", {"user_id": user_id, "profile_form": profile_form})
+    def get(self, request, *args, **kwargs):
 
+        profile_form = AccountProfileForm()
+        org_id = self.kwargs.get("org_id")
+        user_id = self.kwargs.get("user_id")
+        user = get_object_or_404(User, id=user_id)
+        org = Organization.objects.get(id=org_id)
+        ap = AccountProfile.objects.get(user_id=user_id)
+        acos = AccountProfileOrganization.objects.filter(accountprofile_id=ap.id)
+        aco = acos.get(organization_id=org_id)
 
-@permission_required('accounts.change_accountprofile')
-def account_profile_update(request, user_id):
-    profile = get_object_or_404(AccountProfile, user_id=user_id)
+        # Only allow organization owners to change roles
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, org):
+                raise PermissionDenied
 
-    if request.method == 'POST':
-        profile_form = ProfileFormSet(request.POST)
-        if profile_form.is_valid():
-            instances = profile_form.save(commit=False)
-            for instance in instances:
-                instance.accountprofile_id = profile.id
-                instance.save()
-            profile_form.save()
-            return redirect('account_detail', user_id=user_id)
-        else:
-            return render(request, "accounts/account_profile_update.html", {"user_id": user_id,
-                                                                            "profile_form": profile_form})
+        profile_form.initial['role'] = aco.role
+        profile_form.initial['organization'] = aco.organization.id
 
-    else:
-        qs = Organization.objects.all()
-        profile_form = ProfileFormSet(queryset=AccountProfileOrganization.objects.filter(accountprofile_id=profile.id))
-        if not IsGlobalAdmin.has_permission(None, request, None):
-            qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, 'name', True)
-            for form in profile_form.forms:
-                org_bound_field = form['organization']
-                org_field_val = org_bound_field.form.initial.get(org_bound_field.name, '')
-                org_choice_field = form.fields['organization']
-                role_choice_field = form.fields['role']
-                # if form is not an empty form
-                if org_field_val:
-                    org_name = Organization.objects.get(id=org_field_val)
-                    # disable form fields if user is not admin of the set organization
-                    if org_name not in qs:
-                        org_choice_field.widget.attrs['readonly'] = True
-                        role_choice_field.widget.attrs['readonly'] = True
-                        # org_choice_field.widget.attrs['disabled'] = True
-                        # role_choice_field.widget.attrs['disabled'] = True
-                        # org_choice_field.widget.attrs['required'] = False
-                        # role_choice_field.widget.attrs['required'] = False
-                    # otherwise restrict organization options
-                    else:
-                        org_choice_field.queryset = qs
-                # restrict the organizations options on empty form
-                else:
-                    org_choice_field.queryset = qs
-        return render(request, "accounts/account_profile_update.html",
-                      {"profile_form": profile_form, "user_id": user_id})
+        return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form,
+                                                                        "user": user,
+                                                                        "organization": org})

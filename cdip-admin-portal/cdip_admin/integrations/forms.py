@@ -1,23 +1,13 @@
-from django import forms
-
-from accounts.utils import get_user_profile
-from core.permissions import IsGlobalAdmin, IsOrganizationMember
-from organizations.models import Organization
-from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
-    InboundIntegrationType, DeviceGroup, Device, BridgeIntegration
-from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit, Layout, Field
-from crispy_forms.bootstrap import (
-    PrependedText, PrependedAppendedText, FormActions)
-
+from crispy_forms.layout import Submit
 from django import forms
 
-from accounts.utils import get_user_profile
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
+from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput
 from organizations.models import Organization
+from .models import BridgeIntegration
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
-    InboundIntegrationType, DeviceGroup, Device
+    InboundIntegrationType, DeviceGroup
 
 
 class DeviceGroupForm(forms.ModelForm):
