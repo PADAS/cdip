@@ -3,12 +3,12 @@ $(document).ready(function() {
         event.preventDefault();
         if($('#show_hide_password input').attr("type") == "text"){
             $('#show_hide_password input').attr('type', 'password');
-            $('#show_hide_password i').addClass( "fa-eye-slash" );
-            $('#show_hide_password i').removeClass( "fa-eye" );
+            $('.peakaboo').addClass( "fa-eye-slash" );
+            $('.peakaboo').removeClass( "fa-eye" );
         }else if($('#show_hide_password input').attr("type") == "password"){
             $('#show_hide_password input').attr('type', 'text');
-            $('#show_hide_password i').removeClass( "fa-eye-slash" );
-            $('#show_hide_password i').addClass( "fa-eye" );
+            $('.peakaboo').removeClass( "fa-eye-slash" );
+            $('.peakaboo').addClass( "fa-eye" );
         }
     });
 });

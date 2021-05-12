@@ -42,4 +42,5 @@ class PeekabooTextInput(forms.widgets.TextInput):
         css = {
             'all': ('widgets/peekaboo/peekaboo.css',)
         }
-        js = ('widgets/peekaboo/peekaboo.js', 'https://kit.fontawesome.com/0f5032f73b.js')
+        js = ('widgets/peekaboo/peekaboo.js', 'https://kit.fontawesome.com/0f5032f73b.js',
+              'widgets/copy_to_clipboard/copy_to_clipboard.js')
