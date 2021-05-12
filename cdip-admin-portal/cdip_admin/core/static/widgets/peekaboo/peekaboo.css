@@ -3,12 +3,14 @@
   display: inline;
 }
 
-#copy-to-clip{
-  font-size: 1.5rem;
+i{
+  font-size: 1rem;
   margin-left: .5rem;
 }
 
-#copy-to-clip:hover{
+.fas.copy-to-clip { display: none; }
+
+.copy-to-clip:hover{
   color: #007bff;
   cursor: pointer;
 }
