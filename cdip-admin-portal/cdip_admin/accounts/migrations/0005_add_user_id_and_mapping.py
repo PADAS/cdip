@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
             preserve_default=False,
         ),
         migrations.RunSQL(
-            "updat"
+            "update accounts_accountprofile set user_id = au.id from auth_user au where user_username = au.username"
         ),
         migrations.RunSQL('SET CONSTRAINTS ALL IMMEDIATE', reverse_sql='SET CONSTRAINTS ALL DEFERRED'),
     ]
