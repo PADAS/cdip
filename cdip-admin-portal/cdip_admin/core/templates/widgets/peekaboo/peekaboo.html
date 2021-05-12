@@ -3,8 +3,7 @@
         <input type="{{ widget.type }}" name="{{ widget.name }}"{% if widget.value != None %}
                value="{{ widget.value|stringformat:'s' }}"{% endif %}
                {% include "django/forms/widgets/attrs.html" %}>
-        <div class="input-group-addon">
-            <a href=""><i class="fa fa-eye-slash peakaboo" aria-hidden="true"></i></a>
-          </div>
+        <a href=""><i class="fa fa-eye-slash peakaboo" aria-hidden="true"></i></a>
+        <i title="Copy To Clipboard" class="fas fa-copy copy-to-clip" onclick="copyToClipboard(event)"></i>
     </div>
 </div>
