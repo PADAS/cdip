@@ -12,14 +12,18 @@ class Migration(migrations.Migration):
         ('accounts', '0004_rename_user_id_to_user_username'),
     ]
 
+    # For reasons, we need to let UserId be null.
+    # It will be corrected in an immediate subsequent migration (plus some manual clean up).
     operations = [
+        migrations.RunSQL('SET CONSTRAINTS ALL DEFERRED', reverse_sql='SET CONSTRAINTS ALL IMMEDIATE'),
         migrations.AddField(
             model_name='accountprofile',
             name='user',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to='auth.user'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='auth.user'),
             preserve_default=False,
         ),
         migrations.RunSQL(
             "update accounts_accountprofile set user_id = au.id from auth_user au where user_username = au.username"
-        )
+        ),
+        migrations.RunSQL('SET CONSTRAINTS ALL IMMEDIATE', reverse_sql='SET CONSTRAINTS ALL DEFERRED'),
     ]
