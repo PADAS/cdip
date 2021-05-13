@@ -6,7 +6,8 @@ from django.core.exceptions import PermissionDenied
 from rest_framework.utils import json
 
 KONG_PROXY_URL = settings.KONG_PROXY_URL
-KEYS_ROUTE = "key-auth"
+CONSUMERS_PATH = "/consumers"
+KEYS_PATH = "/key-auth"
 
 
 class ConsumerCreationError(Exception):
@@ -28,7 +29,9 @@ def create_api_consumer(integration):
     post_data = {'username': integration.name,
                  'custom_id': custom_id}
 
-    response = requests.post(KONG_PROXY_URL, data=post_data)
+    post_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}'
+
+    response = requests.post(post_url, data=post_data)
 
     if not response.ok:
         raise ConsumerCreationError
@@ -44,7 +47,7 @@ def create_api_consumer(integration):
 
 def create_api_key(consumer_id):
 
-    api_key_url = f'{KONG_PROXY_URL}/{consumer_id}/{KEYS_ROUTE}'
+    api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{consumer_id}{KEYS_PATH}'
 
     response = requests.post(api_key_url)
 
@@ -58,10 +61,8 @@ def create_api_key(consumer_id):
 
 
 def get_api_key(integration):
-    url = KONG_PROXY_URL
-
     # permission checking
-    get_url = f'{url}/{integration.consumer_id}'
+    get_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{integration.consumer_id}'
     response = requests.get(get_url)
     consumer = response.json()
     custom_id = consumer['custom_id']
@@ -77,7 +78,7 @@ def get_api_key(integration):
         raise PermissionDenied
 
     # obtain key if permission checks pass
-    api_key_url = f'{url}/{consumer_id}/{KEYS_ROUTE}'
+    api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{consumer_id}{KEYS_PATH}'
     response = requests.get(api_key_url)
     api_keys = response.json()['data']
 
