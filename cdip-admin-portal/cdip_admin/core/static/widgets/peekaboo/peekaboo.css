@@ -1,3 +1,16 @@
-a, a:hover{
-  color:#333
+#id_key.peekabootextinput{
+  width: 20rem;
+  display: inline;
+}
+
+i{
+  font-size: 1rem;
+  margin-left: .5rem;
+}
+
+.fas.copy-to-clip { display: none; }
+
+.copy-to-clip:hover{
+  color: #007bff;
+  cursor: pointer;
 }
