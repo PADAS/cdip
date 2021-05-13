@@ -1,29 +1,31 @@
+import logging
+import random
+
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from django.urls import reverse
-
-import logging
-
-import random
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
-from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
-    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm
 from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
+from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
+    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm, \
+    KeyAuthForm
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup, BridgeIntegration
 from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundIntegrationConfigurationTable, \
     OutboundIntegrationConfigurationTable, BridgeIntegrationTable
+from .utils import get_api_key, create_api_key, create_api_consumer
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
+
 
 def random_string(n=4):
     return ''.join(random.sample([chr(x) for x in range(97, 97+26)], n))
@@ -454,11 +456,28 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, ListView):
         else:
             return qs
 
+
+
+
 @permission_required('integrations.view_bridgeintegration', raise_exception=True)
 def bridge_integration_view(request, module_id):
     bridge = get_object_or_404(BridgeIntegration, pk=module_id)
+    form = KeyAuthForm()
+
+    if bridge.consumer_id:
+        key = get_api_key(bridge)
+        if key:
+            form.fields['key'].initial = key
+    else:
+        consumer_id = create_api_consumer(bridge)
+        key = create_api_key(consumer_id)
+        if key:
+            form.fields['key'].initial = key
+
     return render(request, "integrations/bridge_integration_view.html",
-                  {"module": bridge})
+                  {"module": bridge,
+                   "form": form})
+
 
 class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     template_name = 'integrations/bridge_integration_add.html'
@@ -505,4 +524,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('bridge_integration_view',
                        kwargs={'module_id': self.kwargs.get("id")})
+
+
 

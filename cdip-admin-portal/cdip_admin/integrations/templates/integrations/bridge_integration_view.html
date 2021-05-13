@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% load crispy_forms_tags %}
+
 {% block title %}Bridge: {{module.id}}{% endblock %}
 
 {% block content %}
@@ -16,7 +18,10 @@
 
     <p>Enabled: {{ module.enabled }}</p>
 
+    {% crispy form %}
+
     <a class="btn btn-primary" href="{% url 'bridge_integration_update' module.id %}" role="button">Update</a>
     <a class="btn btn-primary" href="{% url 'bridge_integration_list' %}" role="button">Back</a>
+
 
 {% endblock %}
