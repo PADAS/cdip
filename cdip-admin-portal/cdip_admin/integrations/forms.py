@@ -159,7 +159,6 @@ class InboundIntegrationTypeForm(forms.ModelForm):
 
 
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
-    # password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
 
     class Meta:
         model = OutboundIntegrationConfiguration
