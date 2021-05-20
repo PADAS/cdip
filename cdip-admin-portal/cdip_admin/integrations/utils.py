@@ -26,7 +26,7 @@ def create_api_consumer(integration):
     json_blob = json_blob.encode('utf-8')
     custom_id = base64.b64encode(json_blob)
 
-    post_data = {'username': integration.name,
+    post_data = {'username': f'integration:{integration.id}',
                  'custom_id': custom_id}
 
     post_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}'

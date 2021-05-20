@@ -14,7 +14,8 @@ from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
-from rest_framework.exceptions import APIException, status
+from rest_framework.exceptions import APIException, status, ValidationError
+from rest_framework.response import Response
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccount
 from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
@@ -196,7 +197,7 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
-class DeviceDetailsView(generics.RetrieveAPIView):
+class DeviceView(generics.RetrieveAPIView):
     """ Returns Detail of a Device """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
@@ -206,14 +207,47 @@ class DeviceDetailsView(generics.RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
-class DeviceListView(generics.ListAPIView):
+class DeviceListView(generics.ListCreateAPIView):
     """ Returns List of Devices """
-    serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
 
+    def perform_create(self, serializer):
+        logger.info('in perform_create, serializer.data: %s', serializer.validated_data)
+        super().perform_create(serializer)
+
+        logger.info('after save in perform_create, serializer.data: %s', serializer.data)
+
+        ibc = serializer.validated_data.get('inbound_configuration')
+        if ibc:
+            logger.info('Adding id %s to default device group for ibc: %s', serializer.data['id'], ibc.id)
+            ibc.default_devicegroup.devices.add(serializer.data['id'])
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        status_code = status.HTTP_201_CREATED
+        try:
+            serializer.is_valid(raise_exception=True)
+
+        except ValidationError:
+            # Trap a unique-together violation.
+            non_field_errors = serializer.errors.get('non_field_errors')
+            if non_field_errors and non_field_errors[0].code == 'unique':
+                status_code = status.HTTP_200_OK
+            else:
+                raise
+        else:
+            self.perform_create(serializer)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status_code, headers=headers)
+
+
+    serializer_class = DeviceSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    queryset = Device.objects.all()
     def get_queryset(self):
         user = self.request.user
-        queryset = Device.objects.all()
+        queryset = super().get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user,
                                                                      'inbound_configuration__owner__name')
@@ -221,6 +255,11 @@ class DeviceListView(generics.ListAPIView):
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        retval = super().post(request, *args, **kwargs)
+
+        return retval
 
 
 class BridgeIntegrationListView(generics.ListAPIView):

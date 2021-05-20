@@ -8,7 +8,6 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 # Register your models here.
 admin.site.register(InboundIntegrationType)
 admin.site.register(OutboundIntegrationType)
-admin.site.register(Device)
 @admin.register(DeviceState)
 class DeviceStateAdmin(admin.ModelAdmin):
     list_display = ('device', '_external_id', '_owner', 'created_at',)
@@ -27,9 +26,23 @@ class DeviceStateAdmin(admin.ModelAdmin):
     _owner.short_description = 'Owner'
 
 
+@admin.register(Device)
+class DeviceAdmin(admin.ModelAdmin):
+    list_display = ('external_id', '_owner', 'created_at',)
+    list_filter = ('inbound_configuration__name', 'inbound_configuration__owner',)
+    search_fields = ('external_id',)
+
+    date_hierarchy = 'created_at'
+
+    def _owner(self, obj):
+        return obj.inbound_configuration.owner
+
+    _owner.short_description = 'Owner'
+
+
 @admin.register(DeviceGroup)
 class DeviceGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', 'owner',)
+    list_display = ('name', 'owner', 'created_at')
     list_filter = ('owner',)
 
 
