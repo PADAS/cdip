@@ -6,12 +6,13 @@ logger = logging.getLogger(__name__)
 
 
 def post_device_information(state: dict, config: InboundIntegrationConfiguration):
-    logger.info('Post Device Information')
+    logger.info('Post Device Information', extra={'integration_id': config.id})
 
-    name = config.type.name + " - Default"
     if config.default_devicegroup:
         device_group = config.default_devicegroup
     else:
+
+        name = f'{config.name} - Default Group'
         device_group = DeviceGroup.objects.create(owner_id=config.owner.id, name=name)
         config.default_devicegroup = device_group
         config.save()
