@@ -12,7 +12,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 # Create your models here.
 class Organization(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200, verbose_name='Owner', unique=True)
+    name = models.CharField(max_length=200, verbose_name='Name', unique=True)
     description = models.TextField(blank=True)
 
     @property

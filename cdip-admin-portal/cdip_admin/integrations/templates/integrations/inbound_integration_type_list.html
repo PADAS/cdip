@@ -4,23 +4,39 @@
 
 {% block content %}
     <div class="row">
-        <div class="col-lg-9">
+        <div class="col-md-9">
             <h2>Inbound Integration Types</h2>
         </div>
-        <div class="col-lg-3">
+        <div class="col-md-3">
             <a class="btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
-               href="{% url 'inbound_integration_type_add' %}" role="button">+ Add</a>
+               href="{% url 'inbound_integration_type_add' %}" role="button">Add Type</a>
         </div>
     </div>
     <div class="row">
-        <ul>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Slug</th>
+              <th scope="col">Description</th>
+            </tr>
+          </thead>
+          <tbody>
             {% for integration in integrations %}
-                <li>
+              <tr>
+                  <td>
                     <a href="{% url 'inbound_integration_type_detail' integration.id %}">
                         {{ integration.name }}
                     </a>
-                </li>
+                  </td>
+                  <td>
+                        {{ integration.slug }}
+                  </td>
+                  <td>
+                        {{ integration.description }}
+                  </td>
+              </tr>
             {% endfor %}
-        </ul>
+
     </div>
 {% endblock %}

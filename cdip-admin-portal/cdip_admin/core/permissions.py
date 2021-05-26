@@ -13,12 +13,10 @@ logger = logging.getLogger(__name__)
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
 
+        # TODO: Change this to not rely on name string.
+        # Consider changing this to be driven by a single custom permission that is
+        # applied with Global Admin  group.
         val = request.user.groups.filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
-
-        if logger.isEnabledFor(logging.DEBUG):
-            group_names = ','.join([group.name for group in request.user.groups.all()])
-            logger.debug('IsGlobalAdmin=%s checked for user.username: %s, groups: %s', val, request.user, group_names)
-
         return val
 
     def has_object_permission(self, request, view, obj):
