@@ -7,10 +7,20 @@
 
 {% block content %}
     <h3>{{object.name}}</h3>
-    <p>{{object.owner.name}}</p>
-    <a class="btn btn-primary" href="{% url 'device_group_update' object.id %}" role="button">Update</a>
+    <p>Organization: {{object.owner.name}}</p>
+
+    <div class="row">
+        <div class="col-md-9">
+            <h2>Devices in Group</h2>
+        </div>
+        <div class="col-md-3">
+    <a class="btn btn-primary" href="{% url 'device_group_update' object.id %}" role="button">Edit Group</a>
     <a class="btn btn-primary" href="{% url 'device_group_management_update' object.id %}" role="button">Manage Devices</a>
     <a class="btn btn-primary" href="{% url 'device_group_list' %}" role="button">Back</a>
+        </div>
+    </div>
+
+
     {% render_table table %}
     <script type="text/javascript"
             id="row-click-handler"

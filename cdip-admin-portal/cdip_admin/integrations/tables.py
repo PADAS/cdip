@@ -20,32 +20,34 @@ class DeviceStateTable(tables.Table):
 class DeviceGroupTable(tables.Table):
     count = tables.Column(accessor="devices", verbose_name="Device Count")
     created = tables.Column(accessor="created_at", verbose_name="Created")
-
+    organization = tables.Column(accessor='owner__name', verbose_name='Organization')
     def render_count(self, value):
         return value.all().count()
 
     class Meta:
         model = DeviceGroup
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('name', 'owner__name')
+        fields = ('name',)
         row_attrs = {"device-group-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-group-table"}
-        sequence = ('name', 'owner__name', 'count', 'created')
+        sequence = ('name', 'organization', 'count', 'created')
         order_by = '-created'
+
 
 
 class DeviceTable(tables.Table):
     created = tables.Column(accessor="created_at", verbose_name="Created")
+    owner = tables.Column(accessor='inbound_configuration__owner__name', verbose_name='Organization')
+    integration_type = tables.Column(accessor='inbound_configuration__type__name', verbose_name='Integration Type')
 
     class Meta:
         model = Device
         template_name = "django_tables2/bootstrap4.html"
-        fields = ('external_id', 'inbound_configuration__owner__name',
-                  'inbound_configuration__type__name')
+        fields = ('external_id', 'owner', 'integration_type')
         row_attrs = {"device-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-table"}
-        sequence = ('external_id', 'inbound_configuration__owner__name',
-                  'inbound_configuration__type__name', 'created')
+        sequence = ('external_id', 'owner',
+                  'integration_type', 'created')
         order_by = '-created'
 
 
