@@ -9,16 +9,33 @@
             <h2>User Accounts</h2>
         </div>
     </div>
-    <div class="row">
-        <ul>
+
+
+<div class="row">
+
+    <div class="col-md-12">
+        <table class="table">
+            <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">email</th>
+            </tr>
+            </thead>
+            <tbody>
             {% for user in accounts %}
-                <li>
+            <tr>
+                <td>
                     <a href="{% url 'account_detail' user.id %}">
-                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }}
+                        {{ user.last_name }}, {{ user.first_name }}
                     </a>
-                </li>
+                </td>
+                <td>
+                    {{ user.email }}
+                </td>
+            </tr>
             {% endfor %}
-        </ul>
+        </table>
     </div>
+</div>
 
 {% endblock %}
