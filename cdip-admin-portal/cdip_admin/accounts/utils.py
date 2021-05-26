@@ -37,13 +37,15 @@ def add_account(user):
 
     response = requests.post(url=url, headers=headers, json=user)
 
-    if response.status_code == 201:
+    if response.ok == 201:
         logger.info(f'User created successfully')
-        return True
+    elif response.status_code == 409:
+        logger.info(f'Keycloak user {user["email"]} already exists.')
     else:
         logger.error(f'Error adding account: {response.status_code}], {response.text}')
         return False
 
+    return True
 
 
 

@@ -5,11 +5,13 @@
 {% block content %}
 
     <div class="row">
-        <div class="col-lg-9">
+        <div class="col-md-8">
             <h2>User Organizations</h2>
         </div>
+        <div class="col-md-4">
         <a class="btn btn-primary {% if not perms.organizations.add_organization %} disabled {% endif %}"
-           href="{% url 'organizations_add' %}" role="button">+ Add</a>
+           href="{% url 'organizations_add' %}" role="button">Add an Organization</a>
+        </div>
     </div>
     <div class="row">
         <ul>
