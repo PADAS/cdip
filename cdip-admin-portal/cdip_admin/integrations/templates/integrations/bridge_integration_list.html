@@ -8,21 +8,22 @@
 {% block content %}
 
     <div class="row">
-        <div class="col-lg-9">
+        <div class="col-md-9">
             <h2>Bridge Integrations</h2>
         </div>
 
+        <div class="col-md-3">
         <a class="btn btn-primary {% if not perms.integrations.add_bridgeintegration %} disabled {% endif %}"
-       href="{% url 'bridge_integration_add' %}" role="button">+ Add</a>
-
+       href="{% url 'bridge_integration_add' %}" role="button">Add Integration</a>
+        </div>
     </div>
     {% render_table table %}
-    <script type="text/javascript"
-            id="row-click-handler"
+    <script data-row-attribute="bridge-config-id"
             data-table-id="bridge-config-table"
-            data-row-attribute="bridge-config-id"
             data-url="{{ base_url }}"
-            src="{% static 'website/js/cdip.custom.js' %}">
+            id="row-click-handler"
+            src="{% static 'website/js/cdip.custom.js' %}"
+            type="text/javascript">
     </script>
 
 {% endblock %}

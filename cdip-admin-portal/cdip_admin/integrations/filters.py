@@ -74,7 +74,7 @@ class DeviceGroupFilter(django_filters.FilterSet):
         queryset=organization_filter,
         field_name='owner',
         to_field_name='name',
-        empty_label=_('Owners'),
+        empty_label=_('All Organizations'),
         distinct=True,
     )
 
