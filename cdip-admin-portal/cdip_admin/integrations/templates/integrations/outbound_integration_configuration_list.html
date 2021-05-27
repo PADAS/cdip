@@ -7,20 +7,23 @@
 
 {% block content %}
 
-    <div class="row">
-        <div class="col-lg-9">
-            <h2>Outbound Integration Configuration</h2>
-        </div>
-        <a class="btn btn-primary {% if not perms.integrations.add_outboundintegrationconfiguration %} disabled {% endif %}"
-               href="{% url 'outbound_integration_configuration_add' %}" role="button">+ Add</a>
+<div class="row">
+    <div class="col-md-9">
+        <h2>Outbound Integrations</h2>
     </div>
-    {% render_table table %}
-    <script type="text/javascript"
-            id="row-click-handler"
-            data-table-id="outbound-config-table"
-            data-row-attribute="outbound-config-id"
-            data-url="{{ base_url }}"
-            src="{% static 'website/js/cdip.custom.js' %}">
-    </script>
+    <div class="col-md-3">
+
+        <a class="btn btn-primary {% if not perms.integrations.add_outboundintegrationconfiguration %} disabled {% endif %}"
+           href="{% url 'outbound_integration_configuration_add' %}" role="button">Add Integration</a>
+    </div>
+</div>
+{% render_table table %}
+<script type="text/javascript"
+        id="row-click-handler"
+        data-table-id="outbound-config-table"
+        data-row-attribute="outbound-config-id"
+        data-url="{{ base_url }}"
+        src="{% static 'website/js/cdip.custom.js' %}">
+</script>
 
 {% endblock %}

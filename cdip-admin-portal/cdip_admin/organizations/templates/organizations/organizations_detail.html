@@ -4,26 +4,47 @@
 
 {% block content %}
 
-    <h3>Organization: {{organization.name}}</h3>
-    <p>{{organization.description}}</p>
-    <a class="btn btn-primary {% if not perms.organizations.change_organization or not is_owner %} disabled {% endif %}"
-       href="{% url 'organizations_update' organization.id %}" role="button">Update</a>
-    <div class="row">
-        <div class="col-lg-9">
-            <h2>Accounts</h2>
-        </div>
+<h3>Organization: {{organization.name}}</h3>
+<p>{{organization.description}}</p>
+<div class="row">
+    <div class="col-md-9">
+        <h2>Accounts</h2>
+    </div>
+    <div class="col-md-3">
+        <a class="btn btn-primary {% if not perms.organizations.change_organization or not is_owner %} disabled {% endif %}"
+           href="{% url 'organizations_update' organization.id %}" role="button">Edit</a>
         <a class="btn btn-primary {% if not is_owner %} disabled {% endif %}"
-           href="{% url 'account_add' organization.id%}" role="button">+ Add</a>
+           href="{% url 'account_add' organization.id%}" role="button">Add Member</a>
     </div>
-    <div class="row">
-        <ul>
+</div>
+<div class="row">
+
+    <div class="col-md-12">
+        <table class="table">
+            <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">email</th>
+                <th scope="col">Role</th>
+            </tr>
+            </thead>
+            <tbody>
             {% for user, role in accounts %}
-                <li>
+            <tr>
+                <td>
                     <a href="{% url 'account_profile_update' organization.id user.id %}">
-                        {{ user.last_name }}, {{ user.first_name }} - {{ user.email }} - {{ role }}
+                        {{ user.last_name }}, {{ user.first_name }}
                     </a>
-                </li>
+                </td>
+                <td>
+                    {{ user.email }}
+                </td>
+                <td>
+                    {{ role }}
+                </td>
+            </tr>
             {% endfor %}
-        </ul>
+        </table>
     </div>
+</div>
 {% endblock %}
