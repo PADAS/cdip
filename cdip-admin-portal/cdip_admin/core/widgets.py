@@ -37,9 +37,19 @@ class PeekabooTextInput(forms.widgets.TextInput):
 
     input_type = 'password'
     template_name = 'widgets/peekaboo/peekaboo.html'
+    readonly = ''
 
     class Media:
         css = {
             'all': ('widgets/peekaboo/peekaboo.css',)
         }
         js = ('widgets/peekaboo/peekaboo.js', 'https://kit.fontawesome.com/0f5032f73b.js')
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context['widget']['readonly'] = self.readonly
+        return context
+
+class ReadonlyPeekabooTextInput(PeekabooTextInput):
+
+    readonly = 'readonly'

@@ -4,6 +4,7 @@ from integrations.models import InboundIntegrationConfiguration, DeviceState
 
 from core.permissions import IsServiceAccount, IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
+from core.enums import RoleChoices
 
 class OrganizationFilter(django_filters.FilterSet):
     class Meta:
@@ -65,7 +66,7 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
             return filtered_qs
 
         filtered_qs = filtered_qs.filter(owner__accountprofile__user=requestor,
-                                         owner__accountprofile__role='admin')
+                                         owner__accountprofile__role=RoleChoices.ADMIN)
         return filtered_qs
 
 

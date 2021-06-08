@@ -280,8 +280,22 @@ class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
 ###
 @permission_required('integrations.view_inboundintegrationconfiguration', raise_exception=True)
 def inbound_integration_configuration_detail(request, module_id):
+
     integration_module = get_object_or_404(InboundIntegrationConfiguration, pk=module_id)
-    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration_module})
+    form = KeyAuthForm()
+
+    if integration_module.consumer_id:
+        key = get_api_key(integration_module)
+        if key:
+            form.fields['key'].initial = key
+    else:
+        consumer_id = create_api_consumer(integration_module)
+        key = create_api_key(consumer_id)
+        if key:
+            form.fields['key'].initial = key
+
+    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration_module,
+                                                                                          'form': form,})
 
 
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
