@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
 {% block title %}Integration: {{module.id}}{% endblock %}
 
@@ -14,10 +15,13 @@
     </p>
     <p>Endpoint: {{module.endpoint}}</p>
     <p>Login: {{module.login}}</p>
-    <p>State:
-        <pre>{{ module.state | pprint }}</pre>
-    </p>
     <p>Enabled: {{ module.enabled }}</p>
     <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_update' module.id %}" role="button">Update</a>
     <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_list' %}" role="button">Back</a>
+
+    {% crispy form %}
+
+    <h3>State</h3>
+        <p><pre>{{ module.state | pprint }}</pre>
+    </p>
 {% endblock %}

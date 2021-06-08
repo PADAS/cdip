@@ -82,8 +82,6 @@ def get_api_key(integration):
     response = requests.get(api_key_url)
     api_keys = response.json()['data']
 
-    # TODO: how to handle multiple API keys
-    key = None
+    # Use the first found key
     if api_keys:
-        key = api_keys[0]['key']
-    return key
+        return api_keys[0]['key']
