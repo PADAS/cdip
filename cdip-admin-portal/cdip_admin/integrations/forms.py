@@ -3,7 +3,7 @@ from crispy_forms.layout import Submit
 from django import forms
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
-from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput
+from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput, ReadonlyPeekabooTextInput
 from organizations.models import Organization
 from .models import BridgeIntegration
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
@@ -46,13 +46,14 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         model = InboundIntegrationConfiguration
         exclude = ['id',]
         fields = (
-            'name', 'type', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token', 'state'
-        )
+            'name', 'type', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token',
+            'state', 'consumer_id',)
         labels = {'default_devicegroup': "Default Device Group"}
         widgets = {
             'password': PeekabooTextInput(),
             'token': PeekabooTextInput(),
             'state': FormattedJsonFieldWidget(),
+            'apikey': PeekabooTextInput(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -222,5 +223,5 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 
 class KeyAuthForm(forms.Form):
-    key = forms.CharField(label="API Key", max_length=100, widget=PeekabooTextInput, required=False)
+    key = forms.CharField(label="API Key", max_length=100, widget=ReadonlyPeekabooTextInput, required=False)
 
