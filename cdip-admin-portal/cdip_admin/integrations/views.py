@@ -281,20 +281,14 @@ class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
 @permission_required('integrations.view_inboundintegrationconfiguration', raise_exception=True)
 def inbound_integration_configuration_detail(request, module_id):
 
-    integration_module = get_object_or_404(InboundIntegrationConfiguration, pk=module_id)
+    integration = get_object_or_404(InboundIntegrationConfiguration, pk=module_id)
     form = KeyAuthForm()
 
-    if integration_module.consumer_id:
-        key = get_api_key(integration_module)
-        if key:
-            form.fields['key'].initial = key
-    else:
-        consumer_id = create_api_consumer(integration_module)
-        key = create_api_key(consumer_id)
-        if key:
-            form.fields['key'].initial = key
+    key = get_api_key(integration)
+    if key:
+        form.fields['key'].initial = key
 
-    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration_module,
+    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration,
                                                                                           'form': form,})
 
 
@@ -330,7 +324,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
         return form
 
 
-class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView):
+class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView, ):
     template_name = 'integrations/inbound_integration_configuration_update.html'
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
@@ -478,15 +472,9 @@ def bridge_integration_view(request, module_id):
     bridge = get_object_or_404(BridgeIntegration, pk=module_id)
     form = KeyAuthForm()
 
-    if bridge.consumer_id:
-        key = get_api_key(bridge)
-        if key:
-            form.fields['key'].initial = key
-    else:
-        consumer_id = create_api_consumer(bridge)
-        key = create_api_key(consumer_id)
-        if key:
-            form.fields['key'].initial = key
+    key = get_api_key(bridge)
+    if key:
+        form.fields['key'].initial = key
 
     return render(request, "integrations/bridge_integration_view.html",
                   {"module": bridge,

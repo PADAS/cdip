@@ -1,4 +1,5 @@
 from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, Row, Column
 from crispy_forms.layout import Submit
 from django import forms
 
@@ -70,6 +71,34 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
     helper.form_method = 'POST'
 
+    helper.layout = Layout(
+        Row(
+            Column('name', css_class='form-group col-md-6'),
+            Column('owner', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('type', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        'enabled',
+        Row(
+            Column('default_devicegroup', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('endpoint', css_class='form-group col-md-6'),
+            Column('token', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('login', css_class='form-group col-md-6'),
+            Column('password', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(Column('state', css_class='form-group col-md-12')),
+
+    )
 
 class InboundIntegrationTypeForm(forms.ModelForm):
 
