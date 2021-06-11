@@ -168,7 +168,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
 
-        if not IsGlobalAdmin.has_permission(None, self.request, None):
+        if not IsGlobalAdmin.has_permission(None, self.request, None) and not IsServiceAccount.has_permission(None, self.request, None):
             queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user, 'owner__name')
 
         inbound_id = self.request.query_params.get('inbound_id')

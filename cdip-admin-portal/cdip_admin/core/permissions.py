@@ -16,6 +16,8 @@ class IsGlobalAdmin(permissions.BasePermission):
         # TODO: Change this to not rely on name string.
         # Consider changing this to be driven by a single custom permission that is
         # applied with Global Admin  group.
+        if not request.user.groups:
+            return False
         val = request.user.groups.filter(name=DjangoGroups.GLOBAL_ADMIN.value).exists()
         return val
 
@@ -78,6 +80,8 @@ class IsServiceAccount(permissions.BasePermission):
 
 class IsOrganizationMember(permissions.BasePermission):
     def has_permission(self, request, view):
+        if not request.user.groups:
+            return False
         return request.user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists()
 
     def has_object_permission(self, request, view, obj):
