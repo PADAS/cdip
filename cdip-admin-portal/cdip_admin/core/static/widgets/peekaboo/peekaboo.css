@@ -3,14 +3,53 @@
   display: inline;
 }
 
-i{
+i {
   font-size: 1rem;
   margin-left: .5rem;
 }
 
-.fas.copy-to-clip { display: none; }
+/*.fas.copy-to-clip { display: none; }*/
 
 .copy-to-clip:hover{
   color: #007bff;
   cursor: pointer;
+}
+
+.tooltiptarget {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltiptext {
+  visibility: hidden;
+  width: 300px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 150%;
+  left: 50%;
+  margin-left: -150px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+.tooltiptarget:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+  transition: .25s all ease;
 }

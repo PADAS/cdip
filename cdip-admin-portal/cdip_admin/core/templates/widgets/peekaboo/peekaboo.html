@@ -1,9 +1,13 @@
-<div class="inxput-group">
-    <div id="show_hide_password">
-        <input type="{{ widget.type }}" name="{{ widget.name }}"{% if widget.value != None %}
+    <div id="show_hide_password" class="input-group col-md-5">
+        <input type="{{ widget.type }}" name="{{ widget.name }}" onmousein="show_tooltip(event)"{% if widget.value != None %}
                value="{{ widget.value|stringformat:'s' }}"{% endif %}
                {% include "django/forms/widgets/attrs.html" %} {{ widget.readonly }}>
+
         <a href=""><i class="fa fa-eye-slash peakaboo" aria-hidden="true"></i></a>
-        <i title="Copy To Clipboard" class="fas fa-copy copy-to-clip" onclick="copyToClipboard(event)"></i>
+
+        <i title="Copy To Clipboard" class="fas fa-copy copy-to-clip tooltiptarget" onclick="copy_to_clipboard(event)" onmouseout="reset_tooltip(event)">
+        <span class="tooltiptext">Copy to clipboard</span>
+</i>
+
     </div>
-</div>
+

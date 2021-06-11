@@ -3,23 +3,22 @@ from django.urls import path
 from . import views
 from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegrationConfigurationUpdateView, \
     DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView, \
-    DeviceGroupAddView, DeviceGroupManagementUpdateView, BridgeIntegrationListView, BridgeIntegrationAddView, \
+    DeviceGroupAddView, DeviceGroupManagementUpdateView, BridgeIntegrationAddView, \
     BridgeIntegrationUpdateView
 
 urlpatterns = [
-    path('devices/<uuid:module_id>', views.device_detail,
-         name='device_detail'),
+    path('devices/<uuid:module_id>', views.device_detail, name='device_detail'),
+    path('devices/<uuid:module_id>/edit', views.device_detail, name='device_edit'),
     path('devices', views.DeviceList.as_view(), name='device_list'),
 
-    path('devicegroups/<uuid:module_id>', views.DeviceGroupDetail.as_view(),
-         name='device_group_detail'),
+    path('devicegroups/<uuid:module_id>', views.DeviceGroupDetail.as_view(), name='device_group'),
+    path('devicegroups/<uuid:module_id>/edit', views.DeviceGroupDetail.as_view(),
+         name='device_group_edit'),
     path('devicegroups', views.DeviceGroupListView.as_view(), name='device_group_list'),
-    path('devicegroups/add', DeviceGroupAddView.as_view(),
-         name="device_group_add"),
-    path('devicegroups/update/<uuid:device_group_id>',
-         DeviceGroupUpdateView.as_view(),
-         name="device_group_update"),
-    path('devicegroups/management/update/<uuid:device_group_id>',
+    path('devicegroups/add', DeviceGroupAddView.as_view(), name="device_group_add"),
+    path('devicegroups/<uuid:device_group_id>/edit',
+         DeviceGroupUpdateView.as_view(), name="device_group_update"),
+    path('devicegroups/<uuid:device_group_id>/manage',
          DeviceGroupManagementUpdateView.as_view(),
          name="device_group_management_update"),
 
