@@ -11,7 +11,7 @@ function addRowHandlers(tableId, rowAttribute, url) {
             function (row) {
                 return function () {
                     let id = row.attributes[rowAttribute].value;
-                    window.location = url + '/' + id + '/edit';
+                    window.location = url + '/' + id; // + '/edit';
                 };
             };
         currentRow.onclick = createClickHandler(currentRow);
