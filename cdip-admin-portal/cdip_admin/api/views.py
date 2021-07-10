@@ -92,7 +92,7 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Type """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember, )
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -116,7 +116,7 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
 
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount)
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
         integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
@@ -144,7 +144,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     # filter_backends =
     def get_queryset(self):
@@ -173,7 +173,7 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -225,7 +225,7 @@ class DeviceListView(generics.ListCreateAPIView):
 
 
     serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = Device.objects.all()
     def get_queryset(self):
         user = self.request.user
@@ -247,7 +247,7 @@ class DeviceListView(generics.ListCreateAPIView):
 class BridgeIntegrationListView(generics.ListAPIView):
 
     serializer_class = BridgeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount ]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
     def get_queryset(self):
@@ -264,7 +264,7 @@ class BridgeIntegrationListView(generics.ListAPIView):
 
 class BridgeIntegrationView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BridgeSerializer
-    permission_classes = [IsGlobalAdmin| IsOrganizationMember | IsServiceAccount ]
+    permission_classes = (IsGlobalAdmin| IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
 
@@ -286,7 +286,7 @@ class DeviceStateListView(generics.ListAPIView):
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get_queryset(self):
 
