@@ -27,6 +27,14 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
         fields = ['state',] + read_only_fields
 
 
+class CeresTagIdentifiersSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = InboundIntegrationConfiguration
+        read_only_fields = ['name', 'id']
+        fields = read_only_fields
+
+
 class OutboundIntegrationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OutboundIntegrationType
