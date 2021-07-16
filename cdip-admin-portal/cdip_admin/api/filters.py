@@ -70,6 +70,30 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
         return filtered_qs
 
 
+class CeresTagIdentifiersFilter(django_filters.FilterSet):
+
+    @property
+    def qs(self):
+        # TODO: filter down further based on user info provided by ceres client
+        filtered_qs = super().qs.filter(type__slug='ceres_tag')
+
+        if IsGlobalAdmin.has_permission(None, self.request, None):
+            return filtered_qs
+
+        requestor = getattr(self.request, 'user', None)
+
+        if IsServiceAccount.has_permission(None, self.request, None):
+            client_id = IsServiceAccount.get_client_id(self.request)
+            client_profile = IsServiceAccount.get_client_profile(client_id)
+            filtered_qs = filtered_qs.filter(type_id=client_profile.type.id)
+            return filtered_qs
+
+        filtered_qs = filtered_qs.filter(owner__accountprofile__user=requestor,
+                                         owner__accountprofile__role=RoleChoices.ADMIN)
+
+        return filtered_qs
+
+
 class DeviceStateFilter(django_filters.FilterSet):
 
     inbound_config_id = django_filters.UUIDFilter(

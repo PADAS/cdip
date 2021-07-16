@@ -112,6 +112,20 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
+class CeresTagIdentifiersListView(generics.ListAPIView):
+    """ Returns List of Identifiers used during the software provider configuration setup for Ceres Tag Integrations
+    """
+    serializer_class = CeresTagIdentifiersSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = CeresTagIdentifiersFilter
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
+
+    queryset = InboundIntegrationConfiguration.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+
 class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView):
 
     queryset = InboundIntegrationConfiguration.objects.all()
