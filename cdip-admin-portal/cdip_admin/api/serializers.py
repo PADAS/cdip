@@ -29,9 +29,12 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
 class CeresTagIdentifiersSerializer(serializers.ModelSerializer):
 
+    DisplayName = serializers.CharField(source='name', read_only=True)
+    identifier = serializers.CharField(source='id', read_only=True)
+
     class Meta:
         model = InboundIntegrationConfiguration
-        read_only_fields = ['name', 'id']
+        read_only_fields = ['DisplayName', 'identifier']
         fields = read_only_fields
 
 
