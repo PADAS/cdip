@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from fernet_fields import EncryptedCharField
 from core.models import TimestampedModel
+from core.fields import APIConsumerField
 from organizations.models import Organization, OrganizationGroup
 
 
@@ -94,6 +95,10 @@ class InboundIntegrationConfiguration(TimestampedModel):
                                             related_name='inbound_integration_configuration',
                                             related_query_name='inbound_integration_configurations',
                                             verbose_name='Default Device Group')
+
+    consumer_id = models.CharField(max_length=200, blank=True)
+
+    # api_consumer = APIConsumerField(verbose_name='API Key', null=True, blank=True)
 
     def __str__(self):
         return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"

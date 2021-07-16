@@ -105,7 +105,7 @@ class AccountsAddView(LoginRequiredMixin, FormView):
                     raise SuspiciousOperation
 
             account_profile, created = AccountProfile.objects.get_or_create(user_id=user.id,
-                                                                            defaults={'user_username': user.username})
+                                                                            )
             apo, created = AccountProfileOrganization.objects.get_or_create(accountprofile_id=account_profile.id,
                                                                             organization_id=org_id,
                                                                             role=role)
