@@ -49,6 +49,8 @@ DEFAULT_PAGINATE_BY = 25
 
 # Application definition
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -57,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_tables2',
+    'django_filters',
     'crispy_forms',
     'website',
     'integrations',
