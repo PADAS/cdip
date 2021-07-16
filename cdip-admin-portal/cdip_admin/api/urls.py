@@ -26,6 +26,8 @@ urlpatterns = [
 
     path('v1.0/integrations/inbound/configurations', InboundIntegrationConfigurationListView.as_view(),
          name='inboundintegrationconfiguration_list'),
+    path('v1.0/integrations/inbound/configurations/ceres_tag', CeresTagIdentifiersListView.as_view(),
+         name='inboundintegration_cerestag_list'),
     path('v1.0/integrations/inbound/configurations/<pk>', InboundIntegrationConfigurationDetailsView.as_view(),
          name='inboundintegrationconfigurations_detail'),
 

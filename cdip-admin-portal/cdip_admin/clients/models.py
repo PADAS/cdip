@@ -11,7 +11,8 @@ from organizations.models import Organization
 class ClientProfile(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     client_id = models.CharField(max_length=200, unique=True)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
+    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE, related_name='clientprofiles',
+                             related_query_name='clientprofile')
     organizations = models.ManyToManyField(Organization, blank=True)
 
     def __str__(self):

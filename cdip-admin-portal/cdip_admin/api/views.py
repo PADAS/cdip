@@ -1,24 +1,22 @@
 import logging
-from functools import wraps
 
+import django_filters
 import rest_framework
 from datadog import statsd
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import PermissionDenied
-from django.db.models import F, Window
-from django.db.models.functions import FirstValue
+from django.db.models import F
 from django.http import JsonResponse, Http404
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.translation import ugettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
 from rest_framework.decorators import permission_classes, api_view
+from rest_framework.exceptions import APIException, status, ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
-from rest_framework.exceptions import APIException, status, ValidationError
 from rest_framework.response import Response
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccount
-from .filters import InboundIntegrationConfigurationFilter, DeviceStateFilter
+from .filters import *
 from .serializers import *
 from .utils import post_device_information
 
@@ -35,8 +33,8 @@ def public(request):
 class OrganizationsListView(generics.ListAPIView):
     """ Returns List of Organizations """
     serializer_class = OrganizationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
-
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
+    filter_class = OrganizationFilter
     def get_queryset(self):
         user = self.request.user
         queryset = Organization.objects.all()
@@ -51,7 +49,9 @@ class OrganizationsListView(generics.ListAPIView):
 class OrganizationDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Organization """
     serializer_class = OrganizationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
+
+    filter_class = OrganizationFilter
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -61,7 +61,7 @@ class InboundIntegrationTypeListView(generics.ListAPIView):
     """ Returns List of Inbound Integration Types """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
@@ -71,7 +71,7 @@ class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Inbound Integration Type """
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -80,9 +80,10 @@ class InboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
 class OutboundIntegrationTypeListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Types """
     queryset = OutboundIntegrationType.objects.all()
-    serializer_class = InboundIntegrationTypeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    serializer_class = OutboundIntegrationTypeSerializer
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
 
+    # filter_class = OutboundIntegrationTypeFilter
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -91,7 +92,7 @@ class OutboundIntegrationTypeDetailsView(generics.RetrieveAPIView):
     """ Returns Detail of an Outbound Integration Type """
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember, )
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -103,33 +104,33 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     serializer_class = InboundIntegrationConfigurationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
 
-    def get_queryset(self):
-        queryset = InboundIntegrationConfiguration.objects.filter(enabled=True).all()
-        if IsServiceAccount.has_permission(None, self.request, None):
-            client_id = IsServiceAccount.get_client_id(self.request)
-            client_profile = IsServiceAccount.get_client_profile(client_id)
-            queryset = queryset.filter(type_id=client_profile.type.id)
-        else:
-            if not IsGlobalAdmin.has_permission(None, self.request, None):
-                queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
-                                                                         'owner__name')
-        return queryset
+    queryset = InboundIntegrationConfiguration.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+
+class CeresTagIdentifiersListView(generics.ListAPIView):
+    """ Returns List of Identifiers used during the software provider configuration setup for Ceres Tag Integrations
+    """
+    serializer_class = CeresTagIdentifiersSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = CeresTagIdentifiersFilter
+    permission_classes = (rest_framework.permissions.IsAuthenticated,)
+
+    queryset = InboundIntegrationConfiguration.objects.all()
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
 
 class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView):
-    """ Returns Detail of an Inbound Integration Configuration
-        Example State: {
-                            "state": "{\"ST2010-2758\": 14469584, \"ST2010-2759\": 14430249, \"ST2010-2760\": 14650428}"
-                       }
-    """
+
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
         integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
@@ -151,20 +152,15 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
                 if not IsServiceAccount.has_object_permission(None, request, self, integration):
                     raise PermissionDenied
 
-    # # TODO: this doesn't work yet with the savannah function
-    # def patch(self, request, *args, **kwargs):
-    #     # TODO: update_device_information takes 2 params
-    #     # update_device_information(self.queryset)
-    #     return self.partial_update(request, *args, **kwargs)
-
 
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """ Returns List of Outbound Integration Configurations """
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
+    # filter_backends =
     def get_queryset(self):
         queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
 
@@ -191,7 +187,7 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -243,7 +239,7 @@ class DeviceListView(generics.ListCreateAPIView):
 
 
     serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = Device.objects.all()
     def get_queryset(self):
         user = self.request.user
@@ -265,7 +261,7 @@ class DeviceListView(generics.ListCreateAPIView):
 class BridgeIntegrationListView(generics.ListAPIView):
 
     serializer_class = BridgeSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount ]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
     def get_queryset(self):
@@ -282,7 +278,7 @@ class BridgeIntegrationListView(generics.ListAPIView):
 
 class BridgeIntegrationView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BridgeSerializer
-    permission_classes = [IsGlobalAdmin| IsOrganizationMember | IsServiceAccount ]
+    permission_classes = (IsGlobalAdmin| IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
 
@@ -304,7 +300,7 @@ class DeviceStateListView(generics.ListAPIView):
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get_queryset(self):
 

@@ -1,9 +1,10 @@
 from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, Row, Column
 from crispy_forms.layout import Submit
 from django import forms
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
-from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput
+from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput, ReadonlyPeekabooTextInput
 from organizations.models import Organization
 from .models import BridgeIntegration
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
@@ -46,13 +47,14 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         model = InboundIntegrationConfiguration
         exclude = ['id',]
         fields = (
-            'name', 'type', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token', 'state'
-        )
+            'name', 'type', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token',
+            'state', 'consumer_id',)
         labels = {'default_devicegroup': "Default Device Group"}
         widgets = {
             'password': PeekabooTextInput(),
             'token': PeekabooTextInput(),
             'state': FormattedJsonFieldWidget(),
+            'apikey': PeekabooTextInput(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -69,6 +71,34 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
     helper.form_method = 'POST'
 
+    helper.layout = Layout(
+        Row(
+            Column('name', css_class='form-group col-md-6'),
+            Column('owner', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('type', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        'enabled',
+        Row(
+            Column('default_devicegroup', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('endpoint', css_class='form-group col-md-6'),
+            Column('token', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(
+            Column('login', css_class='form-group col-md-6'),
+            Column('password', css_class='form-group col-md-6'),
+            css_class='form-row',
+        ),
+        Row(Column('state', css_class='form-group col-md-12')),
+
+    )
 
 class InboundIntegrationTypeForm(forms.ModelForm):
 
@@ -222,5 +252,5 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 
 class KeyAuthForm(forms.Form):
-    key = forms.CharField(label="API Key", max_length=100, widget=PeekabooTextInput, required=False)
+    key = forms.CharField(label="API Key", max_length=100, widget=ReadonlyPeekabooTextInput, required=False)
 

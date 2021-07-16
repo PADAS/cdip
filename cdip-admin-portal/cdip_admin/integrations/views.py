@@ -121,7 +121,7 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         form = DeviceGroupForm(request.POST)
         if form.is_valid():
             config = form.save()
-            return redirect("device_group_detail", config.id)
+            return redirect("device_group_update", config.id)
 
     def get_form(self, form_class=None):
         form = DeviceGroupForm()
@@ -157,7 +157,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         return device_group
 
     def get_success_url(self):
-        return reverse('device_group_detail', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse('device_group_update', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
 class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
@@ -178,7 +178,7 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('device_group_detail', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse('device_group_update', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
 ###
@@ -280,8 +280,16 @@ class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
 ###
 @permission_required('integrations.view_inboundintegrationconfiguration', raise_exception=True)
 def inbound_integration_configuration_detail(request, module_id):
-    integration_module = get_object_or_404(InboundIntegrationConfiguration, pk=module_id)
-    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration_module})
+
+    integration = get_object_or_404(InboundIntegrationConfiguration, pk=module_id)
+    form = KeyAuthForm()
+
+    key = get_api_key(integration)
+    if key:
+        form.fields['key'].initial = key
+
+    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration,
+                                                                                          'form': form,})
 
 
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
@@ -316,7 +324,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
         return form
 
 
-class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView):
+class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView, ):
     template_name = 'integrations/inbound_integration_configuration_update.html'
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
@@ -464,15 +472,9 @@ def bridge_integration_view(request, module_id):
     bridge = get_object_or_404(BridgeIntegration, pk=module_id)
     form = KeyAuthForm()
 
-    if bridge.consumer_id:
-        key = get_api_key(bridge)
-        if key:
-            form.fields['key'].initial = key
-    else:
-        consumer_id = create_api_consumer(bridge)
-        key = create_api_key(consumer_id)
-        if key:
-            form.fields['key'].initial = key
+    key = get_api_key(bridge)
+    if key:
+        form.fields['key'].initial = key
 
     return render(request, "integrations/bridge_integration_view.html",
                   {"module": bridge,

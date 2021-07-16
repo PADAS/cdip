@@ -1,4 +1,5 @@
 import base64
+import logging
 
 import requests as requests
 from django.conf import settings
@@ -9,6 +10,7 @@ KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
 KEYS_PATH = "/key-auth"
 
+logger = logging.getLogger(__name__)
 
 class ConsumerCreationError(Exception):
     """Raised when consumer fails to create"""
@@ -33,21 +35,16 @@ def create_api_consumer(integration):
 
     response = requests.post(post_url, data=post_data)
 
-    if not response.ok:
+    if not response.ok and response.status_code != 409:
+        logger.error('Failed to create API consumer. %s', response.text)
         raise ConsumerCreationError
 
-    content = json.loads(response.content)
-    consumer_id = content["id"]
-
-    integration.consumer_id = consumer_id
-    integration.save()
-
-    return consumer_id
+    return True
 
 
-def create_api_key(consumer_id):
+def create_api_key(integration):
 
-    api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{consumer_id}{KEYS_PATH}'
+    api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}'
 
     response = requests.post(api_key_url)
 
@@ -61,29 +58,19 @@ def create_api_key(consumer_id):
 
 
 def get_api_key(integration):
-    # permission checking
-    get_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{integration.consumer_id}'
-    response = requests.get(get_url)
-    consumer = response.json()
-    custom_id = consumer['custom_id']
-    consumer_id = consumer['id']
-    json_blob = custom_id.encode('utf-8')
-    json_blob = base64.b64decode(json_blob)
-    json_blob = json_blob.decode('utf-8')
-    json_blob = json.loads(json_blob)
-    integration_ids = json_blob['integration_ids']
 
-    # check consumer is valid for this integration
-    if str(integration.id) not in integration_ids:
-        raise PermissionDenied
+    create_api_consumer(integration)
 
     # obtain key if permission checks pass
-    api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/{consumer_id}{KEYS_PATH}'
-    response = requests.get(api_key_url)
-    api_keys = response.json()['data']
+    response = requests.get(f'{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}')
 
-    # TODO: how to handle multiple API keys
-    key = None
-    if api_keys:
-        key = api_keys[0]['key']
-    return key
+    if response.ok:
+        try:
+            data = response.json()['data']
+            api_key = data[0]['key'] if len(data) > 0 else None
+            if api_key:
+                return api_key
+        except:
+            logger.exception('failed getting API key for consumer %s', integration)
+
+    return create_api_key(integration)
