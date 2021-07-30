@@ -22,7 +22,7 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'type_slug',
+        read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'type_slug', 'provider',
                             'default_devicegroup']
         fields = ['state',] + read_only_fields
 
