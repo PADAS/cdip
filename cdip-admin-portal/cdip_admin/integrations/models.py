@@ -89,6 +89,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
+    provider = models.CharField(max_length=200, blank=True)
     enabled = models.BooleanField(default=True)
 
     default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
@@ -102,6 +103,11 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
     def __str__(self):
         return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
+
+    def save(self, *args, **kwargs):
+        if not self.provider:
+            self.provider = self.type.slug
+        super().save(*args, **kwargs)
 
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
