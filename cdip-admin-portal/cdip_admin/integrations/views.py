@@ -121,7 +121,7 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         form = DeviceGroupForm(request.POST)
         if form.is_valid():
             config = form.save()
-            return redirect("device_group_update", config.id)
+            return redirect("device_group", kwargs={'module_id': config.id})
 
     def get_form(self, form_class=None):
         form = DeviceGroupForm()
@@ -157,7 +157,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         return device_group
 
     def get_success_url(self):
-        return reverse('device_group_update', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse('device_group', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
 class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
@@ -178,7 +178,7 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('device_group_update', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse('device_group', kwargs={'module_id': self.kwargs.get("device_group_id")})
 
 
 ###
@@ -312,7 +312,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
                 config.save()
             else:
                 device_group = config.default_devicegroup
-            return redirect("device_group_update", device_group.id)
+            return redirect("device_group_update", kwargs={'device_group_id': device_group.id})
 
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
