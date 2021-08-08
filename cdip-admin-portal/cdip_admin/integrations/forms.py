@@ -47,7 +47,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         model = InboundIntegrationConfiguration
         exclude = ['id',]
         fields = (
-            'name', 'type', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token',
+            'name', 'type', 'provider', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token',
             'state', 'consumer_id',)
         labels = {'default_devicegroup': "Default Device Group"}
         widgets = {
@@ -79,6 +79,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         ),
         Row(
             Column('type', css_class='form-group col-md-6'),
+            Column('provider', css_class='form-group col-md-6'),
             css_class='form-row',
         ),
         'enabled',
