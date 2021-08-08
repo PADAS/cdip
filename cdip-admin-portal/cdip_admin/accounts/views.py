@@ -82,7 +82,7 @@ class AccountsAddView(LoginRequiredMixin, FormView):
 
             email = data["email"]
             first_name = data["firstName"]
-            last_name = data["firstName"]
+            last_name = data["lastName"]
             org_id = data["organization"]
             role = data["role"]
             username = email
