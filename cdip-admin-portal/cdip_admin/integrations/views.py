@@ -13,7 +13,8 @@ from django_tables2.views import SingleTableMixin
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
-from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter
+from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter, InboundIntegrationFilter, \
+    OutboundIntegrationFilter
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm, \
     KeyAuthForm
@@ -312,7 +313,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
                 config.save()
             else:
                 device_group = config.default_devicegroup
-            return redirect("device_group_update", kwargs={'device_group_id': device_group.id})
+            return redirect("device_group_update", device_group_id=device_group.id)
 
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
@@ -349,11 +350,12 @@ class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateV
                        kwargs={'module_id': self.kwargs.get("configuration_id")})
 
 
-class InboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, ListView):
+class InboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
     table_class = InboundIntegrationConfigurationTable
     template_name = 'integrations/inbound_integration_configuration_list.html'
     queryset = InboundIntegrationConfiguration.objects.get_queryset().order_by('id')
     paginate_by = default_paginate_by
+    filterset_class = InboundIntegrationFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -426,11 +428,12 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
                        kwargs={'module_id': self.kwargs.get("configuration_id")})
 
 
-class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, ListView):
+class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
     table_class = OutboundIntegrationConfigurationTable
     template_name = 'integrations/outbound_integration_configuration_list.html'
     queryset = OutboundIntegrationConfiguration.objects.get_queryset().order_by('id')
     paginate_by = default_paginate_by
+    filterset_class = OutboundIntegrationFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
