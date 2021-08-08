@@ -312,7 +312,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
                 config.save()
             else:
                 device_group = config.default_devicegroup
-            return redirect("device_group_update", kwargs={'device_group_id': device_group.id})
+            return redirect("device_group_update", device_group_id=device_group.id)
 
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
