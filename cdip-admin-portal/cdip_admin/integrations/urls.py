@@ -14,8 +14,9 @@ urlpatterns = [
     path('devicegroups/<uuid:module_id>', views.DeviceGroupDetail.as_view(), name='device_group'),
     path('devicegroups', views.DeviceGroupListView.as_view(), name='device_group_list'),
     path('devicegroups/add', DeviceGroupAddView.as_view(), name="device_group_add"),
-    path('devicegroups/<uuid:device_group_id>/edit',
-         DeviceGroupUpdateView.as_view(), name="device_group_update"),
+
+    path('devicegroups/<uuid:device_group_id>/edit', DeviceGroupUpdateView.as_view(), name="device_group_update"),
+
     path('devicegroups/<uuid:device_group_id>/manage',
          DeviceGroupManagementUpdateView.as_view(),
          name="device_group_management_update"),
