@@ -3,7 +3,8 @@ from django.utils.translation import ugettext_lazy as _
 import django_filters
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
-from integrations.models import DeviceState, DeviceGroup, Device, Organization, InboundIntegrationType
+from integrations.models import DeviceState, DeviceGroup, Device, Organization, InboundIntegrationType, \
+    InboundIntegrationConfiguration, OutboundIntegrationConfiguration
 
 
 # set the organization filter options to the organizations that user is member of
@@ -22,6 +23,12 @@ def type_filter(request):
         types = Device.objects.filter(inbound_configuration__owner__in=org_qs).values_list('inbound_configuration__type')
         type_qs = type_qs.filter(inboundintegrationconfiguration__type__in=types).distinct()
     return type_qs
+
+def outbound_integration_filter(request):
+    qs = OutboundIntegrationConfiguration.objects.order_by('name')
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        return IsOrganizationMember.filter_queryset_for_user(qs, request.user, 'name')
+    return qs
 
 
 class DeviceStateFilter(django_filters.FilterSet):
@@ -78,9 +85,17 @@ class DeviceGroupFilter(django_filters.FilterSet):
         distinct=True,
     )
 
+    destinations = django_filters.ModelChoiceFilter(
+        queryset=outbound_integration_filter,
+        field_name='destinations',
+        to_field_name='name',
+        empty_label=_('All Destinations'),
+        distinct=True,
+    )
+
     class Meta:
         model = DeviceGroup
-        fields = ('organization', 'device_group',)
+        fields = ('organization', 'device_group', 'destinations')
 
     @property
     def qs(self):
@@ -126,5 +141,80 @@ class DeviceFilter(django_filters.FilterSet):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
                                                                  'inbound_configuration__owner__name')
+        else:
+            return qs
+
+
+class InboundIntegrationFilter(django_filters.FilterSet):
+
+    name = django_filters.CharFilter(
+        field_name='name',
+        lookup_expr='icontains',
+        label=_('Name')
+    )
+
+    organization = django_filters.ModelChoiceFilter(
+        queryset=organization_filter,
+        field_name='owner',
+        to_field_name='name',
+        empty_label=_('All Owners'),
+        distinct=True,
+    )
+
+    inbound_config_type = django_filters.ModelChoiceFilter(
+        queryset=type_filter,
+        field_name='type',
+        to_field_name='name',
+        empty_label=_('All Types'),
+        distinct=True,
+     )
+
+    class Meta:
+        model = InboundIntegrationConfiguration
+        fields = ('organization', 'inbound_config_type', 'name')
+
+    @property
+    def qs(self):
+        qs = super().qs
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
+                                                                 'owner__name')
+        else:
+            return qs
+
+class OutboundIntegrationFilter(django_filters.FilterSet):
+
+    name = django_filters.CharFilter(
+        field_name='name',
+        lookup_expr='icontains',
+        label=_('Name')
+    )
+
+    organization = django_filters.ModelChoiceFilter(
+        queryset=organization_filter,
+        field_name='owner',
+        to_field_name='name',
+        empty_label=_('All Owners'),
+        distinct=True,
+    )
+
+    config_type = django_filters.ModelChoiceFilter(
+        queryset=type_filter,
+        field_name='type',
+        to_field_name='name',
+        empty_label=_('All Types'),
+        distinct=True,
+     )
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        fields = ('organization', 'config_type', 'name')
+
+    @property
+    def qs(self):
+        qs = super().qs
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user,
+                                                                 'owner__name')
         else:
             return qs
