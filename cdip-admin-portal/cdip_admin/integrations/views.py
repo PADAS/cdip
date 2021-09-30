@@ -122,7 +122,7 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         form = DeviceGroupForm(request.POST)
         if form.is_valid():
             config = form.save()
-            return redirect("device_group", kwargs={'module_id': config.id})
+            return redirect("device_group", str(config.id))
 
     def get_form(self, form_class=None):
         form = DeviceGroupForm()
