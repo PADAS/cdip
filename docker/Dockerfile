@@ -34,7 +34,7 @@ RUN pip3 install GDAL==$(gdal-config --version)
 
 WORKDIR /workspace
 
-ADD requirements.txt /workspace/requirements.txt
+ADD dependencies/requirements.txt /workspace/requirements.txt
 
 RUN pip3 install -U "pip"
 
