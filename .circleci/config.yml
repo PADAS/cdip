@@ -40,7 +40,7 @@ jobs:
       - 'checkout'
       - run:
           name: "Build and Push Image"
-          command: 'cd cdip-admin-portal && make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
+          command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
 
 #  trigger_downstream:
 #    executor: 'gcloud'
