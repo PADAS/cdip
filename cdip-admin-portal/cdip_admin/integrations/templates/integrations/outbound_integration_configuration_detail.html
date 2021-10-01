@@ -13,7 +13,6 @@
         Owner: <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
     </p>
     <p>Endpoint: {{module.endpoint}}</p>
-    <p>Login: {{module.login}}</p>
     <p>State:
         <pre>{{ module.state | pprint }}</pre>
     </p>
