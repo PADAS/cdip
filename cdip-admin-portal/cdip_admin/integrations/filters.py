@@ -35,7 +35,7 @@ def outbound_type_filter(request):
     type_qs = OutboundIntegrationType.objects.all()
     if not IsGlobalAdmin.has_permission(None, request, None):
         org_qs = IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(), request.user, 'name')
-        type_qs = type_qs.filter(outboundintegrationconfiguration_owner__in=org_qs).distinct()
+        type_qs = type_qs.filter(outboundintegrationconfiguration__owner__in=org_qs).distinct()
     return type_qs
 
 

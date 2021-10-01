@@ -198,6 +198,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
             'password': PeekabooTextInput(attrs={'class': 'form-control'}),
             'token': PeekabooTextInput(attrs={'class': 'form-control'}),
             'state': FormattedJsonFieldWidget(),
+            'additional': FormattedJsonFieldWidget(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
