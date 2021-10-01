@@ -8,7 +8,7 @@ from core.utils import get_admin_access_token
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
 KEYCLOAK_REALM = settings.KEYCLOAK_REALM
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
-KEYCLOAK_CLIENT_UUID = settings.KEYCLOAK_CLIENT_UUID
+
 KEYCLOAK_ADMIN_API = f'{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/'
 
 logger = logging.getLogger(__name__)
