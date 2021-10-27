@@ -60,7 +60,7 @@ class DeviceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Device
-        fields = ['id', 'external_id', 'inbound_configuration',]
+        fields = ['id', 'external_id', 'inbound_configuration', 'additional']
 
 
 class DeviceStateSerializer(serializers.ModelSerializer):
