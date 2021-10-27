@@ -10,6 +10,7 @@ urlpatterns = [
     path('v1.0/public', public),
 
     path('v1.0/devices', DeviceListView.as_view(), name='device_list_api'),
+    path('v1.0/devices/<integration_id>', IntegrationDeviceListView.as_view(), name='integration_device_list_api'),
     path('v1.0/devices/<pk>', DeviceView.as_view(), name='device_detail_api'),
     # path('v1.0/devices/<device_id>/destinations', get_destinations_for_device),
     # path('v1.0/devices/outbound/configuration/<integration_id>', get_device_list_by_outbound_configuration),
