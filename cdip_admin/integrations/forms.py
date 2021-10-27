@@ -6,7 +6,7 @@ from django import forms
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from core.widgets import FormattedJsonFieldWidget, PeekabooTextInput, ReadonlyPeekabooTextInput
 from organizations.models import Organization
-from .models import BridgeIntegration
+from .models import BridgeIntegration, Device
 from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, InboundIntegrationConfiguration, \
     InboundIntegrationType, DeviceGroup
 
@@ -172,6 +172,16 @@ class DeviceGroupManagementForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
         exclude = ['id', 'name', 'destinations', 'owner']
+
+    helper = FormHelper()
+    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
+    helper.form_method = 'POST'
+
+
+class DeviceForm(forms.ModelForm):
+    class Meta:
+        model = Device
+        exclude = ['id', 'inbound_configuration']
 
     helper = FormHelper()
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))

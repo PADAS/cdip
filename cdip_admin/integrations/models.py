@@ -131,6 +131,7 @@ class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     external_id = models.CharField(max_length=200)
+    additional = models.JSONField(blank=True, null=True)
 
     @property
     def owner(self):
