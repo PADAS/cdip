@@ -22,22 +22,6 @@ from .utils import post_device_information
 
 logger = logging.getLogger(__name__)
 
-class MultipleFieldLookupMixin:
-    """
-    Apply this mixin to any view or viewset to get multiple field filtering
-    based on a `lookup_fields` attribute, instead of the default single field filtering.
-    """
-    def get_object(self):
-        queryset = self.get_queryset()             # Get the base queryset
-        queryset = self.filter_queryset(queryset)  # Apply any filter backends
-        filter = {}
-        for field in self.lookup_fields:
-            if self.kwargs[field]: # Ignore empty fields.
-                filter[field] = self.kwargs[field]
-        obj = get_object_or_404(queryset, **filter)  # Lookup the object
-        self.check_object_permissions(self.request, obj)
-        return obj
-
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -219,23 +203,32 @@ class DeviceView(generics.RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
-class IntegrationDeviceView(MultipleFieldLookupMixin , generics.RetrieveAPIView):
-    """ Returns Detail of a Device based on integration_id and external_id"""
+class IntegrationDeviceView(generics.GenericAPIView):
+    """ Returns Detail of a Device based on integration_id and external_id
+
+    param1 -- external_id of device
+    """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
     permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
-    lookup_fields = ['inbound_configuration_id', 'external_id']
 
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
+        integration_id = self.kwargs.get('integration_id')
+        queryset = queryset.filter(inbound_configuration=integration_id)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user,
                                                                      'inbound_configuration__owner__name')
         return queryset
 
     def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
+        external_id = self.request.query_params.get('external_id', None)
+        if not external_id:
+            raise MissingArgumentException(detail=_('"external_id" is required.'), )
+        device = self.get_queryset().get(external_id=external_id)
+        serializer = self.get_serializer(device)
+        return Response(serializer.data)
 
 
 class DeviceListView(generics.ListCreateAPIView):
