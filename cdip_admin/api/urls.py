@@ -10,7 +10,6 @@ urlpatterns = [
     path('v1.0/public', public),
 
     path('v1.0/devices', DeviceListView.as_view(), name='device_list_api'),
-    path('v1.0/devices/<integration_id>', IntegrationDeviceListView.as_view(), name='integration_device_list_api'),
     path('v1.0/devices/<pk>', DeviceView.as_view(), name='device_detail_api'),
     # path('v1.0/devices/<device_id>/destinations', get_destinations_for_device),
     # path('v1.0/devices/outbound/configuration/<integration_id>', get_device_list_by_outbound_configuration),
@@ -20,6 +19,9 @@ urlpatterns = [
 
     path('v1.0/organizations', OrganizationsListView.as_view(), name='organization_list'),
     path('v1.0/organizations/<pk>', OrganizationDetailsView.as_view(), name='organization_detail'),
+
+    path('v1.0/integrations/inbound/<inbound_configuration_id>/devices/external_id=<external_id>',
+         IntegrationDeviceView.as_view(), name='integration_device_list_api'),
 
     path('v1.0/integrations/inbound/types', InboundIntegrationTypeListView.as_view(), name='inboundintegrationtype_list'),
     path('v1.0/integrations/inbound/types/<pk>', InboundIntegrationTypeDetailsView.as_view(),
