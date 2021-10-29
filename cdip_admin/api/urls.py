@@ -20,7 +20,7 @@ urlpatterns = [
     path('v1.0/organizations', OrganizationsListView.as_view(), name='organization_list'),
     path('v1.0/organizations/<pk>', OrganizationDetailsView.as_view(), name='organization_detail'),
 
-    path('v1.0/integrations/inbound/<inbound_configuration_id>/devices/external_id=<external_id>',
+    path('v1.0/integrations/inbound/<inbound_configuration_id>/devices/<external_id>',
          IntegrationDeviceView.as_view(), name='integration_device_list_api'),
 
     path('v1.0/integrations/inbound/types', InboundIntegrationTypeListView.as_view(), name='inboundintegrationtype_list'),
