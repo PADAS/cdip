@@ -17,7 +17,7 @@ from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter, Inbound
     OutboundIntegrationFilter
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
     DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm, \
-    KeyAuthForm
+    KeyAuthForm, DeviceForm
 from .models import InboundIntegrationType, OutboundIntegrationType \
     , InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup, BridgeIntegration
 from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundIntegrationConfigurationTable, \
@@ -39,6 +39,30 @@ def device_detail(request, module_id):
     logger.info(f"Request for Device: {module_id}")
     device = get_object_or_404(Device, pk=module_id)
     return render(request, "integrations/device_detail.html", {"device": device})
+
+
+class DeviceUpdateView(PermissionRequiredMixin, UpdateView, ):
+    template_name = 'integrations/device_update.html'
+    form_class = DeviceForm
+    model = Device
+    permission_required = 'integrations.change_device'
+
+    def get_object(self):
+        device = get_object_or_404(Device, pk=self.kwargs.get("module_id"))
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(self.request.user, device):
+                raise PermissionDenied
+        return device
+
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(instance=self.object)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_success_url(self):
+        return reverse('device_detail',
+                       kwargs={'module_id': self.kwargs.get("module_id")})
 
 
 class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):

@@ -203,6 +203,34 @@ class DeviceView(generics.RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
+class IntegrationDeviceView(generics.GenericAPIView):
+    """ Returns Detail of a Device based on integration_id and external_id
+
+    param1 -- external_id of device
+    """
+    queryset = Device.objects.all()
+    serializer_class = DeviceSerializer
+    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = super().get_queryset()
+        integration_id = self.kwargs.get('integration_id')
+        queryset = queryset.filter(inbound_configuration=integration_id)
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user,
+                                                                     'inbound_configuration__owner__name')
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        external_id = self.request.query_params.get('external_id', None)
+        if not external_id:
+            raise MissingArgumentException(detail=_('"external_id" is required.'), )
+        device = self.get_queryset().get(external_id=external_id)
+        serializer = self.get_serializer(device)
+        return Response(serializer.data)
+
+
 class DeviceListView(generics.ListCreateAPIView):
     """ Returns List of Devices """
 
