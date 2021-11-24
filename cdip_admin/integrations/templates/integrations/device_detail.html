@@ -6,5 +6,11 @@
 
     <h3>{{device.inbound_configuration.type}}</h3>
     <p>{{device.id}} - {{ device.inbound_configuration.owner.name }}</p>
+    <p>Additional:
+        <pre>{{ device.additional | pprint }}</pre>
+    </p>
+
+    <a class="btn btn-primary" href="{% url 'device_update' device.id %}" role="button">Edit</a>
+    <a class="btn btn-primary" href="{% url 'device_list' %}" role="button">Close</a>
 
 {% endblock %}
