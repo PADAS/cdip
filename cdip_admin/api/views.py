@@ -19,6 +19,7 @@ from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccou
 from .filters import *
 from .serializers import *
 from .utils import post_device_information
+from cdip_admin.utils import parse_bool
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +36,13 @@ class OrganizationsListView(generics.ListAPIView):
     serializer_class = OrganizationSerializer
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
     filter_class = OrganizationFilter
+
     def get_queryset(self):
         user = self.request.user
         queryset = Organization.objects.all()
         if not IsGlobalAdmin.has_permission(None, self.request, self):
-            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user, 'name')
+            queryset = IsOrganizationMember.filter_queryset_for_user(
+                queryset, user, 'name')
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -108,8 +111,12 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
 
     queryset = InboundIntegrationConfiguration.objects.all()
 
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+    def get_queryset(self):
+        qs = super().get_queryset()
+
+        # Insist on filtering by enabled, and default to True.
+        enabled_qp = parse_bool(self.request.GET.get('enabled', True))
+        return qs.filter(enabled=enabled_qp)
 
 
 class CeresTagIdentifiersListView(generics.ListAPIView):
@@ -130,15 +137,18 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
 
     queryset = InboundIntegrationConfiguration.objects.all()
     serializer_class = InboundIntegrationConfigurationSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
-        integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
+        integration = get_object_or_404(
+            InboundIntegrationConfiguration, id=kwargs['pk'])
         self.permission_checks(request, integration)
         return self.retrieve(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
-        integration = get_object_or_404(InboundIntegrationConfiguration, id=kwargs['pk'])
+        integration = get_object_or_404(
+            InboundIntegrationConfiguration, id=kwargs['pk'])
         self.permission_checks(request, integration)
         response = self.update(request, *args, **kwargs)
         return response
@@ -158,19 +168,23 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     # filter_backends =
     def get_queryset(self):
-        queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
+        queryset = OutboundIntegrationConfiguration.objects.filter(
+            enabled=True).all()
 
         if not IsGlobalAdmin.has_permission(None, self.request, None) and not IsServiceAccount.has_permission(None, self.request, None):
-            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user, 'owner__name')
+            queryset = IsOrganizationMember.filter_queryset_for_user(
+                queryset, self.request.user, 'owner__name')
 
         inbound_id = self.request.query_params.get('inbound_id')
         if inbound_id:
             try:
-                ibc = InboundIntegrationConfiguration.objects.get(id=inbound_id)
+                ibc = InboundIntegrationConfiguration.objects.get(
+                    id=inbound_id)
                 queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
                     inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
             except InboundIntegrationConfiguration.DoesNotExist:
@@ -187,7 +201,8 @@ class OutboundIntegrationConfigurationDetailsView(generics.RetrieveAPIView):
 
     queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -197,7 +212,8 @@ class DeviceView(generics.RetrieveAPIView):
     """ Returns Detail of a Device """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = [IsGlobalAdmin |
+                          IsOrganizationMember | IsServiceAccount]
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -210,7 +226,8 @@ class IntegrationDeviceView(generics.GenericAPIView):
     """
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
-    permission_classes = [IsGlobalAdmin | IsOrganizationMember | IsServiceAccount]
+    permission_classes = [IsGlobalAdmin |
+                          IsOrganizationMember | IsServiceAccount]
 
     def get_queryset(self):
         user = self.request.user
@@ -225,24 +242,33 @@ class IntegrationDeviceView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         external_id = self.request.query_params.get('external_id', None)
         if not external_id:
-            raise MissingArgumentException(detail=_('"external_id" is required.'), )
+            raise MissingArgumentException(
+                detail=_('"external_id" is required.'), )
         device = self.get_queryset().get(external_id=external_id)
         serializer = self.get_serializer(device)
         return Response(serializer.data)
 
 
 class DeviceListView(generics.ListCreateAPIView):
+
     """ Returns List of Devices """
+    serializer_class = DeviceSerializer
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    queryset = Device.objects.all()
 
     def perform_create(self, serializer):
-        logger.info('in perform_create, serializer.data: %s', serializer.validated_data)
+        logger.info('in perform_create, serializer.data: %s',
+                    serializer.validated_data)
         super().perform_create(serializer)
 
-        logger.info('after save in perform_create, serializer.data: %s', serializer.data)
+        logger.info(
+            'after save in perform_create, serializer.data: %s', serializer.data)
 
         ibc = serializer.validated_data.get('inbound_configuration')
         if ibc:
-            logger.info('Adding id %s to default device group for ibc: %s', serializer.data['id'], ibc.id)
+            logger.info('Adding id %s to default device group for ibc: %s',
+                        serializer.data['id'], ibc.id)
             ibc.default_devicegroup.devices.add(serializer.data['id'])
 
     def create(self, request, *args, **kwargs):
@@ -265,10 +291,6 @@ class DeviceListView(generics.ListCreateAPIView):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status_code, headers=headers)
 
-
-    serializer_class = DeviceSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
-    queryset = Device.objects.all()
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
@@ -289,7 +311,8 @@ class DeviceListView(generics.ListCreateAPIView):
 class BridgeIntegrationListView(generics.ListAPIView):
 
     serializer_class = BridgeSerializer
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
     def get_queryset(self):
@@ -297,7 +320,8 @@ class BridgeIntegrationListView(generics.ListAPIView):
         user = self.request.user
 
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            queryset = IsOrganizationMember.filter_queryset_for_user(queryset, user, 'owner__name')
+            queryset = IsOrganizationMember.filter_queryset_for_user(
+                queryset, user, 'owner__name')
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -306,7 +330,8 @@ class BridgeIntegrationListView(generics.ListAPIView):
 
 class BridgeIntegrationView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BridgeSerializer
-    permission_classes = (IsGlobalAdmin| IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = BridgeIntegration.objects.all()
 
 
@@ -328,16 +353,20 @@ class DeviceStateListView(generics.ListAPIView):
     serializer_class = DeviceStateSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
-    permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
+    permission_classes = (
+        IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
 
     def get_queryset(self):
 
-        inbound_config_id = self.request.query_params.get('inbound_config_id', None)
+        inbound_config_id = self.request.query_params.get(
+            'inbound_config_id', None)
         if not inbound_config_id:
-            raise MissingArgumentException(detail=_('"inbound_config_id" is required.'),)
+            raise MissingArgumentException(
+                detail=_('"inbound_config_id" is required.'),)
 
         try:
-            inbound_config = InboundIntegrationConfiguration.objects.get(id=inbound_config_id)
+            inbound_config = InboundIntegrationConfiguration.objects.get(
+                id=inbound_config_id)
         except InboundIntegrationConfiguration.DoesNotExist:
             raise ResourceNotFoundException
 
@@ -349,7 +378,8 @@ class DeviceStateListView(generics.ListAPIView):
             'device__inbound_configuration__id': inbound_config_id
         }
 
-        queryset = super().get_queryset().filter(**filter).order_by('device_id', '-created_at').distinct('device_id')
+        queryset = super().get_queryset().filter(
+            **filter).order_by('device_id', '-created_at').distinct('device_id')
 
         if IsOrganizationMember.has_permission(None, self.request, None):
             IsOrganizationMember.filter_queryset_for_user(queryset, self.request.user,
@@ -363,12 +393,14 @@ class DeviceStateListView(generics.ListAPIView):
 
 @api_view(['POST'])
 def update_inbound_integration_state(request, integration_id):
-    logger.info(f"Updating Inbound Configuration State, Integration ID {integration_id}")
+    logger.info(
+        f"Updating Inbound Configuration State, Integration ID {integration_id}")
     if request.method == 'POST':
         data = request.data
 
         try:
-            config = InboundIntegrationConfiguration.objects.get(id=integration_id)
+            config = InboundIntegrationConfiguration.objects.get(
+                id=integration_id)
         except InboundIntegrationConfiguration.DoesNotExist:
             logger.warning("Retrieve Inbound Configuration, Integration Not Found",
                            extra={"integration_id": integration_id})
@@ -377,12 +409,3 @@ def update_inbound_integration_state(request, integration_id):
         result = post_device_information(data, config)
         response = list(result)
         return JsonResponse(response, safe=False)
-
-
-
-
-
-
-
-
-
