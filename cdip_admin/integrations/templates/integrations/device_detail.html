@@ -6,6 +6,7 @@
 
     <h3>{{device.inbound_configuration.type}}</h3>
     <p>{{device.id}} - {{ device.inbound_configuration.owner.name }}</p>
+    <p>{{device.external_id}} {% if device.name %} - {{ device.name }} {% endif %}</p>
     <p>Additional:
         <pre>{{ device.additional | pprint }}</pre>
     </p>
