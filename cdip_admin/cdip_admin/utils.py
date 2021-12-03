@@ -16,6 +16,7 @@ JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid
 
 logger = logging.getLogger(__name__)
 
+
 def jwt_decode_token(token):
 
     return decode_token(token)
@@ -82,3 +83,12 @@ def parse_jwt_token(jwks, unverified_header, token):
 
             return payload
 
+
+def parse_bool(text):
+    """Return a boolean from the passed in text"""
+    TRUE_VALUES = ['true', '1', 'yes', 'ok', 'okay']
+    if isinstance(text, bool):
+        return text
+    if isinstance(text, str) and text.lower() in TRUE_VALUES:
+        return True
+    return False

@@ -1,3 +1,5 @@
+from django.urls import reverse
+from core.utils import add_base_url
 from rest_framework import serializers
 
 from organizations.models import Organization
@@ -23,8 +25,8 @@ class InboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = InboundIntegrationConfiguration
         read_only_fields = ['id', 'type', 'owner', 'endpoint', 'login', 'password', 'token', 'type_slug', 'provider',
-                            'default_devicegroup']
-        fields = ['state',] + read_only_fields
+                            'default_devicegroup', 'enabled', 'name']
+        fields = ['state', ] + read_only_fields
 
 
 class CeresTagIdentifiersSerializer(serializers.ModelSerializer):
@@ -56,7 +58,8 @@ class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
 class DeviceSerializer(serializers.ModelSerializer):
 
-    inbound_configuration = serializers.PrimaryKeyRelatedField(queryset=InboundIntegrationConfiguration.objects.all())
+    inbound_configuration = serializers.PrimaryKeyRelatedField(
+        queryset=InboundIntegrationConfiguration.objects.all())
 
     class Meta:
         model = Device
@@ -64,14 +67,14 @@ class DeviceSerializer(serializers.ModelSerializer):
 
 
 class DeviceStateSerializer(serializers.ModelSerializer):
-    device_external_id = serializers.CharField(source='device.external_id', read_only=True)
+    device_external_id = serializers.CharField(
+        source='device.external_id', read_only=True)
 
     class Meta:
         model = DeviceState
         fields = ['device_external_id', 'state']
 
-from django.urls import reverse
-from core.utils import add_base_url
+
 class BridgeSerializer(serializers.ModelSerializer):
 
     href = serializers.SerializerMethodField('_href')
@@ -80,7 +83,6 @@ class BridgeSerializer(serializers.ModelSerializer):
         request = self.context['request']
         obj_path = reverse('bridge-integration-view', kwargs={'pk': obj.id})
         return add_base_url(request, obj_path)
-
 
     class Meta:
         model = BridgeIntegration
