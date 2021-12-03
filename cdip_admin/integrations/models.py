@@ -125,6 +125,14 @@ class BridgeIntegration(TimestampedModel):
         ordering = ('name',)
 
 
+class SubjectType(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    value = models.SlugField(max_length=200, unique=True)
+    display_name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return f"{self.display_name}"
+
 
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
@@ -132,6 +140,7 @@ class Device(TimestampedModel):
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(max_length=200)
+    subject_type = models.ForeignKey(SubjectType, on_delete=models.CASCADE, blank=True, null=True)
     additional = models.JSONField(blank=True, default=dict)
 
     @property
@@ -177,6 +186,7 @@ class DeviceGroup(TimestampedModel):
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
+    default_subject_type = models.ForeignKey(SubjectType, on_delete=models.CASCADE, blank=True, null=True)
 
     class Meta:
         ordering = ('name',)

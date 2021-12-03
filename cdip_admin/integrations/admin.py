@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import OutboundIntegrationType, InboundIntegrationType, OutboundIntegrationConfiguration, \
-    InboundIntegrationConfiguration, Device, DeviceGroup, DeviceState, BridgeIntegrationType, BridgeIntegration
+    InboundIntegrationConfiguration, Device, DeviceGroup, DeviceState, BridgeIntegrationType, BridgeIntegration, SubjectType
 
 from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm
 
@@ -38,6 +38,11 @@ class DeviceAdmin(admin.ModelAdmin):
         return obj.inbound_configuration.owner
 
     _owner.short_description = 'Owner'
+
+
+@admin.register(SubjectType)
+class SubjectTypeAdmin(admin.ModelAdmin):
+    list_display = ('value', 'display_name', 'created_at')
 
 
 @admin.register(DeviceGroup)

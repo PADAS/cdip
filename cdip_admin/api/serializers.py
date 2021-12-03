@@ -61,9 +61,11 @@ class DeviceSerializer(serializers.ModelSerializer):
     inbound_configuration = serializers.PrimaryKeyRelatedField(
         queryset=InboundIntegrationConfiguration.objects.all())
 
+    subject_type = serializers.SlugField(source='subject_type.value', read_only=True)
+
     class Meta:
         model = Device
-        fields = ['id', 'external_id', 'name', 'inbound_configuration', 'additional']
+        fields = ['id', 'external_id', 'name', 'subject_type', 'inbound_configuration', 'additional']
 
 
 class DeviceStateSerializer(serializers.ModelSerializer):
