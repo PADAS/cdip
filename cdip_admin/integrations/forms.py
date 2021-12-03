@@ -163,6 +163,7 @@ class DeviceGroupForm(forms.ModelForm):
             else:
                 self.fields['owner'].queryset = qs
 
+    field_order = ['name', 'owner', 'default_subject_type', 'destinations', ]
     helper = FormHelper()
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
     helper.form_method = 'POST'
