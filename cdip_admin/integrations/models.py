@@ -130,6 +130,7 @@ class BridgeIntegration(TimestampedModel):
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(max_length=200)
     additional = models.JSONField(blank=True, default=dict)
 
