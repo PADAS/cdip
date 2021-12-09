@@ -41,6 +41,33 @@ def device_detail(request, module_id):
     return render(request, "integrations/device_detail.html", {"device": device})
 
 
+class DeviceAddView(PermissionRequiredMixin, FormView):
+    template_name = 'integrations/device_add.html'
+    form_class = DeviceForm
+    model = Device
+    permission_required = 'integrations.add_device'
+
+    def post(self, request, *args, **kwargs):
+        form = DeviceForm(request.POST)
+        if form.is_valid():
+            dev = form.save()
+            # save device automatically into default device group of inbound integration selected
+            device_group = DeviceGroup.objects.get(pk=dev.inbound_configuration.default_devicegroup.id)
+            device_group.devices.add(dev)
+            return redirect("device_detail", str(dev.id))
+
+    def get_form(self, form_class=None):
+        form = DeviceForm()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            # can only add if you are an admin of at least one organization
+            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
+                                                                 self.request.user, 'name', admin_only=True):
+                raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form = filter_device_group_form_fields(form, self.request.user)
+        return form
+
+
 class DeviceUpdateView(PermissionRequiredMixin, UpdateView, ):
     template_name = 'integrations/device_update.html'
     form_class = DeviceForm

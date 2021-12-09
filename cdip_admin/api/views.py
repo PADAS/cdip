@@ -245,6 +245,9 @@ class IntegrationDeviceView(generics.GenericAPIView):
             raise MissingArgumentException(
                 detail=_('"external_id" is required.'), )
         device = self.get_queryset().get(external_id=external_id)
+        if not device.subject_type:
+            device.subject_type = DeviceGroup.objects.get(id=device.inbound_configuration.default_devicegroup.id)\
+                .default_subject_type
         serializer = self.get_serializer(device)
         return Response(serializer.data)
 
