@@ -140,7 +140,7 @@ class Device(TimestampedModel):
     inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(max_length=200)
-    subject_type = models.ForeignKey(SubjectType, on_delete=models.CASCADE, blank=True, null=True)
+    subject_type = models.ForeignKey(SubjectType, on_delete=models.PROTECT, blank=True, null=True)
     additional = models.JSONField(blank=True, default=dict)
 
     @property
@@ -186,7 +186,7 @@ class DeviceGroup(TimestampedModel):
     destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
                                           related_query_name='devicegroup', blank=True)
     devices = models.ManyToManyField(Device, blank=True)
-    default_subject_type = models.ForeignKey(SubjectType, on_delete=models.CASCADE, blank=True, null=True)
+    default_subject_type = models.ForeignKey(SubjectType, on_delete=models.PROTECT, blank=True, null=True)
 
     class Meta:
         ordering = ('name',)
