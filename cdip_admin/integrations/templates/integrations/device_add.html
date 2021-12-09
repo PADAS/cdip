@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags %}
+
+{% block title %}Device{% endblock %}
+
+{% block content %}
+    <b>Device</b>
+    <form method="post">
+        {% csrf_token %}
+        {% crispy form %}
+   </form>
+{% endblock %}
