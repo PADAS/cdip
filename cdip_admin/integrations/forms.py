@@ -11,36 +11,6 @@ from .models import OutboundIntegrationConfiguration, OutboundIntegrationType, I
     InboundIntegrationType, DeviceGroup
 
 
-class DeviceGroupForm(forms.ModelForm):
-    class Meta:
-        model = DeviceGroup
-        exclude = ['id', 'devices',]
-
-    def __init__(self, *args, request=None, **kwargs):
-        super(DeviceGroupForm, self).__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields['owner'].queryset = IsOrganizationMember.\
-                    filter_queryset_for_user(qs, request.user, 'name')
-            else:
-                self.fields['owner'].queryset = qs
-
-    helper = FormHelper()
-    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
-    helper.form_method = 'POST'
-
-
-class DeviceGroupManagementForm(forms.ModelForm):
-    class Meta:
-        model = DeviceGroup
-        exclude = ['id', 'name', 'destinations', 'owner']
-
-    helper = FormHelper()
-    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
-    helper.form_method = 'POST'
-
-
 class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     class Meta:
@@ -100,6 +70,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         Row(Column('state', css_class='form-group col-md-12')),
 
     )
+
 
 class InboundIntegrationTypeForm(forms.ModelForm):
 
@@ -182,7 +153,7 @@ class DeviceGroupManagementForm(forms.ModelForm):
 class DeviceForm(forms.ModelForm):
     class Meta:
         model = Device
-        exclude = ['id', 'inbound_configuration']
+        exclude = ['id']
 
     helper = FormHelper()
     helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
