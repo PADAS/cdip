@@ -4,12 +4,13 @@ from . import views
 from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegrationConfigurationUpdateView, \
     DeviceGroupUpdateView, InboundIntegrationConfigurationAddView, OutboundIntegrationConfigurationAddView, \
     DeviceGroupAddView, DeviceGroupManagementUpdateView, BridgeIntegrationAddView, \
-    BridgeIntegrationUpdateView, DeviceUpdateView
+    BridgeIntegrationUpdateView, DeviceUpdateView, DeviceAddView
 
 urlpatterns = [
     path('devices/<uuid:module_id>', views.device_detail, name='device_detail'),
     path('devices/<uuid:module_id>/edit', DeviceUpdateView.as_view(), name='device_update'),
     path('devices', views.DeviceList.as_view(), name='device_list'),
+    path('devices/add', DeviceAddView.as_view(), name="device_add"),
 
     path('devicegroups/<uuid:module_id>', views.DeviceGroupDetail.as_view(), name='device_group'),
     path('devicegroups', views.DeviceGroupListView.as_view(), name='device_group_list'),
