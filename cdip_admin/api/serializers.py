@@ -61,7 +61,14 @@ class DeviceSerializer(serializers.ModelSerializer):
     inbound_configuration = serializers.PrimaryKeyRelatedField(
         queryset=InboundIntegrationConfiguration.objects.all())
 
-    subject_type = serializers.SlugField(source='subject_type.value', read_only=True)
+    subject_type = serializers.SerializerMethodField()
+
+    def get_subject_type(self, obj):
+
+        if not obj.subject_type:
+            device_group = DeviceGroup.objects.get(id=obj.inbound_configuration.default_devicegroup.id)
+            if device_group and device_group.default_subject_type:
+                return device_group.default_subject_type.value
 
     class Meta:
         model = Device
