@@ -1,6 +1,5 @@
 import logging
 
-import django_filters
 import rest_framework
 from datadog import statsd
 from django.core.exceptions import PermissionDenied
@@ -15,11 +14,10 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.permissions import IsGlobalAdmin, IsOrganizationMember, IsServiceAccount
+from cdip_admin.utils import parse_bool
 from .filters import *
 from .serializers import *
 from .utils import post_device_information
-from cdip_admin.utils import parse_bool
 
 logger = logging.getLogger(__name__)
 
@@ -245,9 +243,6 @@ class IntegrationDeviceView(generics.GenericAPIView):
             raise MissingArgumentException(
                 detail=_('"external_id" is required.'), )
         device = self.get_queryset().get(external_id=external_id)
-        if not device.subject_type:
-            device.subject_type = DeviceGroup.objects.get(id=device.inbound_configuration.default_devicegroup.id)\
-                .default_subject_type
         serializer = self.get_serializer(device)
         return Response(serializer.data)
 
@@ -274,6 +269,8 @@ class DeviceListView(generics.ListCreateAPIView):
                         serializer.data['id'], ibc.id)
             ibc.default_devicegroup.devices.add(serializer.data['id'])
 
+        return serializer
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
 
@@ -286,10 +283,13 @@ class DeviceListView(generics.ListCreateAPIView):
             non_field_errors = serializer.errors.get('non_field_errors')
             if non_field_errors and non_field_errors[0].code == 'unique':
                 status_code = status.HTTP_200_OK
+                device = Device.objects.get(inbound_configuration=serializer.data.get('inbound_configuration'),
+                                            external_id=serializer.data.get('external_id'))
+                serializer = self.get_serializer(device)
             else:
                 raise
         else:
-            self.perform_create(serializer)
+            serializer = self.perform_create(serializer)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status_code, headers=headers)
