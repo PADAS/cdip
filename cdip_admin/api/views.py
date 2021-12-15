@@ -255,41 +255,19 @@ class DeviceListView(generics.ListCreateAPIView):
         IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = Device.objects.all()
 
-    def perform_create(self, serializer):
-        logger.info('in perform_create, serializer.data: %s',
-                    serializer.validated_data)
-        super().perform_create(serializer)
-
-        logger.info(
-            'after save in perform_create, serializer.data: %s', serializer.data)
-
-        ibc = serializer.validated_data.get('inbound_configuration')
-        if ibc:
-            logger.info('Adding id %s to default device group for ibc: %s',
-                        serializer.data['id'], ibc.id)
-            ibc.default_devicegroup.devices.add(serializer.data['id'])
-
-        return serializer
-
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-
-        status_code = status.HTTP_201_CREATED
-        try:
-            serializer.is_valid(raise_exception=True)
-
-        except ValidationError:
-            # Trap a unique-together violation.
-            non_field_errors = serializer.errors.get('non_field_errors')
-            if non_field_errors and non_field_errors[0].code == 'unique':
-                status_code = status.HTTP_200_OK
-                device = Device.objects.get(inbound_configuration=serializer.data.get('inbound_configuration'),
-                                            external_id=serializer.data.get('external_id'))
-                serializer = self.get_serializer(device)
-            else:
-                raise
+        device, created = Device.objects.get_or_create(inbound_configuration_id=request.data.get("inbound_configuration"),
+                                                       external_id=request.data.get("external_id"))
+        if created:
+            status_code = status.HTTP_201_CREATED
+            ibc = InboundIntegrationConfiguration.objects.get(id=request.data.get("inbound_configuration"))
+            if ibc:
+                logger.info('Adding id %s to default device group for ibc: %s',
+                            device.id, ibc.id)
+                ibc.default_devicegroup.devices.add(device.id)
         else:
-            serializer = self.perform_create(serializer)
+            status_code = status.HTTP_200_OK
+        serializer = self.get_serializer(device)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status_code, headers=headers)
