@@ -53,8 +53,10 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
             dev = form.save()
             # save device automatically into default device group of inbound integration selected
             device_group = DeviceGroup.objects.get(pk=dev.inbound_configuration.default_devicegroup.id)
-            device_group.devices.add(dev)
-            return redirect("device_detail", str(dev.id))
+            if device_group:
+                device_group.devices.add(dev)
+                device_group.save()
+            return redirect("device_list")
 
     def get_form(self, form_class=None):
         form = DeviceForm()
