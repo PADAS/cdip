@@ -160,6 +160,13 @@ def filter_device_group_form_fields(form, user):
         org_qs = Organization.objects.filter(id__in=dev_qs.values_list('inbound_configuration__owner', flat=True))
         org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
         form.fields['devices'].queryset = dev_qs.filter(inbound_configuration__owner__in=org_qs)
+
+    if form.fields.get('inbound_configuration'):
+        ic_qs = form.fields['inbound_configuration'].queryset
+        org_qs = Organization.objects.filter(id__in=ic_qs.values_list('owner', flat=True))
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
+        form.fields['inbound_configuration'].queryset = ic_qs.filter(owner__in=org_qs)
+
     return form
 
 
