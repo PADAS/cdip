@@ -53,8 +53,14 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
             dev = form.save()
             # save device automatically into default device group of inbound integration selected
             device_group = DeviceGroup.objects.get(pk=dev.inbound_configuration.default_devicegroup.id)
-            device_group.devices.add(dev)
-            return redirect("device_detail", str(dev.id))
+            if device_group:
+                device_group.devices.add(dev)
+            else:
+                logger.warning(f"Did not find default device group for {dev.id} with integration id: {dev.inbound_configuration}")
+            return redirect("device_list")
+        else:
+            logger.warning(f"Error saving device form: {form.errors}")
+            # TODO: Validate JSON before saving
 
     def get_form(self, form_class=None):
         form = DeviceForm()
@@ -160,6 +166,13 @@ def filter_device_group_form_fields(form, user):
         org_qs = Organization.objects.filter(id__in=dev_qs.values_list('inbound_configuration__owner', flat=True))
         org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
         form.fields['devices'].queryset = dev_qs.filter(inbound_configuration__owner__in=org_qs)
+
+    if form.fields.get('inbound_configuration'):
+        ic_qs = form.fields['inbound_configuration'].queryset
+        org_qs = Organization.objects.filter(id__in=ic_qs.values_list('owner', flat=True))
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, 'name')
+        form.fields['inbound_configuration'].queryset = ic_qs.filter(owner__in=org_qs)
+
     return form
 
 
