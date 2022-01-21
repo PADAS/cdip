@@ -36,7 +36,7 @@ coreschema==0.0.4
     # via coreapi
 croniter==0.3.32
     # via -r requirements.in
-cryptography==2.9.2
+cryptography==3.4
     # via
     #   -r requirements.in
     #   django-fernet-fields
@@ -68,7 +68,7 @@ django-phonenumber-field==4.0.0
     # via -r requirements.in
 django-rbac==0.9
     # via -r requirements.in
-git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f#egg=django-rest-swagger
+# git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f#egg=django-rest-swagger
     # via -r requirements.in
 django-scopes==1.2.0
     # via -r requirements.in
