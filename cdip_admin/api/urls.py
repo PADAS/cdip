@@ -1,10 +1,10 @@
 from django.conf.urls import url
 from django.urls import path
-from rest_framework_swagger.views import get_swagger_view
+# from rest_framework_swagger.views import get_swagger_view
 
 from api.views import *
 
-schema_view = get_swagger_view(title="CDIP ADMIN API")
+# schema_view = get_swagger_view(title="CDIP ADMIN API")
 
 urlpatterns = [
     path('v1.0/public', public),
@@ -45,5 +45,5 @@ urlpatterns = [
 
     path('v1.0/integrations/bridges', BridgeIntegrationListView.as_view(), name='bridge_integration-list-view'),
     path('v1.0/integrations/bridges/<pk>', BridgeIntegrationView.as_view(), name='bridge-integration-view'),
-    url(r'^docs/', schema_view),
+    # url(r'^docs/', schema_view),
 ]

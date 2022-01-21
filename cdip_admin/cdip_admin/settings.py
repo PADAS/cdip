@@ -69,7 +69,7 @@ INSTALLED_APPS = [
     'clients',
     'phonenumber_field',
     'rest_framework',
-    'rest_framework_swagger',
+    # 'rest_framework_swagger',
     "bootstrap4",
 ]
 
