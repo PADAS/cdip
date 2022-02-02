@@ -1,5 +1,10 @@
 import json
+from urllib.parse import urlparse
+
 from dasclient.dasclient import DasClient
+from django.db.models import F
+
+from integrations.models import InboundIntegrationConfiguration, OutboundIntegrationConfiguration
 
 from smartconnect import SmartClient, utils
 from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal
@@ -7,15 +12,30 @@ from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_
 CA_LABEL = 'Smart ER Integration Test CA [SMART_ER]'
 
 
-def test_get_conservation_area():
-    smart_client = SmartClient(api='https://54.152.201.207:8443/server', username='chrisdo', password='christestaccess2', use_language_code='en')
-    das_client = DasClient(service_root='https://cdip-er.pamdas.org/api/v1.0',
-                          username='',
-                          password='',
-                          token='asdfasdifuasdofpiausdfopasuidfpuoiasdf',
-                          token_url=f"https://cdip-er.pamdas.org/oauth2/token",
-                          client_id="das_web_client",
-                          provider_key='smart')
+def push_smart_ca_data_model_to_er_event_types():
+    config = InboundIntegrationConfiguration.objects.get(type__slug='smart_connect', name__exact="SMART Connect 7.4.X")
+    smart_client = SmartClient(api=config.endpoint,
+                               username=config.login,
+                               password=config.password,
+                               use_language_code='en')
+
+    # TODO: Get list of all outbounds associated to inbound
+    # ibc = InboundIntegrationConfiguration.objects.get(id=config.id)
+    # er_destinations = OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ibc).\
+    #     annotate(inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
+
+    outbound_config = OutboundIntegrationConfiguration.objects.get(name__exact="ER SMART Test Site")
+
+    provider_key = 'smart_connect'
+    url_parse = urlparse(outbound_config.endpoint)
+
+    return DasClient(service_root=outbound_config.endpoint,
+                     username=outbound_config.login,
+                     password=outbound_config.password,
+                     token=outbound_config.token,
+                     token_url=f"{url_parse.scheme}://{url_parse.hostname}/oauth2/token",
+                     client_id="das_web_client",
+                     provider_key=provider_key)
 
     caslist = smart_client.get_conservation_areas()
 
@@ -70,4 +90,4 @@ def test_get_conservation_area():
 
 
 if __name__ == '__main__':
-    test_get_conservation_area()
+    push_smart_ca_data_model_to_er_event_types()
