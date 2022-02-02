@@ -83,7 +83,7 @@ KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "***REMOVED***")
 KEYCLOAK_CLIENT_SECRET = env.str('KEYCLOAK_CLIENT_SECRET', "something-fancy")
 KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "***REMOVED***")
 KEYCLOAK_CLIENT_UUID = env.str(
-    'KEYCLOAK_CLIENT_UUID', "***REMOVED***")
+    'KEYCLOAK_CLIENT_UUID', "something-fancy")
 KEYCLOAK_ADMIN_CLIENT_SECRET = env.str(
     'KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
@@ -222,7 +222,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 # Celery Settings
-CELERY_BROKER_URL = 'redis://localhost:30091'
+CELERY_BROKER_URL = 'redis://celery-redis:6379'
 
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ['application/json']
