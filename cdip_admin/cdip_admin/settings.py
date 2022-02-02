@@ -28,17 +28,19 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '^$pu=5yw^4cl1&7e#89&-&8*&_*&_hwas*fv!h-=zsl6j2hg0b'
-SECRET_KEY = env.str("SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
+SECRET_KEY = env.str(
+    "SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
 FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
 # Defaults are sensible for local development.
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', 'portal-127.0.0.1.nip.io',])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
+                         'localhost', 'portal-127.0.0.1.nip.io', 'http://localhost:3000', ])
 
 # Tell Django to use Host forwarded from proxy or gateway)
-USE_X_FORWARDED_HOST=True
+USE_X_FORWARDED_HOST = True
 
 # Set forwarded protocol header (Override this in you local dev if using http.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -68,6 +70,7 @@ INSTALLED_APPS = [
     'accounts',
     'clients',
     'phonenumber_field',
+    'corsheaders',
     'rest_framework',
     'rest_framework_swagger',
     "bootstrap4",
@@ -79,8 +82,10 @@ KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
 KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "cdip-admin-portal")
 KEYCLOAK_CLIENT_SECRET = env.str('KEYCLOAK_CLIENT_SECRET', "something-fancy")
 KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "admin-cli")
-KEYCLOAK_CLIENT_UUID = env.str('KEYCLOAK_CLIENT_UUID', "90d34a81-c70c-408b-ad66-7fa1bfe58892")
-KEYCLOAK_ADMIN_CLIENT_SECRET = env.str('KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
+KEYCLOAK_CLIENT_UUID = env.str(
+    'KEYCLOAK_CLIENT_UUID', "90d34a81-c70c-408b-ad66-7fa1bfe58892")
+KEYCLOAK_ADMIN_CLIENT_SECRET = env.str(
+    'KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
@@ -119,9 +124,17 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'cdip_admin.auth.middleware.AuthenticationMiddleware',
     'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
 ]
+
+CORS_ORIGIN_WHITELIST = [
+    'http://localhost:3000'
+]
+
+CORS_ORIGIN_ALLOW_ALL = True
+
 
 ROOT_URLCONF = 'cdip_admin.urls'
 
@@ -207,3 +220,37 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Celery Settings
+CELERY_BROKER_URL = 'redis://localhost:30091'
+
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = 'UTC'
+
+CELERY_REDIS_MAX_CONNECTIONS = 100
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
+
+CELERY_RESULT_PERSISTENT = False
+CELERY_RESULT_EXPIRES = 300
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+# TODO: update in production
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Enables error emails.
+CELERY_SEND_TASK_ERROR_EMAILS = False
+
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_DEFAULT_EXCHANGE = 'default'
+CELERY_TASK_DEFAULT_ROUTING_KEY = 'default'
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,
+    'fanout_prefix': True
+}
+
+# task:
+CELERY_TASK_TRACK_STARTED = True
