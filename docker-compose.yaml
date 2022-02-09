@@ -1,0 +1,150 @@
+version: "3"
+services:
+    web:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        restart: on-failure
+        image: si/cdip:alpine
+        command: "python manage.py runserver 0.0.0.0:7000"
+        ports:
+            - 7000:7000
+        volumes:
+            - ./cdip_admin:/app
+        environment:
+            DEBUG: True
+            DB_NAME: demodb
+            DB_USER: sintegrateDbUser
+            DB_PASSWORD: secret
+            DB_HOST: db
+            REDIS_HOST: redis
+            REDIS_PASSWORD: ***REMOVED***
+            KEYCLOAK_SERVER: "http://keycloak"
+            KEYCLOAK_REALM: Sintegrate
+            KEYCLOAK_CLIENT_ID: ***REMOVED***
+            KEYCLOAK_CLIENT_SECRET: isAFRRHyysnpFJkO2xKa3Jxpd9l9wuxN
+            KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
+            KEYCLOAK_CLIENT_UUID: ***REMOVED***
+            KEYCLOAK_ADMIN_CLIENT_SECRET: something-fancy
+        depends_on:
+            - db
+            - keycloak
+            - redis
+
+    # https://hub.docker.com/_/postgres
+    # db:
+    #     restart: on-failure
+    #     image: postgres:14-alpine
+    #     volumes:
+    #         - ./cdip_admin/db/scripts:/docker-entrypoint-initdb.d
+    #         - postgresql_data:/var/lib/postgresql/data
+    #     environment:
+    #       POSTGRES_USER: sintegrateDbUser
+    #       POSTGRES_PASSWORD: secret
+    #       POSTGRES_DB: demodb
+    db:
+        restart: on-failure
+        image: postgres:9.6-alpine3.15
+        volumes:
+            - ./cdip_admin/db/scripts:/docker-entrypoint-initdb.d
+            - postgresql_data:/var/lib/postgresql/data
+        environment:
+          POSTGRES_USER: sintegrateDbUser
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: demodb
+
+    # redis:
+    #     restart: on-failure
+    #     image: redis:6.2-alpine
+    #     command: "redis-server --appendonly yes --requirepass ***REMOVED***"
+
+    # https://hub.docker.com/r/bitnami/keycloak/
+    keycloak:
+        image: docker.io/bitnami/keycloak:15
+        ports:
+          - "8080:8080"
+        environment:
+            KEYCLOAK_DATABASE_HOST: db
+            KEYCLOAK_DATABASE_PORT: 5432
+            KEYCLOAK_DATABASE_NAME:  keycloak
+            KEYCLOAK_DATABASE_USER:  sintegrateDbUser
+            KEYCLOAK_DATABASE_PASSWORD: secret
+            KEYCLOAK_DATABASE_SCHEMA:  public
+            KEYCLOAK_ADMIN_USER: admin
+            KEYCLOAK_ADMIN_PASSWORD: secret
+            KEYCLOAK_MANAGEMENT_USER: manager
+            KEYCLOAK_MANAGEMENT_PASSWORD: secret
+        depends_on:
+          - db
+    mailhog:
+        image: mailhog/mailhog
+        logging:
+          driver: 'none'  # disable saving logs
+        ports:
+          - 1025:1025 # smtp server
+          - 8025:8025 # web ui
+
+    # kong:
+    #     image: si/kong
+    #     ports:
+    #       - 8001:8001
+    #     environment:
+    #         KONG_DATABASE: postgres # db engine
+    #         KONG_PG_HOST: db
+    #         KONG_PG_USER: sintegrateDbUser
+    #         KONG_PG_PASSWORD: secret
+    #         KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+    #         # KONG_DATABASE: postgres
+    #         # KONG_PG_HOST: db
+    #         # KONG_PG_USER: sintegrateDbUser
+    #         # KONG_PG_PASSWORD: secret
+    #         # POSTGRES_DB: kong
+    #         # # KONG_LOG_LEVEL: info
+    #     depends_on:
+    #         - db
+
+    kong:
+        # image: docker.io/bitnami/kong:2
+        image: si/kong:bitnami
+        ports:
+          - 8000:8000
+          - 8001:8001
+        environment:
+            KONG_DATABASE: postgres
+            KONG_MIGRATE: "yes"
+            KONG_PG_HOST: db
+            KONG_PG_PORT: 5432
+            KONG_PG_USER: sintegrateDbUser
+            KONG_PG_PASSWORD: secret
+            # KONG_PROXY_HTTP_PORT_NUMBER: 9000
+            KONG_ADMIN_LISTEN_ADDRESS: 0.0.0.0
+            # KONG_ADMIN_HTTP_PORT_NUMBER: 8001
+            KONG_PLUGINS: "oidc"
+        depends_on:
+            - db
+
+    konga:
+        image: pantsel/konga
+        ports:
+            - 1337:1337
+        environment:
+            TOKEN_SECRET: "odpohdhpoaphoidphoadertgore"
+            DB_ADAPTER: postgres
+            DB_HOST: db
+            DB_PORT: 5432
+            DB_USER: sintegrateDbUser
+            DB_PASSWORD: secret
+            DB_DATABASE: kong #  Defaults to 'konga_database'
+            # NODE_ENV: production
+        depends_on:
+            - kong
+            - db
+
+    # adminer:
+    #     image: adminer
+    #     restart: on-failure
+    #     ports:
+    #       - 8081:8080
+volumes:
+    postgresql_data:
+        driver: local
