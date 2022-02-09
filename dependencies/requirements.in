@@ -1,5 +1,5 @@
-celery==4.2.2
-celery_once==1.2.0
+celery==5.2.3
+celery-once==1.2.0
 Django==3.2
 PyJWT==1.7.1
 #asgiref==3.2.10
