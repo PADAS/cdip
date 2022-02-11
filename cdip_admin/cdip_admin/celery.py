@@ -42,6 +42,11 @@ app.conf.beat_schedule = {
         'task': 'cdip_admin.tasks.celerybeat_pulse',
         'schedule': timedelta(seconds=60)
     },
+    # Run sync integrations
+    'run-sync-integrations': {
+        'task': 'cdip_admin.tasks.run_sync_integrations',
+        'schedule': timedelta(seconds=45)
+    },
 
 }
 

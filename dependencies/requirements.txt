@@ -93,7 +93,6 @@ django==3.2
     #   django-filter
     #   django-keycloak
     #   django-phonenumber-field
-    #   django-rest-swagger
     #   django-tables2
     #   djangorestframework
     #   drf-jwt
@@ -115,7 +114,7 @@ django-phonenumber-field==4.0.0
     # via -r ../dependencies/requirements.in
 django-rbac==0.9
     # via -r ../dependencies/requirements.in
-django-rest-swagger @ git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f
+django-rest-swagger==2.2.0
     # via -r ../dependencies/requirements.in
 django-scopes==1.2.0
     # via -r ../dependencies/requirements.in
@@ -132,6 +131,8 @@ ecdsa==0.15
     # via
     #   -r ../dependencies/requirements.in
     #   python-jose
+environs==9.5.0
+    # via smartconnect-client
 gevent==21.12.0
     # via -r ../dependencies/requirements.in
 greenlet==1.1.2
@@ -156,6 +157,8 @@ kombu==5.2.3
     # via celery
 markupsafe==1.1.1
     # via jinja2
+marshmallow==3.14.1
+    # via environs
 natsort==7.0.1
     # via
     #   -r ../dependencies/requirements.in
@@ -197,7 +200,9 @@ python-dateutil==2.8.1
     #   croniter
     #   dateparser
 python-dotenv==0.13.0
-    # via -r ../dependencies/requirements.in
+    # via
+    #   -r ../dependencies/requirements.in
+    #   environs
 python-jose==3.1.0
     # via
     #   -r ../dependencies/requirements.in
@@ -258,7 +263,7 @@ six==1.15.0
     #   python-jose
     #   social-auth-app-django
     #   social-auth-core
-smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.0.5/smartconnect_client-1.0.5-py3-none-any.whl
+smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.0.7/smartconnect_client-1.0.7-py3-none-any.whl
     # via -r ../dependencies/requirements.in
 social-auth-app-django==4.0.0
     # via -r ../dependencies/requirements.in
