@@ -21,3 +21,8 @@ def celerybeat_pulse():
     '''
     redis_client = redis.from_url(settings.CELERY_BROKER_URL)
     redis_client.setex(CELERYBEAT_PULSE_SENTINEL_KEY, 30, 'n/a')
+
+
+@celery.app.task(base=QueueOnce, once={'graceful': True})
+def run_sync_integrations():
+    run_er_smart_sync_integrations()
