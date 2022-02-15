@@ -32,6 +32,8 @@ class ERSMART_Synchronizer():
                                         password=smart_config.password,
                                         use_language_code='en')
 
+        self.smart_ca_uuid = smart_config.additional.get('ca_uuid')
+
         provider_key = smart_config.type.slug
         url_parse = urlparse(er_config.endpoint)
 
@@ -46,17 +48,18 @@ class ERSMART_Synchronizer():
     def push_smart_ca_data_model_to_er_event_types(self):
         caslist = self.smart_client.get_conservation_areas()
 
-        # TODO: A configurable property in portal configuration that allows us to identify CA of interest or group of CA's
+        # TODO: Handle Group of CA's
+        ca_match = False
         for ca in caslist:
-            if ca.label == CA_LABEL:
-                ca_uuid = ca.uuid
+            if ca.uuid == self.smart_ca_uuid:
+                ca_match = True
                 break
 
-        if not ca_uuid:
+        if not ca_match:
             logger.warning(f'Conservation Area not found', extra=dict(ca_label=CA_LABEL))
             return
 
-        dm = self.smart_client.download_datamodel(ca_uuid=ca_uuid)
+        dm = self.smart_client.download_datamodel(ca_uuid=self.smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
         event_types = build_earth_ranger_event_types(dm_dict)
