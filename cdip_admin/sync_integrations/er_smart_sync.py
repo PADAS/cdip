@@ -51,12 +51,12 @@ class ERSMART_Synchronizer():
         # TODO: Handle Group of CA's
         ca_match = False
         for ca in caslist:
-            if ca.uuid == self.smart_ca_uuid:
+            if str(ca.uuid) == self.smart_ca_uuid:
                 ca_match = True
                 break
 
         if not ca_match:
-            logger.warning(f'Conservation Area not found', extra=dict(ca_label=CA_LABEL))
+            logger.warning(f'Conservation Area not found', extra=dict(smart_ca_uuid=self.smart_ca_uuid))
             return
 
         dm = self.smart_client.download_datamodel(ca_uuid=self.smart_ca_uuid)
