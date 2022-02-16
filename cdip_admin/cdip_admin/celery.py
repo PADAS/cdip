@@ -9,7 +9,6 @@ from kombu import Exchange, Queue
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import setup_logging
-import settings
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
@@ -46,7 +45,7 @@ app.conf.beat_schedule = {
     # Run sync integrations
     'run-sync-integrations': {
         'task': 'cdip_admin.tasks.run_sync_integrations',
-        'schedule': timedelta(seconds=settings.CELERY_TASK_SYNC_INTEGRATION_INTERVAL_SECONDS)
+        'schedule': timedelta(days=1)
     },
 
 }
