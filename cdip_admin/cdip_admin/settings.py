@@ -214,8 +214,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 # Celery Settings
-# CELERY_BROKER_URL = 'redis://celery-redis:6379'
-CELERY_BROKER_URL = 'redis://localhost:30091'
+CELERY_BROKER_URL = env.str('CELERY_BROKER_URL', 'redis://celery-redis:6379')
 
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ['application/json']
