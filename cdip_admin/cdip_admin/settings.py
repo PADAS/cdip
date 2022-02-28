@@ -28,17 +28,19 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '***REMOVED***'
-SECRET_KEY = env.str("SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
+SECRET_KEY = env.str(
+    "SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
 FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
 # Defaults are sensible for local development.
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', 'portal-127.0.0.1.nip.io',])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
+                         'localhost', 'portal-127.0.0.1.nip.io', ])
 
 # Tell Django to use Host forwarded from proxy or gateway)
-USE_X_FORWARDED_HOST=True
+USE_X_FORWARDED_HOST = True
 
 # Set forwarded protocol header (Override this in you local dev if using http.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -79,15 +81,18 @@ KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
 KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "***REMOVED***")
 KEYCLOAK_CLIENT_SECRET = env.str('KEYCLOAK_CLIENT_SECRET', "something-fancy")
 KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "***REMOVED***")
-KEYCLOAK_CLIENT_UUID = env.str('KEYCLOAK_CLIENT_UUID', "***REMOVED***")
-KEYCLOAK_ADMIN_CLIENT_SECRET = env.str('KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
+KEYCLOAK_CLIENT_UUID = env.str(
+    'KEYCLOAK_CLIENT_UUID', "***REMOVED***")
+KEYCLOAK_ADMIN_CLIENT_SECRET = env.str(
+    'KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-KONG_PROXY_URL = 'http://kong-proxy.kong.svc.cluster.local:8001'
+KONG_PROXY_URL = env.str(
+    'KONG_PROXY_URL', 'http://kong-proxy.kong.svc.cluster.local:8001')
 
 
 REST_FRAMEWORK = {
