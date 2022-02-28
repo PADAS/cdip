@@ -87,7 +87,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-KONG_PROXY_URL = 'http://kong-proxy.kong.svc.cluster.local:8001'
+KONG_PROXY_URL = env.str("KONG_PROXY_URL", "http://kong-admin.svc.cluster.local:8001")
 
 
 REST_FRAMEWORK = {
