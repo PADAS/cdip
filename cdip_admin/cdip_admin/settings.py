@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_swagger',
     "bootstrap4",
+    "cdip_admin",
 ]
 
 
@@ -212,3 +213,38 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Celery Settings
+CELERY_BROKER_URL = env.str('CELERY_BROKER_URL', 'redis://celery-redis:6379')
+
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = 'UTC'
+
+CELERY_REDIS_MAX_CONNECTIONS = 100
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
+
+CELERY_RESULT_PERSISTENT = False
+CELERY_RESULT_EXPIRES = 300
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+# TODO: update in production
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Enables error emails.
+CELERY_SEND_TASK_ERROR_EMAILS = False
+
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_DEFAULT_EXCHANGE = 'default'
+CELERY_TASK_DEFAULT_ROUTING_KEY = 'default'
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,
+    'fanout_prefix': True
+}
+
+# task:
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_SYNC_INTEGRATION_INTERVAL_SECONDS = env.int('CELERY_TASK_SYNC_INTEGRATION_INTERVAL_SECONDS', 1800)
