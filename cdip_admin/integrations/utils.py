@@ -37,18 +37,23 @@ def create_api_consumer(integration):
 
     if not response.ok and response.status_code != 409:
         logger.error('Failed to create API consumer. %s', response.text)
+        logger.error('Status Code was: %s', response.status_code)
         raise ConsumerCreationError
 
+    logger.info("Consumer for %s was created", integration.id)
     return True
 
 
 def create_api_key(integration):
 
     api_key_url = f'{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}'
+    logger.debug(api_key_url)
 
     response = requests.post(api_key_url)
 
     if not response.ok:
+        logger.error(response.status_code)
+        logger.error(response.content)
         raise ConsumerCreationError
         # TODO: delete consumer if api key creation fails?
 
