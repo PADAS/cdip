@@ -1,8 +1,10 @@
 import json
 import logging
+from typing import List
 from urllib.parse import urlparse
 
 from dasclient.dasclient import DasClient
+from pydantic import parse_obj_as
 from smartconnect import SmartClient
 from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal
 
@@ -94,3 +96,21 @@ class ERSMART_Synchronizer():
                     self.das_client.post_event_type(event_type)
         except Exception as e:
             logger.exception(f'Exception raised posting event type', extra=dict(event_type=event_type))
+
+    def sync_patrol_datamodel(self):
+        patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=self.smart_ca_uuid)
+        patrol_subjects = get_subjects_from_patrol_data_model(patrol_data_model)
+
+        existing_subjects = parse_obj_as(List[Subject], self.das_client.get_subjects())
+        for subject in patrol_subjects:
+            smart_member_id = subject.additional.get('smart_member_id')
+            existing_subject_match = next((ex_subject for ex_subject in existing_subjects
+                                           if ex_subject.additional.get('smart_member_id') == smart_member_id), None)
+            if existing_subject_match:
+                subject.id = existing_subject_match.id
+                if not er_subjects_equal(subject, existing_subject_match):
+                    pass
+                    # TODO: subject updates
+                    # das_client.patch_subject(subject.dict())
+            else:
+                self.das_client.post_subject(subject.dict())
