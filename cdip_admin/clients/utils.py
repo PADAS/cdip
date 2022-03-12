@@ -6,11 +6,11 @@ from cdip_admin import settings
 from clients.models import InboundClientResource
 from core.utils import get_admin_access_token
 
-KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
-KEYCLOAK_REALM = settings.KEYCLOAK_REALM
-KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
-KEYCLOAK_CLIENT_UUID = settings.KEYCLOAK_CLIENT_UUID
-KEYCLOAK_ADMIN_API = f'{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/'
+# KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
+# KEYCLOAK_REALM = settings.KEYCLOAK_REALM
+# KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
+
+KEYCLOAK_ADMIN_API = f'{settings.KEYCLOAK_SERVER}/auth/admin/realms/{settings.KEYCLOAK_REALM}/'
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,8 @@ def get_clients():
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -46,7 +47,8 @@ def get_client(client_id):
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -71,7 +73,8 @@ def get_client_by_client_id(client_id):
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -79,7 +82,8 @@ def get_client_by_client_id(client_id):
         "authorization": f"{token['token_type']} {token['access_token']}"
     }
 
-    response = requests.get(url=url, headers=headers, params=params, timeout=(2, 10))
+    response = requests.get(url=url, headers=headers,
+                            params=params, timeout=(2, 10))
 
     if response.status_code == 200:
         return response.json()
@@ -95,7 +99,8 @@ def get_client_secret(client_id):
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -114,18 +119,19 @@ def get_client_secret(client_id):
 
 def add_client(client_info, type_id):
     url = KEYCLOAK_ADMIN_API + 'clients'
-    
+
     client_info = get_default_client_settings(client_info)
 
     authorizationSettings = build_authorization_settings(type_id)
 
     client_info['authorizationSettings'] = authorizationSettings
-    
+
     token = get_admin_access_token()
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -140,9 +146,10 @@ def add_client(client_info, type_id):
         client_id = location.split('/')[-1]
         logger.info(f'Client created successfully')
         return client_id
-    else:
-        logger.error(f'Error adding client: {response.status_code}], {response.text}')
-        return None
+
+    logger.error(
+        f'Error adding client: {response.status_code}], {response.text}')
+    return None
 
 
 def update_client(client_info, client_id):
@@ -154,7 +161,8 @@ def update_client(client_info, client_id):
 
     if not token:
         logger.warning('Cannot get a valid access_token.')
-        response = JsonResponse({'message': 'You don\'t have access to this resource'})
+        response = JsonResponse(
+            {'message': 'You don\'t have access to this resource'})
         response.status_code = 403
         return response
 
@@ -168,7 +176,8 @@ def update_client(client_info, client_id):
         logger.info(f'Client updated successfully')
         return True
     else:
-        logger.error(f'Error updating client: {response.status_code}], {response.text}')
+        logger.error(
+            f'Error updating client: {response.status_code}], {response.text}')
         return False
 
 
