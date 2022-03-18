@@ -58,21 +58,26 @@ class OutboundIntegrationConfigurationSerializer(serializers.ModelSerializer):
 
 class DeviceSerializer(serializers.ModelSerializer):
 
-    inbound_configuration = serializers.PrimaryKeyRelatedField(
-        queryset=InboundIntegrationConfiguration.objects.all())
+    # inbound_configuration = serializers.PrimaryKeyRelatedField(
+    #     queryset=InboundIntegrationConfiguration.objects.all())
+
+    inbound_configuration = InboundIntegrationConfigurationSerializer(
+        read_only=True)
 
     subject_type = serializers.SerializerMethodField()
 
     def get_subject_type(self, obj):
 
         if not obj.subject_type:
-            device_group = DeviceGroup.objects.get(id=obj.inbound_configuration.default_devicegroup.id)
+            device_group = DeviceGroup.objects.get(
+                id=obj.inbound_configuration.default_devicegroup.id)
             if device_group and device_group.default_subject_type:
                 return device_group.default_subject_type.value
 
     class Meta:
         model = Device
-        fields = ['id', 'external_id', 'name', 'subject_type', 'inbound_configuration', 'additional']
+        fields = ['id', 'external_id', 'name', 'subject_type', 'inbound_configuration', 'additional',
+                  ]
 
 
 class DeviceStateSerializer(serializers.ModelSerializer):

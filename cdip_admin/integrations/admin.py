@@ -8,14 +8,18 @@ from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfi
 # Register your models here.
 admin.site.register(InboundIntegrationType)
 admin.site.register(OutboundIntegrationType)
+
+
 @admin.register(DeviceState)
 class DeviceStateAdmin(admin.ModelAdmin):
     list_display = ('device', '_external_id', '_owner', 'created_at',)
-    list_filter = ('device__inbound_configuration__name' , 'device__inbound_configuration__owner',)
-    search_fields = ('device__external_id', 'device__inbound_configuration__name', )
+    list_filter = ('device__inbound_configuration__name',
+                   'device__inbound_configuration__owner',)
+    search_fields = ('device__external_id',
+                     'device__inbound_configuration__name', )
 
     date_hierarchy = 'created_at'
-    
+
     def _external_id(self, obj):
         return obj.device.external_id
     _external_id.short_description = 'Device ID'
@@ -29,7 +33,8 @@ class DeviceStateAdmin(admin.ModelAdmin):
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
     list_display = ('external_id', '_owner', 'created_at',)
-    list_filter = ('inbound_configuration__name', 'inbound_configuration__owner',)
+    list_filter = ('inbound_configuration__name',
+                   'inbound_configuration__owner',)
     search_fields = ('external_id',)
 
     date_hierarchy = 'created_at'
@@ -56,7 +61,7 @@ class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = InboundIntegrationConfigurationForm
 
-    list_display = ('name', 'type', 'owner','enabled',)
+    list_display = ('name', 'type', 'owner', 'enabled',)
 
     list_filter = ('type', 'owner', 'enabled',)
 
@@ -68,11 +73,16 @@ class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
     readonly_fields = ['id', ]
     form = OutboundIntegrationConfigurationForm
 
+    list_filter = ('type', 'owner', 'enabled',)
+
+
 @admin.register(BridgeIntegrationType)
 class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
 
     list_display = ('name',)
 
+
 @admin.register(BridgeIntegration)
 class BridgeIntegrationAdmin(admin.ModelAdmin):
     list_display = ('name', 'owner')
+    list_filter = ('type', 'owner', 'enabled',)
