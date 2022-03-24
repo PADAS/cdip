@@ -1,4 +1,4 @@
-from integrations.models import OutboundIntegrationConfiguration
+from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
 from sync_integrations.er_smart_sync import ERSMART_Synchronizer
 import logging
 
@@ -19,7 +19,15 @@ def run_er_smart_sync_integrations():
         if smart_integration_id and er_integration_id:
             er_smart_sync = ERSMART_Synchronizer(smart_integration_id=smart_integration_id,
                                                  er_integration_id=er_integration_id)
-            er_smart_sync.push_smart_ca_data_model_to_er_event_types()
+            # er_smart_sync.push_smart_ca_data_model_to_er_event_types()
+            # er_smart_sync.sync_patrol_datamodel()
+            # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
+            er_inbound_integration = InboundIntegrationConfiguration.objects.get(endpoint=er_integration.endpoint,
+                                                                                 enabled=True)
+            if er_inbound_integration:
+                # er_smart_sync.get_er_events(config=er_inbound_integration)
+                er_smart_sync.get_er_patrols(config=er_inbound_integration)
+
         else:
             logger.warning(f"skipping sync, er_integration_id not found for smart_integration {smart_integration.id}")
             continue
