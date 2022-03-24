@@ -1,18 +1,30 @@
+from datetime import timezone, datetime, timedelta
 import json
 import logging
-from typing import List
+from typing import List, Optional
 from urllib.parse import urlparse
 
+import pydantic
+from cdip_connector.core.routing import TopicEnum
+from cdip_connector.core.publisher import get_publisher
 from dasclient.dasclient import DasClient
 from pydantic import parse_obj_as
-from smartconnect import SmartClient
-from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal
+from smartconnect import SmartClient, Subject
+from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal, \
+    get_subjects_from_patrol_data_model, er_subjects_equal
 
-from integrations.models import OutboundIntegrationConfiguration
+from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
+from cdip_connector.core.schemas import ERPatrol, EREvent, ERUpdate
 
 logger = logging.getLogger(__name__)
 
 CA_LABEL = 'Smart ER Integration Test CA [SMART_ER]'
+
+
+class EarthRangerReaderState(pydantic.BaseModel):
+    event_greatest_serial_number: Optional[int] = -1
+    event_latest_created_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
+    patrol_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
 
 
 class ERSMART_Synchronizer():
@@ -46,6 +58,8 @@ class ERSMART_Synchronizer():
                                     token_url=f"{url_parse.scheme}://{url_parse.hostname}/oauth2/token",
                                     client_id="das_web_client",
                                     provider_key=provider_key)
+
+        self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self):
         caslist = self.smart_client.get_conservation_areas()
@@ -97,6 +111,32 @@ class ERSMART_Synchronizer():
         except Exception as e:
             logger.exception(f'Exception raised posting event type', extra=dict(event_type=event_type))
 
+    def get_er_events(self, *, config: InboundIntegrationConfiguration):
+        i_state = EarthRangerReaderState.parse_obj(config.state)
+
+        lower = i_state.event_latest_created_at or datetime.now(tz=timezone.utc) - timedelta(days=7)
+        upper = datetime.now(tz=timezone.utc)
+
+        FILTER_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+
+        event_filter_spec = {
+            'create_date': {'lower': lower.strftime(FILTER_DATETIME_FORMAT),
+                            'upper': upper.strftime(FILTER_DATETIME_FORMAT)}
+        }
+
+        events = parse_obj_as(List[EREvent], self.das_client.get_events(filter=json.dumps(event_filter_spec)))
+        event: EREvent
+        for event in events:
+            event.integration_id = config.id
+            event.device_id = event.id
+            # self.publisher.publish(TopicEnum.observations_unprocessed.value, event.dict())
+            i_state.event_latest_created_at = max(event.created_at, i_state.event_latest_created_at)
+            i_state.event_greatest_serial_number = max(event.serial_number, i_state.event_greatest_serial_number)
+
+        config.state = json.loads(i_state.json())
+        config.save()
+
+
     def sync_patrol_datamodel(self):
         patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=self.smart_ca_uuid)
         patrol_subjects = get_subjects_from_patrol_data_model(patrol_data_model)
@@ -114,3 +154,38 @@ class ERSMART_Synchronizer():
                     # das_client.patch_subject(subject.dict())
             else:
                 self.das_client.post_subject(subject.dict())
+
+    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
+        i_state = EarthRangerReaderState.parse_obj(config.state)
+
+        lower = i_state.patrol_last_poll_at or datetime.now(tz=timezone.utc) - timedelta(days=7)
+        upper = datetime.now(tz=timezone.utc)
+
+        FILTER_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+
+        patrol_filter_spec = {
+            'date_range': {'lower': lower.strftime(FILTER_DATETIME_FORMAT),
+                           'upper': upper.strftime(FILTER_DATETIME_FORMAT)}
+        }
+        patrols = parse_obj_as(List[ERPatrol], self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)))
+        logger.info(f'Pulled {len(patrols)} patrols from ER')
+        patrol : ERPatrol
+        for patrol in patrols:
+            patrol.integration_id = config.id
+            patrol.device_id = patrol.id
+            # TODO: determine if open patrol has been updated since last poll
+            if patrol.state != 'done':
+                updates = patrol.updates
+                for seg in patrol.patrol_segments:
+                    for update in seg.updates:
+                        updates.append(update)
+                max_update = max([u.time for u in updates])
+                if max_update < i_state.patrol_last_poll_at:
+                    # patrol hasn't been updated since last poll, skip
+                    continue
+
+            self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
+
+        # i_state.patrol_last_poll_at = upper
+        # config.state = json.loads(i_state.json())
+        # config.save()
