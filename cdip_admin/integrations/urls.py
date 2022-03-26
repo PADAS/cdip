@@ -8,15 +8,19 @@ from .views import OutboundIntegrationConfigurationUpdateView, InboundIntegratio
 
 urlpatterns = [
     path('devices/<uuid:module_id>', views.device_detail, name='device_detail'),
-    path('devices/<uuid:module_id>/edit', DeviceUpdateView.as_view(), name='device_update'),
+    path('devices/<uuid:module_id>/edit',
+         DeviceUpdateView.as_view(), name='device_update'),
     path('devices', views.DeviceList.as_view(), name='device_list'),
     path('devices/add', DeviceAddView.as_view(), name="device_add"),
 
-    path('devicegroups/<uuid:module_id>', views.DeviceGroupDetail.as_view(), name='device_group'),
-    path('devicegroups', views.DeviceGroupListView.as_view(), name='device_group_list'),
+    path('devicegroups/<uuid:module_id>',
+         views.DeviceGroupDetail.as_view(), name='device_group'),
+    path('devicegroups', views.DeviceGroupListView.as_view(),
+         name='device_group_list'),
     path('devicegroups/add', DeviceGroupAddView.as_view(), name="device_group_add"),
 
-    path('devicegroups/<uuid:device_group_id>/edit', DeviceGroupUpdateView.as_view(), name="device_group_update"),
+    path('devicegroups/<uuid:device_group_id>/edit',
+         DeviceGroupUpdateView.as_view(), name="device_group_update"),
 
     path('devicegroups/<uuid:device_group_id>/manage',
          DeviceGroupManagementUpdateView.as_view(),
@@ -26,7 +30,8 @@ urlpatterns = [
 
     path('inboundtypes/<uuid:module_id>', views.inbound_integration_type_detail,
          name='inbound_integration_type_detail'),
-    path('inboundtypes/add', views.inbound_integration_type_add, name='inbound_integration_type_add'),
+    path('inboundtypes/add', views.inbound_integration_type_add,
+         name='inbound_integration_type_add'),
     path('inboundtypes/<uuid:inbound_integration_type_id>/edit',
          views.inbound_integration_type_update,
          name="inbound_integration_type_update"),
@@ -35,7 +40,8 @@ urlpatterns = [
 
     path('outboundtypes/<uuid:module_id>', views.outbound_integration_type_detail,
          name='outbound_integration_type_detail'),
-    path('outboundtypes/add', views.outbound_integration_type_add, name='outbound_integration_type_add'),
+    path('outboundtypes/add', views.outbound_integration_type_add,
+         name='outbound_integration_type_add'),
     path('outboundtypes/<uuid:outbound_integration_type_id>/edit',
          views.outbound_integration_type_update,
          name="outbound_integration_type_update"),
@@ -44,7 +50,7 @@ urlpatterns = [
 
     path('inboundconfigurations', views.InboundIntegrationConfigurationListView.as_view(),
          name="inbound_integration_configuration_list"),
-    path('inboundconfigurations/<uuid:module_id>', views.inbound_integration_configuration_detail,
+    path('inboundconfigurations/<uuid:id>', views.inbound_integration_configuration_detail,
          name="inbound_integration_configuration_detail"),
     path('inboundconfigurations/add', InboundIntegrationConfigurationAddView.as_view(),
          name="inbound_integration_configuration_add"),
