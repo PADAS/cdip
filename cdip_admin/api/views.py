@@ -255,12 +255,16 @@ class DeviceListView(generics.ListCreateAPIView):
         IsGlobalAdmin | IsOrganizationMember | IsServiceAccount, )
     queryset = Device.objects.all()
 
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['external_id', 'inbound_configuration__type__slug']
+
     def create(self, request, *args, **kwargs):
         device, created = Device.objects.get_or_create(inbound_configuration_id=request.data.get("inbound_configuration"),
                                                        external_id=request.data.get("external_id"))
         if created:
             status_code = status.HTTP_201_CREATED
-            ibc = InboundIntegrationConfiguration.objects.get(id=request.data.get("inbound_configuration"))
+            ibc = InboundIntegrationConfiguration.objects.get(
+                id=request.data.get("inbound_configuration"))
             if ibc:
                 logger.info('Adding id %s to default device group for ibc: %s',
                             device.id, ibc.id)
