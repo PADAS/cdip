@@ -1,6 +1,6 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column
-from crispy_forms.layout import Submit
+from crispy_forms.layout import Submit, Field
 from django import forms
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -15,9 +15,10 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        exclude = ['id',]
+        exclude = ['id', ]
         fields = (
-            'name', 'type', 'provider', 'owner', 'enabled', 'default_devicegroup', 'endpoint', 'login', 'password', 'token',
+            'name', 'type', 'provider', 'owner', 'enabled', 'default_devicegroup', 'endpoint',
+            'login', 'password', 'token',
             'state', 'consumer_id',)
         labels = {'default_devicegroup': "Default Device Group"}
         widgets = {
@@ -33,7 +34,8 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields['owner'].queryset = IsOrganizationMember. \
-                    filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
+                    filter_queryset_for_user(
+                        qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
 
@@ -43,13 +45,15 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     helper.layout = Layout(
         Row(
-            Column('name', css_class='form-group col-md-6'),
+            Column(Field('name', autocomplete="off"),
+                   css_class='form-group col-md-6'),
             Column('owner', css_class='form-group col-md-6'),
             css_class='form-row',
         ),
         Row(
             Column('type', css_class='form-group col-md-6'),
-            Column('provider', css_class='form-group col-md-6'),
+            Column(Field('provider', autocomplete="off"),
+                   css_class='form-group col-md-6'),
             css_class='form-row',
         ),
         'enabled',
@@ -58,13 +62,17 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             css_class='form-row',
         ),
         Row(
-            Column('endpoint', css_class='form-group col-md-6'),
-            Column('token', css_class='form-group col-md-6'),
+            Column(Field('endpoint', autocomplete="off"),
+                   css_class='form-group col-md-6',),
+            Column(Field('token', autocomplete="off"),
+                   css_class='form-group col-md-6'),
             css_class='form-row',
         ),
         Row(
-            Column('login', css_class='form-group col-md-6'),
-            Column('password', css_class='form-group col-md-6'),
+            Column(Field('login', autocomplete="off"),
+                   css_class='form-group col-md-6'),
+            Column(Field('password', autocomplete="off"),
+                   css_class='form-group col-md-6'),
             css_class='form-row',
         ),
         Row(Column('state', css_class='form-group col-md-12')),
@@ -84,7 +92,8 @@ class InboundIntegrationTypeForm(forms.ModelForm):
 
 
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
+    password = forms.CharField(widget=forms.PasswordInput(
+        render_value=True), required=False)
 
     class Meta:
         model = OutboundIntegrationConfiguration
@@ -94,12 +103,14 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
         }
 
     def __init__(self, *args, request=None, **kwargs):
-        super(OutboundIntegrationConfigurationForm, self).__init__(*args, **kwargs)
+        super(OutboundIntegrationConfigurationForm,
+              self).__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields['owner'].queryset = IsOrganizationMember. \
-                    filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
+                    filter_queryset_for_user(
+                        qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
 
@@ -122,7 +133,7 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
 class DeviceGroupForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
-        exclude = ['id', 'devices',]
+        exclude = ['id', 'devices', ]
 
     def __init__(self, *args, request=None, **kwargs):
         super(DeviceGroupForm, self).__init__(*args, **kwargs)
@@ -189,7 +200,8 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields['owner'].queryset = IsOrganizationMember. \
-                    filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
+                    filter_queryset_for_user(
+                        qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
 
@@ -213,7 +225,7 @@ class BridgeIntegrationForm(forms.ModelForm):
 
     class Meta:
         model = BridgeIntegration
-        exclude = ['id', 'state',]
+        exclude = ['id', 'state', ]
         fields = ('name', 'type', 'owner', 'enabled', 'additional', 'state')
         widgets = {
             'additional': FormattedJsonFieldWidget(),
@@ -226,7 +238,8 @@ class BridgeIntegrationForm(forms.ModelForm):
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields['owner'].queryset = IsOrganizationMember. \
-                    filter_queryset_for_user(qs, request.user, 'name', admin_only=True)
+                    filter_queryset_for_user(
+                        qs, request.user, 'name', admin_only=True)
             else:
                 self.fields['owner'].queryset = qs
 
@@ -236,5 +249,5 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 
 class KeyAuthForm(forms.Form):
-    key = forms.CharField(label="API Key", max_length=100, widget=ReadonlyPeekabooTextInput, required=False)
-
+    key = forms.CharField(label="API Key", max_length=100,
+                          widget=ReadonlyPeekabooTextInput, required=False)

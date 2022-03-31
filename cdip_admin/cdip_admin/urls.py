@@ -37,5 +37,6 @@ urlpatterns = [
     path('', include('social_django.urls')),
 ]
 
+handler403 = 'cdip_admin.views.custom_error_403'
 
 urlpatterns += staticfiles_urlpatterns()
