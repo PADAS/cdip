@@ -25,7 +25,7 @@ def run_er_smart_sync_integrations():
             er_inbound_integration = InboundIntegrationConfiguration.objects.get(endpoint=er_integration.endpoint,
                                                                                  enabled=True)
             if er_inbound_integration:
-                # er_smart_sync.get_er_events(config=er_inbound_integration)
+                er_smart_sync.get_er_events(config=er_inbound_integration)
                 er_smart_sync.get_er_patrols(config=er_inbound_integration)
 
         else:
