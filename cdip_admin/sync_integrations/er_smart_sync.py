@@ -22,8 +22,7 @@ CA_LABEL = 'Smart ER Integration Test CA [SMART_ER]'
 
 
 class EarthRangerReaderState(pydantic.BaseModel):
-    event_greatest_serial_number: Optional[int] = -1
-    event_latest_created_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
+    event_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
     patrol_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
 
 
@@ -114,28 +113,32 @@ class ERSMART_Synchronizer():
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
         i_state = EarthRangerReaderState.parse_obj(config.state)
 
-        lower = i_state.event_latest_created_at or datetime.now(tz=timezone.utc) - timedelta(days=7)
-        upper = datetime.now(tz=timezone.utc)
+        event_last_poll_at = i_state.event_last_poll_at or datetime.now(tz=timezone.utc) - timedelta(days=7)
+        current_time = datetime.now(tz=timezone.utc)
 
         FILTER_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
-        event_filter_spec = {
-            'create_date': {'lower': lower.strftime(FILTER_DATETIME_FORMAT),
-                            'upper': upper.strftime(FILTER_DATETIME_FORMAT)}
-        }
+        event_last_poll = event_last_poll_at.strftime(FILTER_DATETIME_FORMAT)
 
-        events = parse_obj_as(List[EREvent], self.das_client.get_events(filter=json.dumps(event_filter_spec)))
+        # event_filter_spec = {
+        #     'create_date': {'lower': lower.strftime(FILTER_DATETIME_FORMAT),
+        #                     'upper': upper.strftime(FILTER_DATETIME_FORMAT)}
+        # }
+
+        # TODO: consider just using updated_at param ?
+        # events = parse_obj_as(List[EREvent], self.das_client.get_events(filter=json.dumps(event_filter_spec)))
+        events = parse_obj_as(List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at))
         event: EREvent
         for event in events:
-            event.integration_id = config.id
-            event.device_id = event.id
-            # self.publisher.publish(TopicEnum.observations_unprocessed.value, event.dict())
-            i_state.event_latest_created_at = max(event.created_at, i_state.event_latest_created_at)
-            i_state.event_greatest_serial_number = max(event.serial_number, i_state.event_greatest_serial_number)
+            # Exclude events associated to patrols when pushing independent incidents to SMART
+            if not event.patrols:
+                event.integration_id = config.id
+                event.device_id = event.id
+                self.publisher.publish(TopicEnum.observations_unprocessed.value, event.dict())
 
+        i_state.event_last_poll_at = current_time
         config.state = json.loads(i_state.json())
         config.save()
-
 
     def sync_patrol_datamodel(self):
         patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=self.smart_ca_uuid)
@@ -169,11 +172,10 @@ class ERSMART_Synchronizer():
         }
         patrols = parse_obj_as(List[ERPatrol], self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)))
         logger.info(f'Pulled {len(patrols)} patrols from ER')
-        patrol : ERPatrol
+        patrol: ERPatrol
         for patrol in patrols:
             patrol.integration_id = config.id
             patrol.device_id = patrol.id
-            # TODO: determine if open patrol has been updated since last poll
             if patrol.state != 'done':
                 updates = patrol.updates
                 for seg in patrol.patrol_segments:
@@ -183,9 +185,15 @@ class ERSMART_Synchronizer():
                 if max_update < i_state.patrol_last_poll_at:
                     # patrol hasn't been updated since last poll, skip
                     continue
+            for segment in patrol.patrol_segments:
+                # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
+                for event in segment.events:
+                    event_details = parse_obj_as(List[EREvent], self.das_client.get_events(event_ids=event.id))
+                    segment.event_details.extend(event_details)
+
 
             self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
 
-        # i_state.patrol_last_poll_at = upper
-        # config.state = json.loads(i_state.json())
-        # config.save()
+        i_state.patrol_last_poll_at = upper
+        config.state = json.loads(i_state.json())
+        config.save()
