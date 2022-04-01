@@ -1,25 +1,22 @@
-from datetime import timezone, datetime, timedelta
 import json
 import logging
+from datetime import timezone, datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
 
 import pydantic
-from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.publisher import get_publisher
+from cdip_connector.core.routing import TopicEnum
+from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject
 from dasclient.dasclient import DasClient
 from pydantic import parse_obj_as
-from smartconnect import SmartClient, Subject
+from smartconnect import SmartClient
 from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal, \
     get_subjects_from_patrol_data_model, er_subjects_equal
 
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
-from cdip_connector.core.schemas import ERPatrol, EREvent, ERUpdate
 
 logger = logging.getLogger(__name__)
-
-CA_LABEL = 'Smart ER Integration Test CA [SMART_ER]'
-
 
 class EarthRangerReaderState(pydantic.BaseModel):
     event_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
@@ -63,7 +60,7 @@ class ERSMART_Synchronizer():
     def push_smart_ca_data_model_to_er_event_types(self):
         caslist = self.smart_client.get_conservation_areas()
 
-        # TODO: Handle Group of CA's
+        # TODO: Handle Group of CA's associated to single ER site
         ca_match = False
         for ca in caslist:
             if str(ca.uuid) == self.smart_ca_uuid:
@@ -80,12 +77,12 @@ class ERSMART_Synchronizer():
         event_types = build_earth_ranger_event_types(dm_dict)
 
         existing_event_categories = self.das_client.get_event_categories()
-        event_category = next((x for x in existing_event_categories if x.get('value') == CA_LABEL), None)
+        event_category = next((x for x in existing_event_categories if x.get('value') == ca.label), None)
         if not event_category:
-            logger.info('Event Category not found in destination ER, creating now ...', extra=dict(value=CA_LABEL,
-                                                                                                   display=CA_LABEL))
-            event_category = dict(value=CA_LABEL,
-                                  display=CA_LABEL)
+            logger.info('Event Category not found in destination ER, creating now ...', extra=dict(value=ca.label,
+                                                                                                   display=ca.label))
+            event_category = dict(value=ca.label,
+                                  display=ca.label)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category, event_types)
 
@@ -118,15 +115,6 @@ class ERSMART_Synchronizer():
 
         FILTER_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
-        event_last_poll = event_last_poll_at.strftime(FILTER_DATETIME_FORMAT)
-
-        # event_filter_spec = {
-        #     'create_date': {'lower': lower.strftime(FILTER_DATETIME_FORMAT),
-        #                     'upper': upper.strftime(FILTER_DATETIME_FORMAT)}
-        # }
-
-        # TODO: consider just using updated_at param ?
-        # events = parse_obj_as(List[EREvent], self.das_client.get_events(filter=json.dumps(event_filter_spec)))
         events = parse_obj_as(List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at))
         event: EREvent
         for event in events:
@@ -144,7 +132,7 @@ class ERSMART_Synchronizer():
         patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=self.smart_ca_uuid)
         patrol_subjects = get_subjects_from_patrol_data_model(patrol_data_model)
 
-        existing_subjects = parse_obj_as(List[Subject], self.das_client.get_subjects())
+        existing_subjects = parse_obj_as(List[ERSubject], self.das_client.get_subjects())
         for subject in patrol_subjects:
             smart_member_id = subject.additional.get('smart_member_id')
             existing_subject_match = next((ex_subject for ex_subject in existing_subjects
@@ -190,7 +178,6 @@ class ERSMART_Synchronizer():
                 for event in segment.events:
                     event_details = parse_obj_as(List[EREvent], self.das_client.get_events(event_ids=event.id))
                     segment.event_details.extend(event_details)
-
 
             self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
 
