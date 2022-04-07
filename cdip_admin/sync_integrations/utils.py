@@ -1,5 +1,5 @@
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
-from sync_integrations.er_smart_sync import ERSMART_Synchronizer
+from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ def run_er_smart_sync_integrations():
             if not er_integration:
                 er_integration_id = None
         if smart_integration_id and er_integration_id:
-            er_smart_sync = ERSMART_Synchronizer(smart_integration_id=smart_integration_id,
-                                                 er_integration_id=er_integration_id)
+            er_smart_sync = ER_SMART_Synchronizer(smart_integration_id=smart_integration_id,
+                                                  er_integration_id=er_integration_id)
             er_smart_sync.push_smart_ca_data_model_to_er_event_types()
             er_smart_sync.sync_patrol_datamodel()
             # TODO: create non-directional int so we dont have both inbound and outbound int representing same system

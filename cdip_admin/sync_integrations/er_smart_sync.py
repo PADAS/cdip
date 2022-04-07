@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import pydantic
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject
+from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
 from dasclient.dasclient import DasClient
 from pydantic import parse_obj_as
 from smartconnect import SmartClient
@@ -18,12 +18,13 @@ from integrations.models import OutboundIntegrationConfiguration, InboundIntegra
 
 logger = logging.getLogger(__name__)
 
+
 class EarthRangerReaderState(pydantic.BaseModel):
     event_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
     patrol_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(days=7)
 
 
-class ERSMART_Synchronizer():
+class ER_SMART_Synchronizer():
     def __init__(self, **kwargs):
         smart_integration_id = kwargs.get('smart_integration_id')
         er_integration_id= kwargs.get('er_integration_id')
@@ -89,9 +90,10 @@ class ERSMART_Synchronizer():
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         existing_event_types = self.das_client.get_event_types()
         try:
+            # TODO: Handle multiple CAs
             for event_type in event_types:
-                event_type_match = next((x for x in existing_event_types if x.get('value') == event_type.get('value')),
-                                        None)
+                event_type_match = next((x for x in existing_event_types
+                                         if (x.get('value') == event_type.get('value'))), None)
                 if event_type_match:
                     event_type_match_schema = self.das_client.get_event_schema(event_type.get('value'))
                     if not er_event_type_schemas_equal(json.loads(event_type.get('schema')).get('schema'),
@@ -122,6 +124,8 @@ class ERSMART_Synchronizer():
             if not event.patrols:
                 event.integration_id = config.id
                 event.device_id = event.id
+                logger.info(f'Publishing observation for event', extra=dict(event_id=event.id,
+                                                                            event_title=event.title))
                 self.publisher.publish(TopicEnum.observations_unprocessed.value, event.dict())
 
         i_state.event_last_poll_at = current_time
@@ -144,7 +148,10 @@ class ERSMART_Synchronizer():
                     # TODO: subject updates
                     # das_client.patch_subject(subject.dict())
             else:
-                self.das_client.post_subject(subject.dict())
+                try:
+                    self.das_client.post_subject(subject.dict(exclude_none=True))
+                except Exception:
+                    logger.error(f'Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}')
 
     def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
         i_state = EarthRangerReaderState.parse_obj(config.state)
@@ -162,8 +169,14 @@ class ERSMART_Synchronizer():
         logger.info(f'Pulled {len(patrols)} patrols from ER')
         patrol: ERPatrol
         for patrol in patrols:
+            logger.info(f'Beginning processing of ER patrol',
+                        extra=dict(patrol_id=patrol.id,
+                                   patrol_serial_num=patrol.serial_number,
+                                   patrol_title=patrol.title))
             patrol.integration_id = config.id
             patrol.device_id = patrol.id
+
+            # determine if open patrol has any new updates
             if patrol.state != 'done':
                 updates = patrol.updates
                 for seg in patrol.patrol_segments:
@@ -171,14 +184,40 @@ class ERSMART_Synchronizer():
                         updates.append(update)
                 max_update = max([u.time for u in updates])
                 if max_update < i_state.patrol_last_poll_at:
-                    # patrol hasn't been updated since last poll, skip
+                    logger.info("skipping processing, patrol hasn't been updated since last poll")
                     continue
+
+            # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
                 # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
                 for event in segment.events:
                     event_details = parse_obj_as(List[EREvent], self.das_client.get_events(event_ids=event.id))
                     segment.event_details.extend(event_details)
 
+                if not segment.start_location:
+                    # Need start location to pass in coordinates and determine location timezone
+                    logger.info("skipping processing, patrol contains no start location")
+                    continue
+
+                if not segment.leader:
+                    # SMART requires at least one member on patrol leg
+                    logger.info("skipping processing, patrol contains no start location")
+                    continue
+
+                # Get track points from subject during time range of patrol
+                start = segment.time_range.get('start_time')
+                end = segment.time_range.get('end_time')
+                if not end:
+                    end = upper
+                segment.track_points = parse_obj_as(List[ERObservation],
+                                                    self.das_client.get_subject_observations(
+                                                        subject_id=segment.leader.id,
+                                                        start=start,
+                                                        end=end))
+
+            logger.info(f'Publishing observation for ER Patrol', extra=dict(patrol_id=patrol.id,
+                                                                            patrol_serial_num=patrol.serial_number,
+                                                                            patrol_title=patrol.title))
             self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
 
         i_state.patrol_last_poll_at = upper
