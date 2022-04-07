@@ -13,7 +13,11 @@ def run_er_smart_sync_integrations():
         er_integration_id = smart_integration.additional.get('er_integration_id') if smart_integration.additional else None
         if er_integration_id:
             # confirm er_integration exists
-            er_integration = OutboundIntegrationConfiguration.objects.get(id=er_integration_id)
+            try:
+                er_integration = OutboundIntegrationConfiguration.objects.get(id=er_integration_id)
+            except OutboundIntegrationConfiguration.DoesNotExist:
+                logger.error(f'er_integration_id specified was not found: {er_integration_id}')
+                er_integration = None
             if not er_integration:
                 er_integration_id = None
         if smart_integration_id and er_integration_id:
