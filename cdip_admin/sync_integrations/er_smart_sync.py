@@ -118,6 +118,7 @@ class ER_SMART_Synchronizer():
         FILTER_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
         events = parse_obj_as(List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at))
+        logger.info(f'Pulled {len(events)} events from ER')
         event: EREvent
         for event in events:
             # Exclude events associated to patrols when pushing independent incidents to SMART
