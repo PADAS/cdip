@@ -27,10 +27,10 @@ class EarthRangerReaderState(pydantic.BaseModel):
 class ER_SMART_Synchronizer():
     def __init__(self, **kwargs):
         smart_integration_id = kwargs.get('smart_integration_id')
-        er_integration_id= kwargs.get('er_integration_id')
+        er_integration_id = kwargs.get('er_integration_id')
 
         smart_config = OutboundIntegrationConfiguration.objects.get(id=smart_integration_id)
-        er_config = OutboundIntegrationConfiguration.objects.get(id=er_integration_id)
+        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
 
         if not smart_config or not er_config:
             logger.exception(f"No configurations found for integration ids",
