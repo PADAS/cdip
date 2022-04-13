@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  gcp-gcr: circleci/gcp-gcr@0.13.0
 commands:
   configure_git_for_commit_and_push:
     steps:
@@ -41,6 +43,76 @@ jobs:
       - run:
           name: "Build and Push Image"
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
+  build:
+    docker:
+      - image: cimg/python:3.7.4
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Setup build parameters
+          command: |
+            if [[ -z "$CIRCLE_TAG" ]]; then
+              echo "No tag is defined stg pipeline will be triggered"
+              echo 'export ENV=STG' >> $BASH_ENV && source $BASH_ENV
+              echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
+              echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
+            else
+              echo "$CIRCLE_TAG defined prod pipeline will be triggered"
+              echo 'export ENV=PROD' >> $BASH_ENV && source $BASH_ENV
+            fi
+            echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
+            echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+      - gcp-gcr/build-image:
+          image: $IMAGE_NAME
+          tag: $TAG
+          path: docker
+          no_output_timeout: 10m
+          registry-url: us.gcr.io
+          google-project-id: GOOGLE_PROJECT_ID
+      - run:
+          name: Save image
+          command: |
+            docker save -o "$IMAGE_NAME-$TAG.tar" "us.gcr.io/${GOOGLE_PROJECT_ID}/$IMAGE_NAME:$TAG"
+      - persist_to_workspace:
+          root: .
+          paths:
+            - "*.tar"
+            - "VERSION"
+  push:
+    docker:
+      - image: circleci/python:3.7.4
+    steps:
+      - attach_workspace:
+          at: .
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Import image and setup parameters
+          command: |
+            if [[ -z "$CIRCLE_TAG" ]]; then
+              echo "No tag is defined stg pipeline will be triggered"
+              echo 'export ENV=STG' >> $BASH_ENV && source $BASH_ENV
+              echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
+              echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
+              echo ${GCP_PROJECT_KEY_STG} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
+            else
+              echo "$CIRCLE_TAG defined prod pipeline will be triggered"
+              echo 'export ENV=PROD' >> $BASH_ENV && source $BASH_ENV
+            fi
+            echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
+            echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
+            echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+            docker load -i "$IMAGE_NAME-$TAG.tar"
+      - gcp-gcr/gcr-auth:
+          gcloud-service-key: GOOGLE_CLOUD_KEYS
+          google-project-id: GOOGLE_PROJECT_ID
+          google-compute-zone: GOOGLE_COMPUTE_ZONE
+      - gcp-gcr/push-image:
+          image: $IMAGE_NAME
+          tag: $TAG
+          registry-url: us.gcr.io
 
 #  trigger_downstream:
 #    executor: 'gcloud'
@@ -54,4 +126,11 @@ workflows:
   docker_build_workflow:
     jobs:
       - build_cdip_portal_image
+      - build
+      - push:
+          requires:
+          - build
+          filters:
+            branches:
+              only: feat/new-pipeline
 
