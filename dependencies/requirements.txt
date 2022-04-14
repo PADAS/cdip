@@ -89,7 +89,7 @@ cryptography==2.9.2
     #   -r ../dependencies/requirements.in
     #   django-fernet-fields
     #   social-auth-core
-dasclient @ https://github.com/PADAS/das-clients/releases/download/v1.0.37/dasclient-1.0.37-py3-none-any.whl
+dasclient @ https://github.com/PADAS/das-clients/releases/download/v1.0.38/dasclient-1.0.38-py3-none-any.whl
     # via -r ../dependencies/requirements.in
 datadog==0.39.0
     # via -r ../dependencies/requirements.in
@@ -113,7 +113,6 @@ django==3.2
     #   django-filter
     #   django-keycloak
     #   django-phonenumber-field
-    #   django-rest-swagger
     #   django-tables2
     #   djangorestframework
     #   drf-jwt
@@ -135,7 +134,7 @@ django-phonenumber-field==4.0.0
     # via -r ../dependencies/requirements.in
 django-rbac==0.9
     # via -r ../dependencies/requirements.in
-django-rest-swagger @ git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f
+django-rest-swagger==2.2.0
     # via -r ../dependencies/requirements.in
 django-scopes==1.2.0
     # via -r ../dependencies/requirements.in
@@ -357,7 +356,7 @@ six==1.15.0
     #   python-jose
     #   social-auth-app-django
     #   social-auth-core
-smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.0.8/smartconnect_client-1.0.8-py3-none-any.whl
+smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.0.9/smartconnect_client-1.0.9-py3-none-any.whl
     # via -r ../dependencies/requirements.in
 social-auth-app-django==4.0.0
     # via -r ../dependencies/requirements.in
