@@ -8,7 +8,7 @@ import pydantic
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
-from dasclient.dasclient import DasClient
+from dasclient.dasclient import DasClient, DasClientException
 from pydantic import parse_obj_as
 from smartconnect import SmartClient
 from smartconnect.er_sync_utils import build_earth_ranger_event_types, er_event_type_schemas_equal, \
@@ -43,7 +43,7 @@ class ER_SMART_Synchronizer():
                                         password=smart_config.password,
                                         use_language_code='en')
 
-        self.smart_ca_uuid = smart_config.additional.get('ca_uuid')
+        self.smart_ca_uuids = smart_config.additional.get('ca_uuids')
 
         provider_key = smart_config.type.slug
         url_parse = urlparse(er_config.endpoint)
@@ -58,24 +58,12 @@ class ER_SMART_Synchronizer():
 
         self.publisher = get_publisher()
 
-    def push_smart_ca_data_model_to_er_event_types(self):
-        caslist = self.smart_client.get_conservation_areas()
+    def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
 
-        # TODO: Handle Group of CA's associated to single ER site
-        ca_match = False
-        for ca in caslist:
-            if str(ca.uuid) == self.smart_ca_uuid:
-                ca_match = True
-                break
-
-        if not ca_match:
-            logger.warning(f'Conservation Area not found', extra=dict(smart_ca_uuid=self.smart_ca_uuid))
-            return
-
-        dm = self.smart_client.download_datamodel(ca_uuid=self.smart_ca_uuid)
+        dm = self.smart_client.download_datamodel(ca_uuid=smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
-        event_types = build_earth_ranger_event_types(dm_dict)
+        event_types = build_earth_ranger_event_types(dm=dm_dict, ca_uuid=smart_ca_uuid)
 
         existing_event_categories = self.das_client.get_event_categories()
         event_category = next((x for x in existing_event_categories if x.get('value') == ca.label), None)
@@ -88,7 +76,7 @@ class ER_SMART_Synchronizer():
         self.create_or_update_er_event_types(event_category, event_types)
 
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
-        existing_event_types = self.das_client.get_event_types()
+        existing_event_types = self.das_client.get_event_types(dict(include_inactive=True))
         try:
             # TODO: Handle multiple CAs
             for event_type in event_types:
@@ -106,8 +94,9 @@ class ER_SMART_Synchronizer():
                     logger.info(f'Creating ER event type', extra=dict(value=event_type['value'],
                                                                       category=event_type['category']))
                     self.das_client.post_event_type(event_type)
+
         except Exception as e:
-            logger.exception(f'Exception raised posting event type', extra=dict(event_type=event_type))
+            logger.exception(f'Exception raised posting event type', extra=dict(event_type= event_type))
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
         i_state = EarthRangerReaderState.parse_obj(config.state)
@@ -133,8 +122,8 @@ class ER_SMART_Synchronizer():
         config.state = json.loads(i_state.json())
         config.save()
 
-    def sync_patrol_datamodel(self):
-        patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=self.smart_ca_uuid)
+    def sync_patrol_datamodel(self, *, smart_ca_uuid):
+        patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=smart_ca_uuid)
         patrol_subjects = get_subjects_from_patrol_data_model(patrol_data_model)
 
         existing_subjects = parse_obj_as(List[ERSubject], self.das_client.get_subjects())
