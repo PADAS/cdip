@@ -59,7 +59,6 @@ class ER_SMART_Synchronizer():
         self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-
         dm = self.smart_client.download_datamodel(ca_uuid=smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
@@ -78,7 +77,6 @@ class ER_SMART_Synchronizer():
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         existing_event_types = self.das_client.get_event_types(dict(include_inactive=True))
         try:
-            # TODO: Handle multiple CAs
             for event_type in event_types:
                 event_type_match = next((x for x in existing_event_types
                                          if (x.get('value') == event_type.get('value'))), None)
@@ -96,7 +94,7 @@ class ER_SMART_Synchronizer():
                     self.das_client.post_event_type(event_type)
 
         except Exception as e:
-            logger.exception(f'Exception raised posting event type', extra=dict(event_type= event_type))
+            logger.exception(f'Exception raised posting event type', extra=dict(event_type=event_type))
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
         i_state = EarthRangerReaderState.parse_obj(config.state)
