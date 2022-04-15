@@ -29,6 +29,11 @@ def run_er_smart_sync_integrations():
                                                   er_integration_id=er_integration_id)
             caslist = er_smart_sync.smart_client.get_conservation_areas()
 
+            if not er_smart_sync.smart_ca_uuids:
+                logger.warning(f'ca_uuids not found in integration configuration',
+                               extra=dict(smart_integration_id=smart_integration_id))
+                continue
+
             # Handle Group of CA's associated to single ER site
             for smart_ca_uuid in er_smart_sync.smart_ca_uuids:
                 logger.debug(f'Processing SMART CA: {smart_ca_uuid}')
