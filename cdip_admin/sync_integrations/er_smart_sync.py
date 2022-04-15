@@ -120,15 +120,16 @@ class ER_SMART_Synchronizer():
         config.state = json.loads(i_state.json())
         config.save()
 
-    def sync_patrol_datamodel(self, *, smart_ca_uuid):
+    def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
         patrol_data_model = self.smart_client.download_patrolmodel(ca_uuid=smart_ca_uuid)
-        patrol_subjects = get_subjects_from_patrol_data_model(patrol_data_model)
+        patrol_subjects = get_subjects_from_patrol_data_model(pm=patrol_data_model, ca_uuid=smart_ca_uuid)
 
         existing_subjects = parse_obj_as(List[ERSubject], self.das_client.get_subjects())
         for subject in patrol_subjects:
             smart_member_id = subject.additional.get('smart_member_id')
             existing_subject_match = next((ex_subject for ex_subject in existing_subjects
                                            if ex_subject.additional.get('smart_member_id') == smart_member_id), None)
+
             if existing_subject_match:
                 subject.id = existing_subject_match.id
                 if not er_subjects_equal(subject, existing_subject_match):
@@ -137,6 +138,15 @@ class ER_SMART_Synchronizer():
                     # das_client.patch_subject(subject.dict())
             else:
                 try:
+                    # TODO: False negatives because of race condition
+                    existing_subject_name_collision = next((ex_subject for ex_subject in existing_subjects
+                                                            if ex_subject.name == subject.name),
+                                                           None)
+                    if existing_subject_name_collision:
+                        # TODO: Better strategy for visual indicator of name collision
+                        # text between [] is the identifier defined in SMART Desktop, limited to 8 characters
+                        ca_identifier = ca.label.split('[')[1].strip(']')
+                        subject.name = f'{subject.name} ({ca_identifier})'
                     self.das_client.post_subject(subject.dict(exclude_none=True))
                 except Exception:
                     logger.error(f'Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}')
