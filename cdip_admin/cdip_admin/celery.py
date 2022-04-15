@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import os
-import settings as portal_settings
 from datetime import timedelta
 
 from django.conf import settings
@@ -46,7 +45,7 @@ app.conf.beat_schedule = {
     # Run sync integrations
     'run-sync-integrations': {
         'task': 'cdip_admin.tasks.run_sync_integrations',
-        'schedule': timedelta(minutes=portal_settings.CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES)
+        'schedule': timedelta(minutes=settings.CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES)
     },
 
 }
