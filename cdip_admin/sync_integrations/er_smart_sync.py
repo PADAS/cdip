@@ -138,15 +138,8 @@ class ER_SMART_Synchronizer():
                     # das_client.patch_subject(subject.dict())
             else:
                 try:
-                    # TODO: False negatives because of race condition
-                    existing_subject_name_collision = next((ex_subject for ex_subject in existing_subjects
-                                                            if ex_subject.name == subject.name),
-                                                           None)
-                    if existing_subject_name_collision:
-                        # TODO: Better strategy for visual indicator of name collision
-                        # text between [] is the identifier defined in SMART Desktop, limited to 8 characters
-                        ca_identifier = ca.label.split('[')[1].strip(']')
-                        subject.name = f'{subject.name} ({ca_identifier})'
+                    ca_identifier = ca.label.split('[')[1].strip(']')
+                    subject.name = f'{subject.name} ({ca_identifier})'
                     self.das_client.post_subject(subject.dict(exclude_none=True))
                 except Exception:
                     logger.error(f'Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}')
