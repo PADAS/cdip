@@ -41,7 +41,7 @@ def run_er_smart_sync_integrations():
                 if not ca_match:
                     logger.warning(f'Conservation Area not found', extra=dict(smart_ca_uuid=smart_ca_uuid))
                     return
-                logger.debug(f'Beginning sync of event types: {smart_ca_uuid}')
+                logger.debug(f'Beginning sync of event types', extra=dict(ca_uuid=smart_ca_uuid))
                 er_smart_sync.push_smart_ca_data_model_to_er_event_types(smart_ca_uuid=smart_ca_uuid, ca=ca_match)
                 er_smart_sync.sync_patrol_datamodel(smart_ca_uuid=smart_ca_uuid, ca=ca_match)
 
