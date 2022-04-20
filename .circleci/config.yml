@@ -53,17 +53,16 @@ jobs:
       - run:
           name: Setup build parameters
           command: |
-            if [[ -z "$CIRCLE_TAG" ]]; then
-              echo "No tag is defined stg pipeline will be triggered"
-              echo 'export ENV=STG' >> $BASH_ENV && source $BASH_ENV
-              echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
-              echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
-            else
-              echo "$CIRCLE_TAG defined prod pipeline will be triggered"
-              echo 'export ENV=PROD' >> $BASH_ENV && source $BASH_ENV
-            fi
+            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
+            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
             echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
-            echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+            if [[ -z "$CIRCLE_TAG" ]]; then
+              echo "No tag is defined stg an image with latest tag will be built"
+              echo 'export TAG=latest' >> $BASH_ENV && source $BASH_ENV
+            else
+              echo "$CIRCLE_TAG defined an image with sematic version will be built"
+              echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+            fi
       - gcp-gcr/build-image:
           image: $IMAGE_NAME
           tag: $TAG
@@ -91,19 +90,17 @@ jobs:
       - run:
           name: Import image and setup parameters
           command: |
-            if [[ -z "$CIRCLE_TAG" ]]; then
-              echo "No tag is defined stg pipeline will be triggered"
-              echo 'export ENV=STG' >> $BASH_ENV && source $BASH_ENV
-              echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
-              echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
-              echo ${GCP_PROJECT_KEY_STG} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
-            else
-              echo "$CIRCLE_TAG defined prod pipeline will be triggered"
-              echo 'export ENV=PROD' >> $BASH_ENV && source $BASH_ENV
-            fi
+            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
+            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
+            echo ${GCP_PROJECT_KEY_STG} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
             echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
             echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
-            echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+            if [[ -z "$CIRCLE_TAG" ]]; then
+              echo "No tag is defined latest image will be imported"
+              echo 'export TAG=latest' >> $BASH_ENV && source $BASH_ENV
+            else
+              echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+            fi
             docker load -i "$IMAGE_NAME-$TAG.tar"
       - gcp-gcr/gcr-auth:
           gcloud-service-key: GOOGLE_CLOUD_KEYS
