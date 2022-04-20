@@ -178,22 +178,27 @@ class ER_SMART_Synchronizer():
                     logger.info("skipping processing, patrol hasn't been updated since last poll")
                     continue
 
+            publish_observation = True
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
-                # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
-                for event in segment.events:
-                    event_details = parse_obj_as(List[EREvent], self.das_client.get_events(event_ids=event.id))
-                    segment.event_details.extend(event_details)
-
                 if not segment.start_location:
                     # Need start location to pass in coordinates and determine location timezone
                     logger.info("skipping processing, patrol contains no start location")
+                    publish_observation = False
                     continue
 
                 if not segment.leader:
                     # SMART requires at least one member on patrol leg
                     logger.info("skipping processing, patrol contains no start location")
+                    publish_observation = False
                     continue
+
+                # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
+                for event in segment.events:
+                    event_details = parse_obj_as(List[EREvent], self.das_client.get_events(event_ids=event.id))
+                    segment.event_details.extend(event_details)
+
+
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get('start_time')
@@ -205,11 +210,12 @@ class ER_SMART_Synchronizer():
                                                         subject_id=segment.leader.id,
                                                         start=start,
                                                         end=end))
-
-            logger.info(f'Publishing observation for ER Patrol', extra=dict(patrol_id=patrol.id,
-                                                                            patrol_serial_num=patrol.serial_number,
-                                                                            patrol_title=patrol.title))
-            self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
+            # TODO: Will need to revisit this if we support processing of multiple segments in the future
+            if publish_observation:
+                logger.info(f'Publishing observation for ER Patrol', extra=dict(patrol_id=patrol.id,
+                                                                                patrol_serial_num=patrol.serial_number,
+                                                                                patrol_title=patrol.title))
+                self.publisher.publish(TopicEnum.observations_unprocessed.value, patrol.dict())
 
         i_state.patrol_last_poll_at = upper
         config.state = json.loads(i_state.json())
