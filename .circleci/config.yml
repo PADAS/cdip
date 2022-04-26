@@ -129,5 +129,5 @@ workflows:
           - build
           filters:
             branches:
-              only: feat/new-pipeline
+              only: main
 
