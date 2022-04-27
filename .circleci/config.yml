@@ -43,6 +43,17 @@ jobs:
       - run:
           name: "Build and Push Image"
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
+  lint:
+    docker:
+      - image: pyfound/black:latest_release
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Lint the code
+          command: black --check .
+
   build:
     docker:
       - image: cimg/python:3.7.4
@@ -122,8 +133,13 @@ workflows:
   version: 2
   docker_build_workflow:
     jobs:
-      - build_cdip_portal_image
-      - build
+      - lint
+      - build_cdip_portal_image:
+          requires:
+          - lint
+      - build:
+          requires:
+          - lint
       - push:
           requires:
           - build
