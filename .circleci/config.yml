@@ -52,7 +52,8 @@ jobs:
           docker_layer_caching: false
       - run:
           name: Lint the code
-          command: black --check .
+          command: |
+            git diff-tree --no-commit-id --name-only -r HEAD | xargs black --check
 
   build:
     docker:
