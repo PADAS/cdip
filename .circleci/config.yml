@@ -45,7 +45,10 @@ jobs:
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
   lint:
     docker:
-      - image: pyfound/black:latest_release
+      - image: us.gcr.io/cdip-stage-78ca/sintegrate-py-toolkit:latest
+        auth:
+            username: _json_key  # default username when using a JSON key file to authenticate
+            password: $GCR_KEY # This key must be in json format
     steps:
       - checkout
       - setup_remote_docker:
@@ -53,6 +56,7 @@ jobs:
       - run:
           name: Lint the code
           command: |
+            git diff-tree --no-commit-id --name-only -r HEAD
             git diff-tree --no-commit-id --name-only -r HEAD | xargs black --check
 
   build:
