@@ -58,8 +58,7 @@ jobs:
       - run:
           name: Lint the code
           command: |
-            git diff-tree --no-commit-id --name-only -r HEAD
-            git diff-tree --no-commit-id --name-only -r HEAD | xargs black --check
+            git diff --name-only HEAD main | grep .py | xargs black --check
 
   build:
     docker:
