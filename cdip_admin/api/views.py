@@ -394,4 +394,3 @@ def update_inbound_integration_state(request, integration_id):
         result = post_device_information(data, config)
         response = list(result)
         return JsonResponse(response, safe=False)
-
