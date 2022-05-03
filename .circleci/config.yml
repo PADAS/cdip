@@ -1,6 +1,8 @@
 version: 2.1
+
 orbs:
   gcp-gcr: circleci/gcp-gcr@0.13.0
+
 commands:
   configure_git_for_commit_and_push:
     steps:
@@ -43,6 +45,26 @@ jobs:
       - run:
           name: "Build and Push Image"
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
+  lint:
+    docker:
+      - image: us.gcr.io/cdip-stage-78ca/sintegrate-py-toolkit:latest
+        auth:
+            username: _json_key  # Default username when using a JSON key file to authenticate
+            password: $GCR_KEY # This key must be in json format
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Lint the code
+          command: |
+            if (git diff --name-only HEAD main | grep .py); then
+              echo "Some files were updated"
+              git diff --name-only HEAD main | grep .py | xargs black --check
+            else
+              echo "No python files were updated"
+            fi
+
   build:
     docker:
       - image: cimg/python:3.7.4
@@ -111,23 +133,19 @@ jobs:
           tag: $TAG
           registry-url: us.gcr.io
 
-#  trigger_downstream:
-#    executor: 'gcloud'
-#    steps:
-#      - checkout
-#      - trigger_downstream_builds:
-#        name: "Trigger downstream builds"
-
 workflows:
-  version: 2
   docker_build_workflow:
     jobs:
-      - build_cdip_portal_image
-      - build
+      - lint
+      - build_cdip_portal_image:
+          requires:
+          - lint
+      - build:
+          requires:
+          - lint
       - push:
           requires:
           - build
           filters:
             branches:
               only: main
-
