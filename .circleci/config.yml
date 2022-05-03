@@ -1,6 +1,8 @@
 version: 2.1
+
 orbs:
   gcp-gcr: circleci/gcp-gcr@0.13.0
+
 commands:
   configure_git_for_commit_and_push:
     steps:
@@ -135,7 +137,6 @@ jobs:
 #        name: "Trigger downstream builds"
 
 workflows:
-  version: 2.1
   docker_build_workflow:
     jobs:
       - lint
