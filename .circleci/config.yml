@@ -47,7 +47,7 @@ jobs:
     docker:
       - image: us.gcr.io/cdip-stage-78ca/sintegrate-py-toolkit:latest
         auth:
-            username: _json_key  # default username when using a JSON key file to authenticate
+            username: _json_key  # Default username when using a JSON key file to authenticate
             password: $GCR_KEY # This key must be in json format
     steps:
       - checkout
@@ -135,7 +135,7 @@ jobs:
 #        name: "Trigger downstream builds"
 
 workflows:
-  version: 2
+  version: 2.1
   docker_build_workflow:
     jobs:
       - lint
@@ -151,4 +151,3 @@ workflows:
           filters:
             branches:
               only: main
-
