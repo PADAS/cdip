@@ -128,13 +128,6 @@ jobs:
           tag: $TAG
           registry-url: us.gcr.io
 
-#  trigger_downstream:
-#    executor: 'gcloud'
-#    steps:
-#      - checkout
-#      - trigger_downstream_builds:
-#        name: "Trigger downstream builds"
-
 workflows:
   docker_build_workflow:
     jobs:
