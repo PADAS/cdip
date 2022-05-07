@@ -47,10 +47,10 @@ jobs:
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
   lint:
     docker:
-      - image: us.gcr.io/cdip-stage-78ca/sintegrate-py-toolkit:latest
+      - image: us.gcr.io/cdip-prod1-78ca/sintegrate-py-toolkit:1.1.0
         auth:
             username: _json_key  # Default username when using a JSON key file to authenticate
-            password: $GCR_KEY # This key must be in json format
+            password: $GCR_KEY_CT # This key must be in json format
     steps:
       - checkout
       - setup_remote_docker:
