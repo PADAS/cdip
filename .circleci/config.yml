@@ -75,8 +75,8 @@ jobs:
       - run:
           name: Setup build parameters
           command: |
-            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
-            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
+            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_CT' >> $BASH_ENV && source $BASH_ENV
+            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_CT' >> $BASH_ENV && source $BASH_ENV
             echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
             if [[ -z "$CIRCLE_TAG" ]]; then
               echo "No tag is defined stg an image with latest tag will be built"
@@ -112,9 +112,9 @@ jobs:
       - run:
           name: Import image and setup parameters
           command: |
-            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_STG' >> $BASH_ENV && source $BASH_ENV
-            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_STG' >> $BASH_ENV && source $BASH_ENV
-            echo ${GCP_PROJECT_KEY_STG} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
+            echo 'export GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID_CT' >> $BASH_ENV && source $BASH_ENV
+            echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_CT' >> $BASH_ENV && source $BASH_ENV
+            echo ${GCP_PROJECT_KEY_CT} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
             echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
             echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
             if [[ -z "$CIRCLE_TAG" ]]; then
