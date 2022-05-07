@@ -45,7 +45,7 @@ jobs:
       - run:
           name: "Build and Push Image"
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
-  lint:
+  check_code:
     docker:
       - image: us.gcr.io/cdip-prod1-78ca/sintegrate-py-toolkit:1.1.0
         auth:
@@ -61,6 +61,16 @@ jobs:
             if (git diff --name-only HEAD main | grep .py); then
               echo "Some files were updated"
               git diff --name-only HEAD main | grep .py | xargs black --check
+            else
+              echo "No python files were updated"
+            fi
+      - run:
+          name: Code Analysis
+          command: |
+            if (git diff --name-only HEAD main | grep .py); then
+              echo "Some files were updated"
+              CC=$(git diff --name-only HEAD main | grep .py | xargs radon cc -a | grep "complexity" | awk -F "[()]" '{print $2}')
+              echo $CC
             else
               echo "No python files were updated"
             fi
@@ -136,13 +146,13 @@ jobs:
 workflows:
   docker_build_workflow:
     jobs:
-      - lint
+      - check_code
       - build_cdip_portal_image:
           requires:
-          - lint
+          - check_code
       - build:
           requires:
-          - lint
+          - check_code
       - push:
           requires:
           - build
