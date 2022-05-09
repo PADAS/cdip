@@ -131,7 +131,7 @@ jobs:
           registry-url: us.gcr.io
 
 workflows:
-  docker_build_workflow:
+  pull_request_workflow:
     jobs:
       - check_code
       - build_cdip_portal_image:
@@ -146,3 +146,19 @@ workflows:
           filters:
             branches:
               only: main
+  release_workflow:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /\d+\.\d+\.\d+(-alpha\.\d+)?$/
+            branches:
+              ignore: /.*/
+      - push:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /\d+\.\d+\.\d+(-alpha\.\d+)?$/
+            branches:
+              ignore: /.*/
