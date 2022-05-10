@@ -179,13 +179,13 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
                 queryset, self.request.user, 'owner__name')
 
         inbound_id = self.request.query_params.get('inbound_id')
+        device_id = self.request.query_params.get('device_id')
         if inbound_id:
             try:
-                ibc = InboundIntegrationConfiguration.objects.get(
-                    id=inbound_id)
-                queryset = queryset.filter(devicegroup__devices__inbound_configuration=ibc).annotate(
+                device = Device.objects.get(external_id=device_id, inbound_configuration_id=inbound_id)
+                queryset = queryset.filter(devicegroup__devices__id=device.id).annotate(
                     inbound_type_slug=F('devicegroup__devices__inbound_configuration__type__slug')).distinct()
-            except InboundIntegrationConfiguration.DoesNotExist:
+            except Device.DoesNotExist:
                 queryset = queryset.none()
 
         return queryset
