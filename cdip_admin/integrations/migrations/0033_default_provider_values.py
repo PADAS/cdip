@@ -4,7 +4,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0032_inboundintegrationconfiguration_provider'),
+        ("integrations", "0032_inboundintegrationconfiguration_provider"),
     ]
 
     operations = [

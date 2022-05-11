@@ -10,4 +10,3 @@ admin.site.register(ClientProfile)
 # admin.site.register(ClientAudienceScope)
 # admin.site.register(InboundClientScope)
 # admin.site.register(OutboundClientScope)
-

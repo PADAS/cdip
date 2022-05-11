@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0030_bridgeintegration_consumer_id'),
+        ("integrations", "0030_bridgeintegration_consumer_id"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='consumer_id',
+            model_name="inboundintegrationconfiguration",
+            name="consumer_id",
             field=models.CharField(blank=True, max_length=200),
         ),
     ]

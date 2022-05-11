@@ -6,28 +6,28 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0023_retrofit_devicegroups'),
+        ("integrations", "0023_retrofit_devicegroups"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='end_date',
+            model_name="devicegroup",
+            name="end_date",
         ),
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='end_time',
+            model_name="devicegroup",
+            name="end_time",
         ),
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='organization_group',
+            model_name="devicegroup",
+            name="organization_group",
         ),
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='start_date',
+            model_name="devicegroup",
+            name="start_date",
         ),
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='start_time',
+            model_name="devicegroup",
+            name="start_time",
         ),
     ]

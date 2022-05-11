@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_user(request):
-    if not hasattr(request, '_cached_user'):
+    if not hasattr(request, "_cached_user"):
         request._cached_user = auth.get_user(request)
     return request._cached_user
 
 
 class AuthenticationMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        assert hasattr(request, 'session'), (
+        assert hasattr(request, "session"), (
             "The Django authentication middleware requires session middleware "
             "to be installed. Edit your MIDDLEWARE%s setting to insert "
             "'django.contrib.sessions.middleware.SessionMiddleware' before "
@@ -43,6 +43,7 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
     this class and change the ``header`` attribute if you need to use a
     different header.
     """
+
     # Name of request header to grab username from.  This will be the key as
     # used in the request.META dictionary, i.e. the normalization of headers to
     # all uppercase and the addition of "HTTP_" prefix apply.
@@ -51,19 +52,20 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
 
     def process_request(self, request):
         # AuthenticationMiddleware is required so that request.user exists.
-        if not hasattr(request, 'user'):
+        if not hasattr(request, "user"):
             raise ImproperlyConfigured(
                 "The Django remote user auth middleware requires the"
                 " authentication middleware to be installed.  Edit your"
                 " MIDDLEWARE setting to insert"
                 " 'django.contrib.auth.middleware.AuthenticationMiddleware'"
-                " before the RemoteUserMiddleware class.")
+                " before the RemoteUserMiddleware class."
+            )
         try:
             user_info = request.META[self.header]
             if user_info:
                 user_info = base64.b64decode(user_info)
                 user_info = json.loads(user_info)
-                username = user_info['username']
+                username = user_info["username"]
                 # logger.debug('User-info: %s', user_info)
         except KeyError:
             # If specified header doesn't exist then remove any existing
@@ -110,7 +112,9 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
         but only if the user is authenticated via the RemoteUserBackend.
         """
         try:
-            stored_backend = load_backend(request.session.get(auth.BACKEND_SESSION_KEY, ''))
+            stored_backend = load_backend(
+                request.session.get(auth.BACKEND_SESSION_KEY, "")
+            )
         except ImportError:
             # backend failed to load
             auth.logout(request)
@@ -128,6 +132,5 @@ class PersistentRemoteUserMiddleware(OidcRemoteUserMiddleware):
     is only expected to happen on some "logon" URL and the rest of
     the application wants to use Django's authentication mechanism.
     """
+
     force_logout_if_no_header = False
-
-

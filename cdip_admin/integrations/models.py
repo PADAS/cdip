@@ -11,12 +11,12 @@ from organizations.models import Organization, OrganizationGroup
 # Example Inbound Integrations: Savannah Tracking Collars, Garmin Inreach
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200, verbose_name='Type')
+    name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
 
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.name}"
@@ -36,7 +36,7 @@ class OutboundIntegrationType(TimestampedModel):
     use_token = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.name}"
@@ -44,15 +44,16 @@ class OutboundIntegrationType(TimestampedModel):
 
 class BridgeIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200, verbose_name='Type')
+    name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
 
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.name}"
+
 
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
@@ -69,9 +70,8 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
 
-
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.type.name} - {self.owner.name} - {self.name}"
@@ -92,10 +92,15 @@ class InboundIntegrationConfiguration(TimestampedModel):
     provider = models.CharField(max_length=200, blank=True)
     enabled = models.BooleanField(default=True)
 
-    default_devicegroup = models.ForeignKey('DeviceGroup', blank=True, null=True, on_delete=models.PROTECT,
-                                            related_name='inbound_integration_configuration',
-                                            related_query_name='inbound_integration_configurations',
-                                            verbose_name='Default Device Group')
+    default_devicegroup = models.ForeignKey(
+        "DeviceGroup",
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="inbound_integration_configuration",
+        related_query_name="inbound_integration_configurations",
+        verbose_name="Default Device Group",
+    )
 
     consumer_id = models.CharField(max_length=200, blank=True)
 
@@ -108,6 +113,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
         if not self.provider:
             self.provider = self.type.slug
         super().save(*args, **kwargs)
+
 
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
@@ -122,7 +128,7 @@ class BridgeIntegration(TimestampedModel):
     consumer_id = models.CharField(max_length=200, blank=True)
 
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
 
 class SubjectType(TimestampedModel):
@@ -137,10 +143,14 @@ class SubjectType(TimestampedModel):
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    inbound_configuration = models.ForeignKey(InboundIntegrationConfiguration, on_delete=models.CASCADE)
+    inbound_configuration = models.ForeignKey(
+        InboundIntegrationConfiguration, on_delete=models.CASCADE
+    )
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(max_length=200)
-    subject_type = models.ForeignKey(SubjectType, on_delete=models.PROTECT, blank=True, null=True)
+    subject_type = models.ForeignKey(
+        SubjectType, on_delete=models.PROTECT, blank=True, null=True
+    )
     additional = models.JSONField(blank=True, default=dict)
 
     @property
@@ -151,8 +161,8 @@ class Device(TimestampedModel):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
 
     class Meta:
-        ordering = ('inbound_configuration', 'external_id')
-        unique_together = ('inbound_configuration', 'external_id')
+        ordering = ("inbound_configuration", "external_id")
+        unique_together = ("inbound_configuration", "external_id")
 
 
 # This is where the information is stored for a specific device
@@ -169,9 +179,9 @@ class DeviceState(TimestampedModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=['device', 'created_at']),
+            models.Index(fields=["device", "created_at"]),
         ]
-        ordering = ('device', '-created_at')
+        ordering = ("device", "-created_at")
 
     def __str__(self):
         return f"{self.state}"
@@ -183,15 +193,19 @@ class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    destinations = models.ManyToManyField(OutboundIntegrationConfiguration, related_name='devicegroups',
-                                          related_query_name='devicegroup', blank=True)
+    destinations = models.ManyToManyField(
+        OutboundIntegrationConfiguration,
+        related_name="devicegroups",
+        related_query_name="devicegroup",
+        blank=True,
+    )
     devices = models.ManyToManyField(Device, blank=True)
-    default_subject_type = models.ForeignKey(SubjectType, on_delete=models.PROTECT, blank=True, null=True)
+    default_subject_type = models.ForeignKey(
+        SubjectType, on_delete=models.PROTECT, blank=True, null=True
+    )
 
     class Meta:
-        ordering = ('name',)
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.name} - {self.owner.name}"
-
-

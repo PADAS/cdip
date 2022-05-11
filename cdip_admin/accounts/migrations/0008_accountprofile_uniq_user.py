@@ -9,13 +9,17 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('accounts', '0007_finalize_accountprofile_user_id'),
+        ("accounts", "0007_finalize_accountprofile_user_id"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='accountprofile',
-            name='user',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL, unique=True),
+            model_name="accountprofile",
+            name="user",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                to=settings.AUTH_USER_MODEL,
+                unique=True,
+            ),
         ),
     ]

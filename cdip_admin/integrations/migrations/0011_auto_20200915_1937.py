@@ -6,30 +6,30 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0010_auto_20200915_1843'),
+        ("integrations", "0010_auto_20200915_1843"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='device',
-            old_name='name',
-            new_name='external_id',
+            model_name="device",
+            old_name="name",
+            new_name="external_id",
         ),
         migrations.RenameField(
-            model_name='device',
-            old_name='type',
-            new_name='inbound_configuration',
+            model_name="device",
+            old_name="type",
+            new_name="inbound_configuration",
         ),
         migrations.AlterUniqueTogether(
-            name='device',
-            unique_together={('inbound_configuration', 'external_id')},
+            name="device",
+            unique_together={("inbound_configuration", "external_id")},
         ),
         migrations.RemoveField(
-            model_name='device',
-            name='location',
+            model_name="device",
+            name="location",
         ),
         migrations.RemoveField(
-            model_name='device',
-            name='owner',
+            model_name="device",
+            name="owner",
         ),
     ]

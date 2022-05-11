@@ -7,23 +7,23 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0005_auto_20200824_1913'),
+        ("integrations", "0005_auto_20200824_1913"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='device',
-            name='cursor',
-            field=django.contrib.postgres.fields.jsonb.JSONField(default='{}'),
+            model_name="device",
+            name="cursor",
+            field=django.contrib.postgres.fields.jsonb.JSONField(default="{}"),
         ),
         migrations.AlterField(
-            model_name='inboundintegrationconfiguration',
-            name='cursor',
-            field=django.contrib.postgres.fields.jsonb.JSONField(default='{}'),
+            model_name="inboundintegrationconfiguration",
+            name="cursor",
+            field=django.contrib.postgres.fields.jsonb.JSONField(default="{}"),
         ),
         migrations.AlterField(
-            model_name='outboundintegrationconfiguration',
-            name='cursor',
-            field=django.contrib.postgres.fields.jsonb.JSONField(default='{}'),
+            model_name="outboundintegrationconfiguration",
+            name="cursor",
+            field=django.contrib.postgres.fields.jsonb.JSONField(default="{}"),
         ),
     ]

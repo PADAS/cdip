@@ -6,16 +6,16 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0025_remove_dg_ic'),
+        ("integrations", "0025_remove_dg_ic"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='device',
-            options={'ordering': ('inbound_configuration', 'external_id')},
+            name="device",
+            options={"ordering": ("inbound_configuration", "external_id")},
         ),
         migrations.AlterUniqueTogether(
-            name='device',
-            unique_together={('inbound_configuration', 'external_id')},
+            name="device",
+            unique_together={("inbound_configuration", "external_id")},
         ),
     ]

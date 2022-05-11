@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clients', '0005_clientaudiencescope_inboundclientscope_outboundclientscope'),
+        ("clients", "0005_clientaudiencescope_inboundclientscope_outboundclientscope"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='clientprofile',
-            name='client_id',
+            model_name="clientprofile",
+            name="client_id",
             field=models.CharField(max_length=200, unique=True),
         ),
     ]
