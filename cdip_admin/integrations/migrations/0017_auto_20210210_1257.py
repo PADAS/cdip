@@ -7,19 +7,23 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('organizations', '0004_auto_20201012_1633'),
-        ('integrations', '0016_auto_20210210_1256'),
+        ("organizations", "0004_auto_20201012_1633"),
+        ("integrations", "0016_auto_20210210_1256"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='devicegroup',
-            name='devices',
-            field=models.ManyToManyField(null=True, to='integrations.Device'),
+            model_name="devicegroup",
+            name="devices",
+            field=models.ManyToManyField(null=True, to="integrations.Device"),
         ),
         migrations.AlterField(
-            model_name='devicegroup',
-            name='organization_group',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='organizations.organizationgroup'),
+            model_name="devicegroup",
+            name="organization_group",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="organizations.organizationgroup",
+            ),
         ),
     ]

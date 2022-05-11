@@ -6,23 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0006_auto_20200824_1915'),
+        ("integrations", "0006_auto_20200824_1915"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='device',
-            name='cursor',
+            model_name="device",
+            name="cursor",
             field=models.JSONField(default=dict),
         ),
         migrations.AlterField(
-            model_name='inboundintegrationconfiguration',
-            name='cursor',
+            model_name="inboundintegrationconfiguration",
+            name="cursor",
             field=models.JSONField(default=dict),
         ),
         migrations.AlterField(
-            model_name='outboundintegrationconfiguration',
-            name='cursor',
+            model_name="outboundintegrationconfiguration",
+            name="cursor",
             field=models.JSONField(default=dict),
         ),
     ]

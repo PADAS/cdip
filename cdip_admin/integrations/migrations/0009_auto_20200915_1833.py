@@ -8,35 +8,51 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0008_auto_20200826_1907'),
+        ("integrations", "0008_auto_20200826_1907"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='device',
-            name='state',
+            model_name="device",
+            name="state",
         ),
         migrations.AddField(
-            model_name='device',
-            name='outbound_configuration',
-            field=models.ManyToManyField(to='integrations.OutboundIntegrationConfiguration'),
+            model_name="device",
+            name="outbound_configuration",
+            field=models.ManyToManyField(
+                to="integrations.OutboundIntegrationConfiguration"
+            ),
         ),
         migrations.AlterField(
-            model_name='device',
-            name='type',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='integrations.inboundintegrationconfiguration'),
+            model_name="device",
+            name="type",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                to="integrations.inboundintegrationconfiguration",
+            ),
         ),
         migrations.CreateModel(
-            name='DeviceState',
+            name="DeviceState",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('end_state', models.CharField(max_length=200)),
-                ('device_id', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='integrations.device')),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                ("end_state", models.CharField(max_length=200)),
+                (
+                    "device_id",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="integrations.device",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
     ]

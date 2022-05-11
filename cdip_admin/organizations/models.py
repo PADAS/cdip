@@ -12,7 +12,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 # Create your models here.
 class Organization(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=200, verbose_name='Name', unique=True)
+    name = models.CharField(max_length=200, verbose_name="Name", unique=True)
     description = models.TextField(blank=True)
 
     @property
@@ -33,8 +33,15 @@ class OrganizationGroup(TimestampedModel):
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='user_profiles', related_query_name='user_profile')
-    organizations = models.ManyToManyField(Organization, related_name='user_profiles', related_query_name='user_profile')
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="user_profiles",
+        related_query_name="user_profile",
+    )
+    organizations = models.ManyToManyField(
+        Organization, related_name="user_profiles", related_query_name="user_profile"
+    )
     phone_number = PhoneNumberField(blank=True)
 
     def __str__(self):

@@ -16,12 +16,11 @@ class Migration(migrations.Migration):
             state.save()
 
     dependencies = [
-        ('integrations', '0020_auto_20210216_1703'),
+        ("integrations", "0020_auto_20210216_1703"),
     ]
 
     operations = [
         migrations.RunPython(
-            code=forward_data_migration,
-            reverse_code=migrations.RunPython.noop
+            code=forward_data_migration, reverse_code=migrations.RunPython.noop
         )
     ]

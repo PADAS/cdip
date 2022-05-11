@@ -8,8 +8,10 @@ class OrganzationMemberInline(admin.TabularInline):
 
     model = AccountProfile.organizations.through
 
-    fields = ('accountprofile',
-              'role',)
+    fields = (
+        "accountprofile",
+        "role",
+    )
 
 
 @admin.register(Organization)
@@ -18,5 +20,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         OrganzationMemberInline,
     ]
 
-    fields = ('name', 'description',)
-
+    fields = (
+        "name",
+        "description",
+    )

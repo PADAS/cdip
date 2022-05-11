@@ -6,47 +6,47 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0003_auto_20200712_1012'),
+        ("integrations", "0003_auto_20200712_1012"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='outboundintegrationconfiguration',
-            name='slug',
+            model_name="outboundintegrationconfiguration",
+            name="slug",
         ),
         migrations.AddField(
-            model_name='outboundintegrationconfiguration',
-            name='login',
+            model_name="outboundintegrationconfiguration",
+            name="login",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='outboundintegrationconfiguration',
-            name='password',
+            model_name="outboundintegrationconfiguration",
+            name="password",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='outboundintegrationconfiguration',
-            name='token',
+            model_name="outboundintegrationconfiguration",
+            name="token",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='outboundintegrationtype',
-            name='use_endpoint',
+            model_name="outboundintegrationtype",
+            name="use_endpoint",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='outboundintegrationtype',
-            name='use_login',
+            model_name="outboundintegrationtype",
+            name="use_login",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='outboundintegrationtype',
-            name='use_password',
+            model_name="outboundintegrationtype",
+            name="use_password",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='outboundintegrationtype',
-            name='use_token',
+            model_name="outboundintegrationtype",
+            name="use_token",
             field=models.BooleanField(default=False),
         ),
     ]

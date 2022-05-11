@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0024_prune_devicegroup'),
+        ("integrations", "0024_prune_devicegroup"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='devicegroup',
-            name='inbound_configuration',
+            model_name="devicegroup",
+            name="inbound_configuration",
         ),
     ]

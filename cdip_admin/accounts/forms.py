@@ -8,24 +8,24 @@ from django.forms.models import BaseModelFormSet
 
 
 class AccountForm(forms.Form):
-    email = forms.EmailField(max_length=200, label='Email', required=True)
+    email = forms.EmailField(max_length=200, label="Email", required=True)
     role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
-    firstName = forms.CharField(max_length=200, label='First Name', required=False)
-    lastName = forms.CharField(max_length=200, label='Last Name', required=False)
+    firstName = forms.CharField(max_length=200, label="First Name", required=False)
+    lastName = forms.CharField(max_length=200, label="Last Name", required=False)
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
     helper = FormHelper()
-    helper.add_input(Submit('submit', 'Submit', css_class='btn-primary'))
+    helper.add_input(Submit("submit", "Submit", css_class="btn-primary"))
 
 
 class AccountUpdateForm(forms.Form):
     all_permissions = Task._meta.permissions
-    firstName = forms.CharField(max_length=200, label='First Name', required=True)
-    lastName = forms.CharField(max_length=200, label='Last Name', required=True)
-    username = forms.CharField(max_length=200, label='User Name', required=True)
+    firstName = forms.CharField(max_length=200, label="First Name", required=True)
+    lastName = forms.CharField(max_length=200, label="Last Name", required=True)
+    username = forms.CharField(max_length=200, label="User Name", required=True)
 
     helper = FormHelper()
-    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
 
 
 class AccountProfileForm(forms.Form):
@@ -33,10 +33,4 @@ class AccountProfileForm(forms.Form):
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
     helper = FormHelper()
-    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
-
-
-
-
-
-
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
