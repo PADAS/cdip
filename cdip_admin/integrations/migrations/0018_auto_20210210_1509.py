@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0017_auto_20210210_1257'),
+        ("integrations", "0017_auto_20210210_1257"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='device',
-            unique_together={('external_id', 'inbound_configuration')},
+            name="device",
+            unique_together={("external_id", "inbound_configuration")},
         ),
     ]

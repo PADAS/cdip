@@ -6,13 +6,13 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0003_account_role_dropdown_choices'),
+        ("accounts", "0003_account_role_dropdown_choices"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='accountprofile',
-            old_name='user_id',
-            new_name='user_username',
+            model_name="accountprofile",
+            old_name="user_id",
+            new_name="user_username",
         ),
     ]

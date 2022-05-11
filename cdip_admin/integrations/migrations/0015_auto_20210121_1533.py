@@ -6,28 +6,28 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0014_oc_additional'),
+        ("integrations", "0014_oc_additional"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='inboundintegrationconfiguration',
-            name='state',
+            model_name="inboundintegrationconfiguration",
+            name="state",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='inboundintegrationtype',
-            name='slug',
+            model_name="inboundintegrationtype",
+            name="slug",
             field=models.SlugField(max_length=200, unique=True),
         ),
         migrations.AlterField(
-            model_name='outboundintegrationconfiguration',
-            name='state',
+            model_name="outboundintegrationconfiguration",
+            name="state",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='outboundintegrationtype',
-            name='slug',
+            model_name="outboundintegrationtype",
+            name="slug",
             field=models.SlugField(max_length=200, unique=True),
         ),
     ]

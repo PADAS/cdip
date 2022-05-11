@@ -7,23 +7,25 @@ import phonenumber_field.modelfields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('organizations', '0001_initial'),
+        ("organizations", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='organization',
-            name='description',
+            model_name="organization",
+            name="description",
             field=models.TextField(blank=True),
         ),
         migrations.AddField(
-            model_name='organizationgroup',
-            name='description',
+            model_name="organizationgroup",
+            name="description",
             field=models.TextField(blank=True),
         ),
         migrations.AddField(
-            model_name='userprofile',
-            name='phone_number',
-            field=phonenumber_field.modelfields.PhoneNumberField(blank=True, max_length=128, region=None),
+            model_name="userprofile",
+            name="phone_number",
+            field=phonenumber_field.modelfields.PhoneNumberField(
+                blank=True, max_length=128, region=None
+            ),
         ),
     ]

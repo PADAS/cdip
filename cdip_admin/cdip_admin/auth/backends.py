@@ -15,39 +15,38 @@ class SimpleUserInfoBackend(ModelBackend):
 
             if not user_info:
 
-                if hasattr(request, 'META'):
-                    header = request.META.get('HTTP_X_USERINFO')
+                if hasattr(request, "META"):
+                    header = request.META.get("HTTP_X_USERINFO")
                     user_info = self.get_user_info(header=header)
                 else:
                     return None
 
-            username = user_info.get('username') if user_info else None
+            username = user_info.get("username") if user_info else None
             if not username:
                 return
 
-            email = user_info.get('email') if user_info else None
+            email = user_info.get("email") if user_info else None
 
-            if not email or not '@' in email:
-                email = username if '@' in username else f'{username}@sintegrate.org'
+            if not email or not "@" in email:
+                email = username if "@" in username else f"{username}@sintegrate.org"
 
-
-            client_id = user_info.get('client_id') if user_info else None
+            client_id = user_info.get("client_id") if user_info else None
             if email:
-                user, created = UserModel.objects.get_or_create(email=email,
-                                                                defaults={'username': username})
-
+                user, created = UserModel.objects.get_or_create(
+                    email=email, defaults={"username": username}
+                )
 
             if client_id:
                 try:
                     client_profile = ClientProfile.objects.get(client_id=client_id)
                     if client_profile:
-                        request.session['client_id'] = client_id
+                        request.session["client_id"] = client_id
                 except ClientProfile.DoesNotExist:
                     pass
         except Exception as e:
             # Run the default password hasher once to reduce the timing
             # difference between an existing and a nonexistent user (#20760).
-            logger.exception('Failure in remote user backend. user_info: %s', user_info)
+            logger.exception("Failure in remote user backend. user_info: %s", user_info)
         else:
             if self.user_can_authenticate(user):
                 return user

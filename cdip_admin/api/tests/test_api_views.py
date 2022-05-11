@@ -8,9 +8,13 @@ from core.enums import RoleChoices
 
 pytestmark = pytest.mark.django_db
 
-from integrations.models import DeviceGroup, \
-    OutboundIntegrationConfiguration, InboundIntegrationConfiguration, \
-    Organization, Device
+from integrations.models import (
+    DeviceGroup,
+    OutboundIntegrationConfiguration,
+    InboundIntegrationConfiguration,
+    Organization,
+    Device,
+)
 
 
 def test_get_integration_type_list(client, global_admin_user, setup_data):
@@ -18,13 +22,16 @@ def test_get_integration_type_list(client, global_admin_user, setup_data):
 
     client.force_login(global_admin_user.user)
 
-    response = client.get(reverse("inboundintegrationtype_list"), HTTP_X_USERINFO=global_admin_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationtype_list"),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
 
     assert response.status_code == 200
 
     response = response.json()
 
-    assert str(iit.id) in [x['id'] for x in response]
+    assert str(iit.id) in [x["id"] for x in response]
 
 
 def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
@@ -35,33 +42,43 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     # Sanity check on the test data relationships.
     assert Device.objects.filter(inbound_configuration=ii).exists()
     assert DeviceGroup.objects.filter(devices__inbound_configuration=ii).exists()
-    assert OutboundIntegrationConfiguration.objects.filter(devicegroup__devices__inbound_configuration=ii).exists()
+    assert OutboundIntegrationConfiguration.objects.filter(
+        devicegroup__devices__inbound_configuration=ii
+    ).exists()
 
     client.force_login(global_admin_user.user)
 
     # Get destinations by inbound-id.
-    response = client.get(reverse("outboundintegrationconfiguration_list"),
-                          data={'inbound_id': str(ii.id)},
-                          HTTP_X_USERINFO=global_admin_user.user_info)
+    response = client.get(
+        reverse("outboundintegrationconfiguration_list"),
+        data={"inbound_id": str(ii.id)},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
 
     assert response.status_code == 200
     response = response.json()
 
     assert len(response) == 1
-    assert str(oi.id) in [item['id'] for item in response]
-    assert not str(other_oi.id) in [item['id'] for item in response]
+    assert str(oi.id) in [item["id"] for item in response]
+    assert not str(other_oi.id) in [item["id"] for item in response]
 
 
-def test_get_organizations_list_organization_member_viewer(client, organization_member_user, setup_data):
+def test_get_organizations_list_organization_member_viewer(
+    client, organization_member_user, setup_data
+):
     org1 = setup_data["org1"]
 
-    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER)}
+    account_profile_mapping = {
+        (organization_member_user.user, org1, RoleChoices.VIEWER)
+    }
     setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.get(
+        reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info
+    )
 
     assert response.status_code == 200
     response = response.json()
@@ -70,7 +87,9 @@ def test_get_organizations_list_organization_member_viewer(client, organization_
     assert len(response) == Organization.objects.filter(id=org1.id).count()
 
 
-def test_get_organizations_list_organization_member_admin(client, organization_member_user, setup_data):
+def test_get_organizations_list_organization_member_admin(
+    client, organization_member_user, setup_data
+):
     org1 = setup_data["org1"]
 
     account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.ADMIN)}
@@ -79,7 +98,9 @@ def test_get_organizations_list_organization_member_admin(client, organization_m
     client.force_login(organization_member_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.get(
+        reverse("organization_list"), HTTP_X_USERINFO=organization_member_user.user_info
+    )
 
     assert response.status_code == 200
     response = response.json()
@@ -92,7 +113,9 @@ def test_get_organizations_list_global_admin(client, global_admin_user, setup_da
     client.force_login(global_admin_user.user)
 
     # Get organizations list
-    response = client.get(reverse("organization_list"), HTTP_X_USERINFO=global_admin_user.user_info)
+    response = client.get(
+        reverse("organization_list"), HTTP_X_USERINFO=global_admin_user.user_info
+    )
 
     assert response.status_code == 200
     response = response.json()
@@ -101,166 +124,202 @@ def test_get_organizations_list_global_admin(client, global_admin_user, setup_da
     assert len(response) == Organization.objects.count()
 
 
-def test_get_inbound_integration_configuration_list_client_user(client, client_user, setup_data):
+def test_get_inbound_integration_configuration_list_client_user(
+    client, client_user, setup_data
+):
 
     iit1 = setup_data["iit1"]
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    client_profile = ClientProfile.objects.create(client_id='test-function',
-                                                  type=iit1)
+    client_profile = ClientProfile.objects.create(client_id="test-function", type=iit1)
 
     client.force_login(client_user.user)
 
     # Get inbound integration configuration list
-    response = client.get(reverse("inboundintegrationconfiguration_list"), HTTP_X_USERINFO=client_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationconfiguration_list"),
+        HTTP_X_USERINFO=client_user.user_info,
+    )
 
     assert response.status_code == 200
     response = response.json()
 
-    assert len(response) == InboundIntegrationConfiguration.objects.filter(type=iit1).count()
+    assert (
+        len(response)
+        == InboundIntegrationConfiguration.objects.filter(type=iit1).count()
+    )
 
-    assert str(ii.id) in [item['id'] for item in response]
+    assert str(ii.id) in [item["id"] for item in response]
 
     # confirm integration of different type not present in results
-    assert str(o_ii.id) not in [item['id'] for item in response]
+    assert str(o_ii.id) not in [item["id"] for item in response]
 
 
-def test_get_inbound_integration_configurations_detail_client_user(client, client_user, setup_data):
+def test_get_inbound_integration_configurations_detail_client_user(
+    client, client_user, setup_data
+):
 
     iit = setup_data["iit1"]
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    client_profile = ClientProfile.objects.create(client_id='test-function',
-                                                  type=iit)
+    client_profile = ClientProfile.objects.create(client_id="test-function", type=iit)
 
     client.force_login(client_user.user)
 
     # Get inbound integration configuration detail
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
-                          HTTP_X_USERINFO=client_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": ii.id}),
+        HTTP_X_USERINFO=client_user.user_info,
+    )
 
     assert response.status_code == 200
     response = response.json()
 
-    assert response['id'] == str(ii.id)
+    assert response["id"] == str(ii.id)
 
     # Get inbound integration configuration detail for other type
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
-                          HTTP_X_USERINFO=client_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": o_ii.id}),
+        HTTP_X_USERINFO=client_user.user_info,
+    )
 
     # expect permission denied since this client is not configured for that type
     assert response.status_code == 403
 
 
-def test_get_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user, setup_data):
+def test_get_inbound_integration_configurations_detail_organization_member_hybrid(
+    client, organization_member_user, setup_data
+):
 
     org1 = setup_data["org1"]
     org2 = setup_data["org2"]
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER),
-                               (organization_member_user.user, org2, RoleChoices.ADMIN)}
+    account_profile_mapping = {
+        (organization_member_user.user, org1, RoleChoices.VIEWER),
+        (organization_member_user.user, org2, RoleChoices.ADMIN),
+    }
     setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
     # Get inbound integration configuration detail
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
-                          HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": ii.id}),
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
 
     # confirm viewer role passes object permission check
     assert response.status_code == 200
     response = response.json()
 
-    assert response['id'] == str(ii.id)
+    assert response["id"] == str(ii.id)
 
     # Get inbound integration configuration detail for other type
-    response = client.get(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
-                          HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.get(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": o_ii.id}),
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
 
     # confirm admin role passes object permission check
     assert response.status_code == 200
 
     response = response.json()
-    assert response['id'] == str(o_ii.id)
+    assert response["id"] == str(o_ii.id)
 
 
-def test_put_inbound_integration_configurations_detail_client_user(client, client_user, setup_data):
+def test_put_inbound_integration_configurations_detail_client_user(
+    client, client_user, setup_data
+):
 
     # arrange client profile that will map to this client
     iit = setup_data["iit1"]
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    client_profile = ClientProfile.objects.create(client_id='test-function',
-                                                  type=iit)
+    client_profile = ClientProfile.objects.create(client_id="test-function", type=iit)
 
     client.force_login(client_user.user)
 
-    state = "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
-    ii_update = {'state': state}
+    state = (
+        "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
+    )
+    ii_update = {"state": state}
 
     # Test update of inbound integration configuration detail state
-    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
-                          data=json.dumps(ii_update),
-                          content_type='application/json',
-                          HTTP_X_USERINFO=client_user.user_info)
+    response = client.put(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": ii.id}),
+        data=json.dumps(ii_update),
+        content_type="application/json",
+        HTTP_X_USERINFO=client_user.user_info,
+    )
 
     assert response.status_code == 200
     response = response.json()
 
-    assert response['state'] == state
+    assert response["state"] == state
 
     # Test update of inbound integration configuration detail state on different type
-    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
-                          data=json.dumps(ii_update),
-                          content_type='application/json',
-                          HTTP_X_USERINFO=client_user.user_info)
+    response = client.put(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": o_ii.id}),
+        data=json.dumps(ii_update),
+        content_type="application/json",
+        HTTP_X_USERINFO=client_user.user_info,
+    )
 
     # expect permission denied since this client is not configured for that type
     assert response.status_code == 403
 
 
-def test_put_inbound_integration_configurations_detail_organization_member_hybrid(client, organization_member_user, setup_data):
+def test_put_inbound_integration_configurations_detail_organization_member_hybrid(
+    client, organization_member_user, setup_data
+):
     org1 = setup_data["org1"]
     org2 = setup_data["org2"]
     ii = setup_data["ii1"]
     o_ii = setup_data["ii2"]
 
-    account_profile_mapping = {(organization_member_user.user, org1, RoleChoices.VIEWER),
-                               (organization_member_user.user, org2, RoleChoices.ADMIN)}
+    account_profile_mapping = {
+        (organization_member_user.user, org1, RoleChoices.VIEWER),
+        (organization_member_user.user, org2, RoleChoices.ADMIN),
+    }
     setup_account_profile_mapping(account_profile_mapping)
 
     client.force_login(organization_member_user.user)
 
     # Get inbound integration configuration detail
-    state = "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
-    ii_update = {'state': state}
+    state = (
+        "{'ST2010-2758': 14469584, 'ST2010-2759': 14430249, 'ST2010-2760': 14650428}"
+    )
+    ii_update = {"state": state}
 
     # Test update of inbound integration configuration detail state
-    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': ii.id}),
-                          data=json.dumps(ii_update),
-                          content_type='application/json',
-                          HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.put(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": ii.id}),
+        data=json.dumps(ii_update),
+        content_type="application/json",
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
 
     # confirm viewer role does not pass object permission check
     assert response.status_code == 403
 
-
     # confirm admin role passes object permission check
-    response = client.put(reverse("inboundintegrationconfigurations_detail", kwargs={'pk': o_ii.id}),
-                          data=json.dumps(ii_update),
-                          content_type='application/json',
-                          HTTP_X_USERINFO=organization_member_user.user_info)
+    response = client.put(
+        reverse("inboundintegrationconfigurations_detail", kwargs={"pk": o_ii.id}),
+        data=json.dumps(ii_update),
+        content_type="application/json",
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
 
     # confirm admin role passes object permission check
     assert response.status_code == 200
 
     response = response.json()
-    assert response['state'] == state
+    assert response["state"] == state
 
 
 def test_get_device_state_list_client_user(client, client_user, setup_data):
@@ -271,9 +330,7 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
     device = setup_data["d1"]
     o_device = setup_data["d2"]
 
-    client_profile = ClientProfile.objects.create(client_id='test-function',
-                                                  type=iit)
-
+    client_profile = ClientProfile.objects.create(client_id="test-function", type=iit)
 
     client.force_login(client_user.user)
 
@@ -286,5 +343,7 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
 
     assert len(response) == 1
 
-    assert str(device.external_id) in [item['device_external_id'] for item in response]
-    assert str(o_device.external_id) not in [item['device_external_id'] for item in response]
+    assert str(device.external_id) in [item["device_external_id"] for item in response]
+    assert str(o_device.external_id) not in [
+        item["device_external_id"] for item in response
+    ]

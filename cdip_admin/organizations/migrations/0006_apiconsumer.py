@@ -6,23 +6,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('organizations', '0005_auto_20210210_1259'),
+        ("organizations", "0005_auto_20210210_1259"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='organization',
-            name='name',
-            field=models.CharField(max_length=200, unique=True, verbose_name='Name'),
+            model_name="organization",
+            name="name",
+            field=models.CharField(max_length=200, unique=True, verbose_name="Name"),
         ),
         migrations.AlterField(
-            model_name='organizationgroup',
-            name='id',
-            field=models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            model_name="organizationgroup",
+            name="id",
+            field=models.BigAutoField(
+                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            ),
         ),
         migrations.AlterField(
-            model_name='userprofile',
-            name='id',
-            field=models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            model_name="userprofile",
+            name="id",
+            field=models.BigAutoField(
+                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            ),
         ),
     ]

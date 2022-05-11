@@ -8,47 +8,89 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0013_inboundintegrationconfiguration_encrypted_password_field'),
-        ('clients', '0004_auto_20201117_1800'),
+        (
+            "integrations",
+            "0013_inboundintegrationconfiguration_encrypted_password_field",
+        ),
+        ("clients", "0004_auto_20201117_1800"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ClientAudienceScope',
+            name="ClientAudienceScope",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('scope', models.CharField(max_length=200)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                ("scope", models.CharField(max_length=200)),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='OutboundClientScope',
+            name="OutboundClientScope",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('outbound_client_scope', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='clients.clientaudiencescope')),
-                ('type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='integrations.inboundintegrationtype')),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "outbound_client_scope",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="clients.clientaudiencescope",
+                    ),
+                ),
+                (
+                    "type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="integrations.inboundintegrationtype",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='InboundClientScope',
+            name="InboundClientScope",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('inbound_client_scope', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='clients.clientaudiencescope')),
-                ('type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='integrations.inboundintegrationtype')),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "inbound_client_scope",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="clients.clientaudiencescope",
+                    ),
+                ),
+                (
+                    "type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="integrations.inboundintegrationtype",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
     ]

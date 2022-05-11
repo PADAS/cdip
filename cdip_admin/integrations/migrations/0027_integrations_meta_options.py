@@ -6,28 +6,28 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0026_device_index_updates'),
+        ("integrations", "0026_device_index_updates"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='devicegroup',
-            options={'ordering': ('name',)},
+            name="devicegroup",
+            options={"ordering": ("name",)},
         ),
         migrations.AlterModelOptions(
-            name='devicestate',
-            options={'ordering': ('device', '-created_at')},
+            name="devicestate",
+            options={"ordering": ("device", "-created_at")},
         ),
         migrations.AlterModelOptions(
-            name='inboundintegrationtype',
-            options={'ordering': ('name',)},
+            name="inboundintegrationtype",
+            options={"ordering": ("name",)},
         ),
         migrations.AlterModelOptions(
-            name='outboundintegrationconfiguration',
-            options={'ordering': ('name',)},
+            name="outboundintegrationconfiguration",
+            options={"ordering": ("name",)},
         ),
         migrations.AlterModelOptions(
-            name='outboundintegrationtype',
-            options={'ordering': ('name',)},
+            name="outboundintegrationtype",
+            options={"ordering": ("name",)},
         ),
     ]
