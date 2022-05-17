@@ -8,40 +8,62 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('organizations', '0005_auto_20210210_1259'),
-        ('integrations', '0028_add_enabled_inbound_outbound_configuration'),
+        ("organizations", "0005_auto_20210210_1259"),
+        ("integrations", "0028_add_enabled_inbound_outbound_configuration"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='BridgeIntegrationType',
+            name="BridgeIntegrationType",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=200, verbose_name='Type')),
-                ('slug', models.SlugField(max_length=200, unique=True)),
-                ('description', models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                ("name", models.CharField(max_length=200, verbose_name="Type")),
+                ("slug", models.SlugField(max_length=200, unique=True)),
+                ("description", models.TextField(blank=True)),
             ],
             options={
-                'ordering': ('name',),
+                "ordering": ("name",),
             },
         ),
         migrations.CreateModel(
-            name='BridgeIntegration',
+            name="BridgeIntegration",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('name', models.CharField(blank=True, max_length=200)),
-                ('state', models.JSONField(blank=True, null=True)),
-                ('additional', models.JSONField(blank=True, default=dict)),
-                ('enabled', models.BooleanField(default=True)),
-                ('owner', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='organizations.organization')),
-                ('type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='integrations.bridgeintegrationtype')),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                ("name", models.CharField(blank=True, max_length=200)),
+                ("state", models.JSONField(blank=True, null=True)),
+                ("additional", models.JSONField(blank=True, default=dict)),
+                ("enabled", models.BooleanField(default=True)),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="organizations.organization",
+                    ),
+                ),
+                (
+                    "type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="integrations.bridgeintegrationtype",
+                    ),
+                ),
             ],
             options={
-                'ordering': ('name',),
+                "ordering": ("name",),
             },
         ),
     ]

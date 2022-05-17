@@ -12,7 +12,9 @@ KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
 KEYCLOAK_REALM = settings.KEYCLOAK_REALM
 KEYCLOAK_CLIENT_ID = settings.KEYCLOAK_CLIENT_ID
 KEYCLOAK_CLIENT_SECRET = settings.KEYCLOAK_CLIENT_SECRET
-JWKS_LOCATION = f'{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs'
+JWKS_LOCATION = (
+    f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,23 +64,27 @@ def parse_jwt_token(jwks, unverified_header, token):
                 "kid": key["kid"],
                 "use": key["use"],
                 "n": key["n"],
-                "e": key["e"]
+                "e": key["e"],
             }
         if rsa_key:
             try:
-                payload = jwt.decode(token, rsa_key,
-                                     algorithms=['RS256', ],
-                                     audience=KEYCLOAK_CLIENT_ID,
-                                     issuer=f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}",
-                                     options={"verify_at_hash": False},
-                                     )
+                payload = jwt.decode(
+                    token,
+                    rsa_key,
+                    algorithms=[
+                        "RS256",
+                    ],
+                    audience=KEYCLOAK_CLIENT_ID,
+                    issuer=f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}",
+                    options={"verify_at_hash": False},
+                )
 
             except jwt.ExpiredSignatureError:
                 raise
             except jwt.JWTClaimsError:
                 raise
             except Exception as e:
-                logger.exception('Unexpected error when decoding a JWT')
+                logger.exception("Unexpected error when decoding a JWT")
                 raise
 
             return payload
@@ -86,7 +92,7 @@ def parse_jwt_token(jwks, unverified_header, token):
 
 def parse_bool(text):
     """Return a boolean from the passed in text"""
-    TRUE_VALUES = ['true', '1', 'yes', 'ok', 'okay']
+    TRUE_VALUES = ["true", "1", "yes", "ok", "okay"]
     if isinstance(text, bool):
         return text
     if isinstance(text, str) and text.lower() in TRUE_VALUES:

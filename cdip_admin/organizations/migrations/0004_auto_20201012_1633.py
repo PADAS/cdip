@@ -9,23 +9,32 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('organizations', '0003_auto_20200701_1357'),
+        ("organizations", "0003_auto_20200701_1357"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='organization',
-            name='name',
-            field=models.CharField(max_length=200, verbose_name='Owner'),
+            model_name="organization",
+            name="name",
+            field=models.CharField(max_length=200, verbose_name="Owner"),
         ),
         migrations.AlterField(
-            model_name='userprofile',
-            name='organizations',
-            field=models.ManyToManyField(related_name='user_profiles', related_query_name='user_profile', to='organizations.Organization'),
+            model_name="userprofile",
+            name="organizations",
+            field=models.ManyToManyField(
+                related_name="user_profiles",
+                related_query_name="user_profile",
+                to="organizations.Organization",
+            ),
         ),
         migrations.AlterField(
-            model_name='userprofile',
-            name='user',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='user_profiles', related_query_name='user_profile', to=settings.AUTH_USER_MODEL),
+            model_name="userprofile",
+            name="user",
+            field=models.OneToOneField(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="user_profiles",
+                related_query_name="user_profile",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

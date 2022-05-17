@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0027_integrations_meta_options'),
+        ("integrations", "0027_integrations_meta_options"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='enabled',
+            model_name="inboundintegrationconfiguration",
+            name="enabled",
             field=models.BooleanField(default=True),
         ),
         migrations.AddField(
-            model_name='outboundintegrationconfiguration',
-            name='enabled',
+            model_name="outboundintegrationconfiguration",
+            name="enabled",
             field=models.BooleanField(default=True),
         ),
     ]

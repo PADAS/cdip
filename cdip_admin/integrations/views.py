@@ -14,14 +14,41 @@ from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from organizations.models import Organization
 from accounts.models import AccountProfileOrganization
-from .filters import DeviceStateFilter, DeviceGroupFilter, DeviceFilter, InboundIntegrationFilter, \
-    OutboundIntegrationFilter
-from .forms import InboundIntegrationConfigurationForm, OutboundIntegrationConfigurationForm, DeviceGroupForm, \
-    DeviceGroupManagementForm, InboundIntegrationTypeForm, OutboundIntegrationTypeForm, BridgeIntegrationForm, \
-    KeyAuthForm, DeviceForm
-from .models import InboundIntegrationType, OutboundIntegrationType, InboundIntegrationConfiguration, OutboundIntegrationConfiguration, Device, DeviceGroup, BridgeIntegration
-from .tables import DeviceStateTable, DeviceGroupTable, DeviceTable, InboundIntegrationConfigurationTable, \
-    OutboundIntegrationConfigurationTable, BridgeIntegrationTable
+from .filters import (
+    DeviceStateFilter,
+    DeviceGroupFilter,
+    DeviceFilter,
+    InboundIntegrationFilter,
+    OutboundIntegrationFilter,
+)
+from .forms import (
+    InboundIntegrationConfigurationForm,
+    OutboundIntegrationConfigurationForm,
+    DeviceGroupForm,
+    DeviceGroupManagementForm,
+    InboundIntegrationTypeForm,
+    OutboundIntegrationTypeForm,
+    BridgeIntegrationForm,
+    KeyAuthForm,
+    DeviceForm,
+)
+from .models import (
+    InboundIntegrationType,
+    OutboundIntegrationType,
+    InboundIntegrationConfiguration,
+    OutboundIntegrationConfiguration,
+    Device,
+    DeviceGroup,
+    BridgeIntegration,
+)
+from .tables import (
+    DeviceStateTable,
+    DeviceGroupTable,
+    DeviceTable,
+    InboundIntegrationConfigurationTable,
+    OutboundIntegrationConfigurationTable,
+    BridgeIntegrationTable,
+)
 from .utils import get_api_key, create_api_key, create_api_consumer
 
 logger = logging.getLogger(__name__)
@@ -29,14 +56,15 @@ default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
 
 def random_string(n=4):
-    return ''.join(random.sample([chr(x) for x in range(97, 97+26)], n))
+    return "".join(random.sample([chr(x) for x in range(97, 97 + 26)], n))
+
 
 ###
 # Device Methods/Classes
 ###
 
 
-@permission_required('integrations.view_device')
+@permission_required("integrations.view_device")
 def device_detail(request, module_id):
     logger.info(f"Request for Device: {module_id}")
     device = get_object_or_404(Device, pk=module_id)
@@ -44,10 +72,10 @@ def device_detail(request, module_id):
 
 
 class DeviceAddView(PermissionRequiredMixin, FormView):
-    template_name = 'integrations/device_add.html'
+    template_name = "integrations/device_add.html"
     form_class = DeviceForm
     model = Device
-    permission_required = 'integrations.add_device'
+    permission_required = "integrations.add_device"
 
     def post(self, request, *args, **kwargs):
         form = DeviceForm(request.POST)
@@ -55,12 +83,14 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
             dev = form.save()
             # save device automatically into default device group of inbound integration selected
             device_group = DeviceGroup.objects.get(
-                pk=dev.inbound_configuration.default_devicegroup.id)
+                pk=dev.inbound_configuration.default_devicegroup.id
+            )
             if device_group:
                 device_group.devices.add(dev)
             else:
                 logger.warning(
-                    f"Did not find default device group for {dev.id} with integration id: {dev.inbound_configuration}")
+                    f"Did not find default device group for {dev.id} with integration id: {dev.inbound_configuration}"
+                )
             return redirect("device_list")
         else:
             logger.warning(f"Error saving device form: {form.errors}")
@@ -70,19 +100,23 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
         form = DeviceForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
-            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
-                                                                 self.request.user, 'name', admin_only=True):
+            if not IsOrganizationMember.filter_queryset_for_user(
+                Organization.objects.all(), self.request.user, "name", admin_only=True
+            ):
                 raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return form
 
 
-class DeviceUpdateView(PermissionRequiredMixin, UpdateView, ):
-    template_name = 'integrations/device_update.html'
+class DeviceUpdateView(
+    PermissionRequiredMixin,
+    UpdateView,
+):
+    template_name = "integrations/device_update.html"
     form_class = DeviceForm
     model = Device
-    permission_required = 'integrations.change_device'
+    permission_required = "integrations.change_device"
 
     def get_object(self):
         device = get_object_or_404(Device, pk=self.kwargs.get("module_id"))
@@ -98,19 +132,20 @@ class DeviceUpdateView(PermissionRequiredMixin, UpdateView, ):
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('device_detail',
-                       kwargs={'module_id': self.kwargs.get("module_id")})
+        return reverse(
+            "device_detail", kwargs={"module_id": self.kwargs.get("module_id")}
+        )
 
 
 class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
-    template_name = 'integrations/device_list.html'
+    template_name = "integrations/device_list.html"
     table_class = DeviceTable
     paginate_by = default_paginate_by
     filterset_class = DeviceFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('device_list')
+        base_url = reverse("device_list")
         context["base_url"] = base_url
         return context
 
@@ -119,24 +154,24 @@ class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
 # Device Group Methods/Classes
 ###
 class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
-    template_name = 'integrations/device_group_list.html'
+    template_name = "integrations/device_group_list.html"
     table_class = DeviceGroupTable
     paginate_by = default_paginate_by
     filterset_class = DeviceGroupFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('device_group_list')
+        base_url = reverse("device_group_list")
         context["base_url"] = base_url
         return context
 
 
 class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
-    template_name = 'integrations/device_group_detail.html'
+    template_name = "integrations/device_group_detail.html"
     model = DeviceGroup
     table_class = DeviceTable
     paginate_by = default_paginate_by
-    permission_required = 'integrations.view_devicegroup'
+    permission_required = "integrations.view_devicegroup"
 
     def get_object(self):
         return get_object_or_404(DeviceGroup, pk=self.kwargs.get("module_id"))
@@ -146,53 +181,52 @@ class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('device_list')
+        base_url = reverse("device_list")
         context["base_url"] = base_url
         return context
 
 
 def filter_device_group_form_fields(form, user):
     # owner restricted to admin role
-    if form.fields.get('owner'):
-        form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                      user,
-                                                                                      'name',
-                                                                                      True)
+    if form.fields.get("owner"):
+        form.fields["owner"].queryset = IsOrganizationMember.filter_queryset_for_user(
+            form.fields["owner"].queryset, user, "name", True
+        )
     # destinations open to viewer roles
-    if form.fields.get('destinations'):
-        des_qs = form.fields['destinations'].queryset
+    if form.fields.get("destinations"):
+        des_qs = form.fields["destinations"].queryset
         org_qs = Organization.objects.filter(
-            id__in=des_qs.values_list('owner', flat=True))
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, 'name')
-        form.fields['destinations'].queryset = des_qs.filter(owner__in=org_qs)
+            id__in=des_qs.values_list("owner", flat=True)
+        )
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
+        form.fields["destinations"].queryset = des_qs.filter(owner__in=org_qs)
 
-    if form.fields.get('devices'):
-        dev_qs = form.fields['devices'].queryset
+    if form.fields.get("devices"):
+        dev_qs = form.fields["devices"].queryset
         org_qs = Organization.objects.filter(
-            id__in=dev_qs.values_list('inbound_configuration__owner', flat=True))
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, 'name')
-        form.fields['devices'].queryset = dev_qs.filter(
-            inbound_configuration__owner__in=org_qs)
+            id__in=dev_qs.values_list("inbound_configuration__owner", flat=True)
+        )
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
+        form.fields["devices"].queryset = dev_qs.filter(
+            inbound_configuration__owner__in=org_qs
+        )
 
-    if form.fields.get('inbound_configuration'):
-        ic_qs = form.fields['inbound_configuration'].queryset
+    if form.fields.get("inbound_configuration"):
+        ic_qs = form.fields["inbound_configuration"].queryset
         org_qs = Organization.objects.filter(
-            id__in=ic_qs.values_list('owner', flat=True))
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, 'name')
-        form.fields['inbound_configuration'].queryset = ic_qs.filter(
-            owner__in=org_qs)
+            id__in=ic_qs.values_list("owner", flat=True)
+        )
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
+        form.fields["inbound_configuration"].queryset = ic_qs.filter(owner__in=org_qs)
 
     return form
 
 
 class DeviceGroupAddView(PermissionRequiredMixin, FormView):
-    template_name = 'integrations/device_group_add.html'
+    template_name = "integrations/device_group_add.html"
     form_class = DeviceGroupForm
     model = DeviceGroup
-    permission_required = 'integrations.add_devicegroup'
+    permission_required = "integrations.add_devicegroup"
 
     def post(self, request, *args, **kwargs):
         form = DeviceGroupForm(request.POST)
@@ -204,8 +238,9 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         form = DeviceGroupForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
-            if not IsOrganizationMember.filter_queryset_for_user(Organization.objects.all(),
-                                                                 self.request.user, 'name', admin_only=True):
+            if not IsOrganizationMember.filter_queryset_for_user(
+                Organization.objects.all(), self.request.user, "name", admin_only=True
+            ):
                 raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
@@ -213,10 +248,10 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
 
 
 class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'integrations/device_group_update.html'
+    template_name = "integrations/device_group_update.html"
     form_class = DeviceGroupForm
     model = DeviceGroup
-    permission_required = 'integrations.change_devicegroup'
+    permission_required = "integrations.change_devicegroup"
 
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
@@ -228,24 +263,30 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
 
     def get_object(self):
         device_group = get_object_or_404(
-            DeviceGroup, pk=self.kwargs.get("device_group_id"))
+            DeviceGroup, pk=self.kwargs.get("device_group_id")
+        )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            if not IsOrganizationMember.is_object_owner(self.request.user, device_group.owner):
+            if not IsOrganizationMember.is_object_owner(
+                self.request.user, device_group.owner
+            ):
                 raise PermissionDenied
         return device_group
 
     def get_success_url(self):
-        return reverse('device_group', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse(
+            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
+        )
 
 
 class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
-    template_name = 'integrations/device_group_update.html'
+    template_name = "integrations/device_group_update.html"
     form_class = DeviceGroupManagementForm
     model = DeviceGroup
 
     def get_object(self):
         device_group = get_object_or_404(
-            DeviceGroup, pk=self.kwargs.get("device_group_id"))
+            DeviceGroup, pk=self.kwargs.get("device_group_id")
+        )
         return device_group
 
     def get(self, request, *args, **kwargs):
@@ -257,22 +298,25 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('device_group', kwargs={'module_id': self.kwargs.get("device_group_id")})
+        return reverse(
+            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
+        )
 
 
 ###
 # DeviceState Methods/Classes
 ###
 
+
 class DeviceStateList(LoginRequiredMixin, SingleTableMixin, FilterView):
     table_class = DeviceStateTable
-    template_name = 'integrations/device_state_list.html'
+    template_name = "integrations/device_state_list.html"
     paginate_by = default_paginate_by
     filterset_class = DeviceStateFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('device_list')
+        base_url = reverse("device_list")
         context["base_url"] = base_url
         return context
 
@@ -280,15 +324,18 @@ class DeviceStateList(LoginRequiredMixin, SingleTableMixin, FilterView):
 ###
 # Inbound Integration Type Methods/Classes
 ###
-@permission_required('integrations.view_inboundintegrationtype', raise_exception=True)
+@permission_required("integrations.view_inboundintegrationtype", raise_exception=True)
 def inbound_integration_type_detail(request, module_id):
     logger.info(f"Request for Integration Type: {module_id}")
-    integration_module = get_object_or_404(
-        InboundIntegrationType, pk=module_id)
-    return render(request, "integrations/inbound_integration_type_detail.html", {"module": integration_module})
+    integration_module = get_object_or_404(InboundIntegrationType, pk=module_id)
+    return render(
+        request,
+        "integrations/inbound_integration_type_detail.html",
+        {"module": integration_module},
+    )
 
 
-@permission_required('integrations.add_inboundintegrationtype', raise_exception=True)
+@permission_required("integrations.add_inboundintegrationtype", raise_exception=True)
 def inbound_integration_type_add(request):
     if request.method == "POST":
         form = InboundIntegrationTypeForm(request.POST)
@@ -297,41 +344,49 @@ def inbound_integration_type_add(request):
             return redirect("inbound_integration_type_detail", integration_type.id)
     else:
         form = InboundIntegrationTypeForm
-    return render(request, "integrations/inbound_integration_type_add.html", {"form": form})
+    return render(
+        request, "integrations/inbound_integration_type_add.html", {"form": form}
+    )
 
 
-@permission_required('integrations.change_inboundintegrationtype', raise_exception=True)
+@permission_required("integrations.change_inboundintegrationtype", raise_exception=True)
 def inbound_integration_type_update(request, inbound_integration_type_id):
     integration_type = get_object_or_404(
-        InboundIntegrationType, id=inbound_integration_type_id)
-    form = InboundIntegrationTypeForm(
-        request.POST or None, instance=integration_type)
+        InboundIntegrationType, id=inbound_integration_type_id
+    )
+    form = InboundIntegrationTypeForm(request.POST or None, instance=integration_type)
     if form.is_valid():
         form.save()
         return redirect("inbound_integration_type_detail", inbound_integration_type_id)
-    return render(request, "integrations/inbound_integration_type_update.html", {"form": form})
+    return render(
+        request, "integrations/inbound_integration_type_update.html", {"form": form}
+    )
 
 
 class InboundIntegrationTypeListView(LoginRequiredMixin, ListView):
-    template_name = 'integrations/inbound_integration_type_list.html'
-    queryset = InboundIntegrationType.objects.get_queryset().order_by('name')
-    context_object_name = 'integrations'
+    template_name = "integrations/inbound_integration_type_list.html"
+    queryset = InboundIntegrationType.objects.get_queryset().order_by("name")
+    context_object_name = "integrations"
     paginate_by = default_paginate_by
 
 
 ###
 # Outbound Integration Type Methods/Classes
 ###
-@permission_required('integrations.view_outboundintegrationtype', raise_exception=True)
+@permission_required("integrations.view_outboundintegrationtype", raise_exception=True)
 def outbound_integration_type_detail(request, module_id):
     integration = get_object_or_404(OutboundIntegrationType, pk=module_id)
 
     # permission_can_view(request, integration)
 
-    return render(request, "integrations/outbound_integration_type_detail.html", {"module": integration})
+    return render(
+        request,
+        "integrations/outbound_integration_type_detail.html",
+        {"module": integration},
+    )
 
 
-@permission_required('integrations.add_outboundintegrationtype', raise_exception=True)
+@permission_required("integrations.add_outboundintegrationtype", raise_exception=True)
 def outbound_integration_type_add(request):
     if request.method == "POST":
         form = OutboundIntegrationTypeForm(request.POST)
@@ -340,38 +395,47 @@ def outbound_integration_type_add(request):
             return redirect("outbound_integration_type_detail", integration_type.id)
 
     form = OutboundIntegrationTypeForm
-    return render(request, "integrations/outbound_integration_type_add.html", {"form": form})
+    return render(
+        request, "integrations/outbound_integration_type_add.html", {"form": form}
+    )
 
 
-@permission_required('integrations.change_inboundintegrationtype', raise_exception=True)
+@permission_required("integrations.change_inboundintegrationtype", raise_exception=True)
 def outbound_integration_type_update(request, outbound_integration_type_id):
     integration_type = get_object_or_404(
-        OutboundIntegrationType, id=outbound_integration_type_id)
-    form = OutboundIntegrationTypeForm(
-        request.POST or None, instance=integration_type)
+        OutboundIntegrationType, id=outbound_integration_type_id
+    )
+    form = OutboundIntegrationTypeForm(request.POST or None, instance=integration_type)
     if form.is_valid():
         form.save()
-        return redirect("outbound_integration_type_detail", outbound_integration_type_id)
-    return render(request, "integrations/outbound_integration_type_update.html", {"form": form})
+        return redirect(
+            "outbound_integration_type_detail", outbound_integration_type_id
+        )
+    return render(
+        request, "integrations/outbound_integration_type_update.html", {"form": form}
+    )
 
 
 class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
-    template_name = 'integrations/outbound_integration_type_list.html'
-    queryset = OutboundIntegrationType.objects.get_queryset().order_by('name')
-    context_object_name = 'integrations'
+    template_name = "integrations/outbound_integration_type_list.html"
+    queryset = OutboundIntegrationType.objects.get_queryset().order_by("name")
+    context_object_name = "integrations"
     paginate_by = default_paginate_by
 
 
-def permission_has_role(user, target, roles=('viewer',)):
+def permission_has_role(user, target, roles=("viewer",)):
 
-    if not hasattr(target, 'owner_id'):
+    if not hasattr(target, "owner_id"):
         raise Exception(
-            'Programming error. This method requires target to have owner_id.')
+            "Programming error. This method requires target to have owner_id."
+        )
 
     if not user.accountprofile.organizations.filter(id=target.owner_id).exists():
         raise PermissionDenied
 
-    if not AccountProfileOrganization.objects.filter(accountprofile__user=user, role__in=roles, organization__id=target.owner_id):
+    if not AccountProfileOrganization.objects.filter(
+        accountprofile__user=user, role__in=roles, organization__id=target.owner_id
+    ):
         raise PermissionDenied
 
 
@@ -379,20 +443,22 @@ def permission_can_view(request, target):
     if IsGlobalAdmin.has_permission(None, request, None):
         return
 
-    permission_has_role(request.user, target, roles=('viewer', 'admin'))
+    permission_has_role(request.user, target, roles=("viewer", "admin"))
 
 
 def permission_can_administer(request, target):
     if IsGlobalAdmin.has_permission(None, request, None):
         return
 
-    permission_has_role(request.user, target, roles=('admin'))
+    permission_has_role(request.user, target, roles=("admin"))
 
 
 ###
 # Inbound Integration Configuration Methods/Classes
 ###
-@permission_required('integrations.view_inboundintegrationconfiguration', raise_exception=True)
+@permission_required(
+    "integrations.view_inboundintegrationconfiguration", raise_exception=True
+)
 def inbound_integration_configuration_detail(request, id):
 
     integration = get_object_or_404(InboundIntegrationConfiguration, pk=id)
@@ -403,17 +469,23 @@ def inbound_integration_configuration_detail(request, id):
 
     key = get_api_key(integration)
     if key:
-        form.fields['key'].initial = key
+        form.fields["key"].initial = key
 
-    return render(request, "integrations/inbound_integration_configuration_detail.html", {"module": integration,
-                                                                                          'form': form, })
+    return render(
+        request,
+        "integrations/inbound_integration_configuration_detail.html",
+        {
+            "module": integration,
+            "form": form,
+        },
+    )
 
 
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
-    template_name = 'integrations/inbound_integration_configuration_add.html'
+    template_name = "integrations/inbound_integration_configuration_add.html"
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
-    permission_required = 'integrations.add_inboundintegrationconfiguration'
+    permission_required = "integrations.add_inboundintegrationconfiguration"
 
     def post(self, request, *args, **kwargs):
         form = InboundIntegrationConfigurationForm(request.POST)
@@ -422,10 +494,11 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
             if not config.default_devicegroup:
 
                 if not config.name:
-                    config.name = f'{config.type.name} ({random_string()})'
+                    config.name = f"{config.type.name} ({random_string()})"
                 name = config.name + " - Default Group"
                 device_group = DeviceGroup.objects.create(
-                    owner_id=config.owner.id, name=name)
+                    owner_id=config.owner.id, name=name
+                )
                 config.default_devicegroup = device_group
                 config.save()
             else:
@@ -435,24 +508,31 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                          self.request.user,
-                                                                                          'name',
-                                                                                          True)
+            form.fields[
+                "owner"
+            ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                form.fields["owner"].queryset, self.request.user, "name", True
+            )
         return form
 
 
-class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView, ):
-    template_name = 'integrations/inbound_integration_configuration_update.html'
+class InboundIntegrationConfigurationUpdateView(
+    PermissionRequiredMixin,
+    UpdateView,
+):
+    template_name = "integrations/inbound_integration_configuration_update.html"
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
-    permission_required = 'integrations.change_inboundintegrationconfiguration'
+    permission_required = "integrations.change_inboundintegrationconfiguration"
 
     def get_object(self):
         configuration = get_object_or_404(
-            InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
+            InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id")
+        )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            if not IsOrganizationMember.is_object_owner(self.request.user, configuration):
+            if not IsOrganizationMember.is_object_owner(
+                self.request.user, configuration
+            ):
                 raise PermissionDenied
         return configuration
 
@@ -464,28 +544,33 @@ class InboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateV
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('inbound_integration_configuration_detail',
-                       kwargs={'id': self.kwargs.get("configuration_id")})
+        return reverse(
+            "inbound_integration_configuration_detail",
+            kwargs={"id": self.kwargs.get("configuration_id")},
+        )
 
 
-class InboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
+class InboundIntegrationConfigurationListView(
+    LoginRequiredMixin, SingleTableMixin, FilterView
+):
     table_class = InboundIntegrationConfigurationTable
-    template_name = 'integrations/inbound_integration_configuration_list.html'
-    queryset = InboundIntegrationConfiguration.objects.get_queryset().order_by('id')
+    template_name = "integrations/inbound_integration_configuration_list.html"
+    queryset = InboundIntegrationConfiguration.objects.get_queryset().order_by("id")
     paginate_by = default_paginate_by
     filterset_class = InboundIntegrationFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('inbound_integration_configuration_list')
+        base_url = reverse("inbound_integration_configuration_list")
         context["base_url"] = base_url
         return context
 
     def get_queryset(self):
-        qs = super(InboundIntegrationConfigurationListView,
-                   self).get_queryset()
+        qs = super(InboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+            return IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
         else:
             return qs
 
@@ -493,22 +578,28 @@ class InboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMix
 ###
 # Outbound Integration Configuration Methods/Classes
 ###
-@permission_required('integrations.view_outboundintegrationconfiguration', raise_exception=True)
+@permission_required(
+    "integrations.view_outboundintegrationconfiguration", raise_exception=True
+)
 def outbound_integration_configuration_detail(request, module_id):
     integration_module = get_object_or_404(
-        OutboundIntegrationConfiguration, pk=module_id)
+        OutboundIntegrationConfiguration, pk=module_id
+    )
 
     permission_can_view(request, integration_module)
 
-    return render(request, "integrations/outbound_integration_configuration_detail.html",
-                  {"module": integration_module})
+    return render(
+        request,
+        "integrations/outbound_integration_configuration_detail.html",
+        {"module": integration_module},
+    )
 
 
 class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
-    template_name = 'integrations/outbound_integration_configuration_add.html'
+    template_name = "integrations/outbound_integration_configuration_add.html"
     form_class = OutboundIntegrationConfigurationForm
     model = OutboundIntegrationConfiguration
-    permission_required = 'integrations.add_outboundintegrationconfiguration'
+    permission_required = "integrations.add_outboundintegrationconfiguration"
 
     def post(self, request, *args, **kwargs):
         form = OutboundIntegrationConfigurationForm(request.POST)
@@ -519,24 +610,28 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
     def get_form(self, form_class=None):
         form = OutboundIntegrationConfigurationForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                          self.request.user,
-                                                                                          'name',
-                                                                                          True)
+            form.fields[
+                "owner"
+            ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                form.fields["owner"].queryset, self.request.user, "name", True
+            )
         return form
 
 
 class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'integrations/outbound_integration_configuration_update.html'
+    template_name = "integrations/outbound_integration_configuration_update.html"
     form_class = OutboundIntegrationConfigurationForm
     model = OutboundIntegrationConfiguration
-    permission_required = 'integrations.change_outboundintegrationconfiguration'
+    permission_required = "integrations.change_outboundintegrationconfiguration"
 
     def get_object(self):
         configuration = get_object_or_404(
-            OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id"))
+            OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id")
+        )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            if not IsOrganizationMember.is_object_owner(self.request.user, configuration):
+            if not IsOrganizationMember.is_object_owner(
+                self.request.user, configuration
+            ):
                 raise PermissionDenied
         return configuration
 
@@ -548,52 +643,59 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('outbound_integration_configuration_detail',
-                       kwargs={'module_id': self.kwargs.get("configuration_id")})
+        return reverse(
+            "outbound_integration_configuration_detail",
+            kwargs={"module_id": self.kwargs.get("configuration_id")},
+        )
 
 
-class OutboundIntegrationConfigurationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
+class OutboundIntegrationConfigurationListView(
+    LoginRequiredMixin, SingleTableMixin, FilterView
+):
     table_class = OutboundIntegrationConfigurationTable
-    template_name = 'integrations/outbound_integration_configuration_list.html'
-    queryset = OutboundIntegrationConfiguration.objects.get_queryset().order_by('id')
+    template_name = "integrations/outbound_integration_configuration_list.html"
+    queryset = OutboundIntegrationConfiguration.objects.get_queryset().order_by("id")
     paginate_by = default_paginate_by
     filterset_class = OutboundIntegrationFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse('outbound_integration_configuration_list')
+        base_url = reverse("outbound_integration_configuration_list")
         context["base_url"] = base_url
         return context
 
     def get_queryset(self):
-        qs = super(OutboundIntegrationConfigurationListView,
-                   self).get_queryset()
+        qs = super(OutboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+            return IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
         else:
             return qs
 
 
 class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, ListView):
     table_class = BridgeIntegrationTable
-    template_name = 'integrations/bridge_integration_list.html'
-    queryset = BridgeIntegration.objects.get_queryset().order_by('name')
+    template_name = "integrations/bridge_integration_list.html"
+    queryset = BridgeIntegration.objects.get_queryset().order_by("name")
     paginate_by = default_paginate_by
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['base_url'] = reverse('bridge_integration_list')
+        context["base_url"] = reverse("bridge_integration_list")
         return context
 
     def get_querset(self):
         qs = super(BridgeIntegrationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(qs, self.request.user, 'owner__name')
+            return IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
         else:
             return qs
 
 
-@permission_required('integrations.view_bridgeintegration', raise_exception=True)
+@permission_required("integrations.view_bridgeintegration", raise_exception=True)
 def bridge_integration_view(request, module_id):
     bridge = get_object_or_404(BridgeIntegration, pk=module_id)
     permission_can_view(request, bridge)
@@ -601,18 +703,20 @@ def bridge_integration_view(request, module_id):
 
     key = get_api_key(bridge)
     if key:
-        form.fields['key'].initial = key
+        form.fields["key"].initial = key
 
-    return render(request, "integrations/bridge_integration_view.html",
-                  {"module": bridge,
-                   "form": form})
+    return render(
+        request,
+        "integrations/bridge_integration_view.html",
+        {"module": bridge, "form": form},
+    )
 
 
 class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
-    template_name = 'integrations/bridge_integration_add.html'
+    template_name = "integrations/bridge_integration_add.html"
     form_class = BridgeIntegrationForm
     model = BridgeIntegration
-    permission_required = 'integrations.add_bridgeintegration'
+    permission_required = "integrations.add_bridgeintegration"
 
     def post(self, request, *args, **kwargs):
         form = BridgeIntegrationForm(request.POST)
@@ -623,22 +727,22 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     def get_form(self, form_class=None):
         form = BridgeIntegrationForm()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form.fields['owner'].queryset = IsOrganizationMember.filter_queryset_for_user(form.fields['owner'].queryset,
-                                                                                          self.request.user,
-                                                                                          'name',
-                                                                                          True)
+            form.fields[
+                "owner"
+            ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                form.fields["owner"].queryset, self.request.user, "name", True
+            )
         return form
 
 
 class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'integrations/bridge_integration_update.html'
+    template_name = "integrations/bridge_integration_update.html"
     form_class = BridgeIntegrationForm
     model = BridgeIntegration
-    permission_required = 'integrations.change_bridgeintegration'
+    permission_required = "integrations.change_bridgeintegration"
 
     def get_object(self):
-        configuration = get_object_or_404(
-            BridgeIntegration, pk=self.kwargs.get("id"))
+        configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
         permission_can_view(self.request, configuration)
         return configuration
 
@@ -650,5 +754,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse('bridge_integration_view',
-                       kwargs={'module_id': self.kwargs.get("id")})
+        return reverse(
+            "bridge_integration_view", kwargs={"module_id": self.kwargs.get("id")}
+        )

@@ -11,7 +11,6 @@ class TimestampedModel(models.Model):
 
 
 class Task(models.Model):
-
     class Meta:
         permissions = [
             ("admin", "Admin Role"),

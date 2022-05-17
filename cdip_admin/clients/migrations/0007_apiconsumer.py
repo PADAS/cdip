@@ -7,14 +7,19 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0031_apiconsumer'),
-        ('clients', '0006_auto_20210121_1533'),
+        ("integrations", "0031_apiconsumer"),
+        ("clients", "0006_auto_20210121_1533"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='clientprofile',
-            name='type',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='clientprofiles', related_query_name='clientprofile', to='integrations.inboundintegrationtype'),
+            model_name="clientprofile",
+            name="type",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="clientprofiles",
+                related_query_name="clientprofile",
+                to="integrations.inboundintegrationtype",
+            ),
         ),
     ]

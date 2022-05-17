@@ -28,17 +28,17 @@ def get_accounts_in_user_organization(user):
     """
     user_orgs = IsOrganizationMember.get_organizations_for_user(user, admin_only=False)
     aco = AccountProfileOrganization.objects.filter(organization__name__in=user_orgs)
-    apo_ids = aco.values_list('accountprofile_id', flat=True)
+    apo_ids = aco.values_list("accountprofile_id", flat=True)
     ap = AccountProfile.objects.filter(id__in=apo_ids)
-    accounts = ap.values_list('user_id', flat=True)
+    accounts = ap.values_list("user_id", flat=True)
     return accounts
 
 
 class AccountsListView(LoginRequiredMixin, ListView):
-    template_name = 'accounts/account_list.html'
-    queryset = User.objects.filter(email__contains='@').order_by('last_name')
-    context_object_name = 'accounts'
-    logger.info('Getting account list')
+    template_name = "accounts/account_list.html"
+    queryset = User.objects.filter(email__contains="@").order_by("last_name")
+    context_object_name = "accounts"
+    logger.info("Getting account list")
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -50,9 +50,9 @@ class AccountsListView(LoginRequiredMixin, ListView):
             return qs
 
 
-@permission_required('accounts.view_accountprofile')
+@permission_required("accounts.view_accountprofile")
 def account_detail(request, user_id):
-    logger.info('Getting account detail')
+    logger.info("Getting account detail")
     user = User.objects.get(id=user_id)
 
     # check that requesting user has permission to view this account
@@ -63,13 +63,18 @@ def account_detail(request, user_id):
 
     try:
         profile = AccountProfile.objects.get(user_id=user_id)
-        account_profiles = AccountProfileOrganization.objects.filter(accountprofile_id=profile.id)
+        account_profiles = AccountProfileOrganization.objects.filter(
+            accountprofile_id=profile.id
+        )
     except AccountProfile.DoesNotExist:
         profile = None
         account_profiles = None
 
-    return render(request, "accounts/account_detail.html", {"user": user, "profile": profile,
-                                                            "account_profiles": account_profiles})
+    return render(
+        request,
+        "accounts/account_detail.html",
+        {"user": user, "profile": profile, "account_profiles": account_profiles},
+    )
 
 
 class AccountsAddView(LoginRequiredMixin, FormView):
@@ -89,8 +94,12 @@ class AccountsAddView(LoginRequiredMixin, FormView):
 
             try:
                 user = User.objects.get(email=email)
-                if not user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists():
-                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                if not user.groups.filter(
+                    name=DjangoGroups.ORGANIZATION_MEMBER.value
+                ).exists():
+                    group_id = Group.objects.get(
+                        name=DjangoGroups.ORGANIZATION_MEMBER
+                    ).id
                     user.groups.add(group_id)
 
             except User.DoesNotExist:
@@ -98,18 +107,26 @@ class AccountsAddView(LoginRequiredMixin, FormView):
                 response = add_account(data)
                 # create django user
                 if response:
-                    user = User.objects.create(email=email, username=username, first_name=first_name, last_name=last_name)
-                    group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+                    group_id = Group.objects.get(
+                        name=DjangoGroups.ORGANIZATION_MEMBER
+                    ).id
                     user.groups.add(group_id)
                 else:
                     raise SuspiciousOperation
 
-            account_profile, created = AccountProfile.objects.get_or_create(user_id=user.id,
-                                                                            )
-            apo, created = AccountProfileOrganization.objects.get_or_create(accountprofile_id=account_profile.id,
-                                                                            organization_id=org_id,
-                                                                            role=role)
-            return redirect('organizations_detail', module_id=org_id)
+            account_profile, created = AccountProfile.objects.get_or_create(
+                user_id=user.id,
+            )
+            apo, created = AccountProfileOrganization.objects.get_or_create(
+                accountprofile_id=account_profile.id, organization_id=org_id, role=role
+            )
+            return redirect("organizations_detail", module_id=org_id)
         else:
             raise SuspiciousOperation
 
@@ -123,13 +140,15 @@ class AccountsAddView(LoginRequiredMixin, FormView):
             # can only add if you are an admin of this organization
             if not IsOrganizationMember.is_object_owner(request.user, org):
                 raise PermissionDenied
-        return render(request, "accounts/account_add.html", {'form': form, 'org_id': org_id})
+        return render(
+            request, "accounts/account_add.html", {"form": form, "org_id": org_id}
+        )
 
 
 class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'accounts/account_update.html'
+    template_name = "accounts/account_update.html"
     form_class = AccountUpdateForm
-    permission_required = 'accounts.change_accountprofile'
+    permission_required = "accounts.change_accountprofile"
 
     def post(self, request, *args, **kwargs):
         user_id = self.kwargs.get("user_id")
@@ -149,7 +168,7 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
             user.last_name = data["lastName"]
             user.username = data["username"]
             user.save()
-            return redirect('account_detail', user_id=user_id)
+            return redirect("account_detail", user_id=user_id)
         else:
             raise SuspiciousOperation
 
@@ -164,17 +183,21 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
             if user.id not in accounts:
                 raise PermissionDenied
 
-        account_form.initial['firstName'] = user.first_name
-        account_form.initial['lastName'] = user.last_name
-        account_form.initial['username'] = user.username
+        account_form.initial["firstName"] = user.first_name
+        account_form.initial["lastName"] = user.last_name
+        account_form.initial["username"] = user.username
 
-        return render(request, "accounts/account_update.html", {"account_form": account_form, "user_id": user_id})
+        return render(
+            request,
+            "accounts/account_update.html",
+            {"account_form": account_form, "user_id": user_id},
+        )
 
 
 class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = 'accounts/account_profile_update.html'
+    template_name = "accounts/account_profile_update.html"
     form_class = AccountProfileForm
-    permission_required = 'accounts.change_accountprofile'
+    permission_required = "accounts.change_accountprofile"
 
     def post(self, request, *args, **kwargs):
         org_id = self.kwargs.get("org_id")
@@ -195,7 +218,7 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
             data = profile_form.cleaned_data
             aco.role = data["role"]
             aco.save()
-            return redirect('organizations_detail', module_id=org_id)
+            return redirect("organizations_detail", module_id=org_id)
         else:
             raise SuspiciousOperation
 
@@ -215,9 +238,11 @@ class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
             if not IsOrganizationMember.is_object_owner(self.request.user, org):
                 raise PermissionDenied
 
-        profile_form.initial['role'] = aco.role
-        profile_form.initial['organization'] = aco.organization.id
+        profile_form.initial["role"] = aco.role
+        profile_form.initial["organization"] = aco.organization.id
 
-        return render(request, "accounts/account_profile_update.html", {"profile_form": profile_form,
-                                                                        "user": user,
-                                                                        "organization": org})
+        return render(
+            request,
+            "accounts/account_profile_update.html",
+            {"profile_form": profile_form, "user": user, "organization": org},
+        )

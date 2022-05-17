@@ -12,7 +12,7 @@ import cdip_admin.logconfiguration
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cdip_admin.settings")
 
 cdip_admin.logconfiguration.init()
 
