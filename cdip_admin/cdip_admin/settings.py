@@ -29,147 +29,154 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = '***REMOVED***'
 SECRET_KEY = env.str(
-    "SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a")
-FERNET_KEYS = env.list('FERNET_KEYS', default=[SECRET_KEY, ])
+    "SECRET_KEY", "cfd5266420dffc9baf8137b4eb711498591a0cebaebb14cbdfe74582137d455a"
+)
+FERNET_KEYS = env.list(
+    "FERNET_KEYS",
+    default=[
+        SECRET_KEY,
+    ],
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
 # Defaults are sensible for local development.
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
-                         'localhost', 'portal-127.0.0.1.nip.io', ])
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=[
+        "localhost",
+        "portal-127.0.0.1.nip.io",
+    ],
+)
 
 # Tell Django to use Host forwarded from proxy or gateway)
 USE_X_FORWARDED_HOST = True
 
 # Set forwarded protocol header (Override this in you local dev if using http.
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-STATIC_ROOT = '/var/www/static/'
+STATIC_ROOT = "/var/www/static/"
 
 DEFAULT_PAGINATE_BY = 25
 
 # Application definition
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django_tables2',
-    'django_filters',
-    'crispy_forms',
-    'website',
-    'integrations',
-    'core',
-    'organizations',
-    'accounts',
-    'clients',
-    'phonenumber_field',
-    'rest_framework',
-    'rest_framework_swagger',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django_tables2",
+    "django_filters",
+    "crispy_forms",
+    "website",
+    "integrations",
+    "core",
+    "organizations",
+    "accounts",
+    "clients",
+    "phonenumber_field",
+    "rest_framework",
+    "rest_framework_swagger",
     "bootstrap4",
     "cdip_admin",
 ]
 
 
-KEYCLOAK_SERVER = env.str('KEYCLOAK_SERVER', "https://cdip-auth.pamdas.org")
-KEYCLOAK_REALM = env.str('KEYCLOAK_REALM', "cdip-dev")
-KEYCLOAK_CLIENT_ID = env.str('KEYCLOAK_CLIENT_ID', "***REMOVED***")
-KEYCLOAK_CLIENT_SECRET = env.str('KEYCLOAK_CLIENT_SECRET', "something-fancy")
-KEYCLOAK_ADMIN_CLIENT_ID = env.str('KEYCLOAK_ADMIN_CLIENT_ID', "***REMOVED***")
+KEYCLOAK_SERVER = env.str("KEYCLOAK_SERVER", "https://cdip-auth.pamdas.org")
+KEYCLOAK_REALM = env.str("KEYCLOAK_REALM", "cdip-dev")
+KEYCLOAK_CLIENT_ID = env.str("KEYCLOAK_CLIENT_ID", "***REMOVED***")
+KEYCLOAK_CLIENT_SECRET = env.str("KEYCLOAK_CLIENT_SECRET", "something-fancy")
+KEYCLOAK_ADMIN_CLIENT_ID = env.str("KEYCLOAK_ADMIN_CLIENT_ID", "***REMOVED***")
 # KEYCLOAK_CLIENT_UUID = env.str(
 #     'KEYCLOAK_CLIENT_UUID', "***REMOVED***")
 KEYCLOAK_ADMIN_CLIENT_SECRET = env.str(
-    'KEYCLOAK_ADMIN_CLIENT_SECRET', "something-fancy")
+    "KEYCLOAK_ADMIN_CLIENT_SECRET", "something-fancy"
+)
 
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 KONG_PROXY_URL = env.str(
-    'KONG_PROXY_URL', 'http://kong-proxy.kong.svc.cluster.local:8001')
+    "KONG_PROXY_URL", "http://kong-proxy.kong.svc.cluster.local:8001"
+)
 
 
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "cdip_admin.auth.authentication.SimpleUserInfoAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
     ),
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'cdip_admin.auth.authentication.SimpleUserInfoAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-    ),
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 
 AUTHENTICATION_BACKENDS = {
-    'django.contrib.auth.backends.ModelBackend',
-    'cdip_admin.auth.backends.SimpleUserInfoBackend',
+    "django.contrib.auth.backends.ModelBackend",
+    "cdip_admin.auth.backends.SimpleUserInfoBackend",
 }
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'cdip_admin.auth.middleware.AuthenticationMiddleware',
-    'cdip_admin.auth.middleware.OidcRemoteUserMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "cdip_admin.auth.middleware.AuthenticationMiddleware",
+    "cdip_admin.auth.middleware.OidcRemoteUserMiddleware",
 ]
 
-ROOT_URLCONF = 'cdip_admin.urls'
+ROOT_URLCONF = "cdip_admin.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'cdip_admin.wsgi.application'
+WSGI_APPLICATION = "cdip_admin.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.str('DB_NAME', "cdip_portaldb"),
-        'USER': env.str('DB_USER', "cdip_dbuser"),
-        'PASSWORD': env.str('DB_PASSWORD', "cdip_dbpassword"),
-        'HOST': env.str('DB_HOST', "cdip_dbhost"),
-        'PORT': env.str('DB_PORT', "5432"),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env.str("DB_NAME", "cdip_portaldb"),
+        "USER": env.str("DB_USER", "cdip_dbuser"),
+        "PASSWORD": env.str("DB_PASSWORD", "cdip_dbpassword"),
+        "HOST": env.str("DB_HOST", "cdip_dbhost"),
+        "PORT": env.str("DB_PORT", "5432"),
     }
 }
 
 SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'api_key': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'access_token'
-        }
+    "SECURITY_DEFINITIONS": {
+        "api_key": {"type": "apiKey", "in": "header", "name": "access_token"}
     },
 }
 
@@ -178,30 +185,27 @@ SWAGGER_SETTINGS = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
-LANGUAGES = (
-    ('en', _('English')),
-    ('es', _('Spanish'))
-)
+LANGUAGES = (("en", _("English")), ("es", _("Spanish")))
 
-LANGUAGE_CODE = 'en'
+LANGUAGE_CODE = "en"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -212,17 +216,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = "/static/"
 
 # Celery Settings
-CELERY_BROKER_URL = env.str('CELERY_BROKER_URL', 'redis://celery-redis:6379')
+CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", "redis://celery-redis:6379")
 
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
 CELERY_ENABLE_UTC = True
-CELERY_TIMEZONE = 'UTC'
+CELERY_TIMEZONE = "UTC"
 
 CELERY_REDIS_MAX_CONNECTIONS = 100
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
@@ -236,16 +240,14 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Enables error emails.
 CELERY_SEND_TASK_ERROR_EMAILS = False
 
-CELERY_TASK_DEFAULT_QUEUE = 'default'
-CELERY_TASK_DEFAULT_EXCHANGE = 'default'
-CELERY_TASK_DEFAULT_ROUTING_KEY = 'default'
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_DEFAULT_EXCHANGE = "default"
+CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'visibility_timeout': 3600,
-    'fanout_prefix': True
-}
+CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
 
 # task:
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES = env.int(
-    'CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES', 60)
+    "CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES", 60
+)

@@ -21,22 +21,22 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', welcome, name='welcome'),
-    path('date', date),
-    path('about', about, name='about'),
-    path('integrations/', include('integrations.urls')),
-    path('organizations/', include('organizations.urls')),
-    path('accounts/', include('accounts.urls')),
-    path('clients/', include('clients.urls')),
-    path('api/', include('api.urls')),
-    path('', index),
-    path('login/?', login_view),
-    path('logout/', logout_view),
-    path('', include('django.contrib.auth.urls')),
-    path('', include('social_django.urls')),
+    path("admin/", admin.site.urls),
+    path("", welcome, name="welcome"),
+    path("date", date),
+    path("about", about, name="about"),
+    path("integrations/", include("integrations.urls")),
+    path("organizations/", include("organizations.urls")),
+    path("accounts/", include("accounts.urls")),
+    path("clients/", include("clients.urls")),
+    path("api/", include("api.urls")),
+    path("", index),
+    path("login/?", login_view),
+    path("logout/", logout_view),
+    path("", include("django.contrib.auth.urls")),
+    path("", include("social_django.urls")),
 ]
 
-handler403 = 'cdip_admin.views.custom_error_403'
+handler403 = "cdip_admin.views.custom_error_403"
 
 urlpatterns += staticfiles_urlpatterns()

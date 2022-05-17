@@ -6,23 +6,23 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0007_auto_20200824_1917'),
+        ("integrations", "0007_auto_20200824_1917"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='device',
-            old_name='cursor',
-            new_name='state',
+            model_name="device",
+            old_name="cursor",
+            new_name="state",
         ),
         migrations.RenameField(
-            model_name='inboundintegrationconfiguration',
-            old_name='cursor',
-            new_name='state',
+            model_name="inboundintegrationconfiguration",
+            old_name="cursor",
+            new_name="state",
         ),
         migrations.RenameField(
-            model_name='outboundintegrationconfiguration',
-            old_name='cursor',
-            new_name='state',
+            model_name="outboundintegrationconfiguration",
+            old_name="cursor",
+            new_name="state",
         ),
     ]

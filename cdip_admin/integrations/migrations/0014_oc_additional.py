@@ -6,13 +6,16 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0013_inboundintegrationconfiguration_encrypted_password_field'),
+        (
+            "integrations",
+            "0013_inboundintegrationconfiguration_encrypted_password_field",
+        ),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='outboundintegrationconfiguration',
-            name='additional',
+            model_name="outboundintegrationconfiguration",
+            name="additional",
             field=models.JSONField(blank=True, default=dict),
         ),
     ]

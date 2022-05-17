@@ -6,22 +6,21 @@ from core.permissions import IsServiceAccount, IsGlobalAdmin, IsOrganizationMemb
 from organizations.models import Organization
 from core.enums import RoleChoices
 
+
 class OrganizationFilter(django_filters.FilterSet):
     class Meta:
         model = Organization
-        fields = {
-            'name': ['contains']
-        }
+        fields = {"name": ["contains"]}
 
     @property
     def qs(self):
         queryset = super().qs
 
-        requestor = getattr(self.request, 'user', None)
+        requestor = getattr(self.request, "user", None)
         if not requestor:
             return qs.none
 
-        if not requestor.has_perm('auth.global_admin'):
+        if not requestor.has_perm("auth.global_admin"):
             queryset = queryset.filter(accountprofile__user=requestor)
 
         return queryset
@@ -29,22 +28,13 @@ class OrganizationFilter(django_filters.FilterSet):
 
 class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
 
-    type_slug = django_filters.CharFilter(
-        field_name='type__slug',
-        lookup_expr='exact'
-    )
+    type_slug = django_filters.CharFilter(field_name="type__slug", lookup_expr="exact")
 
-    type_id = django_filters.UUIDFilter(
-        field_name='type__id',
-        lookup_expr='exact'
-    )
+    type_id = django_filters.UUIDFilter(field_name="type__id", lookup_expr="exact")
 
-    owner_id = django_filters.UUIDFilter(
-        field_name='owner__id',
-        lookup_expr='exact'
-    )
+    owner_id = django_filters.UUIDFilter(field_name="owner__id", lookup_expr="exact")
 
-    enabled = django_filters.BooleanFilter(field_name='enabled', lookup_expr='exact')
+    enabled = django_filters.BooleanFilter(field_name="enabled", lookup_expr="exact")
 
     class Meta:
         model = InboundIntegrationConfiguration
@@ -57,7 +47,7 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
         if IsGlobalAdmin.has_permission(None, self.request, None):
             return filtered_qs
 
-        requestor = getattr(self.request, 'user', None)
+        requestor = getattr(self.request, "user", None)
 
         if IsServiceAccount.has_permission(None, self.request, None):
             client_id = IsServiceAccount.get_client_id(self.request)
@@ -65,22 +55,23 @@ class InboundIntegrationConfigurationFilter(django_filters.FilterSet):
             filtered_qs = filtered_qs.filter(type_id=client_profile.type.id)
             return filtered_qs
 
-        filtered_qs = filtered_qs.filter(owner__accountprofile__user=requestor,
-                                         owner__accountprofile__role=RoleChoices.ADMIN)
+        filtered_qs = filtered_qs.filter(
+            owner__accountprofile__user=requestor,
+            owner__accountprofile__role=RoleChoices.ADMIN,
+        )
         return filtered_qs
 
 
 class CeresTagIdentifiersFilter(django_filters.FilterSet):
-
     @property
     def qs(self):
         # TODO: filter down further based on user info provided by ceres client
-        filtered_qs = super().qs.filter(type__slug='ceres_tag')
+        filtered_qs = super().qs.filter(type__slug="ceres_tag")
 
         if IsGlobalAdmin.has_permission(None, self.request, None):
             return filtered_qs
 
-        requestor = getattr(self.request, 'user', None)
+        requestor = getattr(self.request, "user", None)
 
         if IsServiceAccount.has_permission(None, self.request, None):
             client_id = IsServiceAccount.get_client_id(self.request)
@@ -88,8 +79,10 @@ class CeresTagIdentifiersFilter(django_filters.FilterSet):
             filtered_qs = filtered_qs.filter(type_id=client_profile.type.id)
             return filtered_qs
 
-        filtered_qs = filtered_qs.filter(owner__accountprofile__user=requestor,
-                                         owner__accountprofile__role=RoleChoices.ADMIN)
+        filtered_qs = filtered_qs.filter(
+            owner__accountprofile__user=requestor,
+            owner__accountprofile__role=RoleChoices.ADMIN,
+        )
 
         return filtered_qs
 
@@ -97,8 +90,7 @@ class CeresTagIdentifiersFilter(django_filters.FilterSet):
 class DeviceStateFilter(django_filters.FilterSet):
 
     inbound_config_id = django_filters.UUIDFilter(
-        field_name='device__inbound_configuration__id',
-        lookup_expr='exact'
+        field_name="device__inbound_configuration__id", lookup_expr="exact"
     )
 
     class Meta:

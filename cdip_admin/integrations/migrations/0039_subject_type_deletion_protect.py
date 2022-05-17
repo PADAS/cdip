@@ -7,18 +7,28 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0038_devicegroup_default_subject_type'),
+        ("integrations", "0038_devicegroup_default_subject_type"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='device',
-            name='subject_type',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='integrations.subjecttype'),
+            model_name="device",
+            name="subject_type",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="integrations.subjecttype",
+            ),
         ),
         migrations.AlterField(
-            model_name='devicegroup',
-            name='default_subject_type',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='integrations.subjecttype'),
+            model_name="devicegroup",
+            name="default_subject_type",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="integrations.subjecttype",
+            ),
         ),
     ]

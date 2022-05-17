@@ -6,52 +6,54 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0002_auto_20200630_1632'),
+        ("integrations", "0002_auto_20200630_1632"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='inboundintegrationconfiguration',
-            name='slug',
+            model_name="inboundintegrationconfiguration",
+            name="slug",
         ),
         migrations.AddField(
-            model_name='device',
-            name='cursor',
+            model_name="device",
+            name="cursor",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='cursor',
+            model_name="inboundintegrationconfiguration",
+            name="cursor",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='defaultConfiguration',
-            field=models.ManyToManyField(to='integrations.OutboundIntegrationConfiguration'),
+            model_name="inboundintegrationconfiguration",
+            name="defaultConfiguration",
+            field=models.ManyToManyField(
+                to="integrations.OutboundIntegrationConfiguration"
+            ),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='login',
+            model_name="inboundintegrationconfiguration",
+            name="login",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='password',
+            model_name="inboundintegrationconfiguration",
+            name="password",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='token',
+            model_name="inboundintegrationconfiguration",
+            name="token",
             field=models.CharField(blank=True, max_length=200),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='useAdvancedConfiguration',
+            model_name="inboundintegrationconfiguration",
+            name="useAdvancedConfiguration",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='useDefaultConfiguration',
+            model_name="inboundintegrationconfiguration",
+            name="useDefaultConfiguration",
             field=models.BooleanField(default=True),
         ),
     ]

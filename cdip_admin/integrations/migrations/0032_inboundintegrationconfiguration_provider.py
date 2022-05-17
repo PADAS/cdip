@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0031_apiconsumer'),
+        ("integrations", "0031_apiconsumer"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='inboundintegrationconfiguration',
-            name='provider',
+            model_name="inboundintegrationconfiguration",
+            name="provider",
             field=models.CharField(blank=True, max_length=200),
         ),
     ]

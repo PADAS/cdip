@@ -4,31 +4,31 @@ import sys
 
 
 LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-            'format': '%(asctime)s %(levelname)s %(processName)s %(thread)d %(name)s %(message)s',
-            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "format": "%(asctime)s %(levelname)s %(processName)s %(thread)d %(name)s %(message)s",
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
         },
     },
-    'handlers': {
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'stream': sys.stdout,
-            'formatter': 'json'
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "stream": sys.stdout,
+            "formatter": "json",
         },
     },
-    'loggers': {
-        '': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
+    "loggers": {
+        "": {
+            "handlers": ["console"],
+            "level": "DEBUG",
         },
-        'PIL.Image': {
-            'level': 'INFO',
+        "PIL.Image": {
+            "level": "INFO",
         },
-    }
+    },
 }
 
 try:
@@ -40,12 +40,13 @@ except ImportError:
 
 has_initialized = False
 
+
 def init():
-    '''
+    """
     Initialize logging using the default LOGGING_CONFIG above or using an alternative
     imported from .local_log_settings
     :return:
-    '''
+    """
 
     has_initialized = True
 
@@ -53,4 +54,4 @@ def init():
     logging.config.dictConfig(LOGGING_CONFIG)
 
     global init
-    init = lambda: 'already initialized'
+    init = lambda: "already initialized"
