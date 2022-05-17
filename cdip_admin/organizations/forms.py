@@ -6,15 +6,14 @@ from .models import Organization
 
 
 class OrganizationForm(forms.ModelForm):
-
     class Meta:
         model = Organization
-        exclude = ['id']
+        exclude = ["id"]
         widgets = {}
         labels = {
-            'name': 'Organization Name',
+            "name": "Organization Name",
         }
 
     helper = FormHelper()
-    helper.add_input(Submit('submit', 'Save', css_class='btn-primary'))
-    helper.form_method = 'POST'
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.form_method = "POST"

@@ -8,26 +8,36 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0036_device_name'),
+        ("integrations", "0036_device_name"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SubjectType',
+            name="SubjectType",
             fields=[
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('value', models.SlugField(max_length=200, unique=True)),
-                ('display_name', models.CharField(max_length=200)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                ("value", models.SlugField(max_length=200, unique=True)),
+                ("display_name", models.CharField(max_length=200)),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.AddField(
-            model_name='device',
-            name='subject_type',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='integrations.subjecttype'),
+            model_name="device",
+            name="subject_type",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="integrations.subjecttype",
+            ),
         ),
     ]

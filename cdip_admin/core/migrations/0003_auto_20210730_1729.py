@@ -6,12 +6,15 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0002_apiconsumer'),
+        ("core", "0002_apiconsumer"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='task',
-            options={'managed': False, 'permissions': [('admin', 'Admin Role'), ('viewer', 'Viewer Role')]},
+            name="task",
+            options={
+                "managed": False,
+                "permissions": [("admin", "Admin Role"), ("viewer", "Viewer Role")],
+            },
         ),
     ]

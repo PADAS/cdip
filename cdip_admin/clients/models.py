@@ -11,8 +11,12 @@ from organizations.models import Organization
 class ClientProfile(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     client_id = models.CharField(max_length=200, unique=True)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE, related_name='clientprofiles',
-                             related_query_name='clientprofile')
+    type = models.ForeignKey(
+        InboundIntegrationType,
+        on_delete=models.CASCADE,
+        related_name="clientprofiles",
+        related_query_name="clientprofile",
+    )
     organizations = models.ManyToManyField(Organization, blank=True)
 
     def __str__(self):
@@ -48,7 +52,9 @@ class InboundClientResource(TimestampedModel):
 class InboundClientScope(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
-    inbound_client_scope = models.ForeignKey(ClientAudienceScope, on_delete=models.CASCADE)
+    inbound_client_scope = models.ForeignKey(
+        ClientAudienceScope, on_delete=models.CASCADE
+    )
 
     def __str__(self):
         return f"{self.type.name + ' - ' + self.inbound_client_scope.scope}"
@@ -67,7 +73,9 @@ class OutboundClientResource(TimestampedModel):
 class OutboundClientScope(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
-    outbound_client_scope = models.ForeignKey(ClientAudienceScope, on_delete=models.CASCADE)
+    outbound_client_scope = models.ForeignKey(
+        ClientAudienceScope, on_delete=models.CASCADE
+    )
 
     def __str__(self):
         return f"{self.type.name + ' - ' + self.outbound_client_scope.scope}"

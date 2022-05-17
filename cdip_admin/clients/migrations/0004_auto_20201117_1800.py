@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clients', '0003_auto_20201111_2202'),
+        ("clients", "0003_auto_20201111_2202"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='ClientScope',
-            new_name='AuthorizationScope',
+            old_name="ClientScope",
+            new_name="AuthorizationScope",
         ),
     ]

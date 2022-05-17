@@ -27,17 +27,17 @@ def index(request):
     if user.is_authenticated:
         return redirect(welcome)
     else:
-        return render(request, 'index.html')
+        return render(request, "index.html")
 
 
 def logout_view(request):
     logout(request)
 
     # Redirect to a URL that's Kong OIDC plugin to logout the user from the OP
-    return redirect('/oidc-logout')
+    return redirect("/oidc-logout")
 
 
 def login_view(request):
     login(request)
     # Redirect to a success page.
-    return render(request, 'index.html')
+    return render(request, "index.html")

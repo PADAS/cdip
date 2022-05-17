@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0033_default_provider_values'),
+        ("integrations", "0033_default_provider_values"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='device',
-            name='additional',
+            model_name="device",
+            name="additional",
             field=models.JSONField(blank=True, null=True),
         ),
     ]

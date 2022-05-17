@@ -7,6 +7,7 @@ from clients.models import ClientProfile
 from core.enums import RoleChoices, DjangoGroups
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,7 +28,7 @@ class IsGlobalAdmin(permissions.BasePermission):
 
 class IsServiceAccount(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.session and 'client_id' in request.session
+        return request.session and "client_id" in request.session
 
     def has_object_permission(self, request, view, obj):
         client_id = IsServiceAccount.get_client_id(request)
@@ -41,7 +42,7 @@ class IsServiceAccount(permissions.BasePermission):
         request: request to pull client_id off of
         """
         try:
-            client_id = request.session['client_id']
+            client_id = request.session["client_id"]
             return client_id
         except:
             pass
@@ -67,7 +68,7 @@ class IsServiceAccount(permissions.BasePermission):
         client_id: key to client profile
         """
         try:
-            obj.__getattribute__('type')
+            obj.__getattribute__("type")
         except AttributeError:
             # can only determine client permissions on objects that have integration types
             return False
@@ -82,7 +83,9 @@ class IsOrganizationMember(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.groups:
             return False
-        return request.user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists()
+        return request.user.groups.filter(
+            name=DjangoGroups.ORGANIZATION_MEMBER.value
+        ).exists()
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
@@ -100,14 +103,19 @@ class IsOrganizationMember(permissions.BasePermission):
         """
         organizations = []
         try:
-            account_profile_id = AccountProfile.objects.only('id').get(user__id=user.id).id
+            account_profile_id = (
+                AccountProfile.objects.only("id").get(user__id=user.id).id
+            )
         except AccountProfile.DoesNotExist:
             return organizations
         if admin_only:
-            account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id,
-                                                                              role=RoleChoices.ADMIN.value)
+            account_organizations = AccountProfileOrganization.objects.filter(
+                accountprofile_id=account_profile_id, role=RoleChoices.ADMIN.value
+            )
         else:
-            account_organizations = AccountProfileOrganization.objects.filter(accountprofile_id=account_profile_id)
+            account_organizations = AccountProfileOrganization.objects.filter(
+                accountprofile_id=account_profile_id
+            )
         for account in account_organizations:
             organizations.append(account.organization.name)
         return organizations
@@ -122,8 +130,10 @@ class IsOrganizationMember(permissions.BasePermission):
         name_path: the accessor path to the name property on the Organization model
         admin_only: specifies whether we filter the qs down to admin roles only
         """
-        filter_string = name_path + '__in'
-        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only)
+        filter_string = name_path + "__in"
+        organizations = IsOrganizationMember.get_organizations_for_user(
+            user, admin_only
+        )
         return qs.filter(**{filter_string: organizations})
 
     @staticmethod
@@ -135,11 +145,13 @@ class IsOrganizationMember(permissions.BasePermission):
         obj: object to inspect, requires "owner" property
         """
         try:
-            obj.__getattribute__('owner')
+            obj.__getattribute__("owner")
         except AttributeError:
             # return true for objects that dont have owners
             return True
-        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=True)
+        organizations = IsOrganizationMember.get_organizations_for_user(
+            user, admin_only=True
+        )
         return organizations.__contains__(obj.owner.name)
 
     @staticmethod
@@ -151,11 +163,11 @@ class IsOrganizationMember(permissions.BasePermission):
         obj: object to inspect, requires "owner" property
         """
         try:
-            obj.__getattribute__('owner')
+            obj.__getattribute__("owner")
         except AttributeError:
             # return true for objects that dont have owners
             return True
-        organizations = IsOrganizationMember.get_organizations_for_user(user, admin_only=False)
+        organizations = IsOrganizationMember.get_organizations_for_user(
+            user, admin_only=False
+        )
         return organizations.__contains__(obj.owner.name)
-
-

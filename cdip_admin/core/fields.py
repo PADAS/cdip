@@ -11,25 +11,26 @@ from django.db.models.fields import Field, TextField
 from django.db.models.query_utils import DeferredAttribute
 from django.utils.translation import gettext_lazy as _
 
-class KongAdminAPI:
 
+class KongAdminAPI:
     def get_consumer(self, consumer_id):
-        return dict(consumer_id='abcd')
+        return dict(consumer_id="abcd")
 
     def create_consumer(self, consumer_custom_id=None):
-        return dict(consumer_id='abcd')
+        return dict(consumer_id="abcd")
 
     def set_consumer(self, consumer_custom_id=None):
-        return dict(consumer_id='abcd')
+        return dict(consumer_id="abcd")
 
     def get_consumer_key(self, consumer_id):
-        return dict(api_key='xyz')
+        return dict(api_key="xyz")
 
     def create_consumer_key(self, consumer_id):
-        return dict(api_key='xyz')
+        return dict(api_key="xyz")
 
     def delete_consumer(self, consumer_id):
         return True
+
 
 class APIConsumer:
     def __init__(self, instance, field):
@@ -40,7 +41,7 @@ class APIConsumer:
         self.kongapi = KongAdminAPI
 
     def __eq__(self, other):
-        if hasattr(other, 'instance'):
+        if hasattr(other, "instance"):
             return self.instance.id == other.instance.id
 
     def __hash__(self):
@@ -48,7 +49,7 @@ class APIConsumer:
 
     def _get_consumer(self):
 
-        if getattr(self, '_consumer', None) is None:
+        if getattr(self, "_consumer", None) is None:
             self._consumer = self.kongapi.create_consumer(self.instance.id)
         return self._consumer
 
@@ -56,7 +57,7 @@ class APIConsumer:
         return self._get_consumer()
 
     def _del_consumer(self):
-        if hasattr(self, '_consumer', None):
+        if hasattr(self, "_consumer", None):
             return self.kongapi.delete_consumer(self._consumer)
 
     consumer = property(_get_consumer, _set_consumer, _del_consumer)
@@ -71,12 +72,13 @@ class APIConsumer:
         api_key = self.kongapi.create_consumer_key(consumer)
 
         # Will save the consumer ID value in the model field.
-        setattr(selfinstance, self.field.attname, consumer['id'])
+        setattr(selfinstance, self.field.attname, consumer["id"])
         self._committed = True
 
         # Save the object because it has changed, unless save is False
         if save:
             self.instance.save()
+
     save.alters_data = True
 
     def delete(self, save=True):
@@ -89,17 +91,18 @@ class APIConsumer:
 
         if save:
             self.instance.save()
+
     delete.alters_data = True
 
     def __getstate__(self):
 
         return {
-            'name': self.name,
-            'closed': False,
-            '_committed': True,
-            '_file': None,
-            'instance': self.instance,
-            'field': self.field,
+            "name": self.name,
+            "closed": False,
+            "_committed": True,
+            "_file": None,
+            "instance": self.instance,
+            "field": self.field,
         }
 
     def __setstate__(self, state):
@@ -120,6 +123,7 @@ class APIConsumerDescriptor(DeferredAttribute):
         >>> with open('/path/to/hello.world') as f:
         ...     instance.file = File(f)
     """
+
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
@@ -162,7 +166,7 @@ class APIConsumerDescriptor(DeferredAttribute):
         # Finally, because of the (some would say boneheaded) way pickle works,
         # the underlying FieldFile might not actually itself have an associated
         # file. So we need to reset the details of the FieldFile in those cases.
-        elif isinstance(file, APIConsumer) and not hasattr(file, 'field'):
+        elif isinstance(file, APIConsumer) and not hasattr(file, "field"):
             file.instance = instance
             file.field = self.field
             file.storage = self.field.storage
@@ -189,9 +193,9 @@ class APIConsumerField(TextField):
 
     description = _("APIConsumer")
 
-    def __init__(self, verbose_name=None, name=None, type='kong', **kwargs):
-        self._primary_key_set_explicitly = 'primary_key' in kwargs
-        kwargs.setdefault('max_length', 100)
+    def __init__(self, verbose_name=None, name=None, type="kong", **kwargs):
+        self._primary_key_set_explicitly = "primary_key" in kwargs
+        kwargs.setdefault("max_length", 100)
         super().__init__(verbose_name, name, **kwargs)
 
     def check(self, **kwargs):
@@ -204,9 +208,10 @@ class APIConsumerField(TextField):
         if self._primary_key_set_explicitly:
             return [
                 checks.Error(
-                    "'primary_key' is not a valid argument for a %s." % self.__class__.__name__,
+                    "'primary_key' is not a valid argument for a %s."
+                    % self.__class__.__name__,
                     obj=self,
-                    id='fields.E201',
+                    id="fields.E201",
                 )
             ]
         else:
@@ -231,7 +236,11 @@ class APIConsumerField(TextField):
         setattr(cls, self.attname, self.descriptor_class(self))
 
     def generate_consumer_custom_id(self, instance, filename):
-        return {"integration_ids": [str(instance.id),]}
+        return {
+            "integration_ids": [
+                str(instance.id),
+            ]
+        }
 
     def save_form_data(self, instance, data):
         # Important: None means "no change", other false value means "clear"
@@ -239,17 +248,18 @@ class APIConsumerField(TextField):
         # needed because we need to consume values that are also sane for a
         # regular (non Model-) Form to find in its cleaned_data dictionary.
 
-        data = 'abcdef'
+        data = "abcdef"
         if data is not None:
             # This value will be converted to str and stored in the
             # database, so leaving False as-is is not acceptable.
-            setattr(instance, self.name, data or '')
+            setattr(instance, self.name, data or "")
 
     def formfield(self, **kwargs):
         kwargs = kwargs
-        return super().formfield(**{
-            'form_class': forms.CharField,
-            'max_length': self.max_length,
-            **kwargs,
-        })
-
+        return super().formfield(
+            **{
+                "form_class": forms.CharField,
+                "max_length": self.max_length,
+                **kwargs,
+            }
+        )

@@ -4,30 +4,44 @@ from clients.models import ClientProfile
 
 
 grant_types = {
-    'authorization_code': 'authorization_code',
-    'implicit': 'implicit',
-    'refresh_token': 'refresh_token',
-    'client_credentials': 'client_credentials'
+    "authorization_code": "authorization_code",
+    "implicit": "implicit",
+    "refresh_token": "refresh_token",
+    "client_credentials": "client_credentials",
 }
 
 grant_types_init = [
-    'authorization_code',
-    'implicit',
-    'refresh_token',
-    'client_credentials'
+    "authorization_code",
+    "implicit",
+    "refresh_token",
+    "client_credentials",
 ]
 
 
 class ClientForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
-    rootUrl = forms.URLField(max_length=200, required=False, label="Root Url", widget=forms.HiddenInput)
-    protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
+    rootUrl = forms.URLField(
+        max_length=200, required=False, label="Root Url", widget=forms.HiddenInput
+    )
+    protocol = forms.CharField(
+        max_length=200,
+        required=True,
+        initial="openid-connect",
+        widget=forms.HiddenInput,
+    )
 
 
 class ClientUpdateForm(forms.Form):
     clientId = forms.CharField(max_length=200, required=True, label="Client ID")
-    rootUrl = forms.URLField(max_length=200, required=False, label="Root Url", widget=forms.HiddenInput)
-    protocol = forms.CharField(max_length=200, required=True, initial="openid-connect", widget=forms.HiddenInput)
+    rootUrl = forms.URLField(
+        max_length=200, required=False, label="Root Url", widget=forms.HiddenInput
+    )
+    protocol = forms.CharField(
+        max_length=200,
+        required=True,
+        initial="openid-connect",
+        widget=forms.HiddenInput,
+    )
 
 
 class ClientProfileForm(forms.ModelForm):
@@ -35,7 +49,7 @@ class ClientProfileForm(forms.ModelForm):
 
     class Meta:
         model = ClientProfile
-        exclude = ['id', 'organizations']
+        exclude = ["id", "organizations"]
 
 
 class ClientProfileUpdateForm(forms.ModelForm):
@@ -44,7 +58,4 @@ class ClientProfileUpdateForm(forms.ModelForm):
 
     class Meta:
         model = ClientProfile
-        fields = ['id', 'client_id', 'type']
-
-
-
+        fields = ["id", "client_id", "type"]

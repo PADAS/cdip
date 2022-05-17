@@ -10,27 +10,35 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('accounts', '0008_accountprofile_uniq_user'),
+        ("accounts", "0008_accountprofile_uniq_user"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='accountprofile',
-            name='user_username',
+            model_name="accountprofile",
+            name="user_username",
         ),
         migrations.AlterField(
-            model_name='accountprofile',
-            name='user',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL),
+            model_name="accountprofile",
+            name="user",
+            field=models.OneToOneField(
+                on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL
+            ),
         ),
         migrations.AlterField(
-            model_name='accountprofileorganization',
-            name='id',
-            field=models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            model_name="accountprofileorganization",
+            name="id",
+            field=models.BigAutoField(
+                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            ),
         ),
         migrations.AlterField(
-            model_name='accountprofileorganization',
-            name='role',
-            field=models.CharField(choices=[('admin', 'admin'), ('viewer', 'viewer')], default=core.enums.RoleChoices['VIEWER'], max_length=200),
+            model_name="accountprofileorganization",
+            name="role",
+            field=models.CharField(
+                choices=[("admin", "admin"), ("viewer", "viewer")],
+                default=core.enums.RoleChoices["VIEWER"],
+                max_length=200,
+            ),
         ),
     ]
