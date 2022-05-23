@@ -125,7 +125,13 @@ class ER_SMART_Synchronizer:
                             extra=dict(value=event_type["value"]),
                         )
                         event_type["id"] = event_type_match.get("id")
-                        self.das_client.patch_event_type(event_type)
+                        try:
+                            self.das_client.patch_event_type(event_type)
+                        except:
+                            logger.error(
+                                f" Error occurred during das_client.patch_event_type",
+                                extra=dict(event_type=event_type),
+                            )
                 else:
                     event_type["category"] = event_category.get("value")
                     logger.info(
@@ -134,11 +140,17 @@ class ER_SMART_Synchronizer:
                             value=event_type["value"], category=event_type["category"]
                         ),
                     )
-                    self.das_client.post_event_type(event_type)
+                    try:
+                        self.das_client.post_event_type(event_type)
+                    except:
+                        logger.error(
+                            f" Error occurred during das_client.post_event_type",
+                            extra=dict(event_type=event_type),
+                        )
 
         except Exception as e:
             logger.exception(
-                f"Exception raised posting event type",
+                f"Unexpected Error occurred during create_or_update_er_event_types",
                 extra=dict(event_type=event_type),
             )
 
