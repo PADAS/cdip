@@ -135,7 +135,7 @@ class ER_SMART_Synchronizer:
                         event_type.value
                     )
                     if not er_event_type_schemas_equal(
-                        json.loads(event_type.event_schema)['schema'],
+                        json.loads(event_type.event_schema)["schema"],
                         event_type_match_schema.get("schema"),
                     ):
                         logger.info(
