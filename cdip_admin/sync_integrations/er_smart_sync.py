@@ -100,11 +100,7 @@ class ER_SMART_Synchronizer:
                 "Event Category not found in destination ER, creating now ...",
                 extra=dict(value=event_category_value, display=ca.label),
             )
-            # TODO Set this back
-            # event_category = dict(value=event_category_value, display=ca.label)
-            event_category = dict(
-                value=event_category_value, display="Test " + ca.label
-            )
+            event_category = dict(value=event_category_value, display=ca.label)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category, event_types)
 
