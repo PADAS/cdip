@@ -164,13 +164,13 @@ WSGI_APPLICATION = "cdip_admin.wsgi.application"
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.str('DB_NAME', "cdip_portaldb"),
-        'USER': env.str('DB_USER', "cdip_dbuser"),
-        'PASSWORD': env.str('DB_PASSWORD', "cdip_dbpassword"),
-        'HOST': env.str('DB_HOST', "cdip_dbhost"),
-        'PORT': env.str('DB_PORT', "5432"),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env.str("DB_NAME", "cdip_portaldb"),
+        "USER": env.str("DB_USER", "cdip_dbuser"),
+        "PASSWORD": env.str("DB_PASSWORD", "cdip_dbpassword"),
+        "HOST": env.str("DB_HOST", "cdip_dbhost"),
+        "PORT": env.str("DB_PORT", "5432"),
     }
 }
 
