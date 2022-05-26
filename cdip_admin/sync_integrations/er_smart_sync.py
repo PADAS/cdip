@@ -86,17 +86,25 @@ class ER_SMART_Synchronizer:
         event_types = build_earth_ranger_event_types(dm=dm_dict, ca_uuid=smart_ca_uuid)
 
         existing_event_categories = self.das_client.get_event_categories()
+        event_category_value = self.get_event_category_value_from_ca_label(ca.label)
         event_category = next(
-            (x for x in existing_event_categories if x.get("value") == ca.label), None
-        )
+            (x for x in existing_event_categories if x.get("value") == event_category_value), None)
         if not event_category:
             logger.info(
                 "Event Category not found in destination ER, creating now ...",
-                extra=dict(value=ca.label, display=ca.label),
+                extra=dict(value=event_category_value, display=ca.label),
             )
-            event_category = dict(value=ca.label, display=ca.label)
+            event_category = dict(value=event_category_value, display=ca.label)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category, event_types)
+
+    @staticmethod
+    def get_event_category_value_from_ca_label(ca_label: str):
+        value = ca_label.replace('[', '')
+        value = value.replace(']', '')
+        value = value.replace(' ', '_')
+        value = value.lower()
+        return value
 
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         existing_event_types = self.das_client.get_event_types(
@@ -108,40 +116,40 @@ class ER_SMART_Synchronizer:
                     (
                         x
                         for x in existing_event_types
-                        if (x.get("value") == event_type.get("value"))
+                        if (x.get("value") == event_type.value)
                     ),
                     None,
                 )
                 if event_type_match:
                     event_type_match_schema = self.das_client.get_event_schema(
-                        event_type.get("value")
+                        event_type.value
                     )
                     if not er_event_type_schemas_equal(
-                        json.loads(event_type.get("schema")).get("schema"),
+                        json.loads(event_type.event_schema.schema_wrapper),
                         event_type_match_schema.get("schema"),
                     ):
                         logger.info(
                             f"Updating ER event type",
-                            extra=dict(value=event_type["value"]),
+                            extra=dict(value=event_type.value),
                         )
-                        event_type["id"] = event_type_match.get("id")
+                        event_type.id = event_type_match.get("id")
                         try:
-                            self.das_client.patch_event_type(event_type)
+                            self.das_client.patch_event_type(event_type.dict(by_alias=True))
                         except:
                             logger.error(
                                 f" Error occurred during das_client.patch_event_type",
                                 extra=dict(event_type=event_type),
                             )
                 else:
-                    event_type["category"] = event_category.get("value")
+                    event_type.category = event_category.get("value")
                     logger.info(
                         f"Creating ER event type",
                         extra=dict(
-                            value=event_type["value"], category=event_type["category"]
+                            value=event_type.value, category=event_type.category
                         ),
                     )
                     try:
-                        self.das_client.post_event_type(event_type)
+                        self.das_client.post_event_type(event_type.dict(by_alias=True))
                     except:
                         logger.error(
                             f" Error occurred during das_client.post_event_type",
@@ -272,12 +280,15 @@ class ER_SMART_Synchronizer:
                     continue
 
             publish_observation = True
+            extra_dict = dict(patrol_id=patrol.id,
+                              patrol_serial_num=patrol.serial_number,
+                              patrol_title=patrol.title)
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
                 if not segment.start_location:
                     # Need start location to pass in coordinates and determine location timezone
                     logger.info(
-                        "skipping processing, patrol contains no start location"
+                        "skipping processing, patrol contains no start location", extra=extra_dict
                     )
                     publish_observation = False
                     continue
@@ -285,7 +296,7 @@ class ER_SMART_Synchronizer:
                 if not segment.leader:
                     # SMART requires at least one member on patrol leg
                     logger.info(
-                        "skipping processing, patrol contains no start location"
+                        "skipping processing, patrol contains no start location", extra=extra_dict
                     )
                     publish_observation = False
                     continue
@@ -312,11 +323,7 @@ class ER_SMART_Synchronizer:
             if publish_observation:
                 logger.info(
                     f"Publishing observation for ER Patrol",
-                    extra=dict(
-                        patrol_id=patrol.id,
-                        patrol_serial_num=patrol.serial_number,
-                        patrol_title=patrol.title,
-                    ),
+                    extra=extra_dict
                 )
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, patrol.dict()
