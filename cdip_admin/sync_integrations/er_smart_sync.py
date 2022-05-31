@@ -16,6 +16,7 @@ from smartconnect.er_sync_utils import (
     er_event_type_schemas_equal,
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
+    EREventType
 )
 
 from integrations.models import (
@@ -113,11 +114,15 @@ class ER_SMART_Synchronizer:
         return value
 
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
+        # TODO: would be nice to be able to specify category here.
+        #  Currently event_type keys must be globally unique not just within category though
         existing_event_types = self.das_client.get_event_types(
             dict(include_inactive=True)
         )
         try:
+            event_type: EREventType
             for event_type in event_types:
+                event_type.category = event_category.get("value")
                 event_type_match = next(
                     (
                         x
@@ -133,7 +138,7 @@ class ER_SMART_Synchronizer:
                     if not er_event_type_schemas_equal(
                         json.loads(event_type.event_schema)["schema"],
                         event_type_match_schema.get("schema"),
-                    ):
+                    ) or event_type.is_active != event_type_match.get('is_active'):
                         logger.info(
                             f"Updating ER event type",
                             extra=dict(value=event_type.value),
@@ -149,7 +154,6 @@ class ER_SMART_Synchronizer:
                                 extra=dict(event_type=event_type),
                             )
                 else:
-                    event_type.category = event_category.get("value")
                     logger.info(
                         f"Creating ER event type",
                         extra=dict(
