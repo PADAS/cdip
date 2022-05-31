@@ -16,7 +16,7 @@ from smartconnect.er_sync_utils import (
     er_event_type_schemas_equal,
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
-    EREventType
+    EREventType,
 )
 
 from integrations.models import (
@@ -138,7 +138,7 @@ class ER_SMART_Synchronizer:
                     if not er_event_type_schemas_equal(
                         json.loads(event_type.event_schema)["schema"],
                         event_type_match_schema.get("schema"),
-                    ) or event_type.is_active != event_type_match.get('is_active'):
+                    ) or event_type.is_active != event_type_match.get("is_active"):
                         logger.info(
                             f"Updating ER event type",
                             extra=dict(value=event_type.value),
