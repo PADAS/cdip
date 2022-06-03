@@ -84,7 +84,10 @@ class ER_SMART_Synchronizer:
         dm = self.smart_client.download_datamodel(ca_uuid=smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
-        event_types = build_earth_ranger_event_types(dm=dm_dict, ca_uuid=smart_ca_uuid)
+        ca_identifer = self.get_identifier_from_ca_label(ca.label)
+        event_types = build_earth_ranger_event_types(
+            dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifer
+        )
 
         existing_event_categories = self.das_client.get_event_categories()
         event_category_value = self.get_event_category_value_from_ca_label(ca.label)
@@ -113,6 +116,16 @@ class ER_SMART_Synchronizer:
         value = value.lower()
         return value
 
+    @staticmethod
+    def get_identifier_from_ca_label(ca_label: str):
+        try:
+            start = ca_label.index("[") + 1
+            end = ca_label.index("]")
+            return ca_label[start:end]
+        except ValueError:
+            logger.warning(f"Unable to get identifier from ca_label {ca_label}")
+            return ""
+
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
@@ -135,10 +148,14 @@ class ER_SMART_Synchronizer:
                     event_type_match_schema = self.das_client.get_event_schema(
                         event_type.value
                     )
-                    if not er_event_type_schemas_equal(
-                        json.loads(event_type.event_schema)["schema"],
-                        event_type_match_schema.get("schema"),
-                    ) or event_type.is_active != event_type_match.get("is_active"):
+                    if (
+                        not er_event_type_schemas_equal(
+                            json.loads(event_type.event_schema)["schema"],
+                            event_type_match_schema.get("schema"),
+                        )
+                        or event_type.is_active != event_type_match.get("is_active")
+                        or event_type.display != event_type_match.get("display")
+                    ):
                         logger.info(
                             f"Updating ER event type",
                             extra=dict(value=event_type.value),
