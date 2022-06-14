@@ -145,9 +145,16 @@ class ER_SMART_Synchronizer:
                     None,
                 )
                 if event_type_match:
-                    event_type_match_schema = self.das_client.get_event_schema(
-                        event_type.value
-                    )
+                    try:
+                        event_type_match_schema = self.das_client.get_event_schema(
+                            event_type.value
+                        )
+                    except:
+                        logger.error(
+                            f" Error occurred during das_client.get_event_schema",
+                            extra=dict(event_type=event_type),
+                        )
+                        continue
                     if (
                         not er_event_type_schemas_equal(
                             json.loads(event_type.event_schema)["schema"],
