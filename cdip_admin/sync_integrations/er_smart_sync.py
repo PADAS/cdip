@@ -152,8 +152,7 @@ class ER_SMART_Synchronizer:
                     except Exception as e:
                         logger.error(
                             f" Error occurred during das_client.get_event_schema",
-                            extra=dict(event_type=event_type,
-                                       exception=e),
+                            extra=dict(event_type=event_type, exception=e),
                         )
                         continue
                     if (
@@ -176,8 +175,7 @@ class ER_SMART_Synchronizer:
                         except Exception as e:
                             logger.error(
                                 f" Error occurred during das_client.patch_event_type",
-                                extra=dict(event_type=event_type,
-                                           exception=e),
+                                extra=dict(event_type=event_type, exception=e),
                             )
                 else:
                     logger.info(
@@ -197,8 +195,7 @@ class ER_SMART_Synchronizer:
         except Exception as e:
             logger.exception(
                 f"Unexpected Error occurred during create_or_update_er_event_types",
-                extra=dict(event_type=event_type,
-                           exception=e),
+                extra=dict(event_type=event_type, exception=e),
             )
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
