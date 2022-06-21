@@ -130,7 +130,7 @@ class ER_SMART_Synchronizer:
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
         existing_event_types = self.das_client.get_event_types(
-            dict(include_inactive=True)
+           include_inactive=True
         )
         try:
             event_type: EREventType
@@ -154,29 +154,29 @@ class ER_SMART_Synchronizer:
                             f" Error occurred during das_client.get_event_schema",
                             extra=dict(event_type=event_type, exception=e),
                         )
-                        continue
-                    if (
-                        not er_event_type_schemas_equal(
-                            json.loads(event_type.event_schema)["schema"],
-                            event_type_match_schema.get("schema"),
-                        )
-                        or event_type.is_active != event_type_match.get("is_active")
-                        or event_type.display != event_type_match.get("display")
-                    ):
-                        logger.info(
-                            f"Updating ER event type",
-                            extra=dict(value=event_type.value),
-                        )
-                        event_type.id = event_type_match.get("id")
-                        try:
-                            self.das_client.patch_event_type(
-                                event_type.dict(by_alias=True)
+                    else:
+                        if (
+                            not er_event_type_schemas_equal(
+                                json.loads(event_type.event_schema)["schema"],
+                                event_type_match_schema.get("schema"),
                             )
-                        except Exception as e:
-                            logger.error(
-                                f" Error occurred during das_client.patch_event_type",
-                                extra=dict(event_type=event_type, exception=e),
+                            or event_type.is_active != event_type_match.get("is_active")
+                            or event_type.display != event_type_match.get("display")
+                        ):
+                            logger.info(
+                                f"Updating ER event type",
+                                extra=dict(value=event_type.value),
                             )
+                            event_type.id = event_type_match.get("id")
+                            try:
+                                self.das_client.patch_event_type(
+                                    event_type.dict(by_alias=True)
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f" Error occurred during das_client.patch_event_type",
+                                    extra=dict(event_type=event_type, exception=e),
+                                )
                 else:
                     logger.info(
                         f"Creating ER event type",
