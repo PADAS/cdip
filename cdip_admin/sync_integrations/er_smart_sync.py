@@ -129,9 +129,7 @@ class ER_SMART_Synchronizer:
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
-        existing_event_types = self.das_client.get_event_types(
-            dict(include_inactive=True)
-        )
+        existing_event_types = self.das_client.get_event_types(include_inactive=True)
         try:
             event_type: EREventType
             for event_type in event_types:
@@ -145,31 +143,38 @@ class ER_SMART_Synchronizer:
                     None,
                 )
                 if event_type_match:
-                    event_type_match_schema = self.das_client.get_event_schema(
-                        event_type.value
-                    )
-                    if (
-                        not er_event_type_schemas_equal(
-                            json.loads(event_type.event_schema)["schema"],
-                            event_type_match_schema.get("schema"),
+                    try:
+                        event_type_match_schema = self.das_client.get_event_schema(
+                            event_type.value
                         )
-                        or event_type.is_active != event_type_match.get("is_active")
-                        or event_type.display != event_type_match.get("display")
-                    ):
-                        logger.info(
-                            f"Updating ER event type",
-                            extra=dict(value=event_type.value),
+                    except Exception as e:
+                        logger.error(
+                            f" Error occurred during das_client.get_event_schema",
+                            extra=dict(event_type=event_type, exception=e),
                         )
-                        event_type.id = event_type_match.get("id")
-                        try:
-                            self.das_client.patch_event_type(
-                                event_type.dict(by_alias=True)
+                    else:
+                        if (
+                            not er_event_type_schemas_equal(
+                                json.loads(event_type.event_schema)["schema"],
+                                event_type_match_schema.get("schema"),
                             )
-                        except:
-                            logger.error(
-                                f" Error occurred during das_client.patch_event_type",
-                                extra=dict(event_type=event_type),
+                            or event_type.is_active != event_type_match.get("is_active")
+                            or event_type.display != event_type_match.get("display")
+                        ):
+                            logger.info(
+                                f"Updating ER event type",
+                                extra=dict(value=event_type.value),
                             )
+                            event_type.id = event_type_match.get("id")
+                            try:
+                                self.das_client.patch_event_type(
+                                    event_type.dict(by_alias=True)
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f" Error occurred during das_client.patch_event_type",
+                                    extra=dict(event_type=event_type, exception=e),
+                                )
                 else:
                     logger.info(
                         f"Creating ER event type",
@@ -188,7 +193,7 @@ class ER_SMART_Synchronizer:
         except Exception as e:
             logger.exception(
                 f"Unexpected Error occurred during create_or_update_er_event_types",
-                extra=dict(event_type=event_type),
+                extra=dict(event_type=event_type, exception=e),
             )
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
