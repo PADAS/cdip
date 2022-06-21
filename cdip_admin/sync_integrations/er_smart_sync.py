@@ -129,9 +129,7 @@ class ER_SMART_Synchronizer:
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
-        existing_event_types = self.das_client.get_event_types(
-           include_inactive=True
-        )
+        existing_event_types = self.das_client.get_event_types(include_inactive=True)
         try:
             event_type: EREventType
             for event_type in event_types:
