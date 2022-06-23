@@ -38,6 +38,8 @@ def logout_view(request):
 
 
 def login_view(request):
-    login(request)
-    # Redirect to a success page.
-    return render(request, "index.html")
+    return redirect("/login")
+
+# def local_oidc_logout_handler(request):
+#     logout(request)
+#     return render(request, "index.html")
