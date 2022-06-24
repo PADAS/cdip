@@ -4,11 +4,16 @@
 
 {% block content %}
 
-<h2>Log In</h2>
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Log In</button>
-</form>
+    <div class="row">
+    <div class="col-md-8 mx-auto">
+        <h2>Log In</h2>
+        <p>This login form requires your local account. Use your email address and password.</p>
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button type="submit">Log In</button>
+        </form>
+    </div>
+    </div>
 
 {% endblock %}
