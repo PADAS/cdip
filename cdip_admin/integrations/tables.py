@@ -12,13 +12,14 @@ from .models import (
 
 class DeviceStateTable(tables.Table):
     created = tables.Column(accessor="created_at", verbose_name="Created")
+    organization = tables.Column(
+        accessor="device__inbound_configuration__owner", verbose_name="Organization", linkify=True)
 
     class Meta:
         model = DeviceState
         template_name = "django_tables2/bootstrap4.html"
         fields = (
             "device__external_id",
-            "device__inbound_configuration__owner__name",
             "device__inbound_configuration__type__name",
             "state",
         )
@@ -26,7 +27,7 @@ class DeviceStateTable(tables.Table):
         attrs = {"class": "table table-hover", "id": "device-state-table"}
         sequence = (
             "device__external_id",
-            "device__inbound_configuration__owner__name",
+            "organization",
             "device__inbound_configuration__type__name",
             "state",
             "created",
@@ -39,7 +40,7 @@ class DeviceGroupTable(tables.Table):
         accessor="device_count", verbose_name="Device Count")
     created = tables.Column(accessor="created_at", verbose_name="Created")
     organization = tables.Column(
-        accessor="owner__name", verbose_name="Organization")
+        accessor="owner", verbose_name="Organization", linkify=True)
 
     class Meta:
         model = DeviceGroup
@@ -54,8 +55,7 @@ class DeviceGroupTable(tables.Table):
 class DeviceTable(tables.Table):
     created = tables.Column(accessor="created_at", verbose_name="Created")
     owner = tables.Column(
-        accessor="inbound_configuration__owner__name", verbose_name="Organization"
-    )
+        accessor="inbound_configuration__owner", verbose_name="Organization", linkify=True)
     integration_type = tables.Column(
         accessor="inbound_configuration__type__name", verbose_name="Integration Type"
     )
@@ -71,10 +71,14 @@ class DeviceTable(tables.Table):
 
 
 class InboundIntegrationConfigurationTable(tables.Table):
+
+    organization = tables.Column(
+        accessor="owner", verbose_name="Organization", linkify=True)
+
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type__name", "owner__name", "endpoint", "enabled")
+        fields = ("name", "type__name", "organization", "endpoint", "enabled")
         row_attrs = {"inbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
         order_by = "type__name"
@@ -83,10 +87,13 @@ class InboundIntegrationConfigurationTable(tables.Table):
 class OutboundIntegrationConfigurationTable(tables.Table):
     type = tables.Column(accessor="type__name", verbose_name="Type")
 
+    organization = tables.Column(
+        accessor="owner", verbose_name="Organization", linkify=True)
+
     class Meta:
         model = OutboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "owner__name", "endpoint", "enabled")
+        fields = ("name", "type", "organization", "endpoint", "enabled")
         row_attrs = {"outbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = "type__name"
@@ -94,11 +101,13 @@ class OutboundIntegrationConfigurationTable(tables.Table):
 
 class BridgeIntegrationTable(tables.Table):
     type = tables.Column(accessor="type__name", verbose_name="Type")
+    organization = tables.Column(
+        accessor="owner", verbose_name="Organization", linkify=True)
 
     class Meta:
         model = BridgeIntegration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "owner__name", "enabled")
+        fields = ("name", "type", "organization", "enabled")
         row_attrs = {"bridge-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"
