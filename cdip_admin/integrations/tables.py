@@ -35,12 +35,11 @@ class DeviceStateTable(tables.Table):
 
 
 class DeviceGroupTable(tables.Table):
-    count = tables.Column(accessor="devices", verbose_name="Device Count")
+    device_count = tables.Column(
+        accessor="device_count", verbose_name="Device Count")
     created = tables.Column(accessor="created_at", verbose_name="Created")
-    organization = tables.Column(accessor="owner__name", verbose_name="Organization")
-
-    def render_count(self, value):
-        return value.all().count()
+    organization = tables.Column(
+        accessor="owner__name", verbose_name="Organization")
 
     class Meta:
         model = DeviceGroup
@@ -48,8 +47,8 @@ class DeviceGroupTable(tables.Table):
         fields = ("name",)
         row_attrs = {"device-group-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-group-table"}
-        sequence = ("name", "organization", "count", "created")
-        order_by = "-created"
+        sequence = ("name", "organization", "device_count", "created")
+        order_by = ["organization", "-created"]
 
 
 class DeviceTable(tables.Table):
