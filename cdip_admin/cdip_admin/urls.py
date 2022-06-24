@@ -32,6 +32,7 @@ urlpatterns = [
     path("api/", include("api.urls")),
     path("", index),
     path("login/?", login_view),
+    path("oidc-logout", login_view),
     path("logout/", logout_view),
     path("", include("django.contrib.auth.urls")),
     path("", include("social_django.urls")),
