@@ -22,6 +22,10 @@ class Organization(TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('organizations_detail', kwargs={'module_id': self.pk})
+
 
 class OrganizationGroup(TimestampedModel):
     name = models.CharField(max_length=200)
