@@ -36,7 +36,7 @@
         </li>
 
 
-        <h5>{% trans 'Administration' %}</h5>
+        <h5>{% trans 'Portal Administration' %}</h5>
         <li>
             <a href="{% url 'organizations_list' %}">
                 {% trans 'Organization Information' %}
@@ -48,6 +48,14 @@
                 {% trans 'Client Information' %}
             </a>
         </li>
+
+        {% if request.user.is_staff == True %}
+            <h5>{% trans 'Advanced' %}</h5>
+            <li class="nav-item">
+                <a href="/admin/">Advanced Configuration</a>
+            </li>
+        {% endif %}
+
 
     </ul>
 </div>

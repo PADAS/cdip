@@ -64,7 +64,12 @@ class DeviceAdmin(admin.ModelAdmin):
         "inbound_configuration__name",
         "inbound_configuration__owner",
     )
-    search_fields = ("external_id",)
+
+    search_fields = (
+        "external_id",
+        "inbound_configuration__name",
+        "inbound_configuration__owner__name",
+    )
 
     date_hierarchy = "created_at"
 
@@ -83,6 +88,8 @@ class SubjectTypeAdmin(admin.ModelAdmin):
 class DeviceGroupAdmin(admin.ModelAdmin):
     list_display = ("name", "owner", "created_at")
     list_filter = ("owner",)
+
+    search_fields = ("id", "name", "owner__name", "devices__external_id")
 
 
 @admin.register(InboundIntegrationConfiguration)
@@ -107,6 +114,13 @@ class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
 
     list_editable = ("enabled",)
 
+    search_fields = (
+        "id",
+        "name",
+        "type__name",
+        "owner__name",
+    )
+
 
 @admin.register(OutboundIntegrationConfiguration)
 class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
@@ -121,6 +135,13 @@ class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
         "enabled",
     )
 
+    search_fields = (
+        "id",
+        "name",
+        "type__name",
+        "owner__name",
+    )
+
 
 @admin.register(BridgeIntegrationType)
 class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
@@ -130,9 +151,16 @@ class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
 
 @admin.register(BridgeIntegration)
 class BridgeIntegrationAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner")
+    list_display = ("name", "owner", "type")
     list_filter = (
         "type",
         "owner",
         "enabled",
+    )
+
+    search_fields = (
+        "id",
+        "name",
+        "type__name",
+        "owner__name",
     )
