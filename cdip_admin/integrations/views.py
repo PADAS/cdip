@@ -168,7 +168,7 @@ class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
 
     def get_table_data(self):
         qs = super().get_table_data()
-        return qs.annotate(device_count=Count('devices'))
+        return qs.annotate(device_count=Count("devices"))
 
 
 class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
