@@ -203,18 +203,15 @@ def filter_device_group_form_fields(form, user):
         org_qs = Organization.objects.filter(
             id__in=des_qs.values_list("owner", flat=True)
         )
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, "name")
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
         form.fields["destinations"].queryset = des_qs.filter(owner__in=org_qs)
 
     if form.fields.get("devices"):
         dev_qs = form.fields["devices"].queryset
         org_qs = Organization.objects.filter(
-            id__in=dev_qs.values_list(
-                "inbound_configuration__owner", flat=True)
+            id__in=dev_qs.values_list("inbound_configuration__owner", flat=True)
         )
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, "name")
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
         form.fields["devices"].queryset = dev_qs.filter(
             inbound_configuration__owner__in=org_qs
         )
@@ -224,10 +221,8 @@ def filter_device_group_form_fields(form, user):
         org_qs = Organization.objects.filter(
             id__in=ic_qs.values_list("owner", flat=True)
         )
-        org_qs = IsOrganizationMember.filter_queryset_for_user(
-            org_qs, user, "name")
-        form.fields["inbound_configuration"].queryset = ic_qs.filter(
-            owner__in=org_qs)
+        org_qs = IsOrganizationMember.filter_queryset_for_user(org_qs, user, "name")
+        form.fields["inbound_configuration"].queryset = ic_qs.filter(owner__in=org_qs)
 
     return form
 
@@ -337,8 +332,7 @@ class DeviceStateList(LoginRequiredMixin, SingleTableMixin, FilterView):
 @permission_required("integrations.view_inboundintegrationtype", raise_exception=True)
 def inbound_integration_type_detail(request, module_id):
     logger.info(f"Request for Integration Type: {module_id}")
-    integration_module = get_object_or_404(
-        InboundIntegrationType, pk=module_id)
+    integration_module = get_object_or_404(InboundIntegrationType, pk=module_id)
     return render(
         request,
         "integrations/inbound_integration_type_detail.html",
@@ -356,8 +350,7 @@ def inbound_integration_type_add(request):
     else:
         form = InboundIntegrationTypeForm
     return render(
-        request, "integrations/inbound_integration_type_add.html", {
-            "form": form}
+        request, "integrations/inbound_integration_type_add.html", {"form": form}
     )
 
 
@@ -366,14 +359,12 @@ def inbound_integration_type_update(request, inbound_integration_type_id):
     integration_type = get_object_or_404(
         InboundIntegrationType, id=inbound_integration_type_id
     )
-    form = InboundIntegrationTypeForm(
-        request.POST or None, instance=integration_type)
+    form = InboundIntegrationTypeForm(request.POST or None, instance=integration_type)
     if form.is_valid():
         form.save()
         return redirect("inbound_integration_type_detail", inbound_integration_type_id)
     return render(
-        request, "integrations/inbound_integration_type_update.html", {
-            "form": form}
+        request, "integrations/inbound_integration_type_update.html", {"form": form}
     )
 
 
@@ -410,8 +401,7 @@ def outbound_integration_type_add(request):
 
     form = OutboundIntegrationTypeForm
     return render(
-        request, "integrations/outbound_integration_type_add.html", {
-            "form": form}
+        request, "integrations/outbound_integration_type_add.html", {"form": form}
     )
 
 
@@ -420,16 +410,14 @@ def outbound_integration_type_update(request, outbound_integration_type_id):
     integration_type = get_object_or_404(
         OutboundIntegrationType, id=outbound_integration_type_id
     )
-    form = OutboundIntegrationTypeForm(
-        request.POST or None, instance=integration_type)
+    form = OutboundIntegrationTypeForm(request.POST or None, instance=integration_type)
     if form.is_valid():
         form.save()
         return redirect(
             "outbound_integration_type_detail", outbound_integration_type_id
         )
     return render(
-        request, "integrations/outbound_integration_type_update.html", {
-            "form": form}
+        request, "integrations/outbound_integration_type_update.html", {"form": form}
     )
 
 
@@ -544,8 +532,7 @@ class InboundIntegrationConfigurationUpdateView(
 
     def get_object(self):
         configuration = get_object_or_404(
-            InboundIntegrationConfiguration, pk=self.kwargs.get(
-                "configuration_id")
+            InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id")
         )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             if not IsOrganizationMember.is_object_owner(
@@ -584,8 +571,7 @@ class InboundIntegrationConfigurationListView(
         return context
 
     def get_queryset(self):
-        qs = super(InboundIntegrationConfigurationListView,
-                   self).get_queryset()
+        qs = super(InboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
@@ -645,8 +631,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
 
     def get_object(self):
         configuration = get_object_or_404(
-            OutboundIntegrationConfiguration, pk=self.kwargs.get(
-                "configuration_id")
+            OutboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id")
         )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             if not IsOrganizationMember.is_object_owner(
@@ -685,8 +670,7 @@ class OutboundIntegrationConfigurationListView(
         return context
 
     def get_queryset(self):
-        qs = super(OutboundIntegrationConfigurationListView,
-                   self).get_queryset()
+        qs = super(OutboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
@@ -763,8 +747,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     permission_required = "integrations.change_bridgeintegration"
 
     def get_object(self):
-        configuration = get_object_or_404(
-            BridgeIntegration, pk=self.kwargs.get("id"))
+        configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
         permission_can_view(self.request, configuration)
         return configuration
 
