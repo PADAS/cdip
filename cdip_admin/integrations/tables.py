@@ -39,8 +39,7 @@ class DeviceStateTable(tables.Table):
 
 
 class DeviceGroupTable(tables.Table):
-    device_count = tables.Column(
-        accessor="device_count", verbose_name="Device Count")
+    device_count = tables.Column(accessor="device_count", verbose_name="Device Count")
     created = tables.Column(accessor="created_at", verbose_name="Created")
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
