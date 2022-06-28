@@ -154,12 +154,12 @@ class ER_SMART_Synchronizer:
                         )
                     else:
                         if (
-                            not er_event_type_schemas_equal(
-                                json.loads(event_type.event_schema)["schema"],
-                                event_type_match_schema.get("schema"),
-                            )
-                            or event_type.is_active != event_type_match.get("is_active")
+                            event_type.is_active != event_type_match.get("is_active")
                             or event_type.display != event_type_match.get("display")
+                            or (event_type.is_active and event_type.event_schema and not er_event_type_schemas_equal(
+                                json.loads(event_type.event_schema)["schema"],
+                                event_type_match_schema.get("schema")
+                            ))
                         ):
                             logger.info(
                                 f"Updating ER event type",
@@ -168,7 +168,7 @@ class ER_SMART_Synchronizer:
                             event_type.id = event_type_match.get("id")
                             try:
                                 self.das_client.patch_event_type(
-                                    event_type.dict(by_alias=True)
+                                    event_type.dict(by_alias=True, exclude_none=True)
                                 )
                             except Exception as e:
                                 logger.error(
@@ -183,7 +183,7 @@ class ER_SMART_Synchronizer:
                         ),
                     )
                     try:
-                        self.das_client.post_event_type(event_type.dict(by_alias=True))
+                        self.das_client.post_event_type(event_type.dict(by_alias=True, exclude_none=True))
                     except:
                         logger.error(
                             f" Error occurred during das_client.post_event_type",
