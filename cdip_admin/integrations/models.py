@@ -1,6 +1,10 @@
 import uuid
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from fernet_fields import EncryptedCharField
+
+from cdip_admin import celery
 from core.models import TimestampedModel
 from core.fields import APIConsumerField
 from organizations.models import Organization, OrganizationGroup
@@ -209,3 +213,11 @@ class DeviceGroup(TimestampedModel):
 
     def __str__(self):
         return f"{self.name} - {self.owner.name}"
+
+
+@receiver(post_save, sender=OutboundIntegrationConfiguration)
+def integration_configuration_save_tasks(sender, instance, **kwargs):
+    transaction.on_commit(lambda:
+                          celery.app.send_task(
+                              'activity.tasks.run_smart_integration_save_tasks', args=(str(instance.id),))
+                          )
