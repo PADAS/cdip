@@ -24,7 +24,8 @@ class Organization(TimestampedModel):
 
     def get_absolute_url(self):
         from django.urls import reverse
-        return reverse('organizations_detail', kwargs={'module_id': self.pk})
+
+        return reverse("organizations_detail", kwargs={"module_id": self.pk})
 
 
 class OrganizationGroup(TimestampedModel):
