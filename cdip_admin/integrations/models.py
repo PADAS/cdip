@@ -89,7 +89,11 @@ class InboundIntegrationConfiguration(TimestampedModel):
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
-    provider = models.CharField(max_length=200, blank=True)
+    provider = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="This value will be used as the 'provider_key' when sending data to EarthRanger.",
+    )
     enabled = models.BooleanField(default=True)
 
     default_devicegroup = models.ForeignKey(
@@ -115,8 +119,22 @@ class InboundIntegrationConfiguration(TimestampedModel):
         super().save(*args, **kwargs)
 
 
+class GFWInboundConfigurationManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type__slug="gfw")
+
+
+class GFWInboundConfiguration(InboundIntegrationConfiguration):
+    class Meta:
+        proxy = True
+
+    objects = GFWInboundConfigurationManager()
+
+
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
+
+
 class BridgeIntegration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     type = models.ForeignKey(BridgeIntegrationType, on_delete=models.CASCADE)
