@@ -25,4 +25,8 @@ class OrganizationAdmin(admin.ModelAdmin):
         "description",
     )
 
-    search_fields = ("name", "id", "user_profile__user__username",)
+    search_fields = (
+        "name",
+        "id",
+        "user_profile__user__username",
+    )
