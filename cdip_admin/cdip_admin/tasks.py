@@ -5,7 +5,10 @@ from celery_once import QueueOnce
 from django.conf import settings
 
 from cdip_admin import celery
-from sync_integrations.utils import run_er_smart_sync_integrations, on_smart_integration_save
+from sync_integrations.utils import (
+    run_er_smart_sync_integrations,
+    on_smart_integration_save,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,4 +39,3 @@ def run_smart_integration_save_tasks():
 @celery.app.task(base=QueueOnce, once={"graceful": True})
 def _run_smart_integration_save_tasks():
     on_smart_integration_save()
-
