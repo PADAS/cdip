@@ -236,7 +236,9 @@ class DeviceGroup(TimestampedModel):
 @receiver(post_save, sender=OutboundIntegrationConfiguration)
 def integration_configuration_save_tasks(sender, instance, **kwargs):
     if type(instance.type) is OutboundIntegrationType:
-        transaction.on_commit(lambda:
-                              celery.app.send_task(
-                                  'activity.tasks.run_smart_integration_save_tasks', args=(str(instance.id),))
-                              )
+        transaction.on_commit(
+            lambda: celery.app.send_task(
+                "activity.tasks.run_smart_integration_save_tasks",
+                args=(str(instance.id),),
+            )
+        )
