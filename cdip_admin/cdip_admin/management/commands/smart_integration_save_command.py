@@ -21,6 +21,8 @@ class Command(BaseCommand):
             smart_integration_id = options.get("smart_integration_id")
             if smart_integration_id:
                 on_smart_integration_save(integration_id=smart_integration_id)
+            else:
+                logger.warning('smart_integration_id not present in options')
         except:
             # TODO: raise a PortalBackgroundProcessError
             pass
