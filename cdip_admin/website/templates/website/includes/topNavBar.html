@@ -3,7 +3,7 @@
         <div class="d-flex flex-grow-1">
             <span class="w-100 d-lg-none d-block"><!-- hidden spacer to center brand on mobile --></span>
             <a class="navbar-brand d-none d-lg-inline-block" href="/">
-                SMART Integrate Admin Portal
+                Gundi Project
             </a>
             <a class="navbar-brand-two mx-auto d-lg-none d-inline-block" href="/">
                 <!--img src="//placehold.it/40?text=LOGO" alt="logo"-->
@@ -18,12 +18,7 @@
             <ul class="navbar-nav ml-auto flex-nowrap">
                 {% if request.user.is_authenticated == False %}
                     <li class="nav-item">
-                        <a class="nav-link m-2 menu-item" href="/">Local login is not implemented</a>
-                    </li>
-                {% endif %}
-                {% if request.user.is_staff == True %}
-                    <li class="nav-item">
-                        <a class="nav-link m-2 menu-item" href="/admin/">Admin</a>
+                        <a class="nav-link m-2 menu-item" href="/login">Login</a>
                     </li>
                 {% endif %}
                 {% if request.user.is_authenticated == True %}

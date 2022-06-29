@@ -24,3 +24,9 @@ class OrganizationAdmin(admin.ModelAdmin):
         "name",
         "description",
     )
+
+    search_fields = (
+        "name",
+        "id",
+        "user_profile__user__username",
+    )

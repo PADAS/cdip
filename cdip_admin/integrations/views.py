@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
+from django.db.models import Count
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -164,6 +165,10 @@ class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
         base_url = reverse("device_group_list")
         context["base_url"] = base_url
         return context
+
+    def get_table_data(self):
+        qs = super().get_table_data()
+        return qs.annotate(device_count=Count("devices"))
 
 
 class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):

@@ -101,8 +101,9 @@ KEYCLOAK_ADMIN_CLIENT_SECRET = env.str(
 
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
+LOGIN_URL = '/login'
 LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
+# LOGOUT_REDIRECT_URL = "/"
 
 KONG_PROXY_URL = env.str(
     "KONG_PROXY_URL", "http://kong-proxy.kong.svc.cluster.local:8001"
@@ -244,7 +245,8 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_DEFAULT_EXCHANGE = "default"
 CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 
-CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "visibility_timeout": 3600, "fanout_prefix": True}
 
 # task:
 CELERY_TASK_TRACK_STARTED = True
