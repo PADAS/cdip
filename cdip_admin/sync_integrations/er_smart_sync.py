@@ -10,7 +10,7 @@ from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
 from dasclient.dasclient import DasClient, DasClientException
 from pydantic import parse_obj_as
-from smartconnect import SmartClient
+from smartconnect import SmartClient, DataModel
 from smartconnect.er_sync_utils import (
     build_earth_ranger_event_types,
     er_event_type_schemas_equal,
@@ -60,6 +60,7 @@ class ER_SMART_Synchronizer:
             api=smart_config.endpoint,
             username=smart_config.login,
             password=smart_config.password,
+            version=smart_config.additional.get("version"),
             use_language_code="en",
         )
 
@@ -81,7 +82,13 @@ class ER_SMART_Synchronizer:
         self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-        dm = self.smart_client.download_datamodel(ca_uuid=smart_ca_uuid)
+        # with open(
+        #     f"/Users/jamesgoodheart/Documents/GitHub/cdip/cdip_admin/sync_integrations/{smart_ca_uuid}.txt"
+        # ) as f:
+        #     da_text = f.read()
+        # dm = DataModel()
+        # dm.load(da_text)
+        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
         ca_identifer = self.get_identifier_from_ca_label(ca.label)
