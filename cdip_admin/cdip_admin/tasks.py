@@ -32,10 +32,11 @@ def run_sync_integrations():
 
 
 @celery.app.task
-def run_smart_integration_save_tasks():
-    _run_smart_integration_save_tasks.apply_async()
+def run_smart_integration_save_tasks(integration_id):
+    # print(f'\n\narguments: {integration_id}\n\n')
+    _run_smart_integration_save_tasks.apply_async(args=(str(integration_id),))
 
 
 @celery.app.task(base=QueueOnce, once={"graceful": True})
-def _run_smart_integration_save_tasks():
-    on_smart_integration_save()
+def _run_smart_integration_save_tasks(integration_id):
+    on_smart_integration_save(integration_id=integration_id)
