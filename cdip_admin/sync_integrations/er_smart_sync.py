@@ -108,7 +108,9 @@ class ER_SMART_Synchronizer:
             event_category = dict(value=event_category_value, display=ca.label)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category, event_types)
-        logger.info(f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}")
+        logger.info(
+            f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}"
+        )
 
     @staticmethod
     def get_event_category_value_from_ca_label(ca_label: str):
@@ -131,7 +133,9 @@ class ER_SMART_Synchronizer:
     def create_or_update_er_event_types(self, event_category: str, event_types: dict):
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
-        existing_event_types = self.das_client.get_event_types(include_inactive=True, include_schema=True)
+        existing_event_types = self.das_client.get_event_types(
+            include_inactive=True, include_schema=True
+        )
         try:
             event_type: EREventType
             for event_type in event_types:
@@ -153,7 +157,9 @@ class ER_SMART_Synchronizer:
                             and event_type.event_schema
                             and not er_event_type_schemas_equal(
                                 json.loads(event_type.event_schema).get("schema"),
-                                json.loads(event_type_match.get("schema")).get("schema"),
+                                json.loads(event_type_match.get("schema")).get(
+                                    "schema"
+                                ),
                             )
                         )
                     ):
