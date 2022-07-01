@@ -10,7 +10,7 @@ from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
 from dasclient.dasclient import DasClient, DasClientException
 from pydantic import parse_obj_as
-from smartconnect import SmartClient
+from smartconnect import SmartClient, DataModel
 from smartconnect.er_sync_utils import (
     build_earth_ranger_event_types,
     er_event_type_schemas_equal,
@@ -60,6 +60,7 @@ class ER_SMART_Synchronizer:
             api=smart_config.endpoint,
             username=smart_config.login,
             password=smart_config.password,
+            version=smart_config.additional.get("version"),
             use_language_code="en",
         )
 
@@ -81,7 +82,13 @@ class ER_SMART_Synchronizer:
         self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-        dm = self.smart_client.download_datamodel(ca_uuid=smart_ca_uuid)
+        # with open(
+        #     f"/Users/jamesgoodheart/Documents/GitHub/cdip/cdip_admin/sync_integrations/{smart_ca_uuid}.txt"
+        # ) as f:
+        #     da_text = f.read()
+        # dm = DataModel()
+        # dm.load(da_text)
+        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
         dm_dict = dm.export_as_dict()
 
         ca_identifer = self.get_identifier_from_ca_label(ca.label)
@@ -154,12 +161,16 @@ class ER_SMART_Synchronizer:
                         )
                     else:
                         if (
-                            not er_event_type_schemas_equal(
-                                json.loads(event_type.event_schema)["schema"],
-                                event_type_match_schema.get("schema"),
-                            )
-                            or event_type.is_active != event_type_match.get("is_active")
+                            event_type.is_active != event_type_match.get("is_active")
                             or event_type.display != event_type_match.get("display")
+                            or (
+                                event_type.is_active
+                                and event_type.event_schema
+                                and not er_event_type_schemas_equal(
+                                    json.loads(event_type.event_schema)["schema"],
+                                    event_type_match_schema.get("schema"),
+                                )
+                            )
                         ):
                             logger.info(
                                 f"Updating ER event type",
@@ -168,7 +179,7 @@ class ER_SMART_Synchronizer:
                             event_type.id = event_type_match.get("id")
                             try:
                                 self.das_client.patch_event_type(
-                                    event_type.dict(by_alias=True)
+                                    event_type.dict(by_alias=True, exclude_none=True)
                                 )
                             except Exception as e:
                                 logger.error(
@@ -183,7 +194,9 @@ class ER_SMART_Synchronizer:
                         ),
                     )
                     try:
-                        self.das_client.post_event_type(event_type.dict(by_alias=True))
+                        self.das_client.post_event_type(
+                            event_type.dict(by_alias=True, exclude_none=True)
+                        )
                     except:
                         logger.error(
                             f" Error occurred during das_client.post_event_type",
