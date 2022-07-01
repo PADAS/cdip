@@ -38,7 +38,7 @@ cached-property==1.5.1
     #   kombu
 cachetools==5.0.0
     # via google-auth
-cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.1.2/cdip_connector-1.1.2-py3-none-any.whl
+cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.1.6/cdip_connector-1.1.6-py3-none-any.whl
     # via -r ../dependencies/requirements.in
 celery==5.2.3
     # via
@@ -72,10 +72,8 @@ click-plugins==1.1.1
     # via celery
 click-repl==0.2.0
     # via celery
-confluent-kafka==1.8.2
-    # via
-    #   -r ../dependencies/requirements.in
-    #   cdip-connector
+confluent-kafka==1.9.0
+    # via cdip-connector
 coreapi==2.3.3
     # via
     #   django-rest-swagger
@@ -357,7 +355,7 @@ six==1.15.0
     #   python-jose
     #   social-auth-app-django
     #   social-auth-core
-smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.1.4/smartconnect_client-1.1.4-py3-none-any.whl
+smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.1.7/smartconnect_client-1.1.7-py3-none-any.whl
     # via -r ../dependencies/requirements.in
 social-auth-app-django==4.0.0
     # via -r ../dependencies/requirements.in

@@ -1,6 +1,5 @@
 celery==5.2.3
 celery-once==1.2.0
-confluent-kafka==1.8.2
 Django==3.2
 PyJWT==1.7.1
 #asgiref==3.2.10
@@ -58,5 +57,5 @@ phonenumbers==8.12.6
 whitenoise==5.2.0
 python-json-logger==2.0.2
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
-https://github.com/PADAS/smartconnect-client/releases/download/v1.1.4/smartconnect_client-1.1.4-py3-none-any.whl
-https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.1.2/cdip_connector-1.1.2-py3-none-any.whl
+https://github.com/PADAS/smartconnect-client/releases/download/v1.1.7/smartconnect_client-1.1.7-py3-none-any.whl
+https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.1.6/cdip_connector-1.1.6-py3-none-any.whl
