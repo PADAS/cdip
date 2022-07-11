@@ -61,6 +61,17 @@ jobs:
       # - run:
       #     name: Code Analysis
       #     command: ./.circleci/check_complexity.sh
+      #
+  unit_tests:
+    docker:
+      - image: cimg/python:3.7.4
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Run unit tests
+          command: ./.circleci/check_unit_tests.sh
 
   build:
     docker:
@@ -134,12 +145,17 @@ workflows:
   pull_request_workflow:
     jobs:
       - check_code
+      - unit_tests:
+          requires:
+          - check_code
       - build_cdip_portal_image:
           requires:
           - check_code
+          - unit_tests
       - build:
           requires:
           - check_code
+          - unit_tests
       - push:
           requires:
           - build
