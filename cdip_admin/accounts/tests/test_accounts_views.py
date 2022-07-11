@@ -107,14 +107,15 @@ def test_get_accounts_detail_organization_member_viewer(
     )
 
     assert response.status_code == 200
+    assert u1.username in response.content.decode('utf-8')
 
     response = client.get(
         reverse("account_detail", kwargs={"user_id": u2.id}),
         HTTP_X_USERINFO=organization_member_user.user_info,
     )
 
-    # user should not be able to see detail of users not in their organization
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
 
 
 def test_add_account_organization_member_admin(
@@ -147,7 +148,9 @@ def test_add_account_organization_member_admin(
     )
 
     # user should not be able to invite users for organizations they are not admin of
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
+
 
 
 def test_update_account_organization_member_admin(
@@ -180,7 +183,8 @@ def test_update_account_organization_member_admin(
     )
 
     # user should not be able to invite users for organizations they are not admin of
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
 
     new_first_name = "FirstName"
     new_last_name = "FirstName"
@@ -216,7 +220,8 @@ def test_update_account_organization_member_admin(
     )
 
     # check that we can't update this users account
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
 
     data["username"] = ""
 
@@ -261,7 +266,8 @@ def test_update_account_profile_organization_member_admin(
     )
 
     # user should not be able to update user role for organizations they are not admin of
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
 
     # update role with post
     data = {"role": [RoleChoices.ADMIN.value], "organization": [org1.id]}
@@ -291,4 +297,5 @@ def test_update_account_profile_organization_member_admin(
     )
 
     # can't update users in organizations you are not admin of
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert 'permission denied' in response.content.decode('utf-8').lower()
