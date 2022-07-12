@@ -99,7 +99,9 @@ def run(input_filename, *args):
 
     otype = get_outbound_type()
     if not otype:
-        print("Outbound type is not present. Stubbornly insisting on having an 'earth_ranger' Outbound Type.")
+        print(
+            "Outbound type is not present. Stubbornly insisting on having an 'earth_ranger' Outbound Type."
+        )
         exit()
 
     itype = ensure_inbound_type()
