@@ -47,24 +47,35 @@ jobs:
           command: 'make build_and_push descriptive_gcr_path_stem="$CIRCLE_BRANCH" unique_gcr_tag="$CIRCLE_WORKFLOW_ID"'
   check_code:
     docker:
-      - image: us.gcr.io/cdip-prod1-78ca/sintegrate-py-toolkit:1.1.0
+      - image: us.gcr.io/cdip-prod1-78ca/sintegrate-py-toolkit:1.2.0
         auth:
             username: _json_key  # Default username when using a JSON key file to authenticate
             password: $GCR_KEY_CT # This key must be in json format
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: false
+          docker_layer_caching: true
       - run:
           name: Lint the code
           command: ./.circleci/check_standards.sh
       # - run:
       #     name: Code Analysis
       #     command: ./.circleci/check_complexity.sh
+      #
+  unit_tests:
+    docker:
+      - image: cimg/python:3.9
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Run unit tests
+          command: ./.circleci/check_unit_tests.sh
 
   build:
     docker:
-      - image: cimg/python:3.7.4
+      - image: cimg/python:3.9
     steps:
       - checkout
       - setup_remote_docker:
@@ -100,7 +111,7 @@ jobs:
             - "VERSION"
   push:
     docker:
-      - image: circleci/python:3.7.4
+      - image: circleci/python:3.9
     steps:
       - attach_workspace:
           at: .
@@ -134,12 +145,17 @@ workflows:
   pull_request_workflow:
     jobs:
       - check_code
+      - unit_tests:
+          requires:
+          - check_code
       - build_cdip_portal_image:
           requires:
           - check_code
+          - unit_tests
       - build:
           requires:
           - check_code
+          - unit_tests
       - push:
           requires:
           - build
