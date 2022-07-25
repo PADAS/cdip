@@ -38,6 +38,7 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     ii = setup_data["ii1"]
     oi = setup_data["oi1"]
     other_oi = setup_data["oi2"]
+    d1 = setup_data["d1"]
 
     # Sanity check on the test data relationships.
     assert Device.objects.filter(inbound_configuration=ii).exists()
@@ -48,10 +49,11 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
 
     client.force_login(global_admin_user.user)
 
+    view = reverse("outboundintegrationconfiguration_list")
     # Get destinations by inbound-id.
     response = client.get(
-        reverse("outboundintegrationconfiguration_list"),
-        data={"inbound_id": str(ii.id)},
+        view,
+        data={"inbound_id": str(ii.id), 'device_id': d1.external_id},
         HTTP_X_USERINFO=global_admin_user.user_info,
     )
 
