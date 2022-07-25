@@ -148,10 +148,7 @@ class DeviceGroupFilter(django_filters.FilterSet):
             )
         # update the cached values if changes were just made
         if 'organization' in self.data:
-            if self.data['organization'] == '':
-                cache.set('org_filter', '', None)
-            else:
-                cache.set('org_filter', self.data['organization'], None)
+            cache.set('org_filter', self.data['organization'], None)
         # use qs.filter with organization saved in DeviceFilter
         if cache.get('org_filter'):
             return qs.filter(owner__name=cache.get('org_filter'))
@@ -206,10 +203,7 @@ class DeviceFilter(django_filters.FilterSet):
             )
         # update the cached values if changes were just made
         if 'organization' in self.data:
-            if self.data['organization'] == '':
-                cache.set('org_filter', '', None)
-            else:
-                cache.set('org_filter', self.data['organization'], None)
+            cache.set('org_filter', self.data['organization'], None)
         # use qs.filter with organization saved in DeviceFilter
         if cache.get('org_filter'):
             return qs.filter(inbound_configuration__owner__name=cache.get('org_filter'))
@@ -260,10 +254,7 @@ class InboundIntegrationFilter(django_filters.FilterSet):
             )
         # update the cached values if changes were just made
         if 'organization' in self.data:
-            if self.data['organization'] == '':
-                cache.set('org_filter', '', None)
-            else:
-                cache.set('org_filter', self.data['organization'], None)
+            cache.set('org_filter', self.data['organization'], None)
         # use qs.filter with organization saved in DeviceFilter
         if cache.get('org_filter'):
             return qs.filter(owner__name=cache.get('org_filter'))
@@ -314,10 +305,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
             )
         # update the cached values if changes were just made
         if 'organization' in self.data:
-            if self.data['organization'] == '':
-                cache.set('org_filter', '', None)
-            else:
-                cache.set('org_filter', self.data['organization'], None)
+            cache.set('org_filter', self.data['organization'], None)
         # use qs.filter with organization saved in DeviceFilter
         if cache.get('org_filter'):
             return qs.filter(owner__name=cache.get('org_filter'))
