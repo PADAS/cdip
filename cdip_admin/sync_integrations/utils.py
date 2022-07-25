@@ -1,9 +1,18 @@
+import uuid
+
+import smartconnect
+from smartconnect import SmartClient
+from smartconnect.models import (
+    ConservationArea,
+)
+
 from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
 from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +56,6 @@ def run_er_smart_sync_integrations():
                 smart_integration_id=smart_integration_id,
                 er_integration_id=er_integration_id,
             )
-            caslist = er_smart_sync.smart_client.get_conservation_areas()
 
             if not er_smart_sync.smart_ca_uuids:
                 logger.warning(
@@ -59,10 +67,10 @@ def run_er_smart_sync_integrations():
             # Handle Group of CA's associated to single ER site
             for smart_ca_uuid in er_smart_sync.smart_ca_uuids:
                 logger.debug(f"Processing SMART CA: {smart_ca_uuid}")
-                ca_match = next(
-                    (ca for ca in caslist if str(ca.uuid) == smart_ca_uuid), None
+                ca = er_smart_sync.smart_client.get_conservation_area(
+                    ca_uuid=smart_ca_uuid
                 )
-                if not ca_match:
+                if not ca:
                     logger.warning(
                         f"Conservation Area not found",
                         extra=dict(smart_ca_uuid=smart_ca_uuid),
@@ -72,11 +80,9 @@ def run_er_smart_sync_integrations():
                     f"Beginning sync of event types", extra=dict(ca_uuid=smart_ca_uuid)
                 )
                 er_smart_sync.push_smart_ca_data_model_to_er_event_types(
-                    smart_ca_uuid=smart_ca_uuid, ca=ca_match
+                    smart_ca_uuid=smart_ca_uuid, ca=ca
                 )
-                er_smart_sync.sync_patrol_datamodel(
-                    smart_ca_uuid=smart_ca_uuid, ca=ca_match
-                )
+                er_smart_sync.sync_patrol_datamodel(smart_ca_uuid=smart_ca_uuid, ca=ca)
 
             # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
             if er_integration:
@@ -91,5 +97,17 @@ def run_er_smart_sync_integrations():
             continue
 
 
-if __name__ == "__main__":
-    run_er_smart_sync_integrations()
+def on_smart_integration_save(*, integration_id: str):
+    config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
+    version = config.additional.get("version", "7.0")
+    smart_client = SmartClient(
+        api=config.endpoint,
+        username=config.login,
+        password=config.password,
+        use_language_code="en",
+        version=version,
+    )
+    ca_uuids = config.additional.get("ca_uuids")
+    for ca_uuid in ca_uuids:
+        smart_client.get_data_model(ca_uuid=ca_uuid)
+        smart_client.get_conservation_area(ca_uuid=ca_uuid)

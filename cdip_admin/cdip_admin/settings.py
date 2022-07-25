@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     "rest_framework_swagger",
     "bootstrap4",
     "cdip_admin",
+    "django_extensions",
 ]
 
 

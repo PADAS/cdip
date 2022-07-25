@@ -142,6 +142,9 @@ class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
         "owner__name",
     )
 
+    list_display = ('type', 'name', 'owner', 'created_at', 'updated_at')
+    list_display_links = ('owner', )
+
 
 @admin.register(BridgeIntegrationType)
 class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
