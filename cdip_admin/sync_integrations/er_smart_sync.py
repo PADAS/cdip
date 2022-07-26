@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -219,17 +220,34 @@ class ER_SMART_Synchronizer:
             if not event.patrols:
                 event.integration_id = config.id
                 event.device_id = event.id
-                logger.info(
-                    f"Publishing observation for event",
-                    extra=dict(event_id=event.id, event_title=event.title),
-                )
-                self.publisher.publish(
-                    TopicEnum.observations_unprocessed.value, event.dict()
-                )
+                try:
+                    self.update_event_with_smart_data(event=event)
+                except:
+                    logger.error('Error patching event_type with smart_observation_uuid, event not processed',
+                                 extra=dict(event_id=event.id, event_title=event.title))
+                else:
+                    logger.info(
+                        f"Publishing observation for event",
+                        extra=dict(event_id=event.id, event_title=event.title),
+                    )
+                    self.publisher.publish(
+                        TopicEnum.observations_unprocessed.value, event.dict()
+                    )
 
         i_state.event_last_poll_at = current_time
         config.state = json.loads(i_state.json())
         config.save()
+
+    def update_event_with_smart_data(self, event):
+        if not event.event_details.get('smart_observation_uuid'):
+            # TODO: Populate observation uuid if it does not exist
+            smart_observation_uuid = uuid.uuid1()
+            event.event_details['smart_observation_uuid'] = str(smart_observation_uuid)
+            payload = dict(
+                event_details=event.event_details)
+            self.das_client.patch_event(event_id=str(event.id), payload=payload)
+
+
 
     def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
         patrol_data_model = self.smart_client.download_patrolmodel(
