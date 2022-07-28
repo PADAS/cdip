@@ -19,6 +19,7 @@ from smartconnect.er_sync_utils import (
     er_subjects_equal,
     EREventType,
 )
+from packaging import version
 
 from integrations.models import (
     OutboundIntegrationConfiguration,
@@ -220,19 +221,20 @@ class ER_SMART_Synchronizer:
             if not event.patrols:
                 event.integration_id = config.id
                 event.device_id = event.id
-                try:
-                    self.update_event_with_smart_data(event=event)
-                except:
-                    logger.error('Error patching event_type with smart_observation_uuid, event not processed',
-                                 extra=dict(event_id=event.id, event_title=event.title))
-                else:
-                    logger.info(
-                        f"Publishing observation for event",
-                        extra=dict(event_id=event.id, event_title=event.title),
-                    )
-                    self.publisher.publish(
-                        TopicEnum.observations_unprocessed.value, event.dict()
-                    )
+                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                    # stop gap for supporting SMART observation updates
+                    try:
+                        self.update_event_with_smart_data(event=event)
+                    except:
+                        logger.error('Error patching event_type with smart_observation_uuid, event not processed',
+                                     extra=dict(event_id=event.id, event_title=event.title))
+                logger.info(
+                    f"Publishing observation for event",
+                    extra=dict(event_id=event.id, event_title=event.title),
+                )
+                self.publisher.publish(
+                    TopicEnum.observations_unprocessed.value, event.dict()
+                )
 
         i_state.event_last_poll_at = current_time
         config.state = json.loads(i_state.json())
@@ -287,27 +289,7 @@ class ER_SMART_Synchronizer:
                         f"Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}"
                     )
 
-    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
-        i_state = EarthRangerReaderState.parse_obj(config.state)
-
-        lower = i_state.patrol_last_poll_at or datetime.now(
-            tz=timezone.utc
-        ) - timedelta(days=7)
-        upper = datetime.now(tz=timezone.utc)
-
-        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-        patrol_filter_spec = {
-            "date_range": {
-                "lower": lower.strftime(FILTER_DATETIME_FORMAT),
-                "upper": upper.strftime(FILTER_DATETIME_FORMAT),
-            }
-        }
-        patrols = parse_obj_as(
-            List[ERPatrol],
-            self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
-        )
-        logger.info(f"Pulled {len(patrols)} patrols from ER")
+    def process_er_patrols(self, *, patrols: List[ERPatrol], integration_id: str, patrol_last_poll_at: datetime, upper: datetime):
         patrol: ERPatrol
         for patrol in patrols:
             logger.info(
@@ -318,17 +300,21 @@ class ER_SMART_Synchronizer:
                     patrol_title=patrol.title,
                 ),
             )
-            patrol.integration_id = config.id
+            patrol.integration_id = integration_id
             patrol.device_id = patrol.id
 
+            events_updated_at = []
             # determine if open patrol has any new updates
             if patrol.state != "done":
                 updates = patrol.updates
                 for seg in patrol.patrol_segments:
                     for update in seg.updates:
                         updates.append(update)
-                max_update = max([u.time for u in updates])
-                if max_update < i_state.patrol_last_poll_at:
+                    for event in seg.events:
+                        events_updated_at.append(event.updated_at)
+                max_update = max(events_updated_at + [u.time for u in updates])
+
+                if max_update < patrol_last_poll_at:
                     logger.info(
                         "skipping processing, patrol hasn't been updated since last poll"
                     )
@@ -361,11 +347,21 @@ class ER_SMART_Synchronizer:
                     continue
 
                 # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
-                for event in segment.events:
+                for segment_event in segment.events:
+                    # Need to get event details for each event since they are not provided in patrol get
                     event_details = parse_obj_as(
-                        List[EREvent], self.das_client.get_events(event_ids=event.id)
+                        List[EREvent], self.das_client.get_events(event_ids=segment_event.id)
                     )
                     segment.event_details.extend(event_details)
+
+                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                    # stop gap for supporting SMART observation updates
+                    for event in segment.event_details:
+                        try:
+                            self.update_event_with_smart_data(event=event)
+                        except:
+                            logger.error('Error patching event_type with smart_observation_uuid, event not processed',
+                                         extra=dict(event_id=event.id, event_title=event.title))
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get("start_time")
@@ -384,6 +380,30 @@ class ER_SMART_Synchronizer:
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, patrol.dict()
                 )
+
+    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
+        i_state = EarthRangerReaderState.parse_obj(config.state)
+
+        lower = i_state.patrol_last_poll_at or datetime.now(
+            tz=timezone.utc
+        ) - timedelta(days=7)
+        upper = datetime.now(tz=timezone.utc)
+
+        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+        patrol_filter_spec = {
+            "date_range": {
+                "lower": lower.strftime(FILTER_DATETIME_FORMAT),
+                "upper": upper.strftime(FILTER_DATETIME_FORMAT),
+            }
+        }
+        patrols = parse_obj_as(
+            List[ERPatrol],
+            self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
+        )
+        logger.info(f"Pulled {len(patrols)} patrols from ER")
+
+        self.process_er_patrols(patrols=patrols, integration_id=config.id, patrol_last_poll_at=i_state.patrol_last_poll_at, upper=upper)
 
         i_state.patrol_last_poll_at = upper
         config.state = json.loads(i_state.json())
