@@ -237,7 +237,8 @@ class ER_SMART_Synchronizer:
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, event.dict()
                 )
-
+            else:
+                logger.info(f"Skipping {event.serial_number} because it is associated to a patrol")
         i_state.event_last_poll_at = current_time
         config.state = json.loads(i_state.json())
         config.save()
