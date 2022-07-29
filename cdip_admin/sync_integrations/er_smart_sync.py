@@ -226,8 +226,10 @@ class ER_SMART_Synchronizer:
                     try:
                         self.update_event_with_smart_data(event=event)
                     except:
-                        logger.error('Error patching event_type with smart_observation_uuid, event not processed',
-                                     extra=dict(event_id=event.id, event_title=event.title))
+                        logger.error(
+                            "Error patching event_type with smart_observation_uuid, event not processed",
+                            extra=dict(event_id=event.id, event_title=event.title),
+                        )
                 logger.info(
                     f"Publishing observation for event",
                     extra=dict(event_id=event.id, event_title=event.title),
@@ -241,15 +243,12 @@ class ER_SMART_Synchronizer:
         config.save()
 
     def update_event_with_smart_data(self, event):
-        if not event.event_details.get('smart_observation_uuid'):
+        if not event.event_details.get("smart_observation_uuid"):
             # TODO: Populate observation uuid if it does not exist
             smart_observation_uuid = uuid.uuid1()
-            event.event_details['smart_observation_uuid'] = str(smart_observation_uuid)
-            payload = dict(
-                event_details=event.event_details)
+            event.event_details["smart_observation_uuid"] = str(smart_observation_uuid)
+            payload = dict(event_details=event.event_details)
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
-
-
 
     def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
         patrol_data_model = self.smart_client.download_patrolmodel(
@@ -289,7 +288,14 @@ class ER_SMART_Synchronizer:
                         f"Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}"
                     )
 
-    def process_er_patrols(self, *, patrols: List[ERPatrol], integration_id: str, patrol_last_poll_at: datetime, upper: datetime):
+    def process_er_patrols(
+        self,
+        *,
+        patrols: List[ERPatrol],
+        integration_id: str,
+        patrol_last_poll_at: datetime,
+        upper: datetime,
+    ):
         patrol: ERPatrol
         for patrol in patrols:
             logger.info(
@@ -350,7 +356,8 @@ class ER_SMART_Synchronizer:
                 for segment_event in segment.events:
                     # Need to get event details for each event since they are not provided in patrol get
                     event_details = parse_obj_as(
-                        List[EREvent], self.das_client.get_events(event_ids=segment_event.id)
+                        List[EREvent],
+                        self.das_client.get_events(event_ids=segment_event.id),
                     )
                     segment.event_details.extend(event_details)
 
@@ -360,8 +367,10 @@ class ER_SMART_Synchronizer:
                         try:
                             self.update_event_with_smart_data(event=event)
                         except:
-                            logger.error('Error patching event_type with smart_observation_uuid, event not processed',
-                                         extra=dict(event_id=event.id, event_title=event.title))
+                            logger.error(
+                                "Error patching event_type with smart_observation_uuid, event not processed",
+                                extra=dict(event_id=event.id, event_title=event.title),
+                            )
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get("start_time")
@@ -403,7 +412,12 @@ class ER_SMART_Synchronizer:
         )
         logger.info(f"Pulled {len(patrols)} patrols from ER")
 
-        self.process_er_patrols(patrols=patrols, integration_id=config.id, patrol_last_poll_at=i_state.patrol_last_poll_at, upper=upper)
+        self.process_er_patrols(
+            patrols=patrols,
+            integration_id=config.id,
+            patrol_last_poll_at=i_state.patrol_last_poll_at,
+            upper=upper,
+        )
 
         i_state.patrol_last_poll_at = upper
         config.state = json.loads(i_state.json())
