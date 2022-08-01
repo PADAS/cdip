@@ -238,7 +238,7 @@ class ER_SMART_Synchronizer:
                     TopicEnum.observations_unprocessed.value, event.dict()
                 )
             else:
-                logger.info(f"Skipping {event.serial_number} because it is associated to a patrol")
+                logger.info(f"Skipping event {event.serial_number} because it is associated to a patrol")
         i_state.event_last_poll_at = current_time
         config.state = json.loads(i_state.json())
         config.save()
@@ -311,6 +311,15 @@ class ER_SMART_Synchronizer:
             patrol.device_id = patrol.id
 
             events_updated_at = []
+
+            publish_observation = True
+            extra_dict = dict(
+                patrol_id=patrol.id,
+                patrol_serial_num=patrol.serial_number,
+                patrol_title=patrol.title,
+            )
+
+            # TODO: Need to handle ones that are newly done but have updates
             # determine if open patrol has any new updates
             if patrol.state != "done":
                 updates = patrol.updates
@@ -324,15 +333,10 @@ class ER_SMART_Synchronizer:
                 if max_update < patrol_last_poll_at:
                     logger.info(
                         "skipping processing, patrol hasn't been updated since last poll"
-                    )
+                        , extra=extra_dict)
                     continue
 
-            publish_observation = True
-            extra_dict = dict(
-                patrol_id=patrol.id,
-                patrol_serial_num=patrol.serial_number,
-                patrol_title=patrol.title,
-            )
+
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
                 if not segment.start_location:
@@ -411,7 +415,8 @@ class ER_SMART_Synchronizer:
             List[ERPatrol],
             self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
         )
-        logger.info(f"Pulled {len(patrols)} patrols from ER")
+        logger.info(f"Pulled {len(patrols)} patrols from ER", extra=dict(lower=lower.strftime(FILTER_DATETIME_FORMAT),
+                                                                         upper=upper.strftime(FILTER_DATETIME_FORMAT)))
 
         self.process_er_patrols(
             patrols=patrols,
@@ -423,3 +428,4 @@ class ER_SMART_Synchronizer:
         i_state.patrol_last_poll_at = upper
         config.state = json.loads(i_state.json())
         config.save()
+        logger.debug(f"Saved state to config", extra=dict(state=config.state))
