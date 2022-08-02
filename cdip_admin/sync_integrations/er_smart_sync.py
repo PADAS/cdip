@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -17,23 +18,18 @@ from smartconnect.er_sync_utils import (
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
     EREventType,
+    get_earth_ranger_last_poll,
+    set_earth_ranger_last_poll,
 )
+from packaging import version
 
+from cdip_admin import settings
 from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class EarthRangerReaderState(pydantic.BaseModel):
-    event_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(
-        days=7
-    )
-    patrol_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(
-        days=7
-    )
 
 
 class ER_SMART_Synchronizer:
@@ -82,7 +78,9 @@ class ER_SMART_Synchronizer:
         self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
+        dm = self.smart_client.get_data_model(
+            ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
+        )
         dm_dict = dm.export_as_dict()
 
         ca_identifer = self.get_identifier_from_ca_label(ca.label)
@@ -200,7 +198,7 @@ class ER_SMART_Synchronizer:
             )
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
-        i_state = EarthRangerReaderState.parse_obj(config.state)
+        i_state = get_earth_ranger_last_poll(integration_id=config.id)
 
         event_last_poll_at = i_state.event_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -219,6 +217,15 @@ class ER_SMART_Synchronizer:
             if not event.patrols:
                 event.integration_id = config.id
                 event.device_id = event.id
+                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                    # stop gap for supporting SMART observation updates
+                    try:
+                        self.update_event_with_smart_data(event=event)
+                    except:
+                        logger.error(
+                            "Error patching event_type with smart_observation_uuid, event not processed",
+                            extra=dict(event_id=event.id, event_title=event.title),
+                        )
                 logger.info(
                     f"Publishing observation for event",
                     extra=dict(event_id=event.id, event_title=event.title),
@@ -226,10 +233,20 @@ class ER_SMART_Synchronizer:
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, event.dict()
                 )
-
+            else:
+                logger.info(
+                    f"Skipping event {event.serial_number} because it is associated to a patrol"
+                )
         i_state.event_last_poll_at = current_time
-        config.state = json.loads(i_state.json())
-        config.save()
+        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+
+    def update_event_with_smart_data(self, event):
+        if not event.event_details.get("smart_observation_uuid"):
+            # TODO: Populate observation uuid if it does not exist
+            smart_observation_uuid = uuid.uuid1()
+            event.event_details["smart_observation_uuid"] = str(smart_observation_uuid)
+            payload = dict(event_details=event.event_details)
+            self.das_client.patch_event(event_id=str(event.id), payload=payload)
 
     def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
         patrol_data_model = self.smart_client.download_patrolmodel(
@@ -269,27 +286,14 @@ class ER_SMART_Synchronizer:
                         f"Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}"
                     )
 
-    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
-        i_state = EarthRangerReaderState.parse_obj(config.state)
-
-        lower = i_state.patrol_last_poll_at or datetime.now(
-            tz=timezone.utc
-        ) - timedelta(days=7)
-        upper = datetime.now(tz=timezone.utc)
-
-        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-        patrol_filter_spec = {
-            "date_range": {
-                "lower": lower.strftime(FILTER_DATETIME_FORMAT),
-                "upper": upper.strftime(FILTER_DATETIME_FORMAT),
-            }
-        }
-        patrols = parse_obj_as(
-            List[ERPatrol],
-            self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
-        )
-        logger.info(f"Pulled {len(patrols)} patrols from ER")
+    def process_er_patrols(
+        self,
+        *,
+        patrols: List[ERPatrol],
+        integration_id: str,
+        patrol_last_poll_at: datetime,
+        upper: datetime,
+    ):
         patrol: ERPatrol
         for patrol in patrols:
             logger.info(
@@ -300,21 +304,10 @@ class ER_SMART_Synchronizer:
                     patrol_title=patrol.title,
                 ),
             )
-            patrol.integration_id = config.id
+            patrol.integration_id = integration_id
             patrol.device_id = patrol.id
 
-            # determine if open patrol has any new updates
-            if patrol.state != "done":
-                updates = patrol.updates
-                for seg in patrol.patrol_segments:
-                    for update in seg.updates:
-                        updates.append(update)
-                max_update = max([u.time for u in updates])
-                if max_update < i_state.patrol_last_poll_at:
-                    logger.info(
-                        "skipping processing, patrol hasn't been updated since last poll"
-                    )
-                    continue
+            events_updated_at = []
 
             publish_observation = True
             extra_dict = dict(
@@ -322,6 +315,25 @@ class ER_SMART_Synchronizer:
                 patrol_serial_num=patrol.serial_number,
                 patrol_title=patrol.title,
             )
+
+            # TODO: Need to handle ones that are newly done but have updates
+            # determine if open patrol has any new updates
+            if patrol.state != "done":
+                updates = patrol.updates
+                for seg in patrol.patrol_segments:
+                    for update in seg.updates:
+                        updates.append(update)
+                    for event in seg.events:
+                        events_updated_at.append(event.updated_at)
+                max_update = max(events_updated_at + [u.time for u in updates])
+
+                if max_update < patrol_last_poll_at:
+                    logger.info(
+                        "skipping processing, patrol hasn't been updated since last poll",
+                        extra=extra_dict,
+                    )
+                    continue
+
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
                 if not segment.start_location:
@@ -343,11 +355,24 @@ class ER_SMART_Synchronizer:
                     continue
 
                 # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
-                for event in segment.events:
+                for segment_event in segment.events:
+                    # Need to get event details for each event since they are not provided in patrol get
                     event_details = parse_obj_as(
-                        List[EREvent], self.das_client.get_events(event_ids=event.id)
+                        List[EREvent],
+                        self.das_client.get_events(event_ids=segment_event.id),
                     )
                     segment.event_details.extend(event_details)
+
+                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                    # stop gap for supporting SMART observation updates
+                    for event in segment.event_details:
+                        try:
+                            self.update_event_with_smart_data(event=event)
+                        except:
+                            logger.error(
+                                "Error patching event_type with smart_observation_uuid, event not processed",
+                                extra=dict(event_id=event.id, event_title=event.title),
+                            )
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get("start_time")
@@ -367,6 +392,43 @@ class ER_SMART_Synchronizer:
                     TopicEnum.observations_unprocessed.value, patrol.dict()
                 )
 
+    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
+        i_state = get_earth_ranger_last_poll(integration_id=config.id)
+
+        lower = i_state.patrol_last_poll_at or datetime.now(
+            tz=timezone.utc
+        ) - timedelta(days=7)
+        upper = datetime.now(tz=timezone.utc)
+
+        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+        patrol_filter_spec = {
+            "date_range": {
+                "lower": lower.strftime(FILTER_DATETIME_FORMAT),
+                "upper": upper.strftime(FILTER_DATETIME_FORMAT),
+            }
+        }
+        patrols = parse_obj_as(
+            List[ERPatrol],
+            self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
+        )
+        logger.info(
+            f"Pulled {len(patrols)} patrols from ER",
+            extra=dict(
+                lower=lower.strftime(FILTER_DATETIME_FORMAT),
+                upper=upper.strftime(FILTER_DATETIME_FORMAT),
+            ),
+        )
+
+        self.process_er_patrols(
+            patrols=patrols,
+            integration_id=config.id,
+            patrol_last_poll_at=i_state.patrol_last_poll_at,
+            upper=upper,
+        )
+
         i_state.patrol_last_poll_at = upper
-        config.state = json.loads(i_state.json())
-        config.save()
+        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        # config.state = json.loads(i_state.json())
+        # config.save()
+        # logger.debug(f"Saved state to config", extra=dict(state=config.state))
