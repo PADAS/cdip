@@ -18,24 +18,18 @@ from smartconnect.er_sync_utils import (
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
     EREventType,
+    get_earth_ranger_last_poll,
+    set_earth_ranger_last_poll,
 )
 from packaging import version
 
+from cdip_admin import settings
 from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class EarthRangerReaderState(pydantic.BaseModel):
-    event_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(
-        days=7
-    )
-    patrol_last_poll_at: Optional[datetime] = datetime.now(tz=timezone.utc) - timedelta(
-        days=7
-    )
 
 
 class ER_SMART_Synchronizer:
@@ -84,7 +78,9 @@ class ER_SMART_Synchronizer:
         self.publisher = get_publisher()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
+        dm = self.smart_client.get_data_model(
+            ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
+        )
         dm_dict = dm.export_as_dict()
 
         ca_identifer = self.get_identifier_from_ca_label(ca.label)
@@ -202,7 +198,7 @@ class ER_SMART_Synchronizer:
             )
 
     def get_er_events(self, *, config: InboundIntegrationConfiguration):
-        i_state = EarthRangerReaderState.parse_obj(config.state)
+        i_state = get_earth_ranger_last_poll(integration_id=config.id)
 
         event_last_poll_at = i_state.event_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -238,10 +234,11 @@ class ER_SMART_Synchronizer:
                     TopicEnum.observations_unprocessed.value, event.dict()
                 )
             else:
-                logger.info(f"Skipping event {event.serial_number} because it is associated to a patrol")
+                logger.info(
+                    f"Skipping event {event.serial_number} because it is associated to a patrol"
+                )
         i_state.event_last_poll_at = current_time
-        config.state = json.loads(i_state.json())
-        config.save()
+        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
 
     def update_event_with_smart_data(self, event):
         if not event.event_details.get("smart_observation_uuid"):
@@ -332,10 +329,10 @@ class ER_SMART_Synchronizer:
 
                 if max_update < patrol_last_poll_at:
                     logger.info(
-                        "skipping processing, patrol hasn't been updated since last poll"
-                        , extra=extra_dict)
+                        "skipping processing, patrol hasn't been updated since last poll",
+                        extra=extra_dict,
+                    )
                     continue
-
 
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
@@ -396,7 +393,7 @@ class ER_SMART_Synchronizer:
                 )
 
     def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
-        i_state = EarthRangerReaderState.parse_obj(config.state)
+        i_state = get_earth_ranger_last_poll(integration_id=config.id)
 
         lower = i_state.patrol_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -415,8 +412,13 @@ class ER_SMART_Synchronizer:
             List[ERPatrol],
             self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
         )
-        logger.info(f"Pulled {len(patrols)} patrols from ER", extra=dict(lower=lower.strftime(FILTER_DATETIME_FORMAT),
-                                                                         upper=upper.strftime(FILTER_DATETIME_FORMAT)))
+        logger.info(
+            f"Pulled {len(patrols)} patrols from ER",
+            extra=dict(
+                lower=lower.strftime(FILTER_DATETIME_FORMAT),
+                upper=upper.strftime(FILTER_DATETIME_FORMAT),
+            ),
+        )
 
         self.process_er_patrols(
             patrols=patrols,
@@ -426,6 +428,7 @@ class ER_SMART_Synchronizer:
         )
 
         i_state.patrol_last_poll_at = upper
-        config.state = json.loads(i_state.json())
-        config.save()
-        logger.debug(f"Saved state to config", extra=dict(state=config.state))
+        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        # config.state = json.loads(i_state.json())
+        # config.save()
+        # logger.debug(f"Saved state to config", extra=dict(state=config.state))
