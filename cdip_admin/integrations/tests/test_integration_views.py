@@ -150,7 +150,7 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     # Get inbound integration configuration detail
     response = client.get(
         reverse(
-            "inbound_integration_configuration_detail", kwargs={"module_id": ii.id}
+            "inbound_integration_configuration_detail", kwargs={"id": ii.id}
         ),
         HTTP_X_USERINFO=organization_member_user.user_info,
     )
@@ -163,7 +163,7 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     # Get inbound integration configuration detail for other type
     response = client.get(
         reverse(
-            "inbound_integration_configuration_detail", kwargs={"module_id": o_ii.id}
+            "inbound_integration_configuration_detail", kwargs={"id": o_ii.id}
         ),
         HTTP_X_USERINFO=organization_member_user.user_info,
     )
