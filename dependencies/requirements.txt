@@ -107,11 +107,11 @@ django==3.2
     #   -r ../dependencies/requirements.in
     #   django-bootstrap4
     #   django-cors-headers
+    #   django-extensions
     #   django-fernet-fields
     #   django-filter
     #   django-keycloak
     #   django-phonenumber-field
-    #   django-rest-swagger
     #   django-tables2
     #   djangorestframework
     #   drf-jwt
@@ -123,6 +123,8 @@ django-crispy-forms==1.9.1
     # via -r ../dependencies/requirements.in
 django-environ==0.4.5
     # via -r ../dependencies/requirements.in
+django-extensions==3.2.0
+    # via -r ../dependencies/requirements.in
 django-fernet-fields==0.6
     # via -r ../dependencies/requirements.in
 django-filter==2.3.0
@@ -133,7 +135,7 @@ django-phonenumber-field==4.0.0
     # via -r ../dependencies/requirements.in
 django-rbac==0.9
     # via -r ../dependencies/requirements.in
-django-rest-swagger @ git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f
+django-rest-swagger==2.2.0
     # via -r ../dependencies/requirements.in
 django-scopes==1.2.0
     # via -r ../dependencies/requirements.in
