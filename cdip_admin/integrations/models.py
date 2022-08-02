@@ -94,6 +94,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
     provider = models.CharField(
+        verbose_name="Provider_key",
         max_length=200,
         blank=True,
         help_text="This value will be used as the 'provider_key' when sending data to EarthRanger.",
@@ -119,7 +120,9 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.provider:
-            self.provider = self.type.slug
+            self.provider = self.type.slug.lower()
+        else:
+            self.provider = self.provider.lower()
         super().save(*args, **kwargs)
 
 
