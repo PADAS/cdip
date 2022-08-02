@@ -5,6 +5,7 @@ from smartconnect import SmartClient
 from smartconnect.models import (
     ConservationArea,
 )
+from cdip_admin import settings
 
 from integrations.models import (
     OutboundIntegrationConfiguration,
@@ -68,7 +69,7 @@ def run_er_smart_sync_integrations():
             for smart_ca_uuid in er_smart_sync.smart_ca_uuids:
                 logger.debug(f"Processing SMART CA: {smart_ca_uuid}")
                 ca = er_smart_sync.smart_client.get_conservation_area(
-                    ca_uuid=smart_ca_uuid
+                    ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
                 )
                 if not ca:
                     logger.warning(
