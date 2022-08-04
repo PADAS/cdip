@@ -51,6 +51,7 @@ from .tables import (
     BridgeIntegrationTable,
 )
 from .utils import get_api_key, create_api_key, create_api_consumer
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -145,10 +146,18 @@ class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
     filterset_class = DeviceFilter
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        # context = super().get_context_data(**kwargs)
+        devices = cache.get('device_list')
+        if not devices:
+            context = super().get_context_data(**kwargs)
         base_url = reverse("device_list")
         context["base_url"] = base_url
         return context
+
+        # context = super().get_context_data(**kwargs)
+        # base_url = reverse("device_list")
+        # context["base_url"] = base_url
+        # return context
 
 
 ###
