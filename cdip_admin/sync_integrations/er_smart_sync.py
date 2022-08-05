@@ -233,9 +233,14 @@ class ER_SMART_Synchronizer:
                     try:
                         self.process_files(file=file)
                     except Exception as e:
-                        logger.error("Failed to download event file", extra=dict(event_serial_number=event.serial_number,
-                                                                                 file_name=file.get('filename'),
-                                                                                 error=e,))
+                        logger.error(
+                            "Failed to download event file",
+                            extra=dict(
+                                event_serial_number=event.serial_number,
+                                file_name=file.get("filename"),
+                                error=e,
+                            ),
+                        )
                 logger.info(
                     f"Publishing observation for event",
                     extra=dict(event_id=event.id, event_title=event.title),
@@ -259,13 +264,13 @@ class ER_SMART_Synchronizer:
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
 
     def process_files(self, file):
-        file_extension = pathlib.Path(file.get('filename')).suffix
+        file_extension = pathlib.Path(file.get("filename")).suffix
         # use id instead of file_name so that we dont have collisions with other attachments
-        file_name = file.get('id') + file_extension
+        file_name = file.get("id") + file_extension
         # check if we have already uploaded to cloud storage
         if not self.cloud_storage.check_exists(file_name=file_name):
             # download from ER server
-            url = file.get('url')
+            url = file.get("url")
             response = self.das_client.get_file(url)
             if response.ok:
                 image_uri = self.cloud_storage.upload(response.content, file_name)
@@ -383,16 +388,23 @@ class ER_SMART_Synchronizer:
                         List[EREvent],
                         self.das_client.get_events(event_ids=segment_event.id),
                     )
+
+                    # process event files
+                    for event in event_details:
+                        for file in event.files:
+                            try:
+                                self.process_files(file=file)
+                            except Exception as e:
+                                logger.error(
+                                    "Failed to download event file",
+                                    extra=dict(
+                                        event_serial_number=event.serial_number,
+                                        file_name=file.get("filename"),
+                                        error=e,
+                                    ),
+                                )
                     segment.event_details.extend(event_details)
                     # process event files
-                    for file in segment_event.files:
-                        try:
-                            self.process_files(file=file)
-                        except Exception as e:
-                            logger.error("Failed to download event file",
-                                         extra=dict(event_serial_number=segment_event.serial_number,
-                                                    file_name=file.get('filename'),
-                                                    error=e,))
 
                 if version.parse(self.smart_client.version) < version.parse("7.5.3"):
                     # stop gap for supporting SMART observation updates
@@ -410,9 +422,14 @@ class ER_SMART_Synchronizer:
                     try:
                         self.process_files(file=file)
                     except Exception as e:
-                        logger.error("Failed to download patrol file", extra=dict(event_serial_number=patrol.serial_number,
-                                                                                  file_name=file.get('filename'),
-                                                                                  error=e))
+                        logger.error(
+                            "Failed to download patrol file",
+                            extra=dict(
+                                event_serial_number=patrol.serial_number,
+                                file_name=file.get("filename"),
+                                error=e,
+                            ),
+                        )
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get("start_time")
