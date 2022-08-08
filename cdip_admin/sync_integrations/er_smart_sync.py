@@ -1,11 +1,13 @@
 import json
 import logging
+import pathlib
 import uuid
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
 
 import pydantic
+from cdip_connector.core.cloudstorage import get_cloud_storage
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
@@ -76,6 +78,7 @@ class ER_SMART_Synchronizer:
         )
 
         self.publisher = get_publisher()
+        self.cloud_storage = get_cloud_storage()
 
     def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
         dm = self.smart_client.get_data_model(
@@ -226,6 +229,18 @@ class ER_SMART_Synchronizer:
                             "Error patching event_type with smart_observation_uuid, event not processed",
                             extra=dict(event_id=event.id, event_title=event.title),
                         )
+                for file in event.files:
+                    try:
+                        self.process_file(file=file)
+                    except Exception as e:
+                        logger.error(
+                            "Failed to download event file",
+                            extra=dict(
+                                event_serial_number=event.serial_number,
+                                file_name=file.get("filename"),
+                                error=e,
+                            ),
+                        )
                 logger.info(
                     f"Publishing observation for event",
                     extra=dict(event_id=event.id, event_title=event.title),
@@ -247,6 +262,20 @@ class ER_SMART_Synchronizer:
             event.event_details["smart_observation_uuid"] = str(smart_observation_uuid)
             payload = dict(event_details=event.event_details)
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
+
+    def process_file(self, file):
+        file_extension = pathlib.Path(file.get("filename")).suffix
+        # use id instead of file_name so that we dont have collisions with other attachments
+        file_name = file.get("id") + file_extension
+        # check if we have already uploaded to cloud storage
+        if not self.cloud_storage.check_exists(file_name=file_name):
+            # download from ER server
+            url = file.get("url")
+            response = self.das_client.get_file(url)
+            if response.ok:
+                image_uri = self.cloud_storage.upload(response.content, file_name)
+            else:
+                raise Exception("Error processing file")
 
     def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
         patrol_data_model = self.smart_client.download_patrolmodel(
@@ -316,23 +345,21 @@ class ER_SMART_Synchronizer:
                 patrol_title=patrol.title,
             )
 
-            # TODO: Need to handle ones that are newly done but have updates
-            # determine if open patrol has any new updates
-            if patrol.state != "done":
-                updates = patrol.updates
-                for seg in patrol.patrol_segments:
-                    for update in seg.updates:
-                        updates.append(update)
-                    for event in seg.events:
-                        events_updated_at.append(event.updated_at)
-                max_update = max(events_updated_at + [u.time for u in updates])
+            # active patrols always returned so determine if patrol has any new updates
+            updates = patrol.updates
+            for seg in patrol.patrol_segments:
+                for update in seg.updates:
+                    updates.append(update)
+                for event in seg.events:
+                    events_updated_at.append(event.updated_at)
+            max_update = max(events_updated_at + [u.time for u in updates])
 
-                if max_update < patrol_last_poll_at:
-                    logger.info(
-                        "skipping processing, patrol hasn't been updated since last poll",
-                        extra=extra_dict,
-                    )
-                    continue
+            if max_update < patrol_last_poll_at:
+                logger.info(
+                    "skipping processing, patrol hasn't been updated since last poll",
+                    extra=extra_dict,
+                )
+                continue
 
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
@@ -361,7 +388,23 @@ class ER_SMART_Synchronizer:
                         List[EREvent],
                         self.das_client.get_events(event_ids=segment_event.id),
                     )
+
+                    # process event files
+                    for event in event_details:
+                        for file in event.files:
+                            try:
+                                self.process_file(file=file)
+                            except Exception as e:
+                                logger.error(
+                                    "Failed to download event file",
+                                    extra=dict(
+                                        event_serial_number=event.serial_number,
+                                        file_name=file.get("filename"),
+                                        error=e,
+                                    ),
+                                )
                     segment.event_details.extend(event_details)
+                    # process event files
 
                 if version.parse(self.smart_client.version) < version.parse("7.5.3"):
                     # stop gap for supporting SMART observation updates
@@ -373,6 +416,20 @@ class ER_SMART_Synchronizer:
                                 "Error patching event_type with smart_observation_uuid, event not processed",
                                 extra=dict(event_id=event.id, event_title=event.title),
                             )
+
+                # process patrol files
+                for file in patrol.files:
+                    try:
+                        self.process_file(file=file)
+                    except Exception as e:
+                        logger.error(
+                            "Failed to download patrol file",
+                            extra=dict(
+                                event_serial_number=patrol.serial_number,
+                                file_name=file.get("filename"),
+                                error=e,
+                            ),
+                        )
 
                 # Get track points from subject during time range of patrol
                 start = segment.time_range.get("start_time")
