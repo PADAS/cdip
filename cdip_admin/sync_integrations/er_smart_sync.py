@@ -231,7 +231,7 @@ class ER_SMART_Synchronizer:
                         )
                 for file in event.files:
                     try:
-                        self.process_files(file=file)
+                        self.process_file(file=file)
                     except Exception as e:
                         logger.error(
                             "Failed to download event file",
@@ -263,7 +263,7 @@ class ER_SMART_Synchronizer:
             payload = dict(event_details=event.event_details)
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
 
-    def process_files(self, file):
+    def process_file(self, file):
         file_extension = pathlib.Path(file.get("filename")).suffix
         # use id instead of file_name so that we dont have collisions with other attachments
         file_name = file.get("id") + file_extension
@@ -393,7 +393,7 @@ class ER_SMART_Synchronizer:
                     for event in event_details:
                         for file in event.files:
                             try:
-                                self.process_files(file=file)
+                                self.process_file(file=file)
                             except Exception as e:
                                 logger.error(
                                     "Failed to download event file",
@@ -420,7 +420,7 @@ class ER_SMART_Synchronizer:
                 # process patrol files
                 for file in patrol.files:
                     try:
-                        self.process_files(file=file)
+                        self.process_file(file=file)
                     except Exception as e:
                         logger.error(
                             "Failed to download patrol file",
