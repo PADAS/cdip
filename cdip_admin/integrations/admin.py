@@ -1,4 +1,5 @@
 from django.contrib import admin
+from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
     OutboundIntegrationType,
@@ -19,8 +20,8 @@ from .forms import (
 )
 
 # Register your models here.
-admin.site.register(InboundIntegrationType)
-admin.site.register(OutboundIntegrationType)
+admin.site.register(InboundIntegrationType, SimpleHistoryAdmin)
+admin.site.register(OutboundIntegrationType, SimpleHistoryAdmin)
 
 
 @admin.register(DeviceState)
@@ -93,7 +94,7 @@ class DeviceGroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(InboundIntegrationConfiguration)
-class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
+class InboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     readonly_fields = [
         "id",
     ]
