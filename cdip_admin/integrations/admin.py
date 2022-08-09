@@ -25,7 +25,7 @@ admin.site.register(OutboundIntegrationType, SimpleHistoryAdmin)
 
 
 @admin.register(DeviceState)
-class DeviceStateAdmin(admin.ModelAdmin):
+class DeviceStateAdmin(SimpleHistoryAdmin):
     list_display = (
         "device",
         "_external_id",
@@ -55,7 +55,7 @@ class DeviceStateAdmin(admin.ModelAdmin):
 
 
 @admin.register(Device)
-class DeviceAdmin(admin.ModelAdmin):
+class DeviceAdmin(SimpleHistoryAdmin):
     list_display = (
         "external_id",
         "_owner",
@@ -81,12 +81,12 @@ class DeviceAdmin(admin.ModelAdmin):
 
 
 @admin.register(SubjectType)
-class SubjectTypeAdmin(admin.ModelAdmin):
+class SubjectTypeAdmin(SimpleHistoryAdmin):
     list_display = ("value", "display_name", "created_at")
 
 
 @admin.register(DeviceGroup)
-class DeviceGroupAdmin(admin.ModelAdmin):
+class DeviceGroupAdmin(SimpleHistoryAdmin):
     list_display = ("name", "owner", "created_at")
     list_filter = ("owner",)
 
@@ -124,7 +124,7 @@ class InboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
 
 
 @admin.register(OutboundIntegrationConfiguration)
-class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
+class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     readonly_fields = [
         "id",
     ]
@@ -148,13 +148,13 @@ class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(BridgeIntegrationType)
-class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
+class BridgeIntegrationTypeAdmin(SimpleHistoryAdmin):
 
     list_display = ("name",)
 
 
 @admin.register(BridgeIntegration)
-class BridgeIntegrationAdmin(admin.ModelAdmin):
+class BridgeIntegrationAdmin(SimpleHistoryAdmin):
     list_display = ("name", "owner", "type")
     list_filter = (
         "type",
