@@ -9,6 +9,8 @@ from core.models import TimestampedModel
 from core.fields import APIConsumerField
 from organizations.models import Organization, OrganizationGroup
 
+from simple_history.models import HistoricalRecords
+
 
 # This is where the general information for a configuration will be stored
 # This could be an inbound or outbound type
@@ -18,6 +20,7 @@ class InboundIntegrationType(TimestampedModel):
     name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)
@@ -38,6 +41,7 @@ class OutboundIntegrationType(TimestampedModel):
     use_login = models.BooleanField(default=False)
     use_password = models.BooleanField(default=False)
     use_token = models.BooleanField(default=False)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)
@@ -51,6 +55,7 @@ class BridgeIntegrationType(TimestampedModel):
     name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)
@@ -73,6 +78,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     token = EncryptedCharField(max_length=200, blank=True)
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)
@@ -100,6 +106,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
         help_text="This value will be used as the 'provider_key' when sending data to EarthRanger.",
     )
     enabled = models.BooleanField(default=True)
+    history = HistoricalRecords()
 
     default_devicegroup = models.ForeignKey(
         "DeviceGroup",
@@ -127,11 +134,15 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
 
 class GFWInboundConfigurationManager(models.Manager):
+    history = HistoricalRecords()
+
     def get_queryset(self):
         return super().get_queryset().filter(type__slug="gfw")
 
 
 class GFWInboundConfiguration(InboundIntegrationConfiguration):
+    history = HistoricalRecords()
+
     class Meta:
         proxy = True
 
@@ -151,6 +162,7 @@ class BridgeIntegration(TimestampedModel):
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
     consumer_id = models.CharField(max_length=200, blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)
@@ -160,6 +172,7 @@ class SubjectType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     value = models.SlugField(max_length=200, unique=True)
     display_name = models.CharField(max_length=200)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"{self.display_name}"
@@ -177,6 +190,7 @@ class Device(TimestampedModel):
         SubjectType, on_delete=models.PROTECT, blank=True, null=True
     )
     additional = models.JSONField(blank=True, default=dict)
+    history = HistoricalRecords()
 
     @property
     def owner(self):
@@ -197,6 +211,7 @@ class DeviceState(TimestampedModel):
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
     state = models.JSONField(blank=True, null=True)
+    history = HistoricalRecords()
 
     @property
     def owner(self):
@@ -228,6 +243,7 @@ class DeviceGroup(TimestampedModel):
     default_subject_type = models.ForeignKey(
         SubjectType, on_delete=models.PROTECT, blank=True, null=True
     )
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ("name",)

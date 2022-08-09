@@ -61,6 +61,7 @@ def create_api_key(integration):
 
 
 def get_api_key(integration):
+    return "fake api key"
     create_api_consumer(integration)
 
     # obtain key if permission checks pass
