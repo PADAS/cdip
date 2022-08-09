@@ -58,10 +58,10 @@ jobs:
       - run:
           name: Lint the code
           command: ./.circleci/check_standards.sh
-      # - run:
-      #     name: Code Analysis
-      #     command: ./.circleci/check_complexity.sh
-      #
+      - run:
+          name: Code Analysis
+          command: ./.circleci/check_complexity.sh
+
   unit_tests:
     docker:
       - image: cimg/python:3.9
@@ -87,11 +87,11 @@ jobs:
             echo 'export GOOGLE_COMPUTE_ZONE=$GOOGLE_COMPUTE_ZONE_CT' >> $BASH_ENV && source $BASH_ENV
             echo 'export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME' >> $BASH_ENV && source $BASH_ENV
             if [[ -z "$CIRCLE_TAG" ]]; then
-              echo "No tag is defined stg an image with latest tag will be built"
+              echo "No tag is defined stg. An image with latest tag will be built"
               echo 'export TAG=latest' >> $BASH_ENV && source $BASH_ENV
             else
-              echo "$CIRCLE_TAG defined an image with sematic version will be built"
-              echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+              echo "$CIRCLE_TAG defined. An image with sematic version will be built"
+              echo 'export TAG=$CIRCLE_TAG' >> $BASH_ENV && source $BASH_ENV
             fi
       - gcp-gcr/build-image:
           image: $IMAGE_NAME
@@ -129,7 +129,7 @@ jobs:
               echo "No tag is defined latest image will be imported"
               echo 'export TAG=latest' >> $BASH_ENV && source $BASH_ENV
             else
-              echo 'export TAG=$(cat VERSION)' >> $BASH_ENV && source $BASH_ENV
+              echo 'export TAG=$CIRCLE_TAG' >> $BASH_ENV && source $BASH_ENV
             fi
             docker load -i "$IMAGE_NAME-$TAG.tar"
       - gcp-gcr/gcr-auth:
@@ -167,7 +167,7 @@ workflows:
       - build:
           filters:
             tags:
-              only: /\d+\.\d+\.\d+(-alpha\.\d+)?$/
+              only: /\d+\.\d+\.\d+(-rc\.\d+)?$/
             branches:
               ignore: /.*/
       - push:
@@ -175,6 +175,6 @@ workflows:
             - build
           filters:
             tags:
-              only: /\d+\.\d+\.\d+(-alpha\.\d+)?$/
+              only: /\d+\.\d+\.\d+(-rc\.\d+)?$/
             branches:
               ignore: /.*/
