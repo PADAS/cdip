@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     "bootstrap4",
     "cdip_admin",
     "django_extensions",
+    "simple_history",
 ]
 
 
@@ -140,6 +141,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "cdip_admin.auth.middleware.AuthenticationMiddleware",
     "cdip_admin.auth.middleware.OidcRemoteUserMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "cdip_admin.urls"
