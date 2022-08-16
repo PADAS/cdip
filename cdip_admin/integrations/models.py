@@ -106,7 +106,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
         help_text="This value will be used as the 'provider_key' when sending data to EarthRanger.",
     )
     enabled = models.BooleanField(default=True)
-    history = HistoricalRecords()
+    history = HistoricalRecords(excluded_fields=['state'])
 
     default_devicegroup = models.ForeignKey(
         "DeviceGroup",
@@ -211,7 +211,6 @@ class DeviceState(TimestampedModel):
     # TODO: Update end_state as Json
     end_state = models.CharField(max_length=200)
     state = models.JSONField(blank=True, null=True)
-    history = HistoricalRecords()
 
     @property
     def owner(self):
