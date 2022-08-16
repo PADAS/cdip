@@ -25,7 +25,7 @@ admin.site.register(OutboundIntegrationType, SimpleHistoryAdmin)
 
 
 @admin.register(DeviceState)
-class DeviceStateAdmin(SimpleHistoryAdmin):
+class DeviceStateAdmin(admin.ModelAdmin):
     list_display = (
         "device",
         "_external_id",
