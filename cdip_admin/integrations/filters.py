@@ -2,9 +2,6 @@ from django.utils.translation import ugettext_lazy as _
 
 import django_filters
 
-# use this for caching
-from django.core.cache import cache
-
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -131,14 +128,6 @@ class DeviceGroupFilter(django_filters.FilterSet):
         model = DeviceGroup
         fields = ("organization", "device_group", "destinations")
 
-    def __init__(self, *args, **kwargs):
-        # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
-        super(DeviceGroupFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
-
     @property
     def qs(self):
         qs = super().qs
@@ -146,14 +135,8 @@ class DeviceGroupFilter(django_filters.FilterSet):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
-        return qs
+        else:
+            return qs
 
 
 class DeviceFilter(django_filters.FilterSet):
@@ -186,14 +169,6 @@ class DeviceFilter(django_filters.FilterSet):
             "external_id",
         )
 
-    def __init__(self, *args, **kwargs):
-        # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
-        super(DeviceFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
-
     @property
     def qs(self):
         qs = super().qs
@@ -201,14 +176,8 @@ class DeviceFilter(django_filters.FilterSet):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "inbound_configuration__owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(inbound_configuration__owner__name=cache.get('org_filter'))
-
-        return qs
+        else:
+            return qs
 
 
 class InboundIntegrationFilter(django_filters.FilterSet):
@@ -237,14 +206,6 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         model = InboundIntegrationConfiguration
         fields = ("organization", "inbound_config_type", "name")
 
-    def __init__(self, *args, **kwargs):
-        # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
-        super(InboundIntegrationFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
-
     @property
     def qs(self):
         qs = super().qs
@@ -252,14 +213,8 @@ class InboundIntegrationFilter(django_filters.FilterSet):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
-        return qs
+        else:
+            return qs
 
 
 class OutboundIntegrationFilter(django_filters.FilterSet):
@@ -288,13 +243,6 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         model = OutboundIntegrationConfiguration
         fields = ("organization", "outbound_config_type", "name")
 
-    def __init__(self, *args, **kwargs):
-        # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
-        super(OutboundIntegrationFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
 
     @property
     def qs(self):
@@ -303,11 +251,5 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
-        return qs
+        else:
+            return qs

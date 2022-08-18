@@ -16,8 +16,15 @@ from organizations.models import Organization, OrganizationGroup
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200, verbose_name="Type")
-    slug = models.SlugField(max_length=200, unique=True)
-    description = models.TextField(blank=True)
+    slug = models.SlugField(
+        max_length=200,
+        unique=True,
+        help_text="Identifier using lowercase letters and no spaces."
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional field - description of the Technology or Service."
+    )
 
     class Meta:
         ordering = ("name",)
@@ -32,8 +39,13 @@ class InboundIntegrationType(TimestampedModel):
 class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=200, unique=True)
-    description = models.TextField(blank=True)
+    slug = models.SlugField(
+        max_length=200,
+        unique=True,
+        help_text="Identifier using lowercase letters and no spaces.")
+    description = models.TextField(
+        blank=True,
+        help_text="Optional - general description of the destination system.")
     use_endpoint = models.BooleanField(default=False)
     use_login = models.BooleanField(default=False)
     use_password = models.BooleanField(default=False)
@@ -63,10 +75,21 @@ class BridgeIntegrationType(TimestampedModel):
 # Or organization specific information
 class OutboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(OutboundIntegrationType, on_delete=models.CASCADE)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    type = models.ForeignKey(
+        OutboundIntegrationType,
+        on_delete=models.CASCADE,
+        help_text="Destination system"
+    )
+    owner = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="Destination system configured as an Outbound Type"
+    )
     name = models.CharField(max_length=200, blank=True)
-    state = models.JSONField(blank=True, null=True)
+    state = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Additional configuration(s).")
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
@@ -85,11 +108,23 @@ class OutboundIntegrationConfiguration(TimestampedModel):
 # Or organization specific information
 class InboundIntegrationConfiguration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(InboundIntegrationType, on_delete=models.CASCADE)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    type = models.ForeignKey(
+        InboundIntegrationType,
+        on_delete=models.CASCADE,
+        help_text="Data Provider configured as an Inbound Type."
+    )
+    owner = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="EarthRanger site or destination system that owns the data."
+    )
     name = models.CharField(max_length=200, blank=True)
     endpoint = models.URLField(blank=True)
-    state = models.JSONField(blank=True, null=True)
+    state = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Additional integration configuration(s)."
+    )
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
@@ -109,6 +144,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
         related_name="inbound_integration_configuration",
         related_query_name="inbound_integration_configurations",
         verbose_name="Default Device Group",
+        help_text="Device group that will be used unless a different group is specified by the data provider or integration."
     )
 
     consumer_id = models.CharField(max_length=200, blank=True)
@@ -172,11 +208,22 @@ class Device(TimestampedModel):
         InboundIntegrationConfiguration, on_delete=models.CASCADE
     )
     name = models.CharField(max_length=200, blank=True)
-    external_id = models.CharField(max_length=200)
-    subject_type = models.ForeignKey(
-        SubjectType, on_delete=models.PROTECT, blank=True, null=True
+    external_id = models.CharField(
+        max_length=200,
+        help_text="Id sent by the data provider"
     )
-    additional = models.JSONField(blank=True, default=dict)
+    subject_type = models.ForeignKey(
+        SubjectType,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        help_text="Default subject type. Can be overriden by the integration or data provider"
+    )
+    additional = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text="Additional config(s)"
+    )
 
     @property
     def owner(self):
@@ -217,16 +264,25 @@ class DeviceState(TimestampedModel):
 class DeviceGroup(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    owner = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="Organization that owns the data."
+    )
     destinations = models.ManyToManyField(
         OutboundIntegrationConfiguration,
         related_name="devicegroups",
         related_query_name="devicegroup",
         blank=True,
+        help_text="Outbound Integration."
     )
     devices = models.ManyToManyField(Device, blank=True)
     default_subject_type = models.ForeignKey(
-        SubjectType, on_delete=models.PROTECT, blank=True, null=True
+        SubjectType,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        help_text="Subject type to be used unless overriden by the integration or data provider."
     )
 
     class Meta:
