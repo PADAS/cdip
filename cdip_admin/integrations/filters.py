@@ -243,7 +243,6 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         model = OutboundIntegrationConfiguration
         fields = ("organization", "outbound_config_type", "name")
 
-
     @property
     def qs(self):
         qs = super().qs
@@ -253,3 +252,4 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
             )
         else:
             return qs
+
