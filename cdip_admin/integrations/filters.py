@@ -128,15 +128,28 @@ class DeviceGroupFilter(django_filters.FilterSet):
         model = DeviceGroup
         fields = ("organization", "device_group", "destinations")
 
+    def __init__(self, *args, **kwargs):
+        # this can appropriately update the ui filter elements
+        # check for stored values and set form values accordingly
+        super(DeviceGroupFilter, self).__init__(*args, **kwargs)
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
+
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
+        return qs
 
 
 class DeviceFilter(django_filters.FilterSet):
@@ -169,15 +182,28 @@ class DeviceFilter(django_filters.FilterSet):
             "external_id",
         )
 
+    def __init__(self, *args, **kwargs):
+        # this can appropriately update the ui filter elements
+        # check for stored values and set form values accordingly
+        super(DeviceFilter, self).__init__(*args, **kwargs)
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
+
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
-                qs, self.request.user, "inbound_configuration__owner__name"
+                qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        if 'owner_filter' in self.request.session:
+            return qs.filter(inbound_configuration__owner__name=self.request.session['owner_filter'])
+        return qs
 
 
 class InboundIntegrationFilter(django_filters.FilterSet):
@@ -206,15 +232,28 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         model = InboundIntegrationConfiguration
         fields = ("organization", "inbound_config_type", "name")
 
+    def __init__(self, *args, **kwargs):
+        # this can appropriately update the ui filter elements
+        # check for stored values and set form values accordingly
+        super(InboundIntegrationFilter, self).__init__(*args, **kwargs)
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
+
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
+        return qs
 
 
 class OutboundIntegrationFilter(django_filters.FilterSet):
@@ -243,13 +282,26 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         model = OutboundIntegrationConfiguration
         fields = ("organization", "outbound_config_type", "name")
 
+    def __init__(self, *args, **kwargs):
+        # this can appropriately update the ui filter elements
+        # check for stored values and set form values accordingly
+        super(OutboundIntegrationFilter, self).__init__(*args, **kwargs)
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
+
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
+
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
-
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
+        return qs
