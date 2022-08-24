@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="{% static 'website/css/bootstrap.min.css' %}">
     <script src="{% static 'website/js/jquery-3.5.1.min.js' %}"></script>
     <script src="{% static 'website/js/bootstrap.js' %} "></script>
+    <script src="{% static 'website/js/bootstrap.bundle.min.js' %} "></script>
+    <script>
+        $(function () {
+          $('[data-toggle="tooltip"]').tooltip()
+        })
+    </script>
 </head>
 <body>
     {% include "website/includes/topNavBar.html" %}

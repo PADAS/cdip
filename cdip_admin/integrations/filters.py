@@ -2,7 +2,6 @@ from django.utils.translation import ugettext_lazy as _
 
 import django_filters
 
-
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
