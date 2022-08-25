@@ -236,8 +236,9 @@ class Device(TimestampedModel):
         blank=True,
         default=dict,
         help_text="Additional config(s)",
-        history = HistoricalRecords()
+
     )
+    history = HistoricalRecords()
 
     @property
     def owner(self):
