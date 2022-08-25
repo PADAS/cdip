@@ -2,9 +2,6 @@ from django.utils.translation import ugettext_lazy as _
 
 import django_filters
 
-# use this for caching
-from django.core.cache import cache
-
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -133,26 +130,25 @@ class DeviceGroupFilter(django_filters.FilterSet):
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
+        # check for stored values and set form values accordingly
         super(DeviceGroupFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
 
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
         return qs
 
 
@@ -188,26 +184,25 @@ class DeviceFilter(django_filters.FilterSet):
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
+        # check for stored values and set form values accordingly
         super(DeviceFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
 
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
-                qs, self.request.user, "inbound_configuration__owner__name"
+                qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(inbound_configuration__owner__name=cache.get('org_filter'))
-
+        if 'owner_filter' in self.request.session:
+            return qs.filter(inbound_configuration__owner__name=self.request.session['owner_filter'])
         return qs
 
 
@@ -239,26 +234,25 @@ class InboundIntegrationFilter(django_filters.FilterSet):
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
+        # check for stored values and set form values accordingly
         super(InboundIntegrationFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
 
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
         return qs
 
 
@@ -290,24 +284,24 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
-        # check for cached values and set form values accordingly
+        # check for stored values and set form values accordingly
         super(OutboundIntegrationFilter, self).__init__(*args, **kwargs)
-        org_data = cache.get('org_filter')
-        if 'org_data':
-            self.form.initial['organization'] = org_data
+        if 'owner_filter' in self.request.session:
+            self.form.initial['organization'] = self.request.session['owner_filter']
 
     @property
     def qs(self):
         qs = super().qs
+        if 'organization' in self.data:
+            if self.data['organization'] == '':
+                del self.request.session['owner_filter']
+            else:
+                self.request.session['owner_filter'] = self.data['organization']
+
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        # update the cached values if changes were just made
-        if 'organization' in self.data:
-            cache.set('org_filter', self.data['organization'], None)
-        # use qs.filter with organization saved in DeviceFilter
-        if cache.get('org_filter'):
-            return qs.filter(owner__name=cache.get('org_filter'))
-
+        if 'owner_filter' in self.request.session:
+            return qs.filter(owner__name=self.request.session['owner_filter'])
         return qs
