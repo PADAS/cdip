@@ -44,7 +44,6 @@ def create_api_consumer(integration):
 
 
 def create_api_key(integration):
-
     api_key_url = (
         f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}"
     )
