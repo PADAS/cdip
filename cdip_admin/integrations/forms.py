@@ -20,6 +20,25 @@ from .models import (
 )
 
 
+def popover_labels(model, field_strings):
+    fields_html = {}
+    for field_string in field_strings:
+        try:
+            field = model._meta.get_field(field_string)
+        except not field_string:
+            continue
+
+        html = field.verbose_name
+        if field.help_text != "":
+            message = field.help_text
+            html += ''' <button type="button" class="btn btn-light btn-sm" 
+            data-toggle="tooltip" data-placement="right" 
+            title="{}">?</button>'''.format(message)
+
+        fields_html[field.name] = html
+    return fields_html
+
+
 class InboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = InboundIntegrationConfiguration
@@ -40,7 +59,8 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             "state",
             "consumer_id",
         )
-        labels = {"default_devicegroup": "Default Device Group"}
+        # labels = {"default_devicegroup": "Default Device Group"}
+        labels = popover_labels(model, fields)
         widgets = {
             "password": PeekabooTextInput(),
             "token": PeekabooTextInput(),
@@ -52,6 +72,8 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
+            for field_name in self.fields:
+                self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
                     "owner"
@@ -120,14 +142,22 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationConfiguration
         exclude = ["id"]
+        fields = (
+            "type",
+            "owner",
+            "state",
+        )
+        labels = popover_labels(model, fields)
         widgets = {
             "password": forms.PasswordInput(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
-        super(OutboundIntegrationConfigurationForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
+            for field_name in self.fields:
+                self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
                     "owner"
@@ -159,9 +189,17 @@ class DeviceGroupForm(forms.ModelForm):
             "id",
             "devices",
         ]
+        fields = (
+            "owner",
+            "destinations",
+            "default_subject_type"
+        )
+        labels = popover_labels(model, fields)
 
     def __init__(self, *args, request=None, **kwargs):
         super(DeviceGroupForm, self).__init__(*args, **kwargs)
+        for field_name in self.fields:
+            self.fields[field_name].help_text = None
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
@@ -198,6 +236,17 @@ class DeviceForm(forms.ModelForm):
     class Meta:
         model = Device
         exclude = ["id"]
+        fields = (
+            "external_id",
+            "subject_type",
+            "additional"
+        )
+        labels = popover_labels(model, fields)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+           self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -208,6 +257,16 @@ class InboundIntegrationTypeForm(forms.ModelForm):
     class Meta:
         model = InboundIntegrationType
         exclude = ["id"]
+        fields = (
+            "slug",
+            "description"
+        )
+        labels = popover_labels(model, fields)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+           self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -218,6 +277,12 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationConfiguration
         exclude = ["id"]
+        fields = (
+            "type",
+            "owner",
+            "state",
+        )
+        labels = popover_labels(model, fields)
         widgets = {
             "password": PeekabooTextInput(attrs={"class": "form-control"}),
             "token": PeekabooTextInput(attrs={"class": "form-control"}),
@@ -229,6 +294,8 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
+            for field_name in self.fields:
+                self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
                     "owner"
@@ -247,6 +314,16 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationType
         exclude = ["id"]
+        fields = (
+            "slug",
+            "description"
+        )
+        labels = popover_labels(model, fields)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+           self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
