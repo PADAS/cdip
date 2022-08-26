@@ -67,23 +67,30 @@ def run_er_smart_sync_integrations():
 
             # Handle Group of CA's associated to single ER site
             for smart_ca_uuid in er_smart_sync.smart_ca_uuids:
-                logger.debug(f"Processing SMART CA: {smart_ca_uuid}")
-                ca = er_smart_sync.smart_client.get_conservation_area(
-                    ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
-                )
-                if not ca:
-                    logger.warning(
-                        f"Conservation Area not found",
-                        extra=dict(smart_ca_uuid=smart_ca_uuid),
+                try:
+                    extra_dict = dict(smart_ca_uuid=smart_ca_uuid,
+                                      smart_server=er_smart_sync.smart_client.api,
+                                      use_smart_cache=settings.USE_SMART_CACHE)
+                    logger.debug(f"Processing SMART CA: {smart_ca_uuid}")
+                    ca = er_smart_sync.smart_client.get_conservation_area(
+                        ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
                     )
-                    return
-                logger.debug(
-                    f"Beginning sync of event types", extra=dict(ca_uuid=smart_ca_uuid)
-                )
-                er_smart_sync.push_smart_ca_data_model_to_er_event_types(
-                    smart_ca_uuid=smart_ca_uuid, ca=ca
-                )
-                er_smart_sync.sync_patrol_datamodel(smart_ca_uuid=smart_ca_uuid, ca=ca)
+                    if not ca:
+                        logger.warning(
+                            f"Conservation Area not found",
+                            extra=dict(smart_ca_uuid=smart_ca_uuid),
+                        )
+                        return
+                    logger.debug(
+                        f"Beginning sync of event types", extra=dict(ca_uuid=smart_ca_uuid)
+                    )
+                    er_smart_sync.push_smart_ca_data_model_to_er_event_types(
+                        smart_ca_uuid=smart_ca_uuid, ca=ca
+                    )
+                    er_smart_sync.sync_patrol_datamodel(smart_ca_uuid=smart_ca_uuid, ca=ca)
+                except Exception as e:
+                    logger.error(f"Error occurred while attempting to process SMART data", extra=dict(**extra_dict,
+                                                                                                      error=e))
 
             # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
             if er_integration:
