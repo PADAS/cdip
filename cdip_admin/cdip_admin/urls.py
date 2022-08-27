@@ -21,6 +21,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 
 urlpatterns = [
+    path("grappelli/", include("grappelli.urls")),
     path("admin/", admin.site.urls),
     path("", welcome, name="welcome"),
     path("date", date),

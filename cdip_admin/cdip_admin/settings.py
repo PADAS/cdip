@@ -65,6 +65,7 @@ DEFAULT_PAGINATE_BY = 25
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 INSTALLED_APPS = [
+    "grappelli",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -86,6 +87,7 @@ INSTALLED_APPS = [
     "bootstrap4",
     "cdip_admin",
     "django_extensions",
+    "django_htmx",
 ]
 
 
@@ -140,6 +142,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "cdip_admin.auth.middleware.AuthenticationMiddleware",
     "cdip_admin.auth.middleware.OidcRemoteUserMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 ROOT_URLCONF = "cdip_admin.urls"
