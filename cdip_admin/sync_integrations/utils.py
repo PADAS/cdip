@@ -117,5 +117,8 @@ def on_smart_integration_save(*, integration_id: str):
     )
     ca_uuids = config.additional.get("ca_uuids")
     for ca_uuid in ca_uuids:
-        smart_client.get_data_model(ca_uuid=ca_uuid)
-        smart_client.get_conservation_area(ca_uuid=ca_uuid)
+        try:
+            smart_client.get_data_model(ca_uuid=ca_uuid)
+            smart_client.get_conservation_area(ca_uuid=ca_uuid)
+        except:
+            logger.error(f"Error occurred during smart integration save tasks for ca {ca_uuid}")
