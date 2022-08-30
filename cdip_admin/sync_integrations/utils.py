@@ -120,5 +120,5 @@ def on_smart_integration_save(*, integration_id: str):
         try:
             smart_client.get_data_model(ca_uuid=ca_uuid)
             smart_client.get_conservation_area(ca_uuid=ca_uuid)
-        except:
-            logger.error(f"Error occurred during smart integration save tasks for ca {ca_uuid}")
+        except Exception as e:
+            logger.exception(e, extra=dict(ca_uuid=ca_uuid))
