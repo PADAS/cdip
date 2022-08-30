@@ -140,6 +140,8 @@ django-rest-swagger @ git+https://github.com/PADAS/django-rest-swagger.git@0d933
     # via -r requirements.in
 django-scopes==1.2.0
     # via -r requirements.in
+django-simple-history==3.1.1
+    # via -r requirements.in
 django-tables2==2.3.1
     # via -r requirements.in
 djangorestframework==3.11.0
