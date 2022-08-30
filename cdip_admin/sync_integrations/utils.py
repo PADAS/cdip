@@ -89,8 +89,7 @@ def run_er_smart_sync_integrations():
                     )
                     er_smart_sync.sync_patrol_datamodel(smart_ca_uuid=smart_ca_uuid, ca=ca)
                 except Exception as e:
-                    logger.error(f"Error occurred while attempting to process SMART data", extra=dict(**extra_dict,
-                                                                                                      error=e))
+                    logger.exception(f"Error occurred while attempting to process SMART data", extra=extra_dict)
 
             # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
             if er_integration:
