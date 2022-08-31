@@ -83,6 +83,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(
         OutboundIntegrationType,
         on_delete=models.CASCADE,
+        verbose_name="Type",
         help_text="Destination system"
     )
     owner = models.ForeignKey(
@@ -117,19 +118,22 @@ class InboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(
         InboundIntegrationType,
         on_delete=models.CASCADE,
-        help_text="Data Provider configured as an Inbound Type."
+        help_text="Data Provider configured as an Inbound Type.",
+        verbose_name="Type"
     )
     owner = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        help_text="EarthRanger site or destination system that owns the data."
+        help_text="EarthRanger site or destination system that owns the data.",
+        verbose_name="Owner"
     )
     name = models.CharField(max_length=200, blank=True)
     endpoint = models.URLField(blank=True)
     state = models.JSONField(
         blank=True,
         null=True,
-        help_text="Additional integration configuration(s)."
+        help_text="Additional integration configuration(s).",
+        verbose_name="State",
     )
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
