@@ -6,15 +6,18 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0043_historicalbridgeintegration_historicalbridgeintegrationtype_historicaldevice_historicaldevicegroup_h'),
+        (
+            "integrations",
+            "0043_historicalbridgeintegration_historicalbridgeintegrationtype_historicaldevice_historicaldevicegroup_h",
+        ),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='historicalinboundintegrationconfiguration',
-            name='state',
+            model_name="historicalinboundintegrationconfiguration",
+            name="state",
         ),
         migrations.DeleteModel(
-            name='HistoricalDeviceState',
+            name="HistoricalDeviceState",
         ),
     ]
