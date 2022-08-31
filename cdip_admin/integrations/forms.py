@@ -31,9 +31,11 @@ def popover_labels(model, field_strings):
         html = field.verbose_name
         if field.help_text != "":
             message = field.help_text
-            html += ''' <button type="button" class="btn btn-light btn-sm" 
+            html += """ <button type="button" class="btn btn-light btn-sm" 
             data-toggle="tooltip" data-placement="right" 
-            title="{}">?</button>'''.format(message)
+            title="{}">?</button>""".format(
+                message
+            )
 
         fields_html[field.name] = html
     return fields_html
@@ -189,11 +191,7 @@ class DeviceGroupForm(forms.ModelForm):
             "id",
             "devices",
         ]
-        fields = (
-            "owner",
-            "destinations",
-            "default_subject_type"
-        )
+        fields = ("owner", "destinations", "default_subject_type")
         labels = popover_labels(model, fields)
 
     def __init__(self, *args, request=None, **kwargs):
@@ -236,17 +234,13 @@ class DeviceForm(forms.ModelForm):
     class Meta:
         model = Device
         exclude = ["id"]
-        fields = (
-            "external_id",
-            "subject_type",
-            "additional"
-        )
+        fields = ("external_id", "subject_type", "additional")
         labels = popover_labels(model, fields)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
-           self.fields[field_name].help_text = None
+            self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -257,16 +251,13 @@ class InboundIntegrationTypeForm(forms.ModelForm):
     class Meta:
         model = InboundIntegrationType
         exclude = ["id"]
-        fields = (
-            "slug",
-            "description"
-        )
+        fields = ("slug", "description")
         labels = popover_labels(model, fields)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
-           self.fields[field_name].help_text = None
+            self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -314,16 +305,13 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationType
         exclude = ["id"]
-        fields = (
-            "slug",
-            "description"
-        )
+        fields = ("slug", "description")
         labels = popover_labels(model, fields)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
-           self.fields[field_name].help_text = None
+            self.fields[field_name].help_text = None
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
