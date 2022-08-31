@@ -22,6 +22,7 @@ django-environ==0.4.5
 django-filter==2.3.0
 django-keycloak==0.1.1
 django-rbac==0.9
+django-simple-history==3.1.1
 gevent==21.12.0
 git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f#egg=django-rest-swagger
 django-rest-swagger==2.2.0
@@ -60,5 +61,5 @@ python-json-logger==2.0.2
 packaging==20.9
 django-extensions==3.2.0
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
-https://github.com/PADAS/smartconnect-client/releases/download/v1.2.3/smartconnect_client-1.2.3-py3-none-any.whl
+https://github.com/PADAS/smartconnect-client/releases/download/v1.2.6/smartconnect_client-1.2.6-py3-none-any.whl
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.2/cdip_connector-1.2.2-py3-none-any.whl
