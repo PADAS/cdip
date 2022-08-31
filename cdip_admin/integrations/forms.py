@@ -40,9 +40,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             qs = Organization.objects.all()
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
-                    self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                    self.fields[
+                        field_name
+                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                        title="{}">?</button>""".format(
+                        self.fields[field_name].help_text
+                    )
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -122,9 +126,13 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
             qs = Organization.objects.all()
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
-                    self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                    self.fields[
+                        field_name
+                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                        title="{}">?</button>""".format(
+                        self.fields[field_name].help_text
+                    )
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -162,9 +170,13 @@ class DeviceGroupForm(forms.ModelForm):
         super(DeviceGroupForm, self).__init__(*args, **kwargs)
         for field_name in self.fields:
             if self.fields[field_name].help_text != "":
-                self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                self.fields[
+                    field_name
+                ].label += """ <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                    title="{}">?</button>""".format(
+                    self.fields[field_name].help_text
+                )
             self.fields[field_name].help_text = None
         if self.instance and request:
             qs = Organization.objects.all()
@@ -207,9 +219,13 @@ class DeviceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
             if self.fields[field_name].help_text != "":
-                self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                self.fields[
+                    field_name
+                ].label += """ <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                    title="{}">?</button>""".format(
+                    self.fields[field_name].help_text
+                )
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -226,9 +242,13 @@ class InboundIntegrationTypeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
             if self.fields[field_name].help_text != "":
-                self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                self.fields[
+                    field_name
+                ].label += """ <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                    title="{}">?</button>""".format(
+                    self.fields[field_name].help_text
+                )
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -253,9 +273,13 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
             qs = Organization.objects.all()
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
-                    self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                    self.fields[
+                        field_name
+                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                        title="{}">?</button>""".format(
+                        self.fields[field_name].help_text
+                    )
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -280,9 +304,13 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field_name in self.fields:
             if self.fields[field_name].help_text != "":
-                self.fields[field_name].label += ''' <button type="button" class="btn btn-light btn-sm" 
+                self.fields[
+                    field_name
+                ].label += """ <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>'''.format(self.fields[field_name].help_text)
+                    title="{}">?</button>""".format(
+                    self.fields[field_name].help_text
+                )
             self.fields[field_name].help_text = None
 
     helper = FormHelper()

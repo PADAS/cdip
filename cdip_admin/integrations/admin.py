@@ -144,10 +144,13 @@ class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     )
 
     def _name(self, obj):
-        return obj.name or '-no-name-'
+        return obj.name or "-no-name-"
 
-    list_display = ('type', '_name', 'owner', 'created_at', 'updated_at')
-    list_display_links = ('_name', 'owner', )
+    list_display = ("type", "_name", "owner", "created_at", "updated_at")
+    list_display_links = (
+        "_name",
+        "owner",
+    )
 
 
 @admin.register(BridgeIntegrationType)
