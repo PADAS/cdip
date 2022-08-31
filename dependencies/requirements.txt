@@ -112,7 +112,6 @@ django==3.2
     #   django-filter
     #   django-keycloak
     #   django-phonenumber-field
-    #   django-rest-swagger
     #   django-tables2
     #   djangorestframework
     #   drf-jwt
@@ -365,7 +364,7 @@ six==1.15.0
     #   python-jose
     #   social-auth-app-django
     #   social-auth-core
-smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.2.3/smartconnect_client-1.2.3-py3-none-any.whl
+smartconnect-client @ https://github.com/PADAS/smartconnect-client/releases/download/v1.2.6/smartconnect_client-1.2.6-py3-none-any.whl
     # via -r requirements.in
 social-auth-app-django==4.0.0
     # via -r requirements.in
