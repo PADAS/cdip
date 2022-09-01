@@ -1,4 +1,5 @@
 from django.contrib import admin
+from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
     OutboundIntegrationType,
@@ -19,8 +20,8 @@ from .forms import (
 )
 
 # Register your models here.
-admin.site.register(InboundIntegrationType)
-admin.site.register(OutboundIntegrationType)
+admin.site.register(InboundIntegrationType, SimpleHistoryAdmin)
+admin.site.register(OutboundIntegrationType, SimpleHistoryAdmin)
 
 
 @admin.register(DeviceState)
@@ -54,7 +55,7 @@ class DeviceStateAdmin(admin.ModelAdmin):
 
 
 @admin.register(Device)
-class DeviceAdmin(admin.ModelAdmin):
+class DeviceAdmin(SimpleHistoryAdmin):
     list_display = (
         "external_id",
         "_owner",
@@ -80,12 +81,12 @@ class DeviceAdmin(admin.ModelAdmin):
 
 
 @admin.register(SubjectType)
-class SubjectTypeAdmin(admin.ModelAdmin):
+class SubjectTypeAdmin(SimpleHistoryAdmin):
     list_display = ("value", "display_name", "created_at")
 
 
 @admin.register(DeviceGroup)
-class DeviceGroupAdmin(admin.ModelAdmin):
+class DeviceGroupAdmin(SimpleHistoryAdmin):
     list_display = ("name", "owner", "created_at")
     list_filter = ("owner",)
 
@@ -93,7 +94,7 @@ class DeviceGroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(InboundIntegrationConfiguration)
-class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
+class InboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     readonly_fields = [
         "id",
     ]
@@ -123,7 +124,7 @@ class InboundIntegrationConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(OutboundIntegrationConfiguration)
-class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
+class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     readonly_fields = [
         "id",
     ]
@@ -142,18 +143,24 @@ class OutboundIntegrationConfigurationAdmin(admin.ModelAdmin):
         "owner__name",
     )
 
-    list_display = ('type', 'name', 'owner', 'created_at', 'updated_at')
-    list_display_links = ('owner', )
+    def _name(self, obj):
+        return obj.name or "-no-name-"
+
+    list_display = ("type", "_name", "owner", "created_at", "updated_at")
+    list_display_links = (
+        "_name",
+        "owner",
+    )
 
 
 @admin.register(BridgeIntegrationType)
-class BridgeIntegrationTypeAdmin(admin.ModelAdmin):
+class BridgeIntegrationTypeAdmin(SimpleHistoryAdmin):
 
     list_display = ("name",)
 
 
 @admin.register(BridgeIntegration)
-class BridgeIntegrationAdmin(admin.ModelAdmin):
+class BridgeIntegrationAdmin(SimpleHistoryAdmin):
     list_display = ("name", "owner", "type")
     list_filter = (
         "type",

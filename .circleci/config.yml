@@ -58,9 +58,9 @@ jobs:
       - run:
           name: Lint the code
           command: ./.circleci/check_standards.sh
-      - run:
-          name: Code Analysis
-          command: ./.circleci/check_complexity.sh
+      #- run:
+      #   name: Code Analysis
+      #  command: ./.circleci/check_complexity.sh
 
   unit_tests:
     docker:
