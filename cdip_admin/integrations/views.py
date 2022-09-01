@@ -147,7 +147,7 @@ class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
 
     def get_context_data(self, **kwargs):
         # context = super().get_context_data(**kwargs)
-        devices = cache.get('device_list')
+        devices = cache.get("device_list")
         if not devices:
             context = super().get_context_data(**kwargs)
         base_url = reverse("device_list")

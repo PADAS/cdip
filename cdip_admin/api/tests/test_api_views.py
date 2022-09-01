@@ -53,7 +53,7 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     # Get destinations by inbound-id.
     response = client.get(
         view,
-        data={"inbound_id": str(ii.id), 'device_id': d1.external_id},
+        data={"inbound_id": str(ii.id), "device_id": d1.external_id},
         HTTP_X_USERINFO=global_admin_user.user_info,
     )
 
