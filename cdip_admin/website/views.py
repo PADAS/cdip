@@ -40,6 +40,7 @@ def logout_view(request):
 def login_view(request):
     return redirect("/login")
 
+
 # def local_oidc_logout_handler(request):
 #     logout(request)
 #     return render(request, "index.html")
