@@ -22,7 +22,7 @@ def post_device_information(state: dict, config: InboundIntegrationConfiguration
         config.default_devicegroup = device_group
         config.save()
 
-    for key in state:
+    for key, val in state.items():
         device, created = Device.objects.get_or_create(
             external_id=key, inbound_configuration_id=config.id
         )
@@ -32,6 +32,6 @@ def post_device_information(state: dict, config: InboundIntegrationConfiguration
             device_group.save()
 
         logger.debug("Update the state of the device stream if it has changed.")
-        DeviceState.objects.get_or_create(device_id=device.id, state=state[key])
+        DeviceState.objects.create(device_id=device.id, state=val)
 
     return device_group.devices.values("id", "external_id", "inbound_configuration_id")
