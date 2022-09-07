@@ -139,8 +139,8 @@ class DeviceGroupFilter(django_filters.FilterSet):
     def qs(self):
         qs = super().qs
         if "organization" in self.data:
-            if self.data["organization"] == "":
-                del self.request.session["owner_filter"]
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
             else:
                 self.request.session["owner_filter"] = self.data["organization"]
         if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -193,8 +193,8 @@ class DeviceFilter(django_filters.FilterSet):
     def qs(self):
         qs = super().qs
         if "organization" in self.data:
-            if self.data["organization"] == "":
-                del self.request.session["owner_filter"]
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
             else:
                 self.request.session["owner_filter"] = self.data["organization"]
         if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -245,8 +245,8 @@ class InboundIntegrationFilter(django_filters.FilterSet):
     def qs(self):
         qs = super().qs
         if "organization" in self.data:
-            if self.data["organization"] == "":
-                del self.request.session["owner_filter"]
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
             else:
                 self.request.session["owner_filter"] = self.data["organization"]
         if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -295,8 +295,8 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
     def qs(self):
         qs = super().qs
         if "organization" in self.data:
-            if self.data["organization"] == "":
-                del self.request.session["owner_filter"]
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
             else:
                 self.request.session["owner_filter"] = self.data["organization"]
 
