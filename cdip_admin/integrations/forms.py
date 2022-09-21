@@ -2,6 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column
 from crispy_forms.layout import Submit, Field
 from django import forms
+from django.urls import reverse_lazy
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from core.widgets import (
@@ -17,7 +18,10 @@ from .models import (
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     DeviceGroup,
+    BridgeIntegrationType
 )
+
+from .widgets import DynamicFormWidget
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -325,9 +329,22 @@ class BridgeIntegrationForm(forms.ModelForm):
             "id",
             "state",
         ]
-        fields = ("name", "type", "owner", "enabled", "additional", "state")
+        fields = ("name", "owner", "enabled", "type", "additional", "state")
         widgets = {
-            "additional": FormattedJsonFieldWidget(),
+            "name": forms.TextInput(attrs={
+                'hx-get': reverse_lazy('bridge_integration_add'),
+                'hx-trigger': 'keyup'
+            }),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'hx-get': reverse_lazy('schema'),
+                    'hx-trigger': 'change, load',
+                    'hx-target': '#div_id_additional'
+                }),
+            "additional": DynamicFormWidget(
+                schema=BridgeIntegrationType.schema_form
+            ),
             "state": FormattedJsonFieldWidget(),
         }
 
