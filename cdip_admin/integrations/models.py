@@ -3,6 +3,7 @@ from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from fernet_fields import EncryptedCharField
+from django_jsonform.models.fields import JSONField
 
 from cdip_admin import celery
 from core.models import TimestampedModel
@@ -10,6 +11,7 @@ from core.fields import APIConsumerField
 from organizations.models import Organization, OrganizationGroup
 
 from simple_history.models import HistoricalRecords
+from .utils import get_schema
 
 
 # This is where the general information for a configuration will be stored
@@ -70,12 +72,21 @@ class BridgeIntegrationType(TimestampedModel):
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     history = HistoricalRecords()
+    # schema_form = get_schema("None")
 
     class Meta:
         ordering = ("name",)
 
     def __str__(self):
         return f"{self.name}"
+
+    @classmethod
+    def schema_form(cls, typeid=None):
+        if typeid is not None:
+            selected_type = BridgeIntegrationType.objects.filter(id=typeid)[0]
+        else:
+            selected_type = "None"
+        return get_schema(selected_type)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -200,7 +211,8 @@ class BridgeIntegration(TimestampedModel):
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(blank=True, null=True)
-    additional = models.JSONField(default=dict, blank=True)
+    additional = JSONField(schema=BridgeIntegrationType.schema_form)
+    # additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
     consumer_id = models.CharField(max_length=200, blank=True)
     history = HistoricalRecords()

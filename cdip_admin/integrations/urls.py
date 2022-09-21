@@ -140,4 +140,9 @@ urlpatterns = [
         BridgeIntegrationUpdateView.as_view(),
         name="bridge_integration_update",
     ),
+    path(
+        "schema",
+        views.BridgeIntegrationUpdateView.schema,
+        name="schema",
+    )
 ]
