@@ -41,6 +41,7 @@ from .models import (
     Device,
     DeviceGroup,
     BridgeIntegration,
+    BridgeIntegrationType
 )
 from .tables import (
     DeviceStateTable,
@@ -50,8 +51,12 @@ from .tables import (
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
 )
-from .utils import get_api_key, create_api_key, create_api_consumer
+from .utils import get_api_key, get_schema, create_api_key, create_api_consumer
 from django.core.cache import cache
+from crispy_forms.utils import render_crispy_form
+from django.http import HttpResponse
+from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
+from django_jsonform.models.fields import JSONField
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -754,6 +759,31 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     form_class = BridgeIntegrationForm
     model = BridgeIntegration
     permission_required = "integrations.change_bridgeintegration"
+
+    # @staticmethod
+    # def schema(request, *args, **kwargs):
+    #     integration_type = request.GET.get("type")
+    #     form = BridgeIntegrationForm(request=request)
+    #     if integration_type is not '':
+    #         selected_type = BridgeIntegrationType.objects.filter(id=integration_type)[0]
+    #         form.fields["additional"].schema = get_schema(selected_type)
+    #     else:
+    #         form.fields["additional"].schema = get_schema("None")
+    #
+    #     return render_crispy_form(form)
+
+    @staticmethod
+    def schema(request):
+        form = BridgeIntegrationForm(request=request)
+        integration_type = request.GET.get("type")
+        if integration_type is not '':
+            selected_type = BridgeIntegrationType.objects.filter(id=integration_type)[0]
+            newfield = JSONField(schema=get_schema(selected_type))
+        else:
+            newfield = JSONField(schema=get_schema("None"))
+
+        return HttpResponse("hi")
+        # return HttpResponse(as_crispy_field(form["additional"]))
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
