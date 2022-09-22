@@ -9,37 +9,6 @@ from rest_framework.utils import json
 KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
 KEYS_PATH = "/key-auth"
-SCHEMA_DICT = {
-  "Test Bridge Type": {
-        "type": "object",
-        "keys": {
-            "birthday": {
-                "type": "string",
-                "format": "date"
-            },
-            "first_name": {
-                "type": "string"
-            },
-            "last_name": {
-                "type": "string"
-            },
-            "age": {
-                "type": "integer"
-            }
-        }
-    },
-  "None": {
-        "type": "object",
-        "keys": {
-            "first_name": {
-                "type": "string"
-            },
-            "age": {
-                "type": "integer"
-            }
-        }
-    },
-}
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +77,3 @@ def get_api_key(integration):
             logger.exception("failed getting API key for consumer %s", integration)
 
     return create_api_key(integration)
-
-
-def get_schema(name):
-    return SCHEMA_DICT[str(name)]
