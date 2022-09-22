@@ -31,7 +31,13 @@ def post_device_information(state: dict, config: InboundIntegrationConfiguration
             device_group.devices.add(device)
             device_group.save()
 
-        logger.debug("Update the state of the device stream if it has changed.")
-        DeviceState.objects.create(device_id=device.id, state=val)
+        # This construct is here while we don't have unique index on {device_id}.
+        for _ in range(2):
+            try:
+                ds, created = DeviceState.objects.update_or_create(device_id=device.id, defaults=dict(state=val))
+                break
+            except DeviceState.MultipleObjectsReturned:
+                DeviceState.objects.filter(device_id= device.id).delete()
+
 
     return device_group.devices.values("id", "external_id", "inbound_configuration_id")
