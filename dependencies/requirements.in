@@ -14,6 +14,8 @@ datadog==0.39.0
 defusedxml==0.7.0rc1
 django-bootstrap4==2.1.1
 django-fernet-fields==0.6
+django-htmx==1.12.0
+django-jsonform==2.12.0
 django-extensions==3.2.0
 djangorestframework==3.11.0
 django-cors-headers~=3.1.1

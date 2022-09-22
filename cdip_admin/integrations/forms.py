@@ -3,6 +3,7 @@ from crispy_forms.layout import Layout, Submit, Row, Column
 from crispy_forms.layout import Submit, Field
 from django import forms
 from django.urls import reverse_lazy
+from django_jsonform.widgets import JSONFormWidget
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from core.widgets import (
@@ -20,8 +21,6 @@ from .models import (
     DeviceGroup,
     BridgeIntegrationType
 )
-
-from .widgets import DynamicFormWidget
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -323,6 +322,16 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
 
 
 class BridgeIntegrationForm(forms.ModelForm):
+    def full_clean(self):
+
+        if hasattr(self.instance, 'type'):
+            self.fields['additional'].widget.instance = self.instance.type.id
+
+        super().full_clean()
+
+    def clean(self):
+        return super().clean()
+
     class Meta:
         model = BridgeIntegration
         exclude = [
@@ -339,17 +348,17 @@ class BridgeIntegrationForm(forms.ModelForm):
                 attrs={
                     'name': "type",
                     'hx-get': reverse_lazy('schema'),
-                    'hx-trigger': 'change, load',
-                    'hx-target': '#div_id_additional'
+                    'hx-trigger': 'change',
+                    'hx-target': '#div_id_additional',
                 }),
-            "additional": DynamicFormWidget(
-                schema=BridgeIntegrationType.schema_form
+            "additional": JSONFormWidget(
+                schema=BridgeIntegrationType.objects.configuration_schema
             ),
             "state": FormattedJsonFieldWidget(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
-        super(BridgeIntegrationForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
             if not IsGlobalAdmin.has_permission(None, request, None):
@@ -360,6 +369,9 @@ class BridgeIntegrationForm(forms.ModelForm):
                 )
             else:
                 self.fields["owner"].queryset = qs
+
+            if hasattr(self.instance, 'type'):
+                self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
