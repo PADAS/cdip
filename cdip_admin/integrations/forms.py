@@ -329,9 +329,6 @@ class BridgeIntegrationForm(forms.ModelForm):
 
         super().full_clean()
 
-    def clean(self):
-        return super().clean()
-
     class Meta:
         model = BridgeIntegration
         exclude = [
