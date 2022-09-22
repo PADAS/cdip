@@ -51,7 +51,7 @@ from .tables import (
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
 )
-from .utils import get_api_key, get_schema, create_api_key, create_api_consumer
+from .utils import get_api_key, create_api_key, create_api_consumer
 from django.core.cache import cache
 from crispy_forms.utils import render_crispy_form
 from django.http import HttpResponse
@@ -760,30 +760,18 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     model = BridgeIntegration
     permission_required = "integrations.change_bridgeintegration"
 
-    # @staticmethod
-    # def schema(request, *args, **kwargs):
-    #     integration_type = request.GET.get("type")
-    #     form = BridgeIntegrationForm(request=request)
-    #     if integration_type is not '':
-    #         selected_type = BridgeIntegrationType.objects.filter(id=integration_type)[0]
-    #         form.fields["additional"].schema = get_schema(selected_type)
-    #     else:
-    #         form.fields["additional"].schema = get_schema("None")
-    #
-    #     return render_crispy_form(form)
-
     @staticmethod
     def schema(request):
-        form = BridgeIntegrationForm(request=request)
-        integration_type = request.GET.get("type")
-        if integration_type is not '':
-            selected_type = BridgeIntegrationType.objects.filter(id=integration_type)[0]
-            newfield = JSONField(schema=get_schema(selected_type))
-        else:
-            newfield = JSONField(schema=get_schema("None"))
 
-        return HttpResponse("hi")
-        # return HttpResponse(as_crispy_field(form["additional"]))
+        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
+        form = BridgeIntegrationForm(request=request)
+
+        integration_type = request.GET.get("type")
+        if integration_type:
+            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
+            form.fields['additional'].widget.instance = selected_type.id
+
+        return HttpResponse(as_crispy_field(form["additional"]))
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))

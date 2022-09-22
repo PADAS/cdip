@@ -11,7 +11,6 @@ from core.fields import APIConsumerField
 from organizations.models import Organization, OrganizationGroup
 
 from simple_history.models import HistoricalRecords
-from .utils import get_schema
 
 
 # This is where the general information for a configuration will be stored
@@ -66,13 +65,32 @@ class OutboundIntegrationType(TimestampedModel):
         return f"{self.name}"
 
 
+class BridgeIntegrationTypeManager(models.Manager):
+
+    def configuration_schema(cls, typeid=None):
+        if typeid:
+            try:
+                return BridgeIntegrationType.objects.get(id=typeid).configuration_schema
+            except BridgeIntegrationType.DoesNotExist:
+                pass
+        # Return blank schema by default.
+        return {
+            "type": "object",
+            "keys": {}
+        }
+
+
 class BridgeIntegrationType(TimestampedModel):
+
+    objects = BridgeIntegrationTypeManager()
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
+    configuration_schema = models.JSONField(blank=True,
+                                            default=dict, verbose_name='JSON Schema for configuration value')
     history = HistoricalRecords()
-    # schema_form = get_schema("None")
 
     class Meta:
         ordering = ("name",)
@@ -80,13 +98,6 @@ class BridgeIntegrationType(TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
-    @classmethod
-    def schema_form(cls, typeid=None):
-        if typeid is not None:
-            selected_type = BridgeIntegrationType.objects.filter(id=typeid)[0]
-        else:
-            selected_type = "None"
-        return get_schema(selected_type)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -211,7 +222,7 @@ class BridgeIntegration(TimestampedModel):
     owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(blank=True, null=True)
-    additional = JSONField(schema=BridgeIntegrationType.schema_form)
+    additional = JSONField(schema=BridgeIntegrationType.objects.configuration_schema)
     # additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
     consumer_id = models.CharField(max_length=200, blank=True)
