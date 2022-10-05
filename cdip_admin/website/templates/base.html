@@ -12,6 +12,8 @@
     <script src="{% static 'website/js/bootstrap.js' %} "></script>
     <script src="{% static 'website/js/bootstrap.bundle.min.js' %} "></script>
     <script src="https://unpkg.com/htmx.org@1.6.1"></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         $(function () {
           $('[data-toggle="tooltip"]').tooltip()
@@ -24,7 +26,7 @@
         {% if request.user.is_authenticated == True %}
             {% include "website/includes/leftNavBar.html" %}
         {% endif %}
-        <div class="container-fluid" id="content"  style="border:1px solid gray;padding:5px 10px;">
+        <div class="container-fluid" id="content"  style="padding:40px 60px 10px 60px;">
             {% block content %} {% endblock %}
             {% if is_paginated %}
                 {% include "website/includes/pagination.html" %}
