@@ -51,12 +51,11 @@ from .tables import (
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
 )
-from .utils import get_api_key, create_api_key, create_api_consumer
+from .utils import get_api_key
 from django.core.cache import cache
-from crispy_forms.utils import render_crispy_form
 from django.http import HttpResponse
 from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
-from django_jsonform.models.fields import JSONField
+from django.views.decorators.csrf import requires_csrf_token
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -761,17 +760,82 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     permission_required = "integrations.change_bridgeintegration"
 
     @staticmethod
-    def schema(request):
+    @requires_csrf_token
+    def type_modal(request, integration_id):
+        form = BridgeIntegrationForm(request=request)
+        if request.GET.get("type") is not '':
+            integration_type = request.GET.get("type")
+            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
 
+        return HttpResponse("""
+            <div id="modal" 
+                _="on click trigger closeModal add .closing then wait for animationend then remove me">
+                <div class="modal-underlay" 
+                hx-trigger="click"
+                hx-get=/integrations/dropdown_restore/{}
+                hx-target='#div_id_type'>
+                </div>
+                <div class="modal-content">
+                    <h3>Warning</h3>
+                    Are you sure you want to change Integration Type to {}?
+                    All saved configuration values will be lost.
+                    <br>
+                    <br>
+                    <div>
+                        <button
+                            class="btn btn-primary"
+                            hx-get=/integrations/schema/{}
+                            hx-trigger='click',
+                            hx-target='#div_id_additional',
+                            _="on click trigger closeModal">
+                            Proceed
+                        </button>
+                        <button  
+                            class="btn btn-warning"
+                            hx-get=/integrations/dropdown_restore/{}
+                            hx-target='#div_id_type',
+                            _="on click trigger closeModal">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+             </div>""".format(integration_id,
+                              selected_type,
+                              integration_type,
+                              integration_id))
+
+    @staticmethod
+    @requires_csrf_token
+    def dropdown_restore(request, integration_id):
+        bridge = get_object_or_404(BridgeIntegration, pk=integration_id)
+        bridge_form = BridgeIntegrationForm(instance=bridge)
+
+        bridge_form.fields['type'].widget.attrs['hx-get'] = '/integrations/type_modal/{}'.format(integration_id)
+        bridge_form.fields['type'].widget.attrs['name'] = "type"
+        bridge_form.fields['type'].widget.attrs['hx-trigger'] = "change"
+        bridge_form.fields['type'].widget.attrs['hx-target'] = "body"
+        bridge_form.fields['type'].widget.attrs['hx-swap'] = "beforeend"
+        bridge_form.fields['type'].label += """ <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                                data-toggle="tooltip" data-placement="right" 
+                                title="{}">?</button>""".format("Integration component that can process the data.")
+        bridge_form.fields['type'].help_text = None
+        return HttpResponse(as_crispy_field(bridge_form["type"]))
+
+    @staticmethod
+    @requires_csrf_token
+    def schema(request, integration_type):
         # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
         form = BridgeIntegrationForm(request=request)
 
-        integration_type = request.GET.get("type")
-        if integration_type:
+        if integration_type != 'none':
             selected_type = BridgeIntegrationType.objects.get(id=integration_type)
             form.fields['additional'].widget.instance = selected_type.id
-
-        return HttpResponse(as_crispy_field(form["additional"]))
+            return HttpResponse(as_crispy_field(form["additional"]))
+        else:
+            return HttpResponse("")
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))

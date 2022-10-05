@@ -141,8 +141,23 @@ urlpatterns = [
         name="bridge_integration_update",
     ),
     path(
-        "schema",
+        "type_modal/<uuid:integration_id>/",
+        views.BridgeIntegrationUpdateView.type_modal,
+        name="type_modal",
+    ),
+    path(
+        "schema/<str:integration_type>/",
         views.BridgeIntegrationUpdateView.schema,
         name="schema",
+    ),
+    path(
+        "schema/<uuid:integration_type>/",
+        views.BridgeIntegrationUpdateView.schema,
+        name="schema",
+    ),
+    path(
+        "dropdown_restore/<uuid:integration_id>/",
+        views.BridgeIntegrationUpdateView.dropdown_restore,
+        name="dropdown_restore",
     )
 ]

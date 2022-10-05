@@ -66,7 +66,7 @@ class OutboundIntegrationType(TimestampedModel):
 
 
 class BridgeIntegrationTypeManager(models.Manager):
-
+    @classmethod
     def configuration_schema(cls, typeid=None):
         if typeid:
             try:
@@ -86,8 +86,13 @@ class BridgeIntegrationType(TimestampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200, verbose_name="Type")
-    slug = models.SlugField(max_length=200, unique=True)
-    description = models.TextField(blank=True)
+    slug = models.SlugField(
+        max_length=200,
+        unique=True,
+        help_text="Identifier using lowercase letters and no spaces.")
+    description = models.TextField(
+        blank=True,
+        help_text="Optional - general description of the destination system.")
     configuration_schema = models.JSONField(blank=True,
                                             default=dict, verbose_name='JSON Schema for configuration value')
     history = HistoricalRecords()
@@ -99,7 +104,6 @@ class BridgeIntegrationType(TimestampedModel):
         return f"{self.name}"
 
 
-
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
 class OutboundIntegrationConfiguration(TimestampedModel):
@@ -108,12 +112,12 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         OutboundIntegrationType,
         on_delete=models.CASCADE,
         verbose_name="Type",
-        help_text="Destination system",
+        help_text="Integration component that can process the data.”",
     )
     owner = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        help_text="Destination system configured as an Outbound Type",
+        help_text="Organization that owns the data.",
     )
     name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(
@@ -141,13 +145,13 @@ class InboundIntegrationConfiguration(TimestampedModel):
     type = models.ForeignKey(
         InboundIntegrationType,
         on_delete=models.CASCADE,
-        help_text="Data Provider configured as an Inbound Type.",
+        help_text="Integration component that can process the data.",
         verbose_name="Type",
     )
     owner = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        help_text="EarthRanger site or destination system that owns the data.",
+        help_text="Organization that owns the data.",
         verbose_name="Owner",
     )
     name = models.CharField(max_length=200, blank=True)
@@ -218,10 +222,19 @@ class GFWInboundConfiguration(InboundIntegrationConfiguration):
 
 class BridgeIntegration(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    type = models.ForeignKey(BridgeIntegrationType, on_delete=models.CASCADE)
-    owner = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    type = models.ForeignKey(
+        BridgeIntegrationType,
+        on_delete=models.CASCADE,
+        help_text="Integration component that can process the data.")
+    owner = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="Organization that owns the data.")
     name = models.CharField(max_length=200, blank=True)
-    state = models.JSONField(blank=True, null=True)
+    state = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Additional integration configuration(s).",)
     additional = JSONField(schema=BridgeIntegrationType.objects.configuration_schema)
     # additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
