@@ -1,5 +1,5 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Row, Column
+from crispy_forms.layout import Layout, Submit, Row, Column, MultiField
 from crispy_forms.layout import Submit, Field
 from django import forms
 from django.urls import reverse_lazy
@@ -337,19 +337,15 @@ class BridgeIntegrationForm(forms.ModelForm):
         ]
         fields = ("name", "owner", "enabled", "type", "additional", "state")
         widgets = {
-            "name": forms.TextInput(attrs={
-                'hx-get': reverse_lazy('bridge_integration_add'),
-                'hx-trigger': 'keyup'
-            }),
             "type": forms.Select(
                 attrs={
                     'name': "type",
-                    'hx-get': reverse_lazy('schema'),
                     'hx-trigger': 'change',
-                    'hx-target': '#div_id_additional',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
                 }),
             "additional": JSONFormWidget(
-                schema=BridgeIntegrationType.objects.configuration_schema
+                schema=BridgeIntegrationType.objects.configuration_schema,
             ),
             "state": FormattedJsonFieldWidget(),
         }
@@ -358,6 +354,16 @@ class BridgeIntegrationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
+            for field_name in self.fields:
+                if self.fields[field_name].help_text != "":
+                    self.fields[
+                        field_name
+                    ].label += """ <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                        data-toggle="tooltip" data-placement="right" 
+                        title="{}">?</button>""".format(
+                        self.fields[field_name].help_text
+                    )
+                self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
                     "owner"
@@ -368,10 +374,30 @@ class BridgeIntegrationForm(forms.ModelForm):
                 self.fields["owner"].queryset = qs
 
             if hasattr(self.instance, 'type'):
+                self.fields['type'].widget.attrs['hx-get'] = '/integrations/type_modal/{}'.format(self.instance.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.layout = Layout(
+            Row(
+                Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+                Column("owner", css_class="form-group col-lg-3 mb-0"),
+                css_class="form-row",
+            ),
+            Row(
+                Column("enabled", css_class="form-group col-lg-6 mt-0"),
+                css_class="form-row",
+             ),
+            Row(
+                Column("type", css_class="form-group col-lg-6"),
+                css_class="form-row",
+            ),
+            Row(
+                Column("additional", css_class="form-group col-lg-6"),
+                css_class="form-row",
+            ),
+    )
+    helper.add_input(Submit("submit", "Save", css_class="btn btn-primary"))
     helper.form_method = "POST"
 
 

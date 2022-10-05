@@ -5,7 +5,8 @@
 {% block title %}Update Bridge Integration{% endblock %}
 
 {% block content %}
-    <form method="post">
+    <h3>Update Bridge Integration</h3>
+    <form method="post" id="bridge-integration-form">
         {% csrf_token %}
         {% crispy form %}
     </form>

@@ -23,7 +23,7 @@ body {
     min-width: 250px;
     max-width: 250px;
     min-height: 100vh;
-    background: #F5F5F5;
+    background: #FFFFFF;
     color: #000000;
     transition: all 0.3s;
 }
@@ -35,7 +35,7 @@ body {
 
 #sidebar ul.components {
     padding: 0 0 20px 0;
-    border-bottom: 1px solid #47748b;
+    /*border-bottom: 1px solid #47748b;*/
 }
 
 #sidebar ul h5 {
@@ -47,10 +47,12 @@ body {
 #sidebar ul li a {
     padding-left:40px;
     display: block;
+    text-underline: none;
 }
 #sidebar ul li a:hover {
     color: #000000;
     background: #fff;
+    text-underline: none;
 }
 
 #sidebar ul li.active > a, a[aria-expanded="true"] {
@@ -60,4 +62,92 @@ body {
 ul ul a {
    /* padding-left: 40px !important;*/
     background: #6d7fcc;
+}
+
+/***** MODAL DIALOG ****/
+#modal {
+	/* Underlay covers entire screen. */
+	position: fixed;
+	top:0px;
+	bottom: 0px;
+	left:0px;
+	right:0px;
+	background-color:rgba(0,0,0,0.5);
+	z-index:1000;
+
+	/* Flexbox centers the .modal-content vertically and horizontally */
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+
+	/* Animate when opening */
+	animation-name: fadeIn;
+	animation-duration:150ms;
+	animation-timing-function: ease;
+}
+
+#modal > .modal-underlay {
+	/* underlay takes up the entire viewport. This is only
+	required if you want to click to dismiss the popup */
+	position: absolute;
+	z-index: -1;
+	top:0px;
+	bottom:0px;
+	left: 0px;
+	right: 0px;
+}
+
+#modal > .modal-content {
+	/* Position visible dialog near the top of the window */
+	margin-top:10vh;
+
+	/* Sizing for visible dialog */
+	width:80%;
+	max-width:600px;
+
+	/* Display properties for visible dialog*/
+	border:solid 1px #999;
+	border-radius:8px;
+	box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.3);
+	background-color:white;
+	padding:20px;
+
+	/* Animate when opening */
+	animation-name:zoomIn;
+	animation-duration:150ms;
+	animation-timing-function: ease;
+}
+
+#modal.closing {
+	/* Animate when closing */
+	animation-name: fadeOut;
+	animation-duration:150ms;
+	animation-timing-function: ease;
+}
+
+#modal.closing > .modal-content {
+	/* Aniate when closing */
+	animation-name: zoomOut;
+	animation-duration:150ms;
+	animation-timing-function: ease;
+}
+
+@keyframes fadeIn {
+	0% {opacity: 0;}
+	100% {opacity: 1;}
+}
+
+@keyframes fadeOut {
+	0% {opacity: 1;}
+	100% {opacity: 0;}
+}
+
+@keyframes zoomIn {
+	0% {transform: scale(0.9);}
+	100% {transform: scale(1);}
+}
+
+@keyframes zoomOut {
+	0% {transform: scale(1);}
+	100% {transform: scale(0.9);}
 }
