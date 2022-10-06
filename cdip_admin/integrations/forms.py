@@ -374,6 +374,7 @@ class BridgeIntegrationForm(forms.ModelForm):
                 self.fields["owner"].queryset = qs
 
             if hasattr(self.instance, 'type'):
+                request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['type'].widget.attrs['hx-get'] = '/integrations/type_modal/{}'.format(self.instance.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
