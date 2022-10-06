@@ -810,26 +810,36 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     @staticmethod
     @requires_csrf_token
     def dropdown_restore(request, integration_id):
-        bridge = get_object_or_404(BridgeIntegration, pk=integration_id)
-        bridge_form = BridgeIntegrationForm(instance=bridge)
-
-        bridge_form.fields['type'].widget.attrs['hx-get'] = '/integrations/type_modal/{}'.format(integration_id)
-        bridge_form.fields['type'].widget.attrs['name'] = "type"
-        bridge_form.fields['type'].widget.attrs['hx-trigger'] = "change"
-        bridge_form.fields['type'].widget.attrs['hx-target'] = "body"
-        bridge_form.fields['type'].widget.attrs['hx-swap'] = "beforeend"
-        bridge_form.fields['type'].label += """ <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                                data-toggle="tooltip" data-placement="right" 
-                                title="{}">?</button>""".format("Integration component that can process the data.")
-        bridge_form.fields['type'].help_text = None
-        return HttpResponse(as_crispy_field(bridge_form["type"]))
+        response = """<div id="div_id_type" class="form-group">
+                        <label for="id_type" class=" requiredField">
+                        Type
+                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                            data-toggle="tooltip" data-placement="right" 
+                            title="Integration component that can process the data.">?
+                        </button>
+                        <span class="asteriskField">*</span></label> 
+                        <div class="">
+                            <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
+                            hx-get="/integrations/type_modal/53d3a43a-6d8f-4757-b68b-b8d6baa65c01" 
+                            class="select form-control"
+                            required id="id_type">
+                                <option value="" selected>-------</option>"""
+        integration_types = BridgeIntegrationType.objects.all()
+        for option in integration_types:
+            if str(option.id) == request.session["integration_type"]:
+                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
+            else:
+                response += """<option value="{}">{}</option>""".format(option.id, option.name)
+        response += "</select></div> </div> </div> </div>"
+        print(response)
+        return HttpResponse(response)
 
     @staticmethod
     @requires_csrf_token
     def schema(request, integration_type):
         # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
         form = BridgeIntegrationForm(request=request)
-
+        request.session["integration_type"] = integration_type
         if integration_type != 'none':
             selected_type = BridgeIntegrationType.objects.get(id=integration_type)
             form.fields['additional'].widget.instance = selected_type.id
