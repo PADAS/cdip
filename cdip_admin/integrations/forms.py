@@ -45,11 +45,9 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                    ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                        title="{self.fields[field_name].help_text}">?</button>"""
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -131,11 +129,9 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                    ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                        title="{self.fields[field_name].help_text}">?</button>"""
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -175,11 +171,9 @@ class DeviceGroupForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                    title="{self.fields[field_name].help_text}">?</button>"""
             self.fields[field_name].help_text = None
         if self.instance and request:
             qs = Organization.objects.all()
@@ -224,11 +218,9 @@ class DeviceForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                    title="{self.fields[field_name].help_text}">?</button>"""
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -247,11 +239,9 @@ class InboundIntegrationTypeForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                    title="{self.fields[field_name].help_text}">?</button>"""
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -278,11 +268,9 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                    ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                        title="{self.fields[field_name].help_text}">?</button>"""
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -309,11 +297,9 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
+                ].label += f""" <button type="button" class="btn btn-light btn-sm" 
                     data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                    title="{self.fields[field_name].help_text}">?</button>"""
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -358,11 +344,9 @@ class BridgeIntegrationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                    ].label += f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
                         data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                        title="{self.fields[field_name].help_text}">?</button>"""
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -375,7 +359,7 @@ class BridgeIntegrationForm(forms.ModelForm):
 
             if hasattr(self.instance, 'type'):
                 request.session["integration_type"] = str(self.instance.type.id)
-                self.fields['type'].widget.attrs['hx-get'] = '/integrations/type_modal/{}'.format(self.instance.id)
+                self.fields['type'].widget.attrs['hx-get'] = f'/integrations/type_modal/{self.instance.id}'
                 self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
