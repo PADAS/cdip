@@ -6,7 +6,7 @@
 
 {% block content %}
     <h3>Update Bridge Integration</h3>
-    <form method="post" id="bridge-integration-form">
+    <form method="post">
         {% csrf_token %}
         {% crispy form %}
     </form>

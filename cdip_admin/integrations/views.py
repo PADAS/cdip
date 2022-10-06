@@ -770,24 +770,24 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
             integration_type = "none"
             selected_type = "None"
 
-        return HttpResponse("""
+        return HttpResponse(f"""
             <div id="modal" 
                 _="on click trigger closeModal add .closing then wait for animationend then remove me">
                 <div class="modal-underlay" 
                 hx-trigger="click"
-                hx-get=/integrations/dropdown_restore/{}
+                hx-get=/integrations/dropdown_restore/{integration_id}
                 hx-target='#div_id_type'>
                 </div>
                 <div class="modal-content">
                     <h3>Warning</h3>
-                    Are you sure you want to change Integration Type to {}?
+                    Are you sure you want to change Integration Type to {selected_type}?
                     All saved configuration values will be lost.
                     <br>
                     <br>
                     <div>
                         <button
                             class="btn btn-primary"
-                            hx-get=/integrations/schema/{}
+                            hx-get=/integrations/schema/{integration_type}
                             hx-trigger='click',
                             hx-target='#div_id_additional',
                             _="on click trigger closeModal">
@@ -795,22 +795,19 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                         </button>
                         <button  
                             class="btn btn-warning"
-                            hx-get=/integrations/dropdown_restore/{}
+                            hx-get=/integrations/dropdown_restore/{integration_id}
                             hx-target='#div_id_type',
                             _="on click trigger closeModal">
                             Cancel
                         </button>
                     </div>
                 </div>
-             </div>""".format(integration_id,
-                              selected_type,
-                              integration_type,
-                              integration_id))
+             </div>""")
 
     @staticmethod
     @requires_csrf_token
     def dropdown_restore(request, integration_id):
-        response = """<div id="div_id_type" class="form-group">
+        response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
                         <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
@@ -820,7 +817,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                            hx-get="/integrations/type_modal/53d3a43a-6d8f-4757-b68b-b8d6baa65c01" 
+                            hx-get="/integrations/type_modal/{integration_id}" 
                             class="select form-control"
                             required id="id_type">
                                 <option value="" selected>-------</option>"""
@@ -831,7 +828,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
             else:
                 response += """<option value="{}">{}</option>""".format(option.id, option.name)
         response += "</select></div> </div> </div> </div>"
-        print(response)
         return HttpResponse(response)
 
     @staticmethod
