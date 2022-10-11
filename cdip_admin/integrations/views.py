@@ -56,6 +56,7 @@ from django.core.cache import cache
 from django.http import HttpResponse
 from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
 from django.views.decorators.csrf import requires_csrf_token
+from django.template.loader import render_to_string
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -769,44 +770,15 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         else:
             integration_type = "none"
             selected_type = "None"
-
-        return HttpResponse(f"""
-            <div id="modal" 
-                _="on click trigger closeModal add .closing then wait for animationend then remove me">
-                <div class="modal-underlay" 
-                hx-trigger="click"
-                hx-get=/integrations/dropdown_restore/{integration_id}
-                hx-target='#div_id_type'>
-                </div>
-                <div class="modal-content">
-                    <h3>Warning</h3>
-                    Are you sure you want to change Integration Type to {selected_type}?
-                    All saved configuration values will be lost.
-                    <br>
-                    <br>
-                    <div>
-                        <button
-                            class="btn btn-primary"
-                            hx-get=/integrations/schema/{integration_type}
-                            hx-trigger='click',
-                            hx-target='#div_id_additional',
-                            _="on click trigger closeModal">
-                            Proceed
-                        </button>
-                        <button  
-                            class="btn btn-warning"
-                            hx-get=/integrations/dropdown_restore/{integration_id}
-                            hx-target='#div_id_type',
-                            _="on click trigger closeModal">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-             </div>""")
+        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
+                                    'proceed_button': reverse("schema", kwargs={"integration_type": integration_type}),
+                            'cancel_button': reverse("dropdown_restore", kwargs={"integration_id": integration_id})})
+        return HttpResponse(rendered)
 
     @staticmethod
     @requires_csrf_token
     def dropdown_restore(request, integration_id):
+        type_modal = reverse("type_modal", kwargs={"integration_id": integration_id})
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
@@ -817,7 +789,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                            hx-get="/integrations/type_modal/{integration_id}" 
+                            hx-get={type_modal}
                             class="select form-control"
                             required id="id_type">
                                 <option value="" selected>-------</option>"""
