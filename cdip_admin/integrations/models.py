@@ -68,16 +68,22 @@ class OutboundIntegrationType(TimestampedModel):
 class BridgeIntegrationTypeManager(models.Manager):
     @classmethod
     def configuration_schema(cls, typeid=None):
-        if typeid:
-            try:
-                return BridgeIntegrationType.objects.get(id=typeid).configuration_schema
-            except BridgeIntegrationType.DoesNotExist:
-                pass
-        # Return blank schema by default.
-        return {
+        default_schema = {
             "type": "object",
             "keys": {}
         }
+        if typeid:
+            try:
+                schema = BridgeIntegrationType.objects.get(id=typeid).configuration_schema
+                if schema != {}:
+                    return schema
+                else:
+                    return default_schema
+                return
+            except BridgeIntegrationType.DoesNotExist:
+                pass
+        # Return blank schema by default.
+        return default_schema
 
 
 class BridgeIntegrationType(TimestampedModel):
