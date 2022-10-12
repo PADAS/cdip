@@ -151,11 +151,6 @@ urlpatterns = [
         name="schema",
     ),
     path(
-        "schema/<uuid:integration_type>/",
-        views.BridgeIntegrationUpdateView.schema,
-        name="schema",
-    ),
-    path(
         "dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
         name="dropdown_restore",
