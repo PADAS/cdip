@@ -8,19 +8,19 @@
 {% block content %}
 
     <div class="row">
-        <div class="col-md-9">
+        <div class="col-md-9 d-flex align-items-end">
             <h2>Device Groups</h2>
         </div>
-        <div class="col-md-3">
-            <a class="btn btn-primary {% if not perms.integrations.add_devicegroup %} disabled {% endif %}"
+        <div class="col-md-3 d-flex justify-content-end">
+            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_devicegroup %} disabled {% endif %}"
                href="{% url 'device_group_add' %}" role="button">Add a Device Group</a>
         </div>
     </div>
     {% if filter %}
     <div>
         <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' form_group_class='spacing-wrapper' %}
-            {% bootstrap_button 'filter' extra_classes='spacing-wrapper' %}
+            {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+            {% bootstrap_button 'filter' extra_classes='' %}
         </form>
     </div>
     {% endif %}
