@@ -5,23 +5,51 @@
 {% block title %}Bridge: {{module.id}}{% endblock %}
 
 {% block content %}
+    <div class="row">
+        <div class="pt-1">
+            <a class="btn btn-primary btn-sm text-white align-middle my-2 mr-2"
+                   href="{% url 'bridge_integration_list' %}" role="button">
+                    <
+            </a>
+        </div>
+        <div>
+            <h2 class="mt-2">{{module.name}}</h2>
+        </div>
+        <div>
+            <a class="btn btn-primary my-2" href="{% url 'bridge_integration_update' module.id %}" role="button">Edit</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="mx-3">
+            <p><b>ID: </b>{{module.id}}</p>
+            <table class="table">
+              <tbody>
+                <tr>
+                  <th scope="row">Type</th>
+                  <td><a href="{% url 'bridge_integration_view' module.type.id %}"> {{module.type.name}} </a></td>
+                </tr>
+                <tr>
+                  <th scope="row">Owner</th>
+                  <td><a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a></td>
+                </tr>
+                <tr>
+                  <th scope="row">Endpoint</th>
+                  <td>{{module.state}}</td>
+                </tr>
+               <tr>
+                  <th scope="row">Enabled</th>
+                  <td>{{ module.enabled }}</td>
+                </tr>
+              </tbody>
+            </table>
 
-    <h3>Name: {{module.name}}</h3>
-    <p>{{module.id}}</p>
-    <p>
-        Type: <a href="{% url 'bridge_integration_view' module.type.id %}"> {{module.type.name}} </a>
-    </p>
-    <p>
-        Owner: <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
-    </p>
-    <p>Endpoint: {{module.state}}</p>
 
-    <p>Enabled: {{ module.enabled }}</p>
+            {% crispy form %}
 
-    {% crispy form %}
 
-    <a class="btn btn-primary" href="{% url 'bridge_integration_update' module.id %}" role="button">Edit</a>
-    <a class="btn btn-primary" href="{% url 'bridge_integration_list' %}" role="button">Close</a>
+        </div>
+    </div>
+
 
 
 {% endblock %}
