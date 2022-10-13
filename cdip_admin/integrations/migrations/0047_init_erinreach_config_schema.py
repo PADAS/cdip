@@ -33,7 +33,7 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
   "properties": {
     "er_site": {
       "type": "string",
-      "title": "EarthRanger domain",
+      "title": "EarthRanger site",
       "default": "",
       "examples": [
         "cdip-er.pamdas.org"
@@ -42,7 +42,7 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "er_token": {
       "type": "string",
-      "title": "The authorization token used to access EarthRanger APIs.",
+      "title": "EarthRanger Authorization Token",
       "default": "",
       "examples": [
         "gbk3io2su90afsifop308a903ajfaf90390ajfa"
@@ -50,7 +50,8 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "inreach_url": {
       "type": "string",
-      "title": "The Inbound IPC URL for your InReach account",
+      "description": "The Inbound IPC URL for your InReach account",
+      "title": "InReach Inbound IPC URL",
       "format": "url",
       "default": "",
       "examples": [
@@ -59,7 +60,7 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "inreach_password": {
       "type": "string",
-      "title": "Your InReach Inbound IPC password",
+      "title": " nReach Inbound IPC password",
       "default": "",
       "examples": [
         "some-fancy-password"
@@ -67,7 +68,7 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "inreach_username": {
       "type": "string",
-      "title": "Your InReach Inbound IPC username",
+      "title": "InReach Inbound IPC username",
       "default": "",
       "examples": [
         "my-ipc-username"
@@ -75,7 +76,7 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "er_source_provider": {
       "type": "string",
-      "title": "The SourceProvider key that will be used when posting data to EarthRanger",
+      "title": "EarthRanger Source Provider key",
       "default": "",
       "examples": [
         "test-inreach"
@@ -83,7 +84,8 @@ ER_INREACH_CONFIG_SCHEMA = json.loads(
     },
     "append_recipients_to_message": {
       "type": "boolean",
-      "title": "If this is true, InReach message recipient address will be appended to message text as it appears in EarthRanger",
+      "description": "If this is true, InReach message recipient address will be appended to message text as it appears in EarthRanger",
+      "title": "Append recipient list to messages",
       "default": false,
       "examples": [
         true
