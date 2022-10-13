@@ -87,9 +87,6 @@ class BridgeIntegrationTypeManager(models.Manager):
 
 
 class BridgeIntegrationType(TimestampedModel):
-
-    objects = BridgeIntegrationTypeManager()
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=200, verbose_name="Type")
     slug = models.SlugField(
@@ -101,6 +98,7 @@ class BridgeIntegrationType(TimestampedModel):
         help_text="Optional - general description of the destination system.")
     configuration_schema = models.JSONField(blank=True,
                                             default=dict, verbose_name='JSON Schema for configuration value')
+    objects = BridgeIntegrationTypeManager()
     history = HistoricalRecords()
 
     class Meta:
