@@ -1,7 +1,9 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Row, Column
+from crispy_forms.layout import Layout, Submit, Row, Column, MultiField
 from crispy_forms.layout import Submit, Field
 from django import forms
+from django.urls import reverse_lazy
+from django_jsonform.widgets import JSONFormWidget
 
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from core.widgets import (
@@ -17,7 +19,15 @@ from .models import (
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     DeviceGroup,
+    BridgeIntegrationType
 )
+from django.urls import reverse
+
+
+def tooltip_labels(text):
+    return f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+    data-toggle="tooltip" data-placement="right" 
+    title="{text}">?</button>"""
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -42,11 +52,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                        data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -128,11 +134,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                        data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -172,11 +174,7 @@ class DeviceGroupForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                    data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
         if self.instance and request:
             qs = Organization.objects.all()
@@ -221,11 +219,7 @@ class DeviceForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                    data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -244,11 +238,7 @@ class InboundIntegrationTypeForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                    data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -275,11 +265,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
-                    ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                        data-toggle="tooltip" data-placement="right" 
-                        title="{}">?</button>""".format(
-                        self.fields[field_name].help_text
-                    )
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
@@ -306,11 +292,7 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
             if self.fields[field_name].help_text != "":
                 self.fields[
                     field_name
-                ].label += """ <button type="button" class="btn btn-light btn-sm" 
-                    data-toggle="tooltip" data-placement="right" 
-                    title="{}">?</button>""".format(
-                    self.fields[field_name].help_text
-                )
+                ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
@@ -319,22 +301,44 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
 
 
 class BridgeIntegrationForm(forms.ModelForm):
+    def full_clean(self):
+
+        if hasattr(self.instance, 'type'):
+            self.fields['additional'].widget.instance = self.instance.type.id
+
+        super().full_clean()
+
     class Meta:
         model = BridgeIntegration
         exclude = [
             "id",
             "state",
         ]
-        fields = ("name", "type", "owner", "enabled", "additional", "state")
+        fields = ("name", "owner", "enabled", "type", "additional", "state")
         widgets = {
-            "additional": FormattedJsonFieldWidget(),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'hx-trigger': 'change',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
+                }),
+            "additional": JSONFormWidget(
+                schema=BridgeIntegrationType.objects.configuration_schema,
+            ),
             "state": FormattedJsonFieldWidget(),
         }
 
     def __init__(self, *args, request=None, **kwargs):
-        super(BridgeIntegrationForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if self.instance and request:
             qs = Organization.objects.all()
+            for field_name in self.fields:
+                if self.fields[field_name].help_text != "":
+                    self.fields[
+                        field_name
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
+                self.fields[field_name].help_text = None
             if not IsGlobalAdmin.has_permission(None, request, None):
                 self.fields[
                     "owner"
@@ -344,8 +348,33 @@ class BridgeIntegrationForm(forms.ModelForm):
             else:
                 self.fields["owner"].queryset = qs
 
+            if hasattr(self.instance, 'type'):
+                request.session["integration_type"] = str(self.instance.type.id)
+                self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
+                                                                     kwargs={"integration_id": self.instance.id})
+                self.fields['additional'].widget.instance = self.instance.type.id
+
     helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.layout = Layout(
+            Row(
+                Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+                Column("owner", css_class="form-group col-lg-3 mb-0"),
+                css_class="form-row",
+            ),
+            Row(
+                Column("enabled", css_class="form-group col-lg-6 mt-0"),
+                css_class="form-row",
+             ),
+            Row(
+                Column("type", css_class="form-group col-lg-6"),
+                css_class="form-row",
+            ),
+            Row(
+                Column("additional", css_class="form-group col-lg-6"),
+                css_class="form-row",
+            ),
+    )
+    helper.add_input(Submit("submit", "Save", css_class="btn btn-primary"))
     helper.form_method = "POST"
 
 

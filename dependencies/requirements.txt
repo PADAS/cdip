@@ -20,7 +20,7 @@ babel==2.8.0
     # via
     #   -r requirements.in
     #   django-phonenumber-field
-backports-zoneinfo==0.2.1
+backports.zoneinfo==0.2.1
     # via
     #   pytz-deprecation-shim
     #   tzlocal
@@ -106,8 +106,11 @@ django==3.2.15
     #   django-extensions
     #   django-fernet-fields
     #   django-filter
+    #   django-htmx
+    #   django-jsonform
     #   django-keycloak
     #   django-phonenumber-field
+    #   django-rest-swagger
     #   django-tables2
     #   djangorestframework
     #   drf-jwt
@@ -124,6 +127,10 @@ django-extensions==3.2.0
 django-fernet-fields==0.6
     # via -r requirements.in
 django-filter==2.3.0
+    # via -r requirements.in
+django-htmx==1.12.0
+    # via -r requirements.in
+django-jsonform==2.12.0
     # via -r requirements.in
 django-keycloak==0.1.1
     # via -r requirements.in
@@ -208,11 +215,7 @@ idna==2.10
     #   requests
     #   yarl
 importlib-metadata==1.6.1
-    # via
-    #   -r requirements.in
-    #   click
-    #   django-bootstrap4
-    #   kombu
+    # via -r requirements.in
 itypes==1.2.0
     # via coreapi
 jinja2==2.11.2
@@ -409,9 +412,9 @@ zipp==3.1.0
     # via
     #   -r requirements.in
     #   importlib-metadata
-zope-event==4.5.0
+zope.event==4.5.0
     # via gevent
-zope-interface==5.4.0
+zope.interface==5.4.0
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:

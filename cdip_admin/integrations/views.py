@@ -41,6 +41,7 @@ from .models import (
     Device,
     DeviceGroup,
     BridgeIntegration,
+    BridgeIntegrationType
 )
 from .tables import (
     DeviceStateTable,
@@ -50,8 +51,12 @@ from .tables import (
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
 )
-from .utils import get_api_key, create_api_key, create_api_consumer
+from .utils import get_api_key
 from django.core.cache import cache
+from django.http import HttpResponse
+from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
+from django.views.decorators.csrf import requires_csrf_token
+from django.template.loader import render_to_string
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -754,6 +759,60 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     form_class = BridgeIntegrationForm
     model = BridgeIntegration
     permission_required = "integrations.change_bridgeintegration"
+
+    @staticmethod
+    @requires_csrf_token
+    def type_modal(request, integration_id):
+        if request.GET.get("type") is not '':
+            integration_type = request.GET.get("type")
+            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
+        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
+                                    'proceed_button': reverse("schema", kwargs={"integration_type": integration_type}),
+                            'cancel_button': reverse("dropdown_restore", kwargs={"integration_id": integration_id})})
+        return HttpResponse(rendered)
+
+    @staticmethod
+    @requires_csrf_token
+    def dropdown_restore(request, integration_id):
+        type_modal = reverse("type_modal", kwargs={"integration_id": integration_id})
+        response = f"""<div id="div_id_type" class="form-group">
+                        <label for="id_type" class=" requiredField">
+                        Type
+                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                            data-toggle="tooltip" data-placement="right" 
+                            title="Integration component that can process the data.">?
+                        </button>
+                        <span class="asteriskField">*</span></label> 
+                        <div class="">
+                            <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
+                            hx-get={type_modal}
+                            class="select form-control"
+                            required id="id_type">
+                                <option value="" selected>-------</option>"""
+        integration_types = BridgeIntegrationType.objects.values_list("id", "name", named=True)
+        for option in integration_types:
+            if str(option.id) == request.session["integration_type"]:
+                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
+            else:
+                response += """<option value="{}">{}</option>""".format(option.id, option.name)
+        response += "</select></div> </div> </div> </div>"
+        return HttpResponse(response)
+
+    @staticmethod
+    @requires_csrf_token
+    def schema(request, integration_type):
+        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
+        form = BridgeIntegrationForm(request=request)
+        request.session["integration_type"] = integration_type
+        if integration_type != 'none':
+            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
+            form.fields['additional'].widget.instance = selected_type.id
+            return HttpResponse(as_crispy_field(form["additional"]))
+        else:
+            return HttpResponse("")
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
