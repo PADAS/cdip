@@ -1,10 +1,16 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
+{% load static %}
+
+<nav class="navbar navbar-expand-lg navbar-light border-bottom">
     <div class="container-fluid">
         <div class="d-flex flex-grow-1">
             <span class="w-100 d-lg-none d-block"><!-- hidden spacer to center brand on mobile --></span>
-            <a class="navbar-brand d-none d-lg-inline-block" href="/">
-                Gundi Project
-            </a>
+            <div class="align-items-end">
+                <a class="navbar-brand d-none d-lg-inline-block" href="/">
+                    <img src="{% static "logo.png" %}" alt="logo" height="30" class="mb-2"/>
+                    <b class="align-bottom mb-1">GUNDI</b>
+               </a>
+            </div>
+
             <a class="navbar-brand-two mx-auto d-lg-none d-inline-block" href="/">
                 <!--img src="//placehold.it/40?text=LOGO" alt="logo"-->
             </a>

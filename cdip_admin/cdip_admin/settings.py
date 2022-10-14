@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "cdip_admin",
     "django_extensions",
     "simple_history",
+    "django_jsonform",
 ]
 
 

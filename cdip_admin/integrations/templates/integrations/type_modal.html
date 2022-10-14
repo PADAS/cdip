@@ -1,0 +1,32 @@
+<div id="modal"
+    _="on click trigger closeModal add .closing then wait for animationend then remove me">
+    <div class="modal-underlay"
+    hx-trigger="click"
+    hx-get={{ cancel_button }}
+    hx-target='#div_id_type'>
+    </div>
+    <div class="modal-content">
+        <h3>Warning</h3>
+        Are you sure you want to change Integration Type to {{ selected_type }}?
+        All saved configuration values will be lost.
+        <br>
+        <br>
+        <div>
+            <button
+                class="btn btn-primary"
+                hx-get={{ proceed_button }}
+                hx-trigger='click'
+                hx-target='#div_id_additional'
+                _="on click trigger closeModal">
+                Proceed
+            </button>
+            <button
+                class="btn btn-warning"
+                hx-get={{ cancel_button }}
+                hx-target='#div_id_type',
+                _="on click trigger closeModal">
+                Cancel
+            </button>
+        </div>
+    </div>
+ </div>
