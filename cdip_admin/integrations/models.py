@@ -275,16 +275,6 @@ class SubjectType(TimestampedModel):
         return f"{self.display_name}"
 
 
-class DeviceQuerySet(models.QuerySet):
-
-    # Ensure that new devices are added to the default device group
-    def create(self, **kwargs):
-        with transaction.atomic():
-            device = super().create(**kwargs)
-            device.default_group.devices.add(device)
-        return device
-
-
 # This is where the information is stored for a specific device
 class Device(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
@@ -307,7 +297,7 @@ class Device(TimestampedModel):
         default=dict,
         help_text="Additional config(s)",
     )
-    objects = DeviceQuerySet.as_manager()
+
     history = HistoricalRecords()
 
     @property
@@ -320,6 +310,18 @@ class Device(TimestampedModel):
 
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        # Ensure the device is added to the default group after creation
+        self.default_group.devices.add(self)
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
 
     class Meta:
         ordering = ("inbound_configuration", "external_id")
