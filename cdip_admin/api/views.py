@@ -291,28 +291,15 @@ class DeviceListView(generics.ListCreateAPIView):
     filterset_fields = ["external_id", "inbound_configuration__type__slug"]
 
     def create(self, request, *args, **kwargs):
+        # ToDo: Validate inbound_configuration_id and external_id in the serializer
+        # Device creation is idempotent
         device, created = Device.objects.get_or_create(
             inbound_configuration_id=request.data.get("inbound_configuration"),
             external_id=request.data.get("external_id"),
         )
-        if created:
-            status_code = status.HTTP_201_CREATED
-            ibc = InboundIntegrationConfiguration.objects.get(
-                id=request.data.get("inbound_configuration")
-            )
-            if ibc:
-                logger.info(
-                    "Adding id %s to default device group for ibc: %s",
-                    device.id,
-                    ibc.id,
-                )
-                ibc.default_devicegroup.devices.add(device.id)
-        else:
-            status_code = status.HTTP_200_OK
         serializer = self.get_serializer(device)
-
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status_code, headers=headers)
+        return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
 
     def get_queryset(self):
         user = self.request.user
