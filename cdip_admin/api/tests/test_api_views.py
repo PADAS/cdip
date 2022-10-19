@@ -388,3 +388,29 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
     assert str(o_device.external_id) not in [
         item["device_external_id"] for item in response
     ]
+
+
+def test_new_device_from_location_is_added_to_default_group_as_global_admin(client, global_admin_user, setup_data):
+    device = setup_data["d1"]
+    request_data = {
+        "inbound_configuration": str(device.inbound_configuration.id),
+        "external_id": device.external_id,
+    }
+
+    client.force_login(global_admin_user.user)
+    response = client.post(
+        reverse("device_list_api"),
+        data=json.dumps(request_data),
+        content_type="application/json",
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+    # Check the request response
+    assert response.status_code == 200
+    response_data = response.json()
+    assert "id" in response_data
+    # Check that the device is added to the default device group
+    device.refresh_from_db()
+    assert device.default_group is not None
+    assert device in device.default_group.devices.all()
+
+
