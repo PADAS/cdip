@@ -199,9 +199,14 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
         device_id = self.request.query_params.get("device_id")
         if inbound_id:
             try:
-                device = Device.objects.get(
+
+                # TODO: This is an urgent patch to mitigate errors with missing devices.
+                device, created = Device.objects.get_or_create(
                     external_id=device_id, inbound_configuration_id=inbound_id
                 )
+                if created:
+                    device.inbound_configuration.default_devicegroup.devices.add(device)
+
                 queryset = (
                     queryset.filter(devicegroup__devices__id=device.id)
                     .annotate(
