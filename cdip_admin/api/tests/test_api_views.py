@@ -20,6 +20,7 @@ from integrations.models import (
 )
 
 
+# ToDo: Use the api_client instead of client when testing APIs
 def test_get_integration_type_list(client, global_admin_user, setup_data):
     iit = setup_data["iit1"]
 
@@ -390,18 +391,17 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
     ]
 
 
-def test_new_device_from_location_is_added_to_default_group_as_global_admin(client, global_admin_user, setup_data):
+def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_client, global_admin_user, setup_data):
     device = setup_data["d1"]
     request_data = {
         "inbound_configuration": str(device.inbound_configuration.id),
         "external_id": device.external_id,
     }
 
-    client.force_login(global_admin_user.user)
-    response = client.post(
+    api_client.force_authenticate(global_admin_user.user)
+    response = api_client.post(
         reverse("device_list_api"),
-        data=json.dumps(request_data),
-        content_type="application/json",
+        data=request_data,
         HTTP_X_USERINFO=global_admin_user.user_info,
     )
     # Check the request response

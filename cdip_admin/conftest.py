@@ -1,11 +1,9 @@
 import base64
-import uuid
-from typing import NamedTuple, Any
-
 import pytest
+from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
-
+from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
 from core.enums import DjangoGroups
 from integrations.models import (
@@ -18,6 +16,16 @@ from integrations.models import (
     DeviceState,
 )
 from organizations.models import Organization
+
+
+@pytest.fixture
+def api_client():
+    """
+    Use this client to test API endpoints.
+    It'll take care of dict-to-json serialization among other things.
+    https://www.django-rest-framework.org/api-guide/testing/#apiclient
+    """
+    return APIClient()
 
 
 class RemoteUser(NamedTuple):
