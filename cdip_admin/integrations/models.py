@@ -199,6 +199,8 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
     def _pre_save(self, *args, **kwargs):
         # Slug generation
+        # ToDo: We could use a better slug generator like django.utils.text.slugify
+        # https://docs.djangoproject.com/en/3.2/ref/utils/#django.utils.text.slugify
         if not self.provider:
             self.provider = self.type.slug.lower()
         else:
