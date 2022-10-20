@@ -1,6 +1,6 @@
-# cdip (aka SMART Integrate)
+# Gundi Portal
 
-This repository holds code for SMART Integrate's Web Portal. It provides a web interface as well as a restful API for integration functions to use.
+This repository holds code for Gundi's Portal. It provides a web interface as well as a restful API for integration functions to use.
 
 # Prerequisites
 

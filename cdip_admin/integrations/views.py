@@ -763,7 +763,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     @staticmethod
     @requires_csrf_token
     def type_modal(request, integration_id):
-        form = BridgeIntegrationForm(request=request)
         if request.GET.get("type") is not '':
             integration_type = request.GET.get("type")
             selected_type = BridgeIntegrationType.objects.get(id=integration_type)
@@ -793,7 +792,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                             class="select form-control"
                             required id="id_type">
                                 <option value="" selected>-------</option>"""
-        integration_types = BridgeIntegrationType.objects.all()
+        integration_types = BridgeIntegrationType.objects.values_list("id", "name", named=True)
         for option in integration_types:
             if str(option.id) == request.session["integration_type"]:
                 response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)

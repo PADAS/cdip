@@ -6,6 +6,9 @@ from clients.models import ClientProfile
 from conftest import setup_account_profile_mapping
 from core.enums import RoleChoices
 
+import random
+
+
 pytestmark = pytest.mark.django_db
 
 from integrations.models import (
@@ -63,6 +66,42 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     assert len(response) == 1
     assert str(oi.id) in [item["id"] for item in response]
     assert not str(other_oi.id) in [item["id"] for item in response]
+
+
+def test_getting_outbound_for_absent_device(client, global_admin_user, setup_data):
+    '''
+    Test for case described at https://allenai.atlassian.net/browse/SIK-1262
+    It is the case where a client queries for OutboundIntegration data by
+    Inbound ID and Device.external_id. The Inbound ID is valid, but the Device.external_id
+    is not present in the database.
+    The desired result is that the Device is added to the Integration and that the
+    associated Outbound Integration is returned.
+    '''
+    ii = setup_data["ii1"]
+    oi = setup_data["oi1"]
+    other_oi = setup_data["oi2"]
+
+    client.force_login(global_admin_user.user)
+
+    an_external_id = "".join(random.sample([chr(x) for x in range(97, 97 + 26)], 12))
+    view = reverse("outboundintegrationconfiguration_list")
+
+    # Get destinations by inbound-id.
+    response = client.get(
+        view,
+        data={"inbound_id": str(ii.id), "device_id": an_external_id},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    response = response.json()
+
+    assert len(response) == 1
+    assert str(oi.id) in [item["id"] for item in response]
+    assert not str(other_oi.id) in [item["id"] for item in response]
+
+    # Assert that the previously unknown device has been created.
+    assert Device.objects.filter(external_id=an_external_id, inbound_configuration=ii).exists()
 
 
 def test_get_organizations_list_organization_member_viewer(
