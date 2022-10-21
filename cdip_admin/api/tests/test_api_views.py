@@ -1,12 +1,10 @@
 import pytest
 from django.urls import reverse
 from rest_framework.utils import json
-
 from clients.models import ClientProfile
 from conftest import setup_account_profile_mapping
 from core.enums import RoleChoices
 
-import random
 
 
 pytestmark = pytest.mark.django_db
@@ -69,7 +67,7 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     assert not str(other_oi.id) in [item["id"] for item in response]
 
 
-def test_getting_outbound_for_absent_device(client, global_admin_user, setup_data):
+def test_getting_outbound_for_absent_device(client, global_admin_user, get_device_id, setup_data):
     '''
     Test for case described at https://allenai.atlassian.net/browse/SIK-1262
     It is the case where a client queries for OutboundIntegration data by
@@ -80,11 +78,12 @@ def test_getting_outbound_for_absent_device(client, global_admin_user, setup_dat
     '''
     ii = setup_data["ii1"]
     oi = setup_data["oi1"]
+    ii.default_devicegroup.destinations.add(oi)
     other_oi = setup_data["oi2"]
 
     client.force_login(global_admin_user.user)
 
-    an_external_id = "".join(random.sample([chr(x) for x in range(97, 97 + 26)], 12))
+    an_external_id = get_device_id()
     view = reverse("outboundintegrationconfiguration_list")
 
     # Get destinations by inbound-id.
@@ -391,11 +390,19 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
     ]
 
 
-def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_client, global_admin_user, setup_data):
-    device = setup_data["d1"]
+def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_client, global_admin_user, get_device_id, setup_data):
+    """
+    Test for case described at https://allenai.atlassian.net/browse/SIK-1267
+    Given an observation from an unknown device
+    When the routing service calls the Device creation endpoint of the Portal's API
+    Then a new Device is created in the Portal
+    And the Device is added to the default DeviceGroup of the related InboundIntegrationConfiguration
+    """
+    inbound_configuration = setup_data["ii1"]
+    device_external_id = get_device_id()
     request_data = {
-        "inbound_configuration": str(device.inbound_configuration.id),
-        "external_id": device.external_id,
+        "inbound_configuration": str(inbound_configuration.id),
+        "external_id": device_external_id,
     }
 
     api_client.force_authenticate(global_admin_user.user)
@@ -404,13 +411,16 @@ def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_
         data=request_data,
         HTTP_X_USERINFO=global_admin_user.user_info,
     )
+
     # Check the request response
     assert response.status_code == 200
     response_data = response.json()
     assert "id" in response_data
-    # Check that the device is added to the default device group
-    device.refresh_from_db()
+    # Check that the device is created and added to the default device group
+    assert Device.objects.filter(external_id=device_external_id).exists()
+    device = Device.objects.get(external_id=device_external_id)
     assert device.default_group is not None
+    assert device.default_group == inbound_configuration.default_devicegroup
     assert device in device.default_group.devices.all()
 
 
