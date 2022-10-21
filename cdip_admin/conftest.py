@@ -1,5 +1,6 @@
 import base64
 import pytest
+import random
 from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
@@ -26,6 +27,17 @@ def api_client():
     https://www.django-rest-framework.org/api-guide/testing/#apiclient
     """
     return APIClient()
+
+
+@pytest.fixture
+def get_device_id():
+    """
+    A helper function that generates a ramdom alphanumeric id, to be used as external_id of Devices
+    """
+    def _make_device_id():
+        return "".join(random.sample([chr(x) for x in range(97, 97 + 26)], 12))
+
+    return _make_device_id
 
 
 class RemoteUser(NamedTuple):
