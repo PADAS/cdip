@@ -180,14 +180,14 @@ class InboundIntegrationConfigurationDetailsView(generics.RetrieveUpdateAPIView)
 class OutboundIntegrationConfigurationListView(generics.ListAPIView):
     """Returns List of Outbound Integration Configurations"""
 
-    queryset = OutboundIntegrationConfiguration.objects.all()
     serializer_class = OutboundIntegrationConfigurationSerializer
     permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount,)
 
     # filter_backends =
     def get_queryset(self):
-        queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True).all()
-
+        # ToDo: Review the filtering logic and move it into a model manager
+        # or a helper functions in the models module
+        queryset = OutboundIntegrationConfiguration.objects.filter(enabled=True)
         if not IsGlobalAdmin.has_permission(
             None, self.request, None
         ) and not IsServiceAccount.has_permission(None, self.request, None):
@@ -198,27 +198,24 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
         inbound_id = self.request.query_params.get("inbound_id")
         device_id = self.request.query_params.get("device_id")
         if inbound_id:
-            try:
-
-                # TODO: This is an urgent patch to mitigate errors with missing devices.
-                device, created = Device.objects.get_or_create(
-                    external_id=device_id, inbound_configuration_id=inbound_id
-                )
-                if created:
-                    device.inbound_configuration.default_devicegroup.devices.add(device)
-
-                queryset = (
-                    queryset.filter(devicegroup__devices__id=device.id)
-                    .annotate(
-                        inbound_type_slug=F(
-                            "devicegroup__devices__inbound_configuration__type__slug"
-                        )
+            # TODO: This is an urgent patch to mitigate errors with missing devices.
+            device, created = Device.objects.get_or_create(
+                external_id=device_id, inbound_configuration_id=inbound_id
+            )
+            # ToDo: See if we can reduce the complexity and improve this query
+            # ToDo: Review after talking about the Integration models refactor
+            # This gets the outbound configurations set in any device groups containing this device
+            # But if the device was created here it'll belong only to the default group and
+            # if there isn't any OutboundConfiguration related to it then this will return an empty list
+            queryset = (
+                queryset.filter(devicegroup__devices__id=device.id)
+                .annotate(
+                    inbound_type_slug=F(
+                        "devicegroup__devices__inbound_configuration__type__slug"
                     )
-                    .distinct()
                 )
-            except Device.DoesNotExist:
-                queryset = queryset.none()
-
+                .distinct()
+            )
         return queryset
 
     def get(self, request, *args, **kwargs):
