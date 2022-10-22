@@ -4,11 +4,11 @@
 
 {% block content %}
     <div class="row">
-        <div class="col-md-9">
+        <div class="col-md-9 d-flex align-items-end">
             <h2>Inbound Integration Types</h2>
         </div>
-        <div class="col-md-3">
-            <a class="btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
+        <div class="col-md-3 d-flex justify-content-end">
+            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
                href="{% url 'inbound_integration_type_add' %}" role="button">Add Type</a>
         </div>
     </div>
@@ -37,6 +37,7 @@
                   </td>
               </tr>
             {% endfor %}
-
+          </tbody>
+        </table>
     </div>
 {% endblock %}

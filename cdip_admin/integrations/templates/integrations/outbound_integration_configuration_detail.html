@@ -3,21 +3,32 @@
 {% block title %}Integration: {{module.id}}{% endblock %}
 
 {% block content %}
-
-    <h3>Name: {{module.name}}</h3>
-    <p>{{module.id}}</p>
-    <p>
-        Type: <a href="{% url 'outbound_integration_type_detail' module.type.id %}"> {{module.type.name}} </a>
-    </p>
-    <p>
-        Owner: <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
-    </p>
-    <p>Endpoint: {{module.endpoint}}</p>
-    <p>State:
-        <pre>{{ module.state | pprint }}</pre>
-    </p>
-    <p>Enabled: {{ module.enabled }}</p>
-    <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_update' module.id %}" role="button">Edit</a>
-    <a class="btn btn-primary" href="{% url 'outbound_integration_configuration_list' %}" role="button">Close</a>
+    <div class="row">
+        <div class="col-1 pt-1">
+            <a class="btn btn-primary btn-sm text-white align-middle my-2 mr-2"
+                   href="{% url 'outbound_integration_configuration_list' %}" role="button">
+                    <
+            </a>
+        </div>
+        <div class="col-6">
+            <h3>{{module.name}}</h3>
+            <h4>Outbound Integration</h4>
+        </div>
+        <div class="col-sm">
+            <a class="btn btn-primary my-2" href="{% url 'outbound_integration_configuration_update' module.id %}" role="button">Edit</a>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-6 offset-1">
+            <p>
+                <b>Type: </b><a href="{% url 'outbound_integration_type_detail' module.type.id %}"> {{module.type.name}} </a><br/>
+                <b>ID: </b>{{module.id}}<br/>
+                <b>Owner: </b><a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a><br/>
+                <b>Endpoint: </b>{{module.endpoint}}<br/>
+                <b>State: </b>{<pre>{{ module.state | pprint }}</pre><br/>
+                <b>Enabled: </b>{{module.enabled}}<br/>
+            </p>
+        </div>
+    </div>
 
 {% endblock %}

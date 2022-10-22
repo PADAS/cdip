@@ -8,13 +8,13 @@
 {% block content %}
 
     <div class="row">
-        <div class="col-md-9">
-            <h2>Bridge Integrations</h2>
+        <div class="col-md-9 d-flex align-items-end">
+            <h2 class="align-bottom">Bridge Integrations</h2>
         </div>
 
-        <div class="col-md-3">
-        <a class="btn btn-primary {% if not perms.integrations.add_bridgeintegration %} disabled {% endif %}"
-       href="{% url 'bridge_integration_add' %}" role="button">Add Integration</a>
+        <div class="col-md-3 d-flex justify-content-end">
+            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_bridgeintegration %} disabled {% endif %}"
+            href="{% url 'bridge_integration_add' %}" role="button">Add Integration</a>
         </div>
     </div>
     {% render_table table %}
