@@ -5,6 +5,7 @@
 {% block title %}Update Outbound Integration Configuration{% endblock %}
 
 {% block content %}
+    <h3>Outbound Integration</h3>
     <form method="post">
         {% csrf_token %}
         {% crispy form %}
