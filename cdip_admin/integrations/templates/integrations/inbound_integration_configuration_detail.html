@@ -6,68 +6,34 @@
 {% block content %}
 
     <div class="row">
-        <div class="col-md-12">
-            <h2>Inbound Integration</h2>
-            <h3>Name: {{module.name}}</h3>
+        <div class="col-1 pt-1">
+            <a class="btn btn-primary btn-sm text-white align-middle my-2 mr-2"
+                   href="{% url 'inbound_integration_configuration_list' %}" role="button">
+                    <
+            </a>
+        </div>
+        <div class="col-6">
+            <h3>{{module.name}}</h3>
+            <h4>Inbound Integration</h4>
+        </div>
+        <div class="col-sm">
+            <a class="btn btn-primary my-2" href="{% url 'inbound_integration_configuration_update' module.id %}" role="button">Edit</a>
         </div>
     </div>
-    <div class="row">
-        <div class="form-group col-md-3">
-            Type:
-        </div>
-        <div class="form-group col-md-9">
-            <a href="{% url 'inbound_integration_type_detail' module.type.id %}"> {{module.type.name}} </a>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-3">
-            Provider_key:
-        </div>
-        <div class="col-md-9">
-               {{module.provider}}
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-3">
-            Owner:
-        </div>
-        <div class="col-md-9">
-                <a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a>
+    <div class="row mt-3">
+        <div class="col-6 offset-1">
+            <p>
+                <b>Type: </b><a href="{% url 'inbound_integration_type_detail' module.type.id %}"> {{module.type.name}} </a><br/>
+                <b>Provider key: </b>{{module.provider}}<br/>
+                <b>Owner: </b><a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a><br/>
+                <b>Endpoint: </b>{{module.endpoint}}<br/>
+                <b>Login: </b>{{module.login}}<br/>
+                <b>Enabled: </b>{{module.enabled}}<br/>
+            </p>
+            {% crispy form %}
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-3">
-            Endpoint:
-        </div>
-        <div class="col-md-9">
-               {{module.endpoint}}
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-3">
-            Login:
-        </div>
-        <div class="col-md-9">
-               {{module.login}}
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-md-3">
-            Enabled:
-        </div>
-        <div class="col-md-9">
-               {{module.enabled}}
-        </div>
-    </div>
-
-    {% crispy form %}
-
-    <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_update' module.id %}" role="button">Edit</a>
-    <a class="btn btn-primary" href="{% url 'inbound_integration_configuration_list' %}" role="button">Close</a>
 
 
 {% endblock %}
