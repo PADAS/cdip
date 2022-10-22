@@ -510,18 +510,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
         form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             config: InboundIntegrationConfiguration = form.save()
-            if not config.default_devicegroup:
-
-                if not config.name:
-                    config.name = f"{config.type.name} ({random_string()})"
-                name = config.name + " - Default Group"
-                device_group = DeviceGroup.objects.create(
-                    owner_id=config.owner.id, name=name
-                )
-                config.default_devicegroup = device_group
-                config.save()
-            else:
-                device_group = config.default_devicegroup
+            device_group = config.default_devicegroup
             return redirect("device_group_update", device_group_id=device_group.id)
 
     def get_form(self, form_class=None):

@@ -176,6 +176,7 @@ class InboundIntegrationConfiguration(TimestampedModel):
         help_text="This value will be used as the 'provider_key' when sending data to EarthRanger.",
     )
     enabled = models.BooleanField(default=True)
+
     history = HistoricalRecords(excluded_fields=["state"])
 
     default_devicegroup = models.ForeignKey(
@@ -196,12 +197,29 @@ class InboundIntegrationConfiguration(TimestampedModel):
     def __str__(self):
         return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
 
-    def save(self, *args, **kwargs):
+    def _pre_save(self, *args, **kwargs):
+        # Slug generation
+        # ToDo: We could use a better slug generator like django.utils.text.slugify
+        # https://docs.djangoproject.com/en/3.2/ref/utils/#django.utils.text.slugify
         if not self.provider:
             self.provider = self.type.slug.lower()
         else:
             self.provider = self.provider.lower()
+        # Ensure that a default device group is set for new integrations
+        if not self.default_devicegroup:
+            name = self.name + " - Default Group"
+            device_group, _ = DeviceGroup.objects.get_or_create(
+                owner_id=self.owner.id, name=name
+            )
+            self.default_devicegroup = device_group
+
+    def _post_save(self, *args, **kwargs):
+        pass
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
         super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
 
 
 class GFWInboundConfigurationManager(models.Manager):
@@ -281,14 +299,31 @@ class Device(TimestampedModel):
         default=dict,
         help_text="Additional config(s)",
     )
+
     history = HistoricalRecords()
 
     @property
     def owner(self):
         return self.inbound_configuration.owner
 
+    @property
+    def default_group(self):
+        return self.inbound_configuration.default_devicegroup
+
     def __str__(self):
         return f"{self.external_id} - {self.inbound_configuration.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        # Ensure the device is added to the default group after creation
+        self.default_group.devices.add(self)
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
 
     class Meta:
         ordering = ("inbound_configuration", "external_id")
