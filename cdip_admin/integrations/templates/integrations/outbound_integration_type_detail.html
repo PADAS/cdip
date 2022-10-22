@@ -3,11 +3,29 @@
 {% block title %}Integration: {{module.name}}{% endblock %}
 
 {% block content %}
-
-    <h3>{{module.name}}</h3>
-    <p>Slug: {{module.slug}}</p>
-    <p>Description: {{module.description}}</p>
-    <a class="btn btn-primary {% if not perms.integrations.change_outboundintegrationtype %} disabled {% endif %}"
+    <div class="row">
+        <div class="col-1 pt-1">
+            <a class="btn btn-primary btn-sm text-white align-middle my-2 mr-2"
+                   href="{% url 'outbound_integration_type_list' %}" role="button">
+                    <
+            </a>
+        </div>
+        <div class="col-6">
+            <h2 class="mt-2">{{module.name}}</h2>
+        </div>
+        <div class="col-sm">
+            <a class="btn btn-primary {% if not perms.integrations.change_outboundintegrationtype %} disabled {% endif %}"
        href="{% url 'outbound_integration_type_update' module.id %}" role="button">Edit</a>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-6 offset-1">
+            <p>
+                <b>Slug:</b> {{module.slug}}<br/>
+                <b>Description:</b> {{module.description}}
+            </p>
+        </div>
+    </div>
+
 
 {% endblock %}

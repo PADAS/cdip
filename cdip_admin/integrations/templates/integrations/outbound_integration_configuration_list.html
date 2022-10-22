@@ -8,12 +8,12 @@
 {% block content %}
 
 <div class="row">
-    <div class="col-md-9">
+    <div class="col-md-9 d-flex align-items-end">
         <h2>Outbound Integrations</h2>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3 d-flex justify-content-end">
 
-        <a class="btn btn-primary {% if not perms.integrations.add_outboundintegrationconfiguration %} disabled {% endif %}"
+        <a class="mb-2 btn btn-primary {% if not perms.integrations.add_outboundintegrationconfiguration %} disabled {% endif %}"
            href="{% url 'outbound_integration_configuration_add' %}" role="button">Add Integration</a>
     </div>
 </div>
@@ -22,8 +22,8 @@
     {% if filter %}
     <div>
         <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' form_group_class='spacing-wrapper' %}
-            {% bootstrap_button 'filter' extra_classes='spacing-wrapper' %}
+            {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+            {% bootstrap_button 'filter' extra_classes='' %}
         </form>
     </div>
     {% endif %}
