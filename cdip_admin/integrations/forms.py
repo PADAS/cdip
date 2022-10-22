@@ -69,38 +69,38 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     helper.layout = Layout(
         Row(
-            Column(Field("name", autocomplete="off"), css_class="form-group col-md-6"),
-            Column("owner", css_class="form-group col-md-6"),
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("type", css_class="form-group col-md-6"),
+            Column("type", css_class="form-group col-lg-3 mb-0"),
             Column(
-                Field("provider", autocomplete="off"), css_class="form-group col-md-6"
+                Field("provider", autocomplete="off"), css_class="form-group col-lg-3 mb-0"
             ),
             css_class="form-row",
         ),
         "enabled",
         Row(
-            Column("default_devicegroup", css_class="form-group col-md-6"),
+            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
             Column(
                 Field("endpoint", autocomplete="off"),
-                css_class="form-group col-md-6",
+                css_class="form-group col-lg-3 mb-0",
             ),
-            Column(Field("token", autocomplete="off"), css_class="form-group col-md-6"),
+            Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column(Field("login", autocomplete="off"), css_class="form-group col-md-6"),
+            Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
             Column(
-                Field("password", autocomplete="off"), css_class="form-group col-md-6"
+                Field("password", autocomplete="off"), css_class="form-group col-md-3"
             ),
             css_class="form-row",
         ),
-        Row(Column("state", css_class="form-group col-md-12")),
+        Row(Column("state", css_class="form-group col-lg-3 mb-0")),
     )
 
 
@@ -223,6 +223,22 @@ class DeviceForm(forms.ModelForm):
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
+    helper.layout = Layout(
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("external_id", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(Field("inbound_configuration", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("subject_type", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("additional", css_class="form-group col-lg-6"),
+            css_class="form-row",
+        ),
+    )
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
@@ -242,6 +258,17 @@ class InboundIntegrationTypeForm(forms.ModelForm):
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
+    helper.layout = Layout(
+        Row(
+            Column("name", autocomplete="off", css_class="form-group col-lg-3 mb-0"),
+            Column("slug", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("description", css_class="form-group col-lg-6 mt-0"),
+            css_class="form-row",
+        ),
+    )
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
@@ -277,6 +304,41 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                 self.fields["owner"].queryset = qs
 
     helper = FormHelper()
+    helper.layout = Layout(
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("type", css_class="form-group col-lg-6"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(
+                Field("endpoint", autocomplete="off"),
+                css_class="form-group col-lg-3 mb-0",
+            ),
+            Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
+            Column(
+                Field("password", autocomplete="off"), css_class="form-group col-md-3"
+            ),
+            css_class="form-row",
+        ),
+        Row(Column("state", css_class="form-group col-lg-3 mb-0")),
+        Row(
+            Column("additional", css_class="form-group col-lg-6"),
+            css_class="form-row",
+        ),
+    )
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
@@ -296,6 +358,33 @@ class OutboundIntegrationTypeForm(forms.ModelForm):
             self.fields[field_name].help_text = None
 
     helper = FormHelper()
+    helper.layout = Layout(
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("slug", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("description", css_class="form-group col-lg-6 mt-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("use_endpoint", css_class="form-group col-lg-6 my-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("use_login", css_class="form-group col-lg-6 my-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("use_password", css_class="form-group col-lg-6 my-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("use_token", css_class="form-group col-lg-6 mt-0"),
+            css_class="form-row",
+        ),
+    )
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
