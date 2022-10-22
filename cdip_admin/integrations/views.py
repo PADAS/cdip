@@ -728,9 +728,13 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
 
     def post(self, request, *args, **kwargs):
         form = BridgeIntegrationForm(request.POST)
+
         if form.is_valid():
             config = form.save()
-            return redirect("bridge_integration_view", config.id)
+            return redirect("bridge_integration_update", config.id)
+
+        # Errors sends the user back to the form.
+        return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
         form = BridgeIntegrationForm()
