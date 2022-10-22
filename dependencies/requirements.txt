@@ -20,7 +20,7 @@ babel==2.8.0
     # via
     #   -r requirements.in
     #   django-phonenumber-field
-backports.zoneinfo==0.2.1
+backports-zoneinfo==0.2.1
     # via
     #   pytz-deprecation-shim
     #   tzlocal
@@ -34,7 +34,7 @@ cached-property==1.5.1
     # via -r requirements.in
 cachetools==5.0.0
     # via google-auth
-cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.2/cdip_connector-1.2.2-py3-none-any.whl
+cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.5/cdip_connector-1.2.5-py3-none-any.whl
     # via -r requirements.in
 celery==5.2.3
     # via
@@ -412,9 +412,9 @@ zipp==3.1.0
     # via
     #   -r requirements.in
     #   importlib-metadata
-zope.event==4.5.0
+zope-event==4.5.0
     # via gevent
-zope.interface==5.4.0
+zope-interface==5.4.0
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:

@@ -1,4 +1,4 @@
-    <div id="show_hide_password" class="input-group col-md-5">
+    <div id="show_hide_password" class="input-group">
         <input type="{{ widget.type }}" name="{{ widget.name }}" onmousein="show_tooltip(event)"{% if widget.value != None %}
                value="{{ widget.value|stringformat:'s' }}"{% endif %}
                {% include "django/forms/widgets/attrs.html" %} {{ widget.readonly }}>
