@@ -257,7 +257,7 @@ class BridgeIntegration(TimestampedModel):
         blank=True,
         null=True,
         help_text="Additional integration configuration(s).",)
-    additional = JSONField(schema=BridgeIntegrationType.objects.configuration_schema)
+    additional = JSONField(schema=BridgeIntegrationType.objects.configuration_schema, blank=True, default=dict)
     # additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
     consumer_id = models.CharField(max_length=200, blank=True)
