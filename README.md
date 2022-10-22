@@ -8,6 +8,8 @@ This repository holds code for Gundi's Portal. It provides a web interface as we
 * Docker Desktop with Kubernetes enabled
 * kubectl 
 
+# Optional but recommended
+* Kong API Gateway
 
 ## Building a cdip-portal image
 
