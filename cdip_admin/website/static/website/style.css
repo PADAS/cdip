@@ -163,3 +163,7 @@ ul ul a {
   transform: rotate(135deg);
   -webkit-transform: rotate(135deg);
 }
+
+#id_additional_jsonform {
+	height: auto;
+}
