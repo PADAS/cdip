@@ -240,6 +240,9 @@ class GFWInboundConfiguration(InboundIntegrationConfiguration):
 
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
+def get_bridge_configuration_schema(instance=None):
+    type_id = instance.type.id if instance else None
+    return BridgeIntegrationType.objects.configuration_schema(typeid=type_id)
 
 
 class BridgeIntegration(TimestampedModel):
