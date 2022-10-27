@@ -173,6 +173,14 @@ def setup_data(db, django_user_model):
         type=iit2, name="Inbound Configuration 2", owner=org2
     )
 
+    ii3 = InboundIntegrationConfiguration.objects.create(
+        type=iit1, name="Inbound Configuration 3", owner=org2, enabled=False
+    )
+
+    ii4 = InboundIntegrationConfiguration.objects.create(
+        type=iit2, name="Inbound Configuration 4", owner=org2, enabled=False
+    )
+
     oi1 = OutboundIntegrationConfiguration.objects.create(
         type=oit1, name="Outbound Configuration 1", owner=org1
     )
@@ -218,6 +226,8 @@ def setup_data(db, django_user_model):
         "oit1": oit1,
         "ii1": ii1,
         "ii2": ii2,
+        "ii3": ii3,
+        "ii4": ii4,
         "oi1": oi1,
         "oi2": oi2,
         "dg1": dg1,
