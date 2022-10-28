@@ -10,8 +10,10 @@ from core.enums import DjangoGroups
 from integrations.models import (
     InboundIntegrationType,
     OutboundIntegrationType,
+    BridgeIntegrationType,
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
+    BridgeIntegration,
     DeviceGroup,
     Device,
     DeviceState,
@@ -165,6 +167,18 @@ def setup_data(db, django_user_model):
         description="Some integration type.",
     )
 
+    bit1 = BridgeIntegrationType.objects.create(
+        name="Bridge Type 1",
+        slug="bridge-type-one",
+        description="Bridge integration type 1.",
+    )
+
+    bit2 = BridgeIntegrationType.objects.create(
+        name="Bridge Type 2",
+        slug="bridge-type-two",
+        description="Bridge integration type 2.",
+    )
+
     ii1 = InboundIntegrationConfiguration.objects.create(
         type=iit1, name="Inbound Configuration 1", owner=org1
     )
@@ -195,6 +209,22 @@ def setup_data(db, django_user_model):
 
     oi4 = OutboundIntegrationConfiguration.objects.create(
         type=oit2, name="Outbound Configuration 4", owner=org2, enabled=False
+    )
+
+    bi1 = BridgeIntegration.objects.create(
+        type=bit1, name="Bridge Integration 1", owner=org1, enabled=True
+    )
+
+    bi2 = BridgeIntegration.objects.create(
+        type=bit2, name="Bridge Integration 2", owner=org2, enabled=False
+    )
+
+    bi3 = BridgeIntegration.objects.create(
+        type=bit1, name="Bridge Integration 3", owner=org1, enabled=True
+    )
+
+    bi4 = BridgeIntegration.objects.create(
+        type=bit2, name="Bridge Integration 4", owner=org2, enabled=False
     )
 
     dg1 = DeviceGroup.objects.create(
@@ -232,6 +262,8 @@ def setup_data(db, django_user_model):
         "iit1": iit1,
         "iit2": iit2,
         "oit1": oit1,
+        "bit1": bit1,
+        "bit2": bit2,
         "ii1": ii1,
         "ii2": ii2,
         "ii3": ii3,
@@ -240,6 +272,10 @@ def setup_data(db, django_user_model):
         "oi2": oi2,
         "oi3": oi3,
         "oi4": oi4,
+        "bi1": bi1,
+        "bi2": bi2,
+        "bi3": bi3,
+        "bi4": bi4,
         "dg1": dg1,
         "dg2": dg2,
         "d1": d1,
