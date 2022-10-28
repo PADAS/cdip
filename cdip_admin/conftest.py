@@ -136,7 +136,7 @@ def client_user(db, django_user_model):
 
 @pytest.fixture
 def setup_data(db, django_user_model):
-
+    # ToDo: Review this once we start using factories
     org1 = Organization.objects.create(name="Org 1")
 
     org2 = Organization.objects.create(name="Org 2")
@@ -189,6 +189,14 @@ def setup_data(db, django_user_model):
         type=oit2, name="Outbound Configuration 2", owner=org2
     )
 
+    oi3 = OutboundIntegrationConfiguration.objects.create(
+        type=oit1, name="Outbound Configuration 3", owner=org1, enabled=False
+    )
+
+    oi4 = OutboundIntegrationConfiguration.objects.create(
+        type=oit2, name="Outbound Configuration 4", owner=org2, enabled=False
+    )
+
     dg1 = DeviceGroup.objects.create(
         name="device group 1",
         owner=org1,
@@ -230,6 +238,8 @@ def setup_data(db, django_user_model):
         "ii4": ii4,
         "oi1": oi1,
         "oi2": oi2,
+        "oi3": oi3,
+        "oi4": oi4,
         "dg1": dg1,
         "dg2": dg2,
         "d1": d1,
