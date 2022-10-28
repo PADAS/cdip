@@ -9,8 +9,10 @@ from integrations.models import (
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
+    BridgeIntegration,
     Device,
     DeviceGroup,
+
 )
 from organizations.models import Organization
 
@@ -419,6 +421,69 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
     # Check result set is filtered
     all_configurations = OutboundIntegrationConfiguration.objects.all().order_by("id")
     assert list(response.context["outboundintegrationconfiguration_list"]) == list(all_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_true(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    enabled_configurations = BridgeIntegration.objects.filter(enabled=True).order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(enabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(enabled_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_false(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    disabled_configurations = BridgeIntegration.objects.filter(enabled=False).order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(disabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(disabled_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_unset(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": ""},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    all_configurations = BridgeIntegration.objects.all().order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(all_configurations)
     # Check that at least the minimal data for each configuration is seen in the screen
     rendered_screen = response.content.decode("utf-8")
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
