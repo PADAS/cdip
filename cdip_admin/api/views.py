@@ -290,10 +290,23 @@ class DeviceListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         # ToDo: Validate inbound_configuration_id and external_id in the serializer
         # Device creation is idempotent
-        device, created = Device.objects.get_or_create(
-            inbound_configuration_id=request.data.get("inbound_configuration"),
-            external_id=request.data.get("external_id"),
-        )
+
+        inbound_configuration_id = (request.data.get("inbound_configuration"),)
+        external_id = (request.data.get("external_id"),)
+
+        try:
+            device, created = Device.objects.get_or_create(
+                inbound_configuration_id=inbound_configuration_id,
+                external_id=external_id,
+            )
+        except InboundIntegrationConfiguration.DoesNotExist:
+            return Response(
+                {
+                    "message": f'InboundIntegrationConfiguration does not exist for id "{inbound_configuration_id}"'
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = self.get_serializer(device)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK, headers=headers)
