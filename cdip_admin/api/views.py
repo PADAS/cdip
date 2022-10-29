@@ -300,6 +300,23 @@ class DeviceListView(generics.ListCreateAPIView):
                 external_id=external_id,
             )
         except InboundIntegrationConfiguration.DoesNotExist:
+
+            username = (
+                request.user.username
+                if hasattr(request, "user") and hasattr(request.user, "username")
+                else None
+            )
+
+            logger.warning(
+                "Inbound ID %s does not exist for posted device with external-id: %s",
+                inbound_configuration_id,
+                external_id,
+                extra={
+                    "inbound_id": inbound_configuration_id,
+                    "external_id": external_id,
+                    "user": username,
+                },
+            )
             return Response(
                 {
                     "message": f'InboundIntegrationConfiguration does not exist for id "{inbound_configuration_id}"'
