@@ -291,8 +291,8 @@ class DeviceListView(generics.ListCreateAPIView):
         # ToDo: Validate inbound_configuration_id and external_id in the serializer
         # Device creation is idempotent
 
-        inbound_configuration_id = (request.data.get("inbound_configuration"),)
-        external_id = (request.data.get("external_id"),)
+        inbound_configuration_id = request.data.get("inbound_configuration")
+        external_id = request.data.get("external_id")
 
         try:
             device, created = Device.objects.get_or_create(
