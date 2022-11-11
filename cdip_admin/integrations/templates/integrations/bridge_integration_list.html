@@ -17,6 +17,18 @@
             href="{% url 'bridge_integration_add' %}" role="button">Add Integration</a>
         </div>
     </div>
+
+    {% if filter %}
+    <div class="row">
+        <div class="col-md-12">
+            <form action="" method="get" class="form form-inline">
+                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+                {% bootstrap_button 'Filter' extra_classes='' %}
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     {% render_table table %}
     <script data-row-attribute="bridge-config-id"
             data-table-id="bridge-config-table"
