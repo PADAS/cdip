@@ -21,6 +21,7 @@ from .filters import (
     DeviceFilter,
     InboundIntegrationFilter,
     OutboundIntegrationFilter,
+    BridgeIntegrationFilter
 )
 from .forms import (
     InboundIntegrationConfigurationForm,
@@ -682,11 +683,12 @@ class OutboundIntegrationConfigurationListView(
             return qs
 
 
-class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, ListView):
+class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
     table_class = BridgeIntegrationTable
     template_name = "integrations/bridge_integration_list.html"
     queryset = BridgeIntegration.objects.get_queryset().order_by("name")
     paginate_by = default_paginate_by
+    filterset_class = BridgeIntegrationFilter
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

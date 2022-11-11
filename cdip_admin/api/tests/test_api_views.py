@@ -4,7 +4,7 @@ from rest_framework.utils import json
 from clients.models import ClientProfile
 from conftest import setup_account_profile_mapping
 from core.enums import RoleChoices
-
+from core import permissions
 
 
 pytestmark = pytest.mark.django_db
@@ -188,7 +188,7 @@ def test_get_inbound_integration_configuration_list_client_user(
 
     assert (
         len(response)
-        == InboundIntegrationConfiguration.objects.filter(type=iit1).count()
+        == InboundIntegrationConfiguration.objects.filter(owner=ii.owner, type=iit1).count()
     )
 
     assert str(ii.id) in [item["id"] for item in response]
