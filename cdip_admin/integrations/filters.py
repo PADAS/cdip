@@ -12,7 +12,9 @@ from integrations.models import (
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
+    BridgeIntegration
 )
+from core.widgets import CustomBooleanWidget
 
 
 # set the organization filter options to the organizations that user is member of
@@ -230,9 +232,11 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         distinct=True,
     )
 
+    enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ("organization", "inbound_config_type", "name")
+        fields = ("organization", "inbound_config_type", "name", "enabled")
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
@@ -280,9 +284,11 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         distinct=True,
     )
 
+    enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+
     class Meta:
         model = OutboundIntegrationConfiguration
-        fields = ("organization", "outbound_config_type", "name")
+        fields = ("organization", "outbound_config_type", "name", "enabled")
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
@@ -307,3 +313,11 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         if "owner_filter" in self.request.session:
             return qs.filter(owner__name=self.request.session["owner_filter"])
         return qs
+
+
+class BridgeIntegrationFilter(django_filters.FilterSet):
+    enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+
+    class Meta:
+        model = BridgeIntegration
+        fields = ("enabled",)

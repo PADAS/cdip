@@ -1,20 +1,21 @@
+from typing import List
 from django.http import QueryDict
 from django.urls import reverse
-from rest_framework.utils import json
-
-from accounts.models import AccountProfile, AccountProfileOrganization
 from conftest import setup_account_profile_mapping
-from core.enums import DjangoGroups, RoleChoices
+from core.enums import RoleChoices
 from integrations import models
 from integrations.models import (
     InboundIntegrationType,
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
+    BridgeIntegration,
     Device,
     DeviceGroup,
+
 )
 from organizations.models import Organization
+
 
 # Inbound Integration Tests
 def test_get_inbound_integration_type_list_global_admin(client, global_admin_user):
@@ -128,6 +129,77 @@ def test_get_inbound_integration_configuration_list_organization_member_viewer(
     assert list(response.context["inboundintegrationconfiguration_list"]) == list(
         InboundIntegrationConfiguration.objects.filter(owner=org1)
     )
+
+
+def _test_basic_config_data_is_rendered(configurations: List, rendered_screen: str):
+    # Helper function to check that the minimal data for each configuration is shown in the screen
+    for config in configurations:
+        assert str(config.name) in rendered_screen
+        assert str(config.type) in rendered_screen
+        assert str(config.owner) in rendered_screen
+
+
+def test_get_inbound_integration_configuration_list_filter_by_enabled_true(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        data={"enabled": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    enabled_configurations = InboundIntegrationConfiguration.objects.filter(enabled=True).order_by("id")
+    assert list(response.context["inboundintegrationconfiguration_list"]) == list(enabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(enabled_configurations, rendered_screen)
+
+
+def test_get_inbound_integration_configuration_list_filter_by_enabled_false(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=False
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        data={"enabled": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    disabled_configurations = InboundIntegrationConfiguration.objects.filter(enabled=False).order_by("id")
+    assert list(response.context["inboundintegrationconfiguration_list"]) == list(disabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(disabled_configurations, rendered_screen)
+
+
+def test_get_inbound_integration_configuration_list_filter_by_enabled_unset(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=False
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        data={"enabled": ""},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set in NOT filtered by the enabled field
+    all_configurations = InboundIntegrationConfiguration.objects.all().order_by("id")
+    assert list(response.context["inboundintegrationconfiguration_list"]) == list(all_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
 # ToDo: Mock external dependencies. This test fails when Kong isn't available / reachable
@@ -287,8 +359,134 @@ def test_get_outbound_integration_configuration_list_organization_member_viewer(
 
     # confirm result set is filtered queryset based on organization profile
     assert list(response.context["outboundintegrationconfiguration_list"]) == list(
-        OutboundIntegrationConfiguration.objects.filter(owner=org1)
+        OutboundIntegrationConfiguration.objects.filter(owner=org1).order_by("id")
     )
+
+
+def test_get_outbound_integration_configuration_list_filter_by_enabled_true(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        data={"enabled": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    enabled_configurations = OutboundIntegrationConfiguration.objects.filter(enabled=True).order_by("id")
+    assert list(response.context["outboundintegrationconfiguration_list"]) == list(enabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(enabled_configurations, rendered_screen)
+
+
+def test_get_outbound_integration_configuration_list_filter_by_enabled_false(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        data={"enabled": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    disabled_configurations = OutboundIntegrationConfiguration.objects.filter(enabled=False).order_by("id")
+    assert list(response.context["outboundintegrationconfiguration_list"]) == list(disabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(disabled_configurations, rendered_screen)
+
+
+def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        data={"enabled": ""},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    all_configurations = OutboundIntegrationConfiguration.objects.all().order_by("id")
+    assert list(response.context["outboundintegrationconfiguration_list"]) == list(all_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_true(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    enabled_configurations = BridgeIntegration.objects.filter(enabled=True).order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(enabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(enabled_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_false(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    disabled_configurations = BridgeIntegration.objects.filter(enabled=False).order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(disabled_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(disabled_configurations, rendered_screen)
+
+
+def test_get_bridge_integration_configuration_list_filter_by_enabled_unset(
+    client, global_admin_user, setup_data
+):
+    # Request the configurations filtering by enabled=True
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("bridge_integration_list"),
+        data={"enabled": ""},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    # Check the request response
+    assert response.status_code == 200
+    # Check result set is filtered
+    all_configurations = BridgeIntegration.objects.all().order_by("name")
+    assert list(response.context["bridgeintegration_list"]) == list(all_configurations)
+    # Check that at least the minimal data for each configuration is seen in the screen
+    rendered_screen = response.content.decode("utf-8")
+    _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
 # TODO: Get Post Working
