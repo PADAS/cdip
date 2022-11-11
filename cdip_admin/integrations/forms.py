@@ -46,22 +46,23 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
+        if self.instance:
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name", admin_only=True
-                )
-            else:
-                self.fields["owner"].queryset = qs
+            if request:
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "owner"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        qs, request.user, "name", admin_only=True
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -286,22 +287,23 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
+        if self.instance:
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name", admin_only=True
-                )
-            else:
-                self.fields["owner"].queryset = qs
+            if request:
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "owner"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        qs, request.user, "name", admin_only=True
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
 
     helper = FormHelper()
     helper.layout = Layout(
@@ -420,26 +422,29 @@ class BridgeIntegrationForm(forms.ModelForm):
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
+        if self.instance:
             for field_name in self.fields:
                 if self.fields[field_name].help_text != "":
                     self.fields[
                         field_name
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name", admin_only=True
-                )
-            else:
-                self.fields["owner"].queryset = qs
+            qs = Organization.objects.all()
+            if request:
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "owner"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        qs, request.user, "name", admin_only=True
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
+            self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
+                                                                 kwargs={"integration_id": self.instance.id})
             if hasattr(self.instance, 'type'):
                 request.session["integration_type"] = str(self.instance.type.id)
-                self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
-                                                                     kwargs={"integration_id": self.instance.id})
+                # self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
+                #                                                      kwargs={"integration_id": self.instance.id})
                 self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
