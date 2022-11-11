@@ -17,6 +17,7 @@ from .models import (
 from .forms import (
     InboundIntegrationConfigurationForm,
     OutboundIntegrationConfigurationForm,
+    BridgeIntegrationForm
 )
 
 # Register your models here.
@@ -161,6 +162,7 @@ class BridgeIntegrationTypeAdmin(SimpleHistoryAdmin):
 
 @admin.register(BridgeIntegration)
 class BridgeIntegrationAdmin(SimpleHistoryAdmin):
+    form = BridgeIntegrationForm
     list_display = ("name", "owner", "type")
     list_filter = (
         "type",
