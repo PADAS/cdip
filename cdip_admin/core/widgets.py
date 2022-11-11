@@ -1,5 +1,6 @@
 from django import forms
 import json
+from django_filters.widgets import BooleanWidget
 
 import logging
 
@@ -56,3 +57,9 @@ class PeekabooTextInput(forms.widgets.TextInput):
 class ReadonlyPeekabooTextInput(PeekabooTextInput):
 
     readonly = "readonly"
+
+
+class CustomBooleanWidget(BooleanWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.choices = (("", "All Statuses"), ("true", "Enabled"), ("false", "Not Enabled"))
