@@ -116,7 +116,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         OutboundIntegrationType,
         on_delete=models.CASCADE,
         verbose_name="Type",
-        help_text="Integration component that can process the data.”",
+        help_text="Integration component that can process the data.",
     )
     owner = models.ForeignKey(
         Organization,
