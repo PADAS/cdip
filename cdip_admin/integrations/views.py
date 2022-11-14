@@ -790,7 +790,7 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
 
         if form.is_valid():
             config = form.save()
-            return redirect("bridge_integration_update", config.id)
+            return redirect("bridge_integration_view", config.id)
 
         # Errors sends the user back to the form.
         return render(request, self.template_name, {'form': form})
