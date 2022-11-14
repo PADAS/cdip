@@ -442,9 +442,9 @@ class BridgeIntegrationForm(forms.ModelForm):
             self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
             if hasattr(self.instance, 'type'):
-                request.session["integration_type"] = str(self.instance.type.id)
-                # self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
-                #                                                      kwargs={"integration_id": self.instance.id})
+
+                if hasattr(request, 'session'):
+                    request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
