@@ -55,6 +55,14 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             "additional": JSONFormWidget(
                 schema=InboundIntegrationType.objects.configuration_schema,
             ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_state',
+                    'hx-swap': 'outerHTML'
+                },
+            ),
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -76,10 +84,15 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
+            # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
             if hasattr(self.instance, 'type'):
-
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("inboundconfigurations/schema",
+                                                                      kwargs={"integration_type": self.instance.type.id,
+                                                                              "integration_id": self.instance.id,
+                                                                              "update": "false"})
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
@@ -440,7 +453,7 @@ class BridgeIntegrationForm(forms.ModelForm):
             "owner": forms.Select(
                 attrs={
                     'name': "owner",
-                    'hx-trigger': 'load, change',
+                    'hx-trigger': 'load',
                     'hx-target': '#div_id_additional',
                     'hx-swap': 'outerHTML'
                 },
@@ -467,10 +480,12 @@ class BridgeIntegrationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
+            # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("bridges/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
 
             if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
                 self.fields['owner'].widget.attrs['hx-get'] = reverse("bridges/schema",
                                                                       kwargs={"integration_type": self.instance.type.id,
                                                                               "integration_id": self.instance.id,
