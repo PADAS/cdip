@@ -95,7 +95,7 @@ urlpatterns = [
         name="inboundconfigurations/type_modal",
     ),
     path(
-        "inboundconfigurations/schema/<str:integration_type>/",
+        "inboundconfigurations/schema/<str:integration_type>/<uuid:integration_id>/<str:update>",
         views.InboundIntegrationConfigurationUpdateView.schema,
         name="inboundconfigurations/schema",
     ),
