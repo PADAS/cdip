@@ -506,69 +506,6 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     model = InboundIntegrationConfiguration
     permission_required = "integrations.add_inboundintegrationconfiguration"
 
-    @staticmethod
-    @requires_csrf_token
-    def type_modal(request, integration_id):
-        if request.GET.get("type") is not '':
-            integration_type = request.GET.get("type")
-            selected_type = InboundIntegrationType.objects.get(id=integration_type)
-        else:
-            integration_type = "none"
-            selected_type = "None"
-        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
-                                                                     'target': '#div_id_state',
-                                                                     'proceed_button':
-                                                                         reverse("inboundconfigurations/schema",
-                                                                                 kwargs={
-                                                                                     "integration_type":
-                                                                                         integration_type}),
-                                                                     'cancel_button':
-                                                                         reverse(
-                                                                             "inboundconfigurations/dropdown_restore",
-                                                                             kwargs={
-                                                                                 "integration_id":
-                                                                                     integration_id}
-                                                                         )})
-        return HttpResponse(rendered)
-
-    @staticmethod
-    @requires_csrf_token
-    def schema(request, integration_type):
-        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
-        form = InboundIntegrationConfigurationForm(request=request)
-        request.session["integration_type"] = integration_type
-        if integration_type != 'none':
-            selected_type = InboundIntegrationType.objects.get(id=integration_type)
-            form.fields['state'].widget.instance = selected_type.id
-            return HttpResponse(as_crispy_field(form["state"]))
-        else:
-            return HttpResponse("")
-
-    def dropdown_restore(request, integration_id):
-        type_modal = reverse("inboundconfigurations/type_modal", kwargs={"integration_id": integration_id})
-        response = f"""<div id="div_id_type" class="form-group">
-                        <label for="id_type" class=" requiredField">
-                        Type
-                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                            data-toggle="tooltip" data-placement="right" 
-                            title="Integration component that can process the data.">?
-                        </button>
-                        <span class="asteriskField">*</span></label> 
-                        <div class="">
-                            <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                            hx-get={type_modal}
-                            class="select form-control"
-                            required id="id_type">
-                                <option value="" selected>-------</option>"""
-        integration_types = InboundIntegrationType.objects.values_list("id", "name", named=True)
-        for option in integration_types:
-            if str(option.id) == request.session["integration_type"]:
-                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
-            else:
-                response += """<option value="{}">{}</option>""".format(option.id, option.name)
-        response += "</select></div> </div> </div> </div>"
-        return HttpResponse(response)
-
     def post(self, request, *args, **kwargs):
         form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
@@ -611,7 +548,10 @@ class InboundIntegrationConfigurationUpdateView(
                                                                          reverse("inboundconfigurations/schema",
                                                                                  kwargs={
                                                                                      "integration_type":
-                                                                                         integration_type}),
+                                                                                         integration_type,
+                                                                                     "integration_id":
+                                                                                         integration_id,
+                                                                                     "update": "true"}),
                                                                      'cancel_button':
                                                                          reverse(
                                                                              "inboundconfigurations/dropdown_restore",
@@ -623,16 +563,36 @@ class InboundIntegrationConfigurationUpdateView(
 
     @staticmethod
     @requires_csrf_token
-    def schema(request, integration_type):
+    def schema(request, integration_type, integration_id, update):
         # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
         form = InboundIntegrationConfigurationForm(request=request)
+        selected_type = InboundIntegrationType.objects.get(id=integration_type)
+
         request.session["integration_type"] = integration_type
+        # there is a type selected
         if integration_type != 'none':
-            selected_type = InboundIntegrationType.objects.get(id=integration_type)
-            form.fields['state'].widget.instance = selected_type.id
-            return HttpResponse(as_crispy_field(form["state"]))
+            # a new type is selected and schema needs to be updated
+            if update == "true":
+                if selected_type.configuration_schema != {}:
+                    request.session["integration_type"] = integration_type
+                    form.fields['state'].widget.instance = selected_type.id
+                else:
+                    form.fields['state'].widget = FormattedJsonFieldWidget()
+                return HttpResponse(as_crispy_field(form["state"]))
+            # loading the schema already associated with the form
+            else:
+                # load the proper schema populated with additional values from the integration
+                selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
+                if selected_type.configuration_schema != {}:
+                    form.fields['state'].widget.instance = selected_integration.additional
+                # load a textarea populated with json from the integration
+                else:
+                    form.fields['state'].widget = FormattedJsonFieldWidget()
+                    form.fields['state'].initial = selected_integration.state
+                return HttpResponse(as_crispy_field(form["state"]))
+        # there is no type selected
         else:
-            return HttpResponse("")
+            return HttpResponse("Please select an integration type")
 
     def dropdown_restore(request, integration_id):
         type_modal = reverse("inboundconfigurations/type_modal", kwargs={"integration_id": integration_id})
