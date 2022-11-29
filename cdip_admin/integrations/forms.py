@@ -138,62 +138,6 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     )
 
 
-class InboundIntegrationTypeForm(forms.ModelForm):
-    class Meta:
-        model = InboundIntegrationType
-        exclude = ["id"]
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
-
-
-class OutboundIntegrationConfigurationForm(forms.ModelForm):
-    password = forms.CharField(
-        widget=forms.PasswordInput(render_value=True), required=False
-    )
-
-    class Meta:
-        model = OutboundIntegrationConfiguration
-        exclude = ["id"]
-        widgets = {
-            "password": forms.PasswordInput(),
-        }
-
-    def __init__(self, *args, request=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
-            for field_name in self.fields:
-                if self.fields[field_name].help_text != "":
-                    self.fields[
-                        field_name
-                    ].label += tooltip_labels(self.fields[field_name].help_text)
-                self.fields[field_name].help_text = None
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name", admin_only=True
-                )
-            else:
-                self.fields["owner"].queryset = qs
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
-
-
-class OutboundIntegrationTypeForm(forms.ModelForm):
-    class Meta:
-        model = OutboundIntegrationType
-        exclude = ["id"]
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
-
-
 class DeviceGroupForm(forms.ModelForm):
     class Meta:
         model = DeviceGroup
