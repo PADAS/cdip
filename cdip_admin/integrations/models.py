@@ -26,11 +26,7 @@ class InboundIntegrationTypeManager(models.Manager):
         if typeid:
             try:
                 schema = InboundIntegrationType.objects.get(id=typeid).configuration_schema
-                if schema != {}:
-                    return schema
-                else:
-                    return default_schema
-                return
+                return schema or default_schema
             except InboundIntegrationType.DoesNotExist:
                 pass
         # Return blank schema by default.
@@ -100,11 +96,7 @@ class BridgeIntegrationTypeManager(models.Manager):
         if typeid:
             try:
                 schema = BridgeIntegrationType.objects.get(id=typeid).configuration_schema
-                if schema != {}:
-                    return schema
-                else:
-                    return default_schema
-                return
+                return schema or default_schema
             except BridgeIntegrationType.DoesNotExist:
                 pass
         # Return blank schema by default.
