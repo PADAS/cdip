@@ -58,6 +58,7 @@ from django.http import HttpResponse
 from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
 from django.views.decorators.csrf import requires_csrf_token
 from django.template.loader import render_to_string
+from core.widgets import FormattedJsonFieldWidget
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -109,7 +110,7 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
             if not IsOrganizationMember.filter_queryset_for_user(
-                Organization.objects.all(), self.request.user, "name", admin_only=True
+                    Organization.objects.all(), self.request.user, "name", admin_only=True
             ):
                 raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -259,7 +260,7 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
             if not IsOrganizationMember.filter_queryset_for_user(
-                Organization.objects.all(), self.request.user, "name", admin_only=True
+                    Organization.objects.all(), self.request.user, "name", admin_only=True
             ):
                 raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, self.request, None):
@@ -287,7 +288,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             if not IsOrganizationMember.is_object_owner(
-                self.request.user, device_group.owner
+                    self.request.user, device_group.owner
             ):
                 raise PermissionDenied
         return device_group
@@ -444,7 +445,6 @@ class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
 
 
 def permission_has_role(user, target, roles=("viewer",)):
-
     if not hasattr(target, "owner_id"):
         raise Exception(
             "Programming error. This method requires target to have owner_id."
@@ -454,7 +454,7 @@ def permission_has_role(user, target, roles=("viewer",)):
         raise PermissionDenied
 
     if not AccountProfileOrganization.objects.filter(
-        accountprofile__user=user, role__in=roles, organization__id=target.owner_id
+            accountprofile__user=user, role__in=roles, organization__id=target.owner_id
     ):
         raise PermissionDenied
 
@@ -480,7 +480,6 @@ def permission_can_administer(request, target):
     "integrations.view_inboundintegrationconfiguration", raise_exception=True
 )
 def inbound_integration_configuration_detail(request, id):
-
     integration = get_object_or_404(InboundIntegrationConfiguration, pk=id)
 
     permission_can_view(request, integration)
@@ -534,13 +533,100 @@ class InboundIntegrationConfigurationUpdateView(
     model = InboundIntegrationConfiguration
     permission_required = "integrations.change_inboundintegrationconfiguration"
 
+    @staticmethod
+    @requires_csrf_token
+    def type_modal(request, integration_id):
+        if request.GET.get("type") is not '':
+            integration_type = request.GET.get("type")
+            selected_type = InboundIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
+        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
+                                                                     'target': '#div_id_state',
+                                                                     'proceed_button':
+                                                                         reverse("inboundconfigurations/schema",
+                                                                                 kwargs={
+                                                                                     "integration_type":
+                                                                                         integration_type,
+                                                                                     "integration_id":
+                                                                                         integration_id,
+                                                                                     "update": "true"}),
+                                                                     'cancel_button':
+                                                                         reverse(
+                                                                             "inboundconfigurations/dropdown_restore",
+                                                                             kwargs={
+                                                                                 "integration_id":
+                                                                                     integration_id}
+                                                                         )})
+        return HttpResponse(rendered)
+
+    @staticmethod
+    @requires_csrf_token
+    def schema(request, integration_type, integration_id, update):
+        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
+        form = InboundIntegrationConfigurationForm(request=request)
+        selected_type = InboundIntegrationType.objects.get(id=integration_type)
+
+        request.session["integration_type"] = integration_type
+        # No type selected
+        if integration_type == 'none':
+            return HttpResponse("Please select an integration type")
+
+        # a new type is selected and schema needs to be updated
+        if update == "true":
+            if selected_type.configuration_schema != {}:
+                request.session["integration_type"] = integration_type
+                form.fields['state'].widget.instance = selected_type.id
+            else:
+                form.fields['state'].widget = FormattedJsonFieldWidget()
+            return HttpResponse(as_crispy_field(form["state"]))
+
+        # loading the schema already associated with the form
+        # load the proper schema populated with additional values from the integration
+        selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
+        if selected_type.configuration_schema != {}:
+            form.fields['state'].widget.instance = selected_integration.state
+        # load a textarea populated with json from the integration
+        else:
+            form.fields['state'].widget = FormattedJsonFieldWidget()
+            form.fields['state'].initial = selected_integration.state
+        return HttpResponse(as_crispy_field(form["state"]))
+
+    @staticmethod
+    @requires_csrf_token
+    def dropdown_restore(request, integration_id):
+        type_modal = reverse("inboundconfigurations/type_modal", kwargs={"integration_id": integration_id})
+        response = f"""<div id="div_id_type" class="form-group">
+                        <label for="id_type" class=" requiredField">
+                        Type
+                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                            data-toggle="tooltip" data-placement="right" 
+                            title="Integration component that can process the data.">?
+                        </button>
+                        <span class="asteriskField">*</span></label> 
+                        <div class="">
+                            <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
+                            hx-get={type_modal}
+                            class="select form-control"
+                            required id="id_type">
+                                <option value="" selected>-------</option>"""
+        integration_types = InboundIntegrationType.objects.values_list("id", "name", named=True)
+        for option in integration_types:
+            if str(option.id) == request.session["integration_type"]:
+                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
+            else:
+                response += """<option value="{}">{}</option>""".format(option.id, option.name)
+        response += "</select></div> </div> </div> </div>"
+        return HttpResponse(response)
+
     def get_object(self):
         configuration = get_object_or_404(
             InboundIntegrationConfiguration, pk=self.kwargs.get("configuration_id")
         )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             if not IsOrganizationMember.is_object_owner(
-                self.request.user, configuration
+                    self.request.user, configuration
             ):
                 raise PermissionDenied
         return configuration
@@ -639,7 +725,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         )
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             if not IsOrganizationMember.is_object_owner(
-                self.request.user, configuration
+                    self.request.user, configuration
             ):
                 raise PermissionDenied
         return configuration
@@ -728,63 +814,6 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     model = BridgeIntegration
     permission_required = "integrations.add_bridgeintegration"
 
-    @staticmethod
-    @requires_csrf_token
-    def type_modal(request, integration_id):
-        if request.GET.get("type") is not '':
-            integration_type = request.GET.get("type")
-            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
-        else:
-            integration_type = "none"
-            selected_type = "None"
-        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
-                                                                     'proceed_button': reverse("schema", kwargs={
-                                                                         "integration_type": integration_type}),
-                                                                     'cancel_button': reverse("dropdown_restore",
-                                                                                              kwargs={
-                                                                                                  "integration_id": integration_id})})
-        return HttpResponse(rendered)
-
-    @staticmethod
-    @requires_csrf_token
-    def dropdown_restore(request, integration_id):
-        type_modal = reverse("type_modal", kwargs={"integration_id": integration_id})
-        response = f"""<div id="div_id_type" class="form-group">
-                            <label for="id_type" class=" requiredField">
-                            Type
-                            <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                                data-toggle="tooltip" data-placement="right" 
-                                title="Integration component that can process the data.">?
-                            </button>
-                            <span class="asteriskField">*</span></label> 
-                            <div class="">
-                                <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                                hx-get={type_modal}
-                                class="select form-control"
-                                required id="id_type">
-                                    <option value="" selected>-------</option>"""
-        integration_types = BridgeIntegrationType.objects.values_list("id", "name", named=True)
-        for option in integration_types:
-            if str(option.id) == request.session["integration_type"]:
-                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
-            else:
-                response += """<option value="{}">{}</option>""".format(option.id, option.name)
-        response += "</select></div> </div> </div> </div>"
-        return HttpResponse(response)
-
-    @staticmethod
-    @requires_csrf_token
-    def schema(request, integration_type):
-        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
-        form = BridgeIntegrationForm(request=request)
-        request.session["integration_type"] = integration_type
-        if integration_type != 'none':
-            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
-            form.fields['additional'].widget.instance = selected_type.id
-            return HttpResponse(as_crispy_field(form["additional"]))
-        else:
-            return HttpResponse("")
-
     def post(self, request, *args, **kwargs):
         form = BridgeIntegrationForm(request.POST)
 
@@ -822,14 +851,24 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
             integration_type = "none"
             selected_type = "None"
         rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
-                                    'proceed_button': reverse("schema", kwargs={"integration_type": integration_type}),
-                            'cancel_button': reverse("dropdown_restore", kwargs={"integration_id": integration_id})})
+                                                                     'target': '#div_id_additional',
+                                                                     'proceed_button': reverse("bridges/schema",
+                                                                                               kwargs={
+                                                                                                   "integration_type":
+                                                                                                       integration_type,
+                                                                                                   "integration_id":
+                                                                                                       integration_id,
+                                                                                                   "update": "true"
+                                                                                               }),
+                                                                     'cancel_button': reverse(
+                                                                         "bridges/dropdown_restore",
+                                                                         kwargs={"integration_id": integration_id})})
         return HttpResponse(rendered)
 
     @staticmethod
     @requires_csrf_token
     def dropdown_restore(request, integration_id):
-        type_modal = reverse("type_modal", kwargs={"integration_id": integration_id})
+        type_modal = reverse("bridges/type_modal", kwargs={"integration_id": integration_id})
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
@@ -855,16 +894,35 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
 
     @staticmethod
     @requires_csrf_token
-    def schema(request, integration_type):
+    def schema(request, integration_type, integration_id, update):
         # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
         form = BridgeIntegrationForm(request=request)
+        selected_type = BridgeIntegrationType.objects.get(id=integration_type)
+
         request.session["integration_type"] = integration_type
-        if integration_type != 'none':
-            selected_type = BridgeIntegrationType.objects.get(id=integration_type)
-            form.fields['additional'].widget.instance = selected_type.id
+        # No type selected
+        if integration_type == 'none':
+            return HttpResponse("Please select an integration type")
+
+        # a new type is selected and schema needs to be updated
+        if update == "true":
+            if selected_type.configuration_schema != {}:
+                request.session["integration_type"] = integration_type
+                form.fields['additional'].widget.instance = selected_type.id
+            else:
+                form.fields['additional'].widget = FormattedJsonFieldWidget()
             return HttpResponse(as_crispy_field(form["additional"]))
+
+        # loading the schema already associated with the form
+        # load the proper schema populated with additional values from the integration
+        selected_integration = BridgeIntegration.objects.get(id=integration_id)
+        if selected_type.configuration_schema != {}:
+            form.fields['additional'].widget.instance = selected_integration.additional
+        # load a textarea populated with json from the integration
         else:
-            return HttpResponse("")
+            form.fields['additional'].widget = FormattedJsonFieldWidget()
+            form.fields['additional'].initial = selected_integration.additional
+        return HttpResponse(as_crispy_field(form["additional"]))
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))

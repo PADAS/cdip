@@ -90,6 +90,21 @@ urlpatterns = [
         name="inbound_integration_configuration_update",
     ),
     path(
+        "inboundconfigurations/type_modal/<uuid:integration_id>/",
+        views.InboundIntegrationConfigurationUpdateView.type_modal,
+        name="inboundconfigurations/type_modal",
+    ),
+    path(
+        "inboundconfigurations/schema/<str:integration_type>/<uuid:integration_id>/<str:update>",
+        views.InboundIntegrationConfigurationUpdateView.schema,
+        name="inboundconfigurations/schema",
+    ),
+    path(
+        "inboundconfigurations/dropdown_restore/<uuid:integration_id>/",
+        views.InboundIntegrationConfigurationUpdateView.dropdown_restore,
+        name="inboundconfigurations/dropdown_restore",
+    ),
+    path(
         "outboundconfigurations",
         views.OutboundIntegrationConfigurationListView.as_view(),
         name="outbound_integration_configuration_list",
@@ -128,18 +143,18 @@ urlpatterns = [
         name="bridge_integration_update",
     ),
     path(
-        "type_modal/<uuid:integration_id>/",
+        "bridges/type_modal/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.type_modal,
-        name="type_modal",
+        name="bridges/type_modal",
     ),
     path(
-        "schema/<str:integration_type>/",
+        "bridges/schema/<str:integration_type>/<uuid:integration_id>/<str:update>",
         views.BridgeIntegrationUpdateView.schema,
-        name="schema",
+        name="bridges/schema",
     ),
     path(
-        "dropdown_restore/<uuid:integration_id>/",
+        "bridges/dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
-        name="dropdown_restore",
+        name="bridges/dropdown_restore",
     )
 ]
