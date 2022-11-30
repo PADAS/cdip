@@ -569,31 +569,32 @@ class InboundIntegrationConfigurationUpdateView(
         selected_type = InboundIntegrationType.objects.get(id=integration_type)
 
         request.session["integration_type"] = integration_type
-        # there is a type selected
-        if integration_type != 'none':
-            # a new type is selected and schema needs to be updated
-            if update == "true":
-                if selected_type.configuration_schema != {}:
-                    request.session["integration_type"] = integration_type
-                    form.fields['state'].widget.instance = selected_type.id
-                else:
-                    form.fields['state'].widget = FormattedJsonFieldWidget()
-                return HttpResponse(as_crispy_field(form["state"]))
-            # loading the schema already associated with the form
-            else:
-                # load the proper schema populated with additional values from the integration
-                selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
-                if selected_type.configuration_schema != {}:
-                    form.fields['state'].widget.instance = selected_integration.additional
-                # load a textarea populated with json from the integration
-                else:
-                    form.fields['state'].widget = FormattedJsonFieldWidget()
-                    form.fields['state'].initial = selected_integration.state
-                return HttpResponse(as_crispy_field(form["state"]))
-        # there is no type selected
-        else:
+        # No type selected
+        if integration_type == 'none':
             return HttpResponse("Please select an integration type")
 
+        # a new type is selected and schema needs to be updated
+        if update == "true":
+            if selected_type.configuration_schema != {}:
+                request.session["integration_type"] = integration_type
+                form.fields['state'].widget.instance = selected_type.id
+            else:
+                form.fields['state'].widget = FormattedJsonFieldWidget()
+            return HttpResponse(as_crispy_field(form["state"]))
+
+        # loading the schema already associated with the form
+        # load the proper schema populated with additional values from the integration
+        selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
+        if selected_type.configuration_schema != {}:
+            form.fields['state'].widget.instance = selected_integration.state
+        # load a textarea populated with json from the integration
+        else:
+            form.fields['state'].widget = FormattedJsonFieldWidget()
+            form.fields['state'].initial = selected_integration.state
+        return HttpResponse(as_crispy_field(form["state"]))
+
+    @staticmethod
+    @requires_csrf_token
     def dropdown_restore(request, integration_id):
         type_modal = reverse("inboundconfigurations/type_modal", kwargs={"integration_id": integration_id})
         response = f"""<div id="div_id_type" class="form-group">
@@ -899,30 +900,29 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         selected_type = BridgeIntegrationType.objects.get(id=integration_type)
 
         request.session["integration_type"] = integration_type
-        # there is a type selected
-        if integration_type != 'none':
-            # a new type is selected and schema needs to be updated
-            if update == "true":
-                if selected_type.configuration_schema != {}:
-                    request.session["integration_type"] = integration_type
-                    form.fields['additional'].widget.instance = selected_type.id
-                else:
-                    form.fields['additional'].widget = FormattedJsonFieldWidget()
-                return HttpResponse(as_crispy_field(form["additional"]))
-            # loading the schema already associated with the form
-            else:
-                # load the proper schema populated with additional values from the integration
-                selected_integration = BridgeIntegration.objects.get(id=integration_id)
-                if selected_type.configuration_schema != {}:
-                    form.fields['additional'].widget.instance = selected_integration.additional
-                # load a textarea populated with json from the integration
-                else:
-                    form.fields['additional'].widget = FormattedJsonFieldWidget()
-                    form.fields['additional'].initial = selected_integration.additional
-                return HttpResponse(as_crispy_field(form["additional"]))
-        # there is no type selected
-        else:
+        # No type selected
+        if integration_type == 'none':
             return HttpResponse("Please select an integration type")
+
+        # a new type is selected and schema needs to be updated
+        if update == "true":
+            if selected_type.configuration_schema != {}:
+                request.session["integration_type"] = integration_type
+                form.fields['additional'].widget.instance = selected_type.id
+            else:
+                form.fields['additional'].widget = FormattedJsonFieldWidget()
+            return HttpResponse(as_crispy_field(form["additional"]))
+
+        # loading the schema already associated with the form
+        # load the proper schema populated with additional values from the integration
+        selected_integration = BridgeIntegration.objects.get(id=integration_id)
+        if selected_type.configuration_schema != {}:
+            form.fields['additional'].widget.instance = selected_integration.additional
+        # load a textarea populated with json from the integration
+        else:
+            form.fields['additional'].widget = FormattedJsonFieldWidget()
+            form.fields['additional'].initial = selected_integration.additional
+        return HttpResponse(as_crispy_field(form["additional"]))
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
