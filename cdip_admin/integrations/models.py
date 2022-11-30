@@ -15,6 +15,24 @@ from simple_history.models import HistoricalRecords
 
 # This is where the general information for a configuration will be stored
 # This could be an inbound or outbound type
+
+class InboundIntegrationTypeManager(models.Manager):
+    @classmethod
+    def configuration_schema(cls, typeid=None):
+        default_schema = {
+            "type": "object",
+            "keys": {}
+        }
+        if typeid:
+            try:
+                schema = InboundIntegrationType.objects.get(id=typeid).configuration_schema
+                return schema or default_schema
+            except InboundIntegrationType.DoesNotExist:
+                pass
+        # Return blank schema by default.
+        return default_schema
+
+
 # Example Inbound Integrations: Savannah Tracking Collars, Garmin Inreach
 class InboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
@@ -28,6 +46,9 @@ class InboundIntegrationType(TimestampedModel):
         blank=True,
         help_text="Optional field - description of the Technology or Service.",
     )
+    configuration_schema = models.JSONField(blank=True,
+                                            default=dict, verbose_name='JSON Schema for configuration value')
+    objects = InboundIntegrationTypeManager()
     history = HistoricalRecords()
 
     class Meta:
@@ -75,11 +96,7 @@ class BridgeIntegrationTypeManager(models.Manager):
         if typeid:
             try:
                 schema = BridgeIntegrationType.objects.get(id=typeid).configuration_schema
-                if schema != {}:
-                    return schema
-                else:
-                    return default_schema
-                return
+                return schema or default_schema
             except BridgeIntegrationType.DoesNotExist:
                 pass
         # Return blank schema by default.
@@ -160,12 +177,13 @@ class InboundIntegrationConfiguration(TimestampedModel):
     )
     name = models.CharField(max_length=200, blank=True)
     endpoint = models.URLField(blank=True)
-    state = models.JSONField(
-        blank=True,
-        null=True,
-        help_text="Additional integration configuration(s).",
-        verbose_name="State",
-    )
+    # state = models.JSONField(
+    #     blank=True,
+    #     null=True,
+    #     help_text="Additional integration configuration(s).",
+    #     verbose_name="State",
+    # )
+    state = JSONField(schema=InboundIntegrationType.objects.configuration_schema, blank=True, default=dict)
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
@@ -254,7 +272,7 @@ class BridgeIntegration(TimestampedModel):
     owner = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        help_text="Organization that owns the data.")
+        help_text="Organization that owns the data.",)
     name = models.CharField(max_length=200, blank=True)
     state = models.JSONField(
         blank=True,

@@ -12,14 +12,15 @@ from core.widgets import (
     ReadonlyPeekabooTextInput,
 )
 from organizations.models import Organization
-from .models import BridgeIntegration, Device
 from .models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     DeviceGroup,
-    BridgeIntegrationType
+    BridgeIntegrationType,
+    BridgeIntegration,
+    Device
 )
 from django.urls import reverse
 
@@ -36,12 +37,32 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         exclude = [
             "id",
         ]
-
+        fields = ("name", "owner", "type", "provider", "enabled",
+                  "default_devicegroup", "endpoint", "token",
+                  "login", "password", "state")
         widgets = {
             "password": PeekabooTextInput(),
             "token": PeekabooTextInput(),
             "state": FormattedJsonFieldWidget(),
             "apikey": PeekabooTextInput(),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'hx-trigger': 'change',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
+                }),
+            "additional": JSONFormWidget(
+                schema=InboundIntegrationType.objects.configuration_schema,
+            ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_state',
+                    'hx-swap': 'outerHTML'
+                },
+            ),
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -63,6 +84,18 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
+            # TODO: review how we trigger the warning modal
+            self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
+                                                                 kwargs={"integration_id": self.instance.id})
+            if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("inboundconfigurations/schema",
+                                                                      kwargs={"integration_type": self.instance.type.id,
+                                                                              "integration_id": self.instance.id,
+                                                                              "update": "false"})
+                if hasattr(request, 'session'):
+                    request.session["integration_type"] = str(self.instance.type.id)
+                self.fields['state'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -103,62 +136,6 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         ),
         Row(Column("state", css_class="form-group col-lg-3 mb-0")),
     )
-
-
-class InboundIntegrationTypeForm(forms.ModelForm):
-    class Meta:
-        model = InboundIntegrationType
-        exclude = ["id"]
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
-
-
-class OutboundIntegrationConfigurationForm(forms.ModelForm):
-    password = forms.CharField(
-        widget=forms.PasswordInput(render_value=True), required=False
-    )
-
-    class Meta:
-        model = OutboundIntegrationConfiguration
-        exclude = ["id"]
-        widgets = {
-            "password": forms.PasswordInput(),
-        }
-
-    def __init__(self, *args, request=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and request:
-            qs = Organization.objects.all()
-            for field_name in self.fields:
-                if self.fields[field_name].help_text != "":
-                    self.fields[
-                        field_name
-                    ].label += tooltip_labels(self.fields[field_name].help_text)
-                self.fields[field_name].help_text = None
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name", admin_only=True
-                )
-            else:
-                self.fields["owner"].queryset = qs
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
-
-
-class OutboundIntegrationTypeForm(forms.ModelForm):
-    class Meta:
-        model = OutboundIntegrationType
-        exclude = ["id"]
-
-    helper = FormHelper()
-    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
-    helper.form_method = "POST"
 
 
 class DeviceGroupForm(forms.ModelForm):
@@ -417,6 +394,14 @@ class BridgeIntegrationForm(forms.ModelForm):
             "additional": JSONFormWidget(
                 schema=BridgeIntegrationType.objects.configuration_schema,
             ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_additional',
+                    'hx-swap': 'outerHTML'
+                },
+            ),
             "state": FormattedJsonFieldWidget(),
         }
 
@@ -439,33 +424,39 @@ class BridgeIntegrationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
-            self.fields['type'].widget.attrs['hx-get'] = reverse("type_modal",
+            # TODO: review how we trigger the warning modal
+            self.fields['type'].widget.attrs['hx-get'] = reverse("bridges/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
-            if hasattr(self.instance, 'type'):
 
+            if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("bridges/schema",
+                                                                      kwargs={"integration_type": self.instance.type.id,
+                                                                              "integration_id": self.instance.id,
+                                                                              "update": "false"})
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
     helper.layout = Layout(
-            Row(
-                Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
-                Column("owner", css_class="form-group col-lg-3 mb-0"),
-                css_class="form-row",
-            ),
-            Row(
-                Column("enabled", css_class="form-group col-lg-6 mt-0"),
-                css_class="form-row",
-             ),
-            Row(
-                Column("type", css_class="form-group col-lg-6"),
-                css_class="form-row",
-            ),
-            Row(
-                Column("additional", css_class="form-group col-lg-6"),
-                css_class="form-row",
-            ),
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("type", css_class="form-group col-lg-6"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("additional", css_class="form-group col-lg-6"),
+            css_class="form-row",
+        ),
     )
     helper.add_input(Submit("submit", "Save", css_class="btn btn-primary"))
     helper.form_method = "POST"

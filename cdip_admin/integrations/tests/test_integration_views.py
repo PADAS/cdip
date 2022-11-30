@@ -489,6 +489,34 @@ def test_get_bridge_integration_configuration_list_filter_by_enabled_unset(
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
+def test_get_bridge_integration_update_page_load(
+    client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    b1 = setup_data["bi1"]
+
+    response = client.get(
+        reverse("bridge_integration_update", kwargs={"id": b1.id}),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+
+
+def test_dynamic_form_div_bridge_update_form(
+    client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    b1 = setup_data["bi1"]
+
+    response = client.get(
+        reverse("bridge_integration_update", kwargs={"id": b1.id}),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert "id_additional_jsonform" in response.rendered_content
+
+
 # TODO: Get Post Working
 def test_add_outbound_integration_configuration_organization_member_hybrid(
     client, organization_member_user, setup_data
