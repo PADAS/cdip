@@ -354,13 +354,6 @@ class ER_SMART_Synchronizer:
                     events_updated_at.append(event.updated_at)
             max_update = max(events_updated_at + [u.time for u in updates])
 
-            if max_update < patrol_last_poll_at:
-                logger.info(
-                    "skipping processing, patrol hasn't been updated since last poll",
-                    extra=extra_dict,
-                )
-                continue
-
             # collect events and track points associated to patrol
             for segment in patrol.patrol_segments:
                 if not segment.start_location:
@@ -375,7 +368,7 @@ class ER_SMART_Synchronizer:
                 if not segment.leader:
                     # SMART requires at least one member on patrol leg
                     logger.info(
-                        "skipping processing, patrol contains no start location",
+                        "skipping processing, patrol contains no segment leader",
                         extra=extra_dict,
                     )
                     publish_observation = False
@@ -432,16 +425,23 @@ class ER_SMART_Synchronizer:
                         )
 
                 # Get track points from subject during time range of patrol
-                start = segment.time_range.get("start_time")
-                end = segment.time_range.get("end_time")
-                if not end:
-                    end = upper
+                start = patrol_last_poll_at
+                end = upper
                 segment.track_points = parse_obj_as(
                     List[ERObservation],
                     self.das_client.get_subject_observations(
                         subject_id=segment.leader.id, start=start, end=end
                     ),
                 )
+
+            if max_update < patrol_last_poll_at and \
+                    not any(len(seg.track_points) > 0 for seg in patrol.patrol_segments):
+                logger.info(
+                    "skipping processing, patrol doesn't have updates since last poll",
+                    extra=extra_dict,
+                )
+                continue
+
             # TODO: Will need to revisit this if we support processing of multiple segments in the future
             if publish_observation:
                 logger.info(f"Publishing observation for ER Patrol", extra=extra_dict)
@@ -455,6 +455,7 @@ class ER_SMART_Synchronizer:
         lower = i_state.patrol_last_poll_at or datetime.now(
             tz=timezone.utc
         ) - timedelta(days=7)
+        # lower = datetime.now(tz=timezone.utc) - timedelta(days=1)
         upper = datetime.now(tz=timezone.utc)
 
         FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -480,12 +481,9 @@ class ER_SMART_Synchronizer:
         self.process_er_patrols(
             patrols=patrols,
             integration_id=config.id,
-            patrol_last_poll_at=i_state.patrol_last_poll_at,
+            patrol_last_poll_at=lower,
             upper=upper,
         )
 
         i_state.patrol_last_poll_at = upper
         set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
-        # config.state = json.loads(i_state.json())
-        # config.save()
-        # logger.debug(f"Saved state to config", extra=dict(state=config.state))
