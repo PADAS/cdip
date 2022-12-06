@@ -40,7 +40,7 @@ cached-property==1.5.1
     #   kombu
 cachetools==5.0.0
     # via google-auth
-cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.8/cdip_connector-1.2.8-py3-none-any.whl
+cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.11/cdip_connector-1.2.11-py3-none-any.whl
     # via -r requirements.in
 celery==5.2.3
     # via
@@ -306,6 +306,8 @@ packaging==20.9
     # via -r requirements.in
 phonenumbers==8.12.6
     # via -r requirements.in
+pillow==9.3.0
+    # via cdip-connector
 prompt-toolkit==3.0.27
     # via click-repl
 proto-plus==1.22.1
