@@ -125,6 +125,21 @@ urlpatterns = [
         name="outbound_integration_configuration_update",
     ),
     path(
+        "outboundconfigurations/type_modal/<uuid:configuration_id>/",
+        views.OutboundIntegrationConfigurationUpdateView.type_modal,
+        name="outboundconfigurations/type_modal",
+    ),
+    path(
+        "outboundconfigurations/schema/<str:configuration_type>/<uuid:configuration_id>/<str:update>",
+        views.OutboundIntegrationConfigurationUpdateView.schema,
+        name="outboundconfigurations/schema",
+    ),
+    path(
+        "outboundconfigurations/dropdown_restore/<uuid:integration_id>/",
+        views.OutboundIntegrationConfigurationUpdateView.dropdown_restore,
+        name="outboundconfigurations/dropdown_restore",
+    ),
+    path(
         "bridges",
         views.BridgeIntegrationListView.as_view(),
         name="bridge_integration_list",

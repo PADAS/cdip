@@ -8,6 +8,7 @@
     <h3>Update Inbound Integration</h3>
     <form method="post">
         {% csrf_token %}
+        <div class="form-group col-lg-6 px-0 list-inline">{{form.errors}}</div>
         {% crispy form %}
    </form>
 {% endblock %}
