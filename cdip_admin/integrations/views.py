@@ -59,6 +59,7 @@ from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
 from django.views.decorators.csrf import requires_csrf_token
 from django.template.loader import render_to_string
 from core.widgets import FormattedJsonFieldWidget
+from django_jsonform.widgets import JSONFormWidget
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -587,7 +588,10 @@ class InboundIntegrationConfigurationUpdateView(
         # load the proper schema populated with additional values from the integration
         selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
         if selected_type.configuration_schema != {}:
-            form.fields['state'].widget.instance = selected_integration.state
+            form.fields['state'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
+            form.fields['state'].initial = selected_integration.state
         # load a textarea populated with json from the integration
         else:
             form.fields['state'].widget = FormattedJsonFieldWidget()
@@ -774,7 +778,9 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         # load the proper schema populated with additional values from the integration
         selected_integration = OutboundIntegrationConfiguration.objects.get(id=configuration_id)
         if selected_type.configuration_schema != {}:
-            form.fields['state'].widget.instance = selected_type.id
+            form.fields['state'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
             form.fields['state'].initial = selected_integration.state
         # load a textarea populated with json from the integration
         else:
@@ -1007,7 +1013,10 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         # load the proper schema populated with additional values from the integration
         selected_integration = BridgeIntegration.objects.get(id=integration_id)
         if selected_type.configuration_schema != {}:
-            form.fields['additional'].widget = selected_integration.additional
+            form.fields['additional'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
+            form.fields['additional'].initial = selected_integration.additional
         # load a textarea populated with json from the integration
         else:
             form.fields['additional'].widget = FormattedJsonFieldWidget()
