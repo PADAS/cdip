@@ -3,7 +3,7 @@ import random
 
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.generic import ListView, DetailView, UpdateView, FormView
@@ -59,6 +59,7 @@ from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
 from django.views.decorators.csrf import requires_csrf_token
 from django.template.loader import render_to_string
 from core.widgets import FormattedJsonFieldWidget
+from django_jsonform.widgets import JSONFormWidget
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -512,6 +513,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
             config: InboundIntegrationConfiguration = form.save()
             device_group = config.default_devicegroup
             return redirect("device_group_update", device_group_id=device_group.id)
+        return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
         form = InboundIntegrationConfigurationForm()
@@ -586,7 +588,10 @@ class InboundIntegrationConfigurationUpdateView(
         # load the proper schema populated with additional values from the integration
         selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
         if selected_type.configuration_schema != {}:
-            form.fields['state'].widget.instance = selected_integration.state
+            form.fields['state'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
+            form.fields['state'].initial = selected_integration.state
         # load a textarea populated with json from the integration
         else:
             form.fields['state'].widget = FormattedJsonFieldWidget()
@@ -701,6 +706,7 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
         if form.is_valid():
             config = form.save()
             return redirect("outbound_integration_configuration_detail", config.id)
+        return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
         form = OutboundIntegrationConfigurationForm()
@@ -718,6 +724,96 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     form_class = OutboundIntegrationConfigurationForm
     model = OutboundIntegrationConfiguration
     permission_required = "integrations.change_outboundintegrationconfiguration"
+
+    @staticmethod
+    @requires_csrf_token
+    def type_modal(request, configuration_id):
+        if request.GET.get("type") is not '':
+            integration_type = request.GET.get("type")
+            selected_type = OutboundIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
+        rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
+                                                                     'target': '#div_id_state',
+                                                                     'proceed_button':
+                                                                         reverse("outboundconfigurations/schema",
+                                                                                 kwargs={
+                                                                                     "configuration_type":
+                                                                                         integration_type,
+                                                                                     "configuration_id":
+                                                                                         configuration_id,
+                                                                                     "update": "true"}),
+                                                                     'cancel_button':
+                                                                         reverse(
+                                                                             "outboundconfigurations/dropdown_restore",
+                                                                             kwargs={
+                                                                                 "integration_id":
+                                                                                     configuration_id}
+                                                                         )})
+        return HttpResponse(rendered)
+
+    @staticmethod
+    @requires_csrf_token
+    def schema(request, configuration_type, configuration_id, update):
+        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
+        form = OutboundIntegrationConfigurationForm(request=request)
+        selected_type = OutboundIntegrationType.objects.get(id=configuration_type)
+
+        request.session["integration_type"] = configuration_type
+        # No type selected
+        if configuration_type == 'none':
+            return HttpResponse("Please select an integration type")
+
+        # a new type is selected and schema needs to be updated
+        if update == "true":
+            if selected_type.configuration_schema != {}:
+                request.session["integration_type"] = configuration_type
+                form.fields['state'].widget.instance = selected_type.id
+            else:
+                form.fields['state'].widget = FormattedJsonFieldWidget()
+            return HttpResponse(as_crispy_field(form["state"]))
+
+        # loading the schema already associated with the form
+        # load the proper schema populated with additional values from the integration
+        selected_integration = OutboundIntegrationConfiguration.objects.get(id=configuration_id)
+        if selected_type.configuration_schema != {}:
+            form.fields['state'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
+            form.fields['state'].initial = selected_integration.state
+        # load a textarea populated with json from the integration
+        else:
+            form.fields['state'].widget = FormattedJsonFieldWidget()
+            form.fields['state'].initial = selected_integration.state
+        return HttpResponse(as_crispy_field(form["state"]))
+
+    @staticmethod
+    @requires_csrf_token
+    def dropdown_restore(request, integration_id):
+        type_modal = reverse("outboundconfigurations/type_modal", kwargs={"configuration_id": integration_id})
+        response = f"""<div id="div_id_type" class="form-group">
+                                <label for="id_type" class=" requiredField">
+                                Type
+                                <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                                    data-toggle="tooltip" data-placement="right" 
+                                    title="Integration component that can process the data.">?
+                                </button>
+                                <span class="asteriskField">*</span></label> 
+                                <div class="">
+                                    <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
+                                    hx-get={type_modal}
+                                    class="select form-control"
+                                    required id="id_type">
+                                        <option value="" selected>-------</option>"""
+        integration_types = OutboundIntegrationType.objects.values_list("id", "name", named=True)
+        for option in integration_types:
+            if str(option.id) == request.session["integration_type"]:
+                response += """<option value="{}" selected>{}</option>""".format(option.id, option.name)
+            else:
+                response += """<option value="{}">{}</option>""".format(option.id, option.name)
+        response += "</select></div> </div> </div> </div>"
+        return HttpResponse(response)
 
     def get_object(self):
         configuration = get_object_or_404(
@@ -814,6 +910,7 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     model = BridgeIntegration
     permission_required = "integrations.add_bridgeintegration"
 
+    # replace this with get_success_url
     def post(self, request, *args, **kwargs):
         form = BridgeIntegrationForm(request.POST)
 
@@ -821,7 +918,6 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
             config = form.save()
             return redirect("bridge_integration_view", config.id)
 
-        # Errors sends the user back to the form.
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
@@ -917,7 +1013,10 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         # load the proper schema populated with additional values from the integration
         selected_integration = BridgeIntegration.objects.get(id=integration_id)
         if selected_type.configuration_schema != {}:
-            form.fields['additional'].widget.instance = selected_integration.additional
+            form.fields['additional'].widget = JSONFormWidget(
+                schema=selected_type.configuration_schema,
+            )
+            form.fields['additional'].initial = selected_integration.additional
         # load a textarea populated with json from the integration
         else:
             form.fields['additional'].widget = FormattedJsonFieldWidget()
