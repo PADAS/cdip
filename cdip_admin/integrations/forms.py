@@ -23,6 +23,8 @@ from .models import (
     Device
 )
 from django.urls import reverse
+from django.core.exceptions import ValidationError
+import json
 
 
 def tooltip_labels(text):
@@ -43,7 +45,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
         widgets = {
             "password": PeekabooTextInput(),
             "token": PeekabooTextInput(),
-            "state": FormattedJsonFieldWidget(),
+            # "state": FormattedJsonFieldWidget(),
             "apikey": PeekabooTextInput(),
             "type": forms.Select(
                 attrs={
@@ -52,7 +54,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     'hx-target': 'body',
                     'hx-swap': 'beforeend'
                 }),
-            "additional": JSONFormWidget(
+            "state": JSONFormWidget(
                 schema=InboundIntegrationType.objects.configuration_schema,
             ),
             "owner": forms.Select(
@@ -62,7 +64,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     'hx-target': '#div_id_state',
                     'hx-swap': 'outerHTML'
                 },
-            ),
+            )
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -254,12 +256,32 @@ class InboundIntegrationTypeForm(forms.ModelForm):
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationConfiguration
+        fields = ("type", "owner", "name", "state", "endpoint", "login", "password", "token",
+                  "additional", "enabled")
         exclude = ["id"]
         widgets = {
             "password": PeekabooTextInput(attrs={"class": "form-control"}),
             "token": PeekabooTextInput(attrs={"class": "form-control"}),
-            "state": FormattedJsonFieldWidget(),
+            # "state": FormattedJsonFieldWidget(),
             "additional": FormattedJsonFieldWidget(),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'hx-trigger': 'change',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
+                }),
+            "state": JSONFormWidget(
+                schema=OutboundIntegrationType.objects.configuration_schema,
+            ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_state',
+                    'hx-swap': 'outerHTML'
+                },
+            )
         }
 
     def __init__(self, *args, request=None, **kwargs):
@@ -281,6 +303,20 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
+
+            # TODO: review how we trigger the warning modal
+            self.fields['type'].widget.attrs['hx-get'] = reverse("outboundconfigurations/type_modal",
+                                                                 kwargs={"configuration_id": self.instance.id})
+            if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("outboundconfigurations/schema",
+                                                                      kwargs={
+                                                                          "configuration_type": self.instance.type.id,
+                                                                          "configuration_id": self.instance.id,
+                                                                          "update": "false"})
+                if hasattr(request, 'session'):
+                    request.session["integration_type"] = str(self.instance.type.id)
+                self.fields['state'].widget.instance = self.instance.type.id
 
     helper = FormHelper()
     helper.layout = Layout(

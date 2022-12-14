@@ -167,3 +167,16 @@ ul ul a {
 #id_additional_jsonform {
 	height: auto;
 }
+
+.errorlist {
+	list-style-type: none;
+	color: #720000;
+	background: #FFBABA;
+	padding-left: 5px;
+	border-radius: 4px;
+
+}
+
+.ul.errorlist {
+	text-transform: capitalize;
+}
