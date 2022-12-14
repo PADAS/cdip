@@ -60,6 +60,24 @@ class InboundIntegrationType(TimestampedModel):
 
 # This is where the general information for a configuration will be stored
 # This could be an inbound or outbound type
+
+class OutboundIntegrationTypeManager(models.Manager):
+    @classmethod
+    def configuration_schema(cls, typeid=None):
+        default_schema = {
+            "type": "object",
+            "keys": {}
+        }
+        if typeid:
+            try:
+                schema = OutboundIntegrationType.objects.get(id=typeid).configuration_schema
+                return schema or default_schema
+            except OutboundIntegrationType.DoesNotExist:
+                pass
+        # Return blank schema by default.
+        return default_schema
+
+
 # Example Outbound Integrations: EarthRanger, SMART, WpsWatch
 class OutboundIntegrationType(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
@@ -73,6 +91,9 @@ class OutboundIntegrationType(TimestampedModel):
         blank=True,
         help_text="Optional - general description of the destination system.",
     )
+    configuration_schema = models.JSONField(blank=True,
+                                            default=dict, verbose_name='JSON Schema for configuration value')
+    objects = OutboundIntegrationTypeManager()
     use_endpoint = models.BooleanField(default=False)
     use_login = models.BooleanField(default=False)
     use_password = models.BooleanField(default=False)
@@ -141,9 +162,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         help_text="Organization that owns the data.",
     )
     name = models.CharField(max_length=200, blank=True)
-    state = models.JSONField(
-        blank=True, null=True, help_text="Additional configuration(s)."
-    )
+    # state = models.JSONField(
+    #     blank=True, null=True, help_text="Additional configuration(s)."
+    # )
+    state = JSONField(schema=OutboundIntegrationType.objects.configuration_schema, blank=True, default=dict)
     endpoint = models.URLField(blank=True)
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
