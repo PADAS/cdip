@@ -15,11 +15,11 @@ from integrations.models import (
 
 )
 from organizations.models import Organization
+from urllib.parse import urlencode
 
 
 # Inbound Integration Tests
 def test_get_inbound_integration_type_list_global_admin(client, global_admin_user):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -35,9 +35,8 @@ def test_get_inbound_integration_type_list_global_admin(client, global_admin_use
 
 
 def test_get_inbound_integration_type_list_organization_member(
-    client, organization_member_user
+        client, organization_member_user
 ):
-
     client.force_login(organization_member_user.user)
 
     response = client.get(
@@ -53,9 +52,8 @@ def test_get_inbound_integration_type_list_organization_member(
 
 
 def test_get_inbound_integration_type_detail_global_admin(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
-
     iit = setup_data["iit1"]
 
     client.force_login(global_admin_user.user)
@@ -71,9 +69,8 @@ def test_get_inbound_integration_type_detail_global_admin(
 
 
 def test_get_inbound_integration_type_detail_organization_member(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
-
     iit = setup_data["iit1"]
 
     client.force_login(organization_member_user.user)
@@ -89,9 +86,8 @@ def test_get_inbound_integration_type_detail_organization_member(
 
 
 def test_get_inbound_integration_configuration_list_global_admin(
-    client, global_admin_user
+        client, global_admin_user
 ):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -108,7 +104,7 @@ def test_get_inbound_integration_configuration_list_global_admin(
 
 
 def test_get_inbound_integration_configuration_list_organization_member_viewer(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
     org1 = setup_data["org1"]
 
@@ -140,7 +136,7 @@ def _test_basic_config_data_is_rendered(configurations: List, rendered_screen: s
 
 
 def test_get_inbound_integration_configuration_list_filter_by_enabled_true(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -161,7 +157,7 @@ def test_get_inbound_integration_configuration_list_filter_by_enabled_true(
 
 
 def test_get_inbound_integration_configuration_list_filter_by_enabled_false(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=False
     client.force_login(global_admin_user.user)
@@ -182,7 +178,7 @@ def test_get_inbound_integration_configuration_list_filter_by_enabled_false(
 
 
 def test_get_inbound_integration_configuration_list_filter_by_enabled_unset(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=False
     client.force_login(global_admin_user.user)
@@ -204,9 +200,8 @@ def test_get_inbound_integration_configuration_list_filter_by_enabled_unset(
 
 # ToDo: Mock external dependencies. This test fails when Kong isn't available / reachable
 def test_get_inbound_integration_configurations_detail_organization_member_hybrid(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
-
     org1 = setup_data["org1"]
     org2 = setup_data["org2"]
     ii = setup_data["ii1"]
@@ -249,7 +244,6 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
 
 # Outbound Integration Tests
 def test_get_outbound_integration_type_list_global_admin(client, global_admin_user):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -265,9 +259,8 @@ def test_get_outbound_integration_type_list_global_admin(client, global_admin_us
 
 
 def test_get_outbound_integration_type_list_organization_member(
-    client, organization_member_user
+        client, organization_member_user
 ):
-
     client.force_login(organization_member_user.user)
 
     response = client.get(
@@ -283,9 +276,8 @@ def test_get_outbound_integration_type_list_organization_member(
 
 
 def test_get_outbound_integration_type_detail_global_admin(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
-
     oit = setup_data["oit1"]
 
     client.force_login(global_admin_user.user)
@@ -301,9 +293,8 @@ def test_get_outbound_integration_type_detail_global_admin(
 
 
 def test_get_outbound_integration_type_detail_organization_member(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
-
     oit = setup_data["oit1"]
 
     client.force_login(organization_member_user.user)
@@ -319,9 +310,8 @@ def test_get_outbound_integration_type_detail_organization_member(
 
 
 def test_get_outbound_integration_configuration_list_global_admin(
-    client, global_admin_user
+        client, global_admin_user
 ):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -338,7 +328,7 @@ def test_get_outbound_integration_configuration_list_global_admin(
 
 
 def test_get_outbound_integration_configuration_list_organization_member_viewer(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
     org1 = setup_data["org1"]
 
@@ -364,7 +354,7 @@ def test_get_outbound_integration_configuration_list_organization_member_viewer(
 
 
 def test_get_outbound_integration_configuration_list_filter_by_enabled_true(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -385,7 +375,7 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_true(
 
 
 def test_get_outbound_integration_configuration_list_filter_by_enabled_false(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -406,7 +396,7 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_false(
 
 
 def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -427,7 +417,7 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
 
 
 def test_get_bridge_integration_configuration_list_filter_by_enabled_true(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -448,7 +438,7 @@ def test_get_bridge_integration_configuration_list_filter_by_enabled_true(
 
 
 def test_get_bridge_integration_configuration_list_filter_by_enabled_false(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -469,7 +459,7 @@ def test_get_bridge_integration_configuration_list_filter_by_enabled_false(
 
 
 def test_get_bridge_integration_configuration_list_filter_by_enabled_unset(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     # Request the configurations filtering by enabled=True
     client.force_login(global_admin_user.user)
@@ -490,7 +480,7 @@ def test_get_bridge_integration_configuration_list_filter_by_enabled_unset(
 
 
 def test_get_bridge_integration_update_page_load(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     client.force_login(global_admin_user.user)
     b1 = setup_data["bi1"]
@@ -504,7 +494,7 @@ def test_get_bridge_integration_update_page_load(
 
 
 def test_dynamic_form_div_bridge_update_form(
-    client, global_admin_user, setup_data
+        client, global_admin_user, setup_data
 ):
     client.force_login(global_admin_user.user)
     b1 = setup_data["bi1"]
@@ -517,9 +507,41 @@ def test_dynamic_form_div_bridge_update_form(
     assert "id_additional_jsonform" in response.rendered_content
 
 
+def test_bridge_update_form_save(
+        client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    org2 = setup_data["org2"]
+    bit2 = setup_data["bit2"]
+    bit3 = setup_data["bit3"]
+    bi = BridgeIntegration.objects.create(
+        type=bit3, name="Bridge Integration Original", owner=org2, enabled=False,
+        additional={"site_name": "foo"}
+    )
+
+    bi_request_post = {
+        "type": str(bit2.id),
+        "owner": str(org2.id),
+        "name": "Bridge Update Test EDITED",
+        "additional": {"test": "new additional config"},
+        "enabled": False
+    }
+
+    response = client.post(
+        reverse("bridge_integration_update", kwargs={"id": bi.id}),
+        follow=True,
+        data=urlencode(bi_request_post),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+        content_type="application/x-www-form-urlencoded"
+    )
+    assert response.status_code == 200
+    assert bi_request_post["name"] in response.rendered_content
+    assert bi_request_post["additional"]["test"] in response.rendered_content
+
+
 # TODO: Get Post Working
 def test_add_outbound_integration_configuration_organization_member_hybrid(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
     org1 = setup_data["org1"]
     org2 = setup_data["org2"]
@@ -585,7 +607,6 @@ def test_add_outbound_integration_configuration_organization_member_hybrid(
 
 
 def test_get_device_detail_global_admin(client, global_admin_user, setup_data):
-
     d = setup_data["d1"]
 
     client.force_login(global_admin_user.user)
@@ -601,9 +622,8 @@ def test_get_device_detail_global_admin(client, global_admin_user, setup_data):
 
 
 def test_get_device_detail_organization_member(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
-
     d = setup_data["d1"]
 
     client.force_login(organization_member_user.user)
@@ -619,7 +639,6 @@ def test_get_device_detail_organization_member(
 
 
 def test_device_list_global_admin(client, global_admin_user):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -633,7 +652,6 @@ def test_device_list_global_admin(client, global_admin_user):
 
 
 def test_device_group_list_global_admin(client, global_admin_user):
-
     client.force_login(global_admin_user.user)
 
     response = client.get(
@@ -648,7 +666,7 @@ def test_device_group_list_global_admin(client, global_admin_user):
 
 
 def test_device_group_list_organization_member_viewer(
-    client, organization_member_user, setup_data
+        client, organization_member_user, setup_data
 ):
     org1 = setup_data["org1"]
 

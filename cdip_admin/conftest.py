@@ -36,6 +36,7 @@ def get_device_id():
     """
     A helper function that generates a ramdom alphanumeric id, to be used as external_id of Devices
     """
+
     def _make_device_id():
         return "".join(random.sample([chr(x) for x in range(97, 97 + 26)], 12))
 
@@ -177,6 +178,36 @@ def setup_data(db, django_user_model):
         name="Bridge Type 2",
         slug="bridge-type-two",
         description="Bridge integration type 2.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "test": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+    bit3 = BridgeIntegrationType.objects.create(
+        name="Bridge Type 3",
+        slug="bridge-type-three",
+        description="Bridge integration type 3.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "site_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
     )
 
     ii1 = InboundIntegrationConfiguration.objects.create(
@@ -227,6 +258,11 @@ def setup_data(db, django_user_model):
         type=bit2, name="Bridge Integration 4", owner=org2, enabled=False
     )
 
+    bi5 = BridgeIntegration.objects.create(
+        type=bit3, name="Bridge Integration 5", owner=org2, enabled=False,
+        additional={"site_name": "foo"}
+    )
+
     dg1 = DeviceGroup.objects.create(
         name="device group 1",
         owner=org1,
@@ -264,6 +300,7 @@ def setup_data(db, django_user_model):
         "oit1": oit1,
         "bit1": bit1,
         "bit2": bit2,
+        "bit3": bit3,
         "ii1": ii1,
         "ii2": ii2,
         "ii3": ii3,
@@ -276,6 +313,7 @@ def setup_data(db, django_user_model):
         "bi2": bi2,
         "bi3": bi3,
         "bi4": bi4,
+        "bi5": bi5,
         "dg1": dg1,
         "dg2": dg2,
         "d1": d1,
