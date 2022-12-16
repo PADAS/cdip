@@ -574,7 +574,7 @@ class InboundIntegrationConfigurationUpdateView(
         # No type selected
         if integration_type == 'none':
             return HttpResponse("Please select an integration type")
-
+        selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
         # a new type is selected and schema needs to be updated
         if update == "true":
             if selected_type.configuration_schema != {}:
@@ -582,11 +582,12 @@ class InboundIntegrationConfigurationUpdateView(
                 form.fields['state'].widget.instance = selected_type.id
             else:
                 form.fields['state'].widget = FormattedJsonFieldWidget()
+                form.fields['state'].initial = selected_integration.state
             return HttpResponse(as_crispy_field(form["state"]))
 
         # loading the schema already associated with the form
         # load the proper schema populated with additional values from the integration
-        selected_integration = InboundIntegrationConfiguration.objects.get(id=integration_id)
+
         if selected_type.configuration_schema != {}:
             form.fields['state'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
@@ -764,7 +765,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         # No type selected
         if configuration_type == 'none':
             return HttpResponse("Please select an integration type")
-
+        selected_integration = OutboundIntegrationConfiguration.objects.get(id=configuration_id)
         # a new type is selected and schema needs to be updated
         if update == "true":
             if selected_type.configuration_schema != {}:
@@ -772,11 +773,12 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
                 form.fields['state'].widget.instance = selected_type.id
             else:
                 form.fields['state'].widget = FormattedJsonFieldWidget()
+                form.fields['state'].initial = selected_integration.state
             return HttpResponse(as_crispy_field(form["state"]))
 
         # loading the schema already associated with the form
         # load the proper schema populated with additional values from the integration
-        selected_integration = OutboundIntegrationConfiguration.objects.get(id=configuration_id)
+
         if selected_type.configuration_schema != {}:
             form.fields['state'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
@@ -999,7 +1001,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         # No type selected
         if integration_type == 'none':
             return HttpResponse("Please select an integration type")
-
+        selected_integration = BridgeIntegration.objects.get(id=integration_id)
         # a new type is selected and schema needs to be updated
         if update == "true":
             if selected_type.configuration_schema != {}:
@@ -1007,11 +1009,12 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                 form.fields['additional'].widget.instance = selected_type.id
             else:
                 form.fields['additional'].widget = FormattedJsonFieldWidget()
+                form.fields['additional'].initial = selected_integration.additional
             return HttpResponse(as_crispy_field(form["additional"]))
 
         # loading the schema already associated with the form
         # load the proper schema populated with additional values from the integration
-        selected_integration = BridgeIntegration.objects.get(id=integration_id)
+
         if selected_type.configuration_schema != {}:
             form.fields['additional'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
