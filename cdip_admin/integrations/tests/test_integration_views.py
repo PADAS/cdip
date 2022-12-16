@@ -239,6 +239,47 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
     assert response.context["module"].id == o_ii.id
 
 
+def test_inbound_integration_update_form_save(
+    client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    org2 = setup_data["org2"]
+    iit3 = setup_data["iit3"]
+    iit4 = setup_data["iit4"]
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit3, name="Inbound Configuration Original", owner=org2, enabled=False,
+        state={"test": "foo"}
+    )
+    new_state_value = {
+        "email": "test@email.com",  # Required
+        "password": "password",  # Required
+        "site_name": "new site name",  # Required
+        "test": "new state config"
+    }
+    ii_request_post = {
+        "type": str(iit4.id),
+        "owner": str(org2.id),
+        "name": "Inbound EDITED",
+        "state": json.dumps(new_state_value),
+        "enabled": True
+    }
+    urlencoded_data = urlencode(ii_request_post)
+    response = client.post(
+        reverse("inbound_integration_configuration_update", kwargs={"configuration_id": ii.id}),
+        follow=True,
+        data=urlencoded_data,
+        HTTP_X_USERINFO=global_admin_user.user_info,
+        content_type="application/x-www-form-urlencoded"
+    )
+    assert response.status_code == 200
+    ii.refresh_from_db()
+    assert ii.name == ii_request_post["name"]
+    assert str(ii.type.id) == ii_request_post["type"]
+    assert str(ii.owner.id) == ii_request_post["owner"]
+    assert ii.state == new_state_value
+    assert ii.enabled == ii_request_post["enabled"]
+
+
 # TODO: InboundIntegrationConfigurationAddView
 
 # TODO: InboundIntegrationConfigurationUpdateView
@@ -417,6 +458,113 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
+# TODO: Get Post Working
+def test_add_outbound_integration_configuration_organization_member_hybrid(
+        client, organization_member_user, setup_data
+):
+    org1 = setup_data["org1"]
+    org2 = setup_data["org2"]
+    oit = setup_data["oit1"]
+
+    account_profile_mapping = {
+        (organization_member_user.user, org1, RoleChoices.VIEWER),
+        (organization_member_user.user, org2, RoleChoices.ADMIN),
+    }
+    setup_account_profile_mapping(account_profile_mapping)
+
+    client.force_login(organization_member_user.user)
+
+    response = client.get(
+        reverse("outbound_integration_configuration_add"),
+        follow=True,
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
+
+    assert response.status_code == 200
+
+    # confirm result set is filtered queryset based on organization profile
+    assert list(response.context["form"].fields["owner"].queryset) == list(
+        Organization.objects.filter(id=org2.id)
+    )
+
+    oi = models.OutboundIntegrationConfiguration(
+        type=oit, owner=org2, name="Add Outbound Test"
+    )
+
+    oi_request_post = {
+        "type": str(oit.id),
+        "owner": str(org2.id),
+        "name": "Test Add Outbound",
+        "state": "null",
+        "endpoint": "",
+        "login": "",
+        "password": "",
+        "token": "",
+        "additional": "{}",
+        "initial-additional": "{}",
+        "enabled": "on",
+    }
+
+    query_dict = QueryDict("", mutable=True)
+    query_dict.update(oi_request_post)
+
+    response = client.post(
+        reverse("outbound_integration_configuration_add"),
+        follow=True,
+        data=query_dict,
+        HTTP_X_USERINFO=organization_member_user.user_info,
+    )
+
+    # assert response.status_code == 200
+    #
+    # assert OutboundIntegrationConfiguration.objects.filter(name=oi.name).exists()
+
+
+def test_outbound_integration_update_form(
+    client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    org2 = setup_data["org2"]
+    oit3 = setup_data["oit3"]
+    oit4 = setup_data["oit4"]
+    oi = OutboundIntegrationConfiguration.objects.create(
+        type=oit3, name="Outbound Configuration Original", owner=org2, enabled=False,
+        state={"test": "foo"}
+    )
+    new_state_value = {
+        "email": "test@email.com",  # Required
+        "password": "password",  # Required
+        "site_name": "new site name",  # Required
+        "test": "new state config"
+    }
+    oi_request_post = {
+        "type": str(oit4.id),
+        "owner": str(org2.id),
+        "name": "Outbound EDITED",
+        "state": json.dumps(new_state_value),
+        "enabled": True
+    }
+    urlencoded_data = urlencode(oi_request_post)
+    response = client.post(
+        reverse("outbound_integration_configuration_update", kwargs={"configuration_id": oi.id}),
+        follow=True,
+        data=urlencoded_data,
+        HTTP_X_USERINFO=global_admin_user.user_info,
+        content_type="application/x-www-form-urlencoded"
+    )
+    assert response.status_code == 200
+    oi.refresh_from_db()
+    assert oi.name == oi_request_post["name"]
+    assert str(oi.type.id) == oi_request_post["type"]
+    assert str(oi.owner.id) == oi_request_post["owner"]
+    assert oi.state == new_state_value
+    assert oi.enabled == oi_request_post["enabled"]
+
+
+# TODO: OutboundIntegrationConfigurationUpdateView
+
+
+# Bridge Integration Tests
 def test_get_bridge_integration_configuration_list_filter_by_enabled_true(
         client, global_admin_user, setup_data
 ):
@@ -516,8 +664,8 @@ def test_bridge_update_form_save(
     bit2 = setup_data["bit2"]
     bit3 = setup_data["bit3"]
     bi = BridgeIntegration.objects.create(
-        type=bit3, name="Bridge Integration Original", owner=org2, enabled=False,
-        additional={"site_name": "foo"}
+        type=bit2, name="Bridge Integration Original", owner=org2, enabled=False,
+        additional={"test": "foo"}
     )
     new_additional_value = {
         "email": "test@email.com",     # Required
@@ -526,11 +674,11 @@ def test_bridge_update_form_save(
         "test": "new additional config"
     }
     bi_request_post = {
-        "type": str(bit2.id),
+        "type": str(bit3.id),
         "owner": str(org2.id),
         "name": "Bridge Update Test EDITED",
         "additional": json.dumps(new_additional_value),
-        "enabled": False
+        "enabled": True
     }
     urlencoded_data = urlencode(bi_request_post)
     response = client.post(
@@ -543,73 +691,11 @@ def test_bridge_update_form_save(
     assert response.status_code == 200
     bi.refresh_from_db()
     assert bi.name == bi_request_post["name"]
-    # ToDo: Check the other attributes
+    assert str(bi.type.id) == bi_request_post["type"]
+    assert str(bi.owner.id) == bi_request_post["owner"]
+    assert bi.additional == new_additional_value
+    assert bi.enabled == bi_request_post["enabled"]
 
-
-
-# TODO: Get Post Working
-def test_add_outbound_integration_configuration_organization_member_hybrid(
-        client, organization_member_user, setup_data
-):
-    org1 = setup_data["org1"]
-    org2 = setup_data["org2"]
-    oit = setup_data["oit1"]
-
-    account_profile_mapping = {
-        (organization_member_user.user, org1, RoleChoices.VIEWER),
-        (organization_member_user.user, org2, RoleChoices.ADMIN),
-    }
-    setup_account_profile_mapping(account_profile_mapping)
-
-    client.force_login(organization_member_user.user)
-
-    response = client.get(
-        reverse("outbound_integration_configuration_add"),
-        follow=True,
-        HTTP_X_USERINFO=organization_member_user.user_info,
-    )
-
-    assert response.status_code == 200
-
-    # confirm result set is filtered queryset based on organization profile
-    assert list(response.context["form"].fields["owner"].queryset) == list(
-        Organization.objects.filter(id=org2.id)
-    )
-
-    oi = models.OutboundIntegrationConfiguration(
-        type=oit, owner=org2, name="Add Outbound Test"
-    )
-
-    oi_request_post = {
-        "type": str(oit.id),
-        "owner": str(org2.id),
-        "name": "Test Add Outbound",
-        "state": "null",
-        "endpoint": "",
-        "login": "",
-        "password": "",
-        "token": "",
-        "additional": "{}",
-        "initial-additional": "{}",
-        "enabled": "on",
-    }
-
-    query_dict = QueryDict("", mutable=True)
-    query_dict.update(oi_request_post)
-
-    response = client.post(
-        reverse("outbound_integration_configuration_add"),
-        follow=True,
-        data=query_dict,
-        HTTP_X_USERINFO=organization_member_user.user_info,
-    )
-
-    # assert response.status_code == 200
-    #
-    # assert OutboundIntegrationConfiguration.objects.filter(name=oi.name).exists()
-
-
-# TODO: OutboundIntegrationConfigurationUpdateView
 
 # Device Tests
 
