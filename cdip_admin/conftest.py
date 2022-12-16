@@ -156,6 +156,42 @@ def setup_data(db, django_user_model):
         description="Some integration type.",
     )
 
+    iit3 = InboundIntegrationType.objects.create(
+        name="Inbound Type 3",
+        slug="inbound-type-three",
+        description="Some integration type.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "test": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+    iit4 = InboundIntegrationType.objects.create(
+        name="Inbound Type 4",
+        slug="inbound-type-four",
+        description="Some integration type.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "site_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
+    )
+
     oit1 = OutboundIntegrationType.objects.create(
         name="Outbound Type 1",
         slug="outbound-type-one",
@@ -166,6 +202,42 @@ def setup_data(db, django_user_model):
         name="Outbound Type 2",
         slug="outbound-type-two",
         description="Some integration type.",
+    )
+
+    oit3 = OutboundIntegrationType.objects.create(
+        name="Outbound Type 3",
+        slug="outbound-type-three",
+        description="Some integration type.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "test": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+    oit4 = OutboundIntegrationType.objects.create(
+        name="Outbound Type 4",
+        slug="outbound-type-four",
+        description="Some integration type.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "site_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
     )
 
     bit1 = BridgeIntegrationType.objects.create(
@@ -226,6 +298,11 @@ def setup_data(db, django_user_model):
         type=iit2, name="Inbound Configuration 4", owner=org2, enabled=False
     )
 
+    ii5 = InboundIntegrationConfiguration.objects.create(
+        type=iit3, name="Inbound Configuration 4", owner=org2, enabled=False,
+        state={}
+    )
+
     oi1 = OutboundIntegrationConfiguration.objects.create(
         type=oit1, name="Outbound Configuration 1", owner=org1
     )
@@ -240,6 +317,11 @@ def setup_data(db, django_user_model):
 
     oi4 = OutboundIntegrationConfiguration.objects.create(
         type=oit2, name="Outbound Configuration 4", owner=org2, enabled=False
+    )
+
+    oi5 = OutboundIntegrationConfiguration.objects.create(
+        type=oit4, name="Outbound Configuration 4", owner=org2, enabled=False,
+        state={}
     )
 
     bi1 = BridgeIntegration.objects.create(
@@ -297,7 +379,12 @@ def setup_data(db, django_user_model):
         "org2": org2,
         "iit1": iit1,
         "iit2": iit2,
+        "iit3": iit3,
+        "iit4": iit4,
         "oit1": oit1,
+        "oit2": oit2,
+        "oit3": oit3,
+        "oit4": oit4,
         "bit1": bit1,
         "bit2": bit2,
         "bit3": bit3,
@@ -305,10 +392,12 @@ def setup_data(db, django_user_model):
         "ii2": ii2,
         "ii3": ii3,
         "ii4": ii4,
+        "ii5": ii5,
         "oi1": oi1,
         "oi2": oi2,
         "oi3": oi3,
         "oi4": oi4,
+        "oi5": oi5,
         "bi1": bi1,
         "bi2": bi2,
         "bi3": bi3,
