@@ -1,3 +1,4 @@
+import json
 from typing import List
 from django.http import QueryDict
 from django.urls import reverse
@@ -518,25 +519,32 @@ def test_bridge_update_form_save(
         type=bit3, name="Bridge Integration Original", owner=org2, enabled=False,
         additional={"site_name": "foo"}
     )
-
+    new_additional_value = {
+        "email": "test@email.com",     # Required
+        "password": "pasword",         # Required
+        "site_name": "new site name",  # Required
+        "test": "new additional config"
+    }
     bi_request_post = {
         "type": str(bit2.id),
         "owner": str(org2.id),
         "name": "Bridge Update Test EDITED",
-        "additional": {"test": "new additional config"},
+        "additional": json.dumps(new_additional_value),
         "enabled": False
     }
-
+    urlencoded_data = urlencode(bi_request_post)
     response = client.post(
         reverse("bridge_integration_update", kwargs={"id": bi.id}),
         follow=True,
-        data=urlencode(bi_request_post),
+        data=urlencoded_data,
         HTTP_X_USERINFO=global_admin_user.user_info,
         content_type="application/x-www-form-urlencoded"
     )
     assert response.status_code == 200
-    assert bi_request_post["name"] in response.rendered_content
-    assert bi_request_post["additional"]["test"] in response.rendered_content
+    bi.refresh_from_db()
+    assert bi.name == bi_request_post["name"]
+    # ToDo: Check the other attributes
+
 
 
 # TODO: Get Post Working
