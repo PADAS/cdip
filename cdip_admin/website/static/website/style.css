@@ -168,6 +168,10 @@ ul ul a {
 	height: auto;
 }
 
+#id_state_jsonform {
+	height: auto;
+}
+
 .errorlist {
 	list-style-type: none;
 	color: #720000;
