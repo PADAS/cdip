@@ -757,7 +757,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     @staticmethod
     @requires_csrf_token
     def schema(request, configuration_type, configuration_id, update):
-        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
+
         form = OutboundIntegrationConfigurationForm(request=request)
         selected_type = OutboundIntegrationType.objects.get(id=configuration_type)
 
@@ -765,7 +765,11 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         # No type selected
         if configuration_type == 'none':
             return HttpResponse("Please select an integration type")
-        selected_integration = OutboundIntegrationConfiguration.objects.get(id=configuration_id)
+        try:
+            initial_state = OutboundIntegrationConfiguration.objects.get(id=configuration_id).state or {}
+        except OutboundIntegrationConfiguration.DoesNotExist:
+            initial_state = {}
+
         # a new type is selected and schema needs to be updated
         if update == "true":
             if selected_type.configuration_schema != {}:
@@ -773,21 +777,21 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
                 form.fields['state'].widget.instance = selected_type.id
             else:
                 form.fields['state'].widget = FormattedJsonFieldWidget()
-                form.fields['state'].initial = selected_integration.state
+                form.fields['state'].initial = initial_state
             return HttpResponse(as_crispy_field(form["state"]))
 
         # loading the schema already associated with the form
         # load the proper schema populated with additional values from the integration
 
+        form.fields['state'].initial = initial_state
+
         if selected_type.configuration_schema != {}:
             form.fields['state'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
             )
-            form.fields['state'].initial = selected_integration.state
         # load a textarea populated with json from the integration
         else:
             form.fields['state'].widget = FormattedJsonFieldWidget()
-            form.fields['state'].initial = selected_integration.state
         return HttpResponse(as_crispy_field(form["state"]))
 
     @staticmethod
