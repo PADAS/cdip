@@ -15,6 +15,9 @@ class Organization(TimestampedModel):
     name = models.CharField(max_length=200, verbose_name="Name", unique=True)
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ('name',)
+
     @property
     def owner(self):
         return self
