@@ -262,22 +262,6 @@ class InboundIntegrationConfiguration(TimestampedModel):
         self._post_save(self, *args, **kwargs)
 
 
-class GFWInboundConfigurationManager(models.Manager):
-    history = HistoricalRecords()
-
-    def get_queryset(self):
-        return super().get_queryset().filter(type__slug="gfw")
-
-
-class GFWInboundConfiguration(InboundIntegrationConfiguration):
-    history = HistoricalRecords()
-
-    class Meta:
-        proxy = True
-
-    objects = GFWInboundConfigurationManager()
-
-
 # This is the information for a given configuration this will include a specific organizations account information
 # Or organization specific information
 def get_bridge_configuration_schema(instance=None):
