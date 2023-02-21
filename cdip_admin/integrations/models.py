@@ -175,10 +175,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     history = HistoricalRecords()
 
     class Meta:
-        ordering = ("name",)
+        ordering = ("owner", "name")
 
     def __str__(self):
-        return f"{self.type.name} - {self.owner.name} - {self.name}"
+        return f"{self.owner.name} - {self.name} - {self.type.name}"
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -234,8 +234,11 @@ class InboundIntegrationConfiguration(TimestampedModel):
 
     # api_consumer = APIConsumerField(verbose_name='API Key', null=True, blank=True)
 
+    class Meta:
+        ordering = ("owner", "name")
+
     def __str__(self):
-        return f"Type:{self.type.name} Owner:{self.owner.name} Name:{self.name}"
+        return f"Owner: {self.owner.name} Name: {self.name} Type: {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
         # Slug generation
@@ -394,7 +397,7 @@ class DeviceGroup(TimestampedModel):
         related_name="devicegroups",
         related_query_name="devicegroup",
         blank=True,
-        help_text="Outbound Integration.",
+        help_text="Outbound Integration(s). To choose multiple options, hold CMD/Ctrl key and select.",
     )
     devices = models.ManyToManyField(Device, blank=True)
     default_subject_type = models.ForeignKey(
