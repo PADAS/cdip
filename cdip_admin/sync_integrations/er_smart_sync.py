@@ -86,9 +86,15 @@ class ER_SMART_Synchronizer:
         )
         dm_dict = dm.export_as_dict()
 
-        ca_identifer = self.get_identifier_from_ca_label(ca.label)
+        cm_uuid = self.smart_client.get_configurable_datamodel_for_ca(ca_uuid=smart_ca_uuid)
+        cdm_dict = None
+        if cm_uuid:
+            cdm = self.smart_client.get_configurable_data_model(cm_uuid=cm_uuid, use_cache=settings.USE_SMART_CACHE)
+            cdm_dict = cdm.export_as_dict()
+
+        ca_identifier = self.get_identifier_from_ca_label(ca.label)
         event_types = build_earth_ranger_event_types(
-            dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifer
+            dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifier, cdm=cdm_dict
         )
 
         existing_event_categories = self.das_client.get_event_categories()
