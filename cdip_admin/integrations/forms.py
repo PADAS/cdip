@@ -136,7 +136,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             ),
             css_class="form-row",
         ),
-        Row(Column("state", css_class="form-group col-lg-3 mb-0")),
+        Row(Column("state", css_class="form-group col-lg-6 mb-0")),
     )
 
 
@@ -348,7 +348,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
             ),
             css_class="form-row",
         ),
-        Row(Column("state", css_class="form-group col-lg-3 mb-0")),
+        Row(Column("state", css_class="form-group col-lg-6 mb-0")),
         Row(
             Column("additional", css_class="form-group col-lg-6"),
             css_class="form-row",
