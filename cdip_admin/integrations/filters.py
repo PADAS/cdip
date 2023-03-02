@@ -295,7 +295,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         queryset=inbound_type_filter,
         method='affected_destinations_filter',
         to_field_name="name",
-        empty_label=_("Inbound Integration Type"),
+        empty_label=_("All Inbound Integration Types"),
         field_name="name",
         distinct=True,
     )
