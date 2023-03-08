@@ -15,6 +15,7 @@ from integrations.models import (
     BridgeIntegration
 )
 from core.widgets import CustomBooleanWidget
+from django.db.models import Q
 
 
 # set the organization filter options to the organizations that user is member of
@@ -263,6 +264,10 @@ class InboundIntegrationFilter(django_filters.FilterSet):
 
 
 class OutboundIntegrationFilter(django_filters.FilterSet):
+    def affected_destinations_filter(self, request, name, value):
+        return OutboundIntegrationConfiguration.objects.filter(
+            Q(devicegroup__inbound_integration_configurations__type__name__icontains=value) |
+            Q(devicegroup__devices__inbound_configuration__type__name__icontains=value)).order_by('id').distinct('id')
 
     name = django_filters.CharFilter(
         field_name="name", lookup_expr="icontains", label=_("Name")
@@ -280,15 +285,24 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         queryset=outbound_type_filter,
         field_name="type",
         to_field_name="name",
-        empty_label=_("All Types"),
+        empty_label=_("All Outbound Types"),
         distinct=True,
     )
 
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
 
+    outbound_affected_destinations = django_filters.ModelChoiceFilter(
+        queryset=inbound_type_filter,
+        method='affected_destinations_filter',
+        to_field_name="name",
+        empty_label=_("All Inbound Integration Types"),
+        field_name="name",
+        distinct=True,
+    )
+
     class Meta:
         model = OutboundIntegrationConfiguration
-        fields = ("organization", "outbound_config_type", "name", "enabled")
+        fields = ("organization", "name", "outbound_config_type", "outbound_affected_destinations", "enabled")
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
@@ -305,6 +319,13 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
                 self.request.session.pop("owner_filter", None)
             else:
                 self.request.session["owner_filter"] = self.data["organization"]
+
+        # if "outbound_affected_destinations" in self.data:
+        #     # get all device groups associated with the selected inbound type
+        #     selected_inbound_type = self.data["outbound_affected_destinations"]
+        #     associated_device_groups = InboundIntegrationConfiguration.objects.filter_by(selected_inbound_type)
+        #     # get all destination(s) associated with the device groups
+        #     self.data["outbound_affected_destinations"] = associated_device_groups
 
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
