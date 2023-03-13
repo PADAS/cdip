@@ -19,11 +19,12 @@ def get_admin_access_token():
     }
     response = requests.post(oauth_token_url, data=payload)
 
-    if response.status_code == 200:
-        return response.json()
-
-    else:
+    if response.status_code != 200:
         logger.warning(f"[{response.status_code}], {response.text}")
+        return
+
+    return response.json()
+
 
 
 def add_base_url(request, url):
