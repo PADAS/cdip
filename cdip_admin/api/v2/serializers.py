@@ -1,7 +1,10 @@
 from rest_framework import serializers
+from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 class InviteUserSerializer(serializers.Serializer):
     """
@@ -29,3 +32,19 @@ class InviteUserSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         pass
+
+    def validate_email(self, value):
+        """
+        Check if the user is already part of the Organization
+        """
+        email_clean = value.strip().lower()
+        try:
+            user = User.objects.get(email=email_clean)
+        except User.DoesNotExist:
+            pass  # New user
+        else:  # Existent user
+            org_id = self.context.get("view", {}).kwargs.get("pk")
+            is_organization_member = user.accountprofile.organizations.filter(id=org_id).exists()
+            if is_organization_member:
+                raise drf_exceptions.ValidationError("The user is already a member of this organization.")
+            return email_clean
