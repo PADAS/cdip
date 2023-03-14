@@ -13,6 +13,8 @@ class OrganizationView(viewsets.ModelViewSet):
     """
 
     def get_serializer_class(self):
+        if self.action == "members":
+            return v2_serializers.OrganizationMemberSerializer
         if self.action == "invite":
             return v2_serializers.InviteUserSerializer
         return v1_serializers.OrganizationSerializer
@@ -30,7 +32,6 @@ class OrganizationView(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post', 'put'])
     def invite(self, request, pk=None):
-        org = self.get_object()
         # Validations
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
@@ -43,3 +44,21 @@ class OrganizationView(viewsets.ModelViewSet):
         # ToDo: Analyze new cases when we want to send emails
         # Consider using some third-party email service
         return Response({'status': 'User invited successfully'})
+
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        requester = self.request.user
+        org = self.get_object()
+        # Get the members of this organization
+        members_qs = org.accountprofile_set.all()
+        # Only a member or a superuser can see the members list
+        if not requester.is_superuser and not members_qs.filter(user__id=requester.id).exists():
+            return Response(
+                ["You don't have permissions to see the members list"],
+                status=status.HTTP_403_FORBIDDEN
+            )
+        # Return the members list
+        # ToDo: me may want to add pagination in the future
+        serializer = self.get_serializer(members_qs, many=True)
+        return Response(serializer.data)
+

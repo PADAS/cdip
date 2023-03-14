@@ -2,9 +2,12 @@ from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
+from accounts.models import AccountProfile
 from django.contrib.auth import get_user_model
 
+
 User = get_user_model()
+
 
 class InviteUserSerializer(serializers.Serializer):
     """
@@ -47,4 +50,31 @@ class InviteUserSerializer(serializers.Serializer):
             is_organization_member = user.accountprofile.organizations.filter(id=org_id).exists()
             if is_organization_member:
                 raise drf_exceptions.ValidationError("The user is already a member of this organization.")
-            return email_clean
+        return email_clean
+
+
+class OrganizationMemberSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccountProfile
+        fields = (
+            "id",
+            "full_name",
+            "email",
+            "role",
+        )
+
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.first_name}"
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    def get_role(self, obj):
+        # get the user role in this organization
+        org_id = self.context.get("view", {}).kwargs.get("pk")
+        profile_in_org = obj.accountprofileorganization_set.get(organization__id=org_id)
+        return profile_in_org.role
