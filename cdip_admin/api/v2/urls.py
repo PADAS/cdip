@@ -3,7 +3,7 @@ from rest_framework_swagger.views import get_swagger_view
 from . import views
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
-router.register('organization', views.OrganizationView, basename="organications")
+router.register('organizations', views.OrganizationView, basename="organizations")
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 
 urlpatterns = [
