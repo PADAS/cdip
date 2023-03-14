@@ -1,5 +1,6 @@
 import logging
 from organizations.models import Organization
+from accounts.models import AccountProfile
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -28,7 +29,11 @@ class OrganizationView(viewsets.ModelViewSet):
         if user.is_superuser:
             return Organization.objects.all()
         # Members can only see the organizations they belong too
-        return user.user_profile.organizations.all()
+        try:
+            profile = user.accountprofile
+        except AccountProfile.DoesNotExist as e:
+            return Organization.objects.none()
+        return user.accountprofile.organizations.all()
 
     @action(detail=True, methods=['post', 'put'])
     def invite(self, request, pk=None):
