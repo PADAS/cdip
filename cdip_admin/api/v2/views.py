@@ -75,7 +75,7 @@ class MemberViewSet(mixins.RetrieveModelMixin,
                     mixins.UpdateModelMixin,
                     mixins.ListModelMixin,
                     GenericViewSet):
-
+    # ToDo: validate Permissions?
     def get_serializer_class(self):
         if self.action == "update":
             return v2_serializers.OrganizationMemberUpdateSerializer
@@ -83,3 +83,17 @@ class MemberViewSet(mixins.RetrieveModelMixin,
 
     def get_queryset(self):
         return AccountProfileOrganization.objects.filter(organization=self.kwargs['organization_pk'])
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        # Return the data which was updated
+        return Response(serializer.validated_data)
