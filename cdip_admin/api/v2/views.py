@@ -1,11 +1,12 @@
 import logging
 from organizations.models import Organization
-from accounts.models import AccountProfile
+from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework import mixins
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
-from api import serializers as v1_serializers
 from . import serializers as v2_serializers
 
 
@@ -15,13 +16,11 @@ class OrganizationView(viewsets.ModelViewSet):
     """
 
     def get_serializer_class(self):
-        if self.action == "members":
-                return v2_serializers.OrganizationMemberSerializer
         if self.action == "invite":
             return v2_serializers.InviteUserSerializer
         if self.action == "remove_members":
             return v2_serializers.RemoveMemberSerializer
-        return v1_serializers.OrganizationSerializer
+        return v2_serializers.OrganizationSerializer
 
     def get_queryset(self):
         """
@@ -58,23 +57,6 @@ class OrganizationView(viewsets.ModelViewSet):
         # Consider using some third-party email service
         return Response({'status': 'User invited successfully'})
 
-    @action(detail=True, methods=['get'])
-    def members(self, request, pk=None):
-        requester = self.request.user
-        org = self.get_object()
-        # Get the members of this organization
-        members_qs = org.accountprofileorganization_set.all()
-        # Only a member or a superuser can see the members list
-        if not requester.is_superuser and not members_qs.filter(accountprofile_user__id=requester.id).exists():
-            return Response(
-                ["You don't have permissions to see the members list"],
-                status=status.HTTP_403_FORBIDDEN
-            )
-        # Return the members list
-        # ToDo: me may want to add pagination in the future
-        serializer = self.get_serializer(members_qs, many=True)
-        return Response(serializer.data)
-
     @action(detail=True, methods=['post', 'put', 'patch'], url_path="remove-members")
     def remove_members(self, request, pk=None):
         requester = self.request.user
@@ -87,3 +69,17 @@ class OrganizationView(viewsets.ModelViewSet):
         # Remove members from organization
         removed_qty = remove_members_from_organization(org_id=org.id, profile_ids=serializer.validated_data["member_ids"])
         return Response(data={"removed": removed_qty}, status=status.HTTP_200_OK)
+
+
+class MemberViewSet(mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.ListModelMixin,
+                    GenericViewSet):
+
+    def get_serializer_class(self):
+        if self.action == "update":
+            return v2_serializers.OrganizationMemberUpdateSerializer
+        return v2_serializers.OrganizationMemberRetrieveSerializer
+
+    def get_queryset(self):
+        return AccountProfileOrganization.objects.filter(organization=self.kwargs['organization_pk'])
