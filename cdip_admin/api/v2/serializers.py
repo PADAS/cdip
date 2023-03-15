@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
-from accounts.models import AccountProfile
+from accounts.models import AccountProfileOrganization
 from django.contrib.auth import get_user_model
 
 
@@ -59,7 +59,7 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
 
     class Meta:
-        model = AccountProfile
+        model = AccountProfileOrganization
         fields = (
             "id",
             "full_name",
@@ -68,13 +68,23 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
         )
 
     def get_full_name(self, obj):
-        return f"{obj.user.first_name} {obj.user.first_name}"
+        return f"{obj.accountprofile.user.first_name} {obj.accountprofile.user.first_name}"
 
     def get_email(self, obj):
-        return obj.user.email
+        return obj.accountprofile.user.email
 
     def get_role(self, obj):
-        # get the user role in this organization
-        org_id = self.context.get("view", {}).kwargs.get("pk")
-        profile_in_org = obj.accountprofileorganization_set.get(organization__id=org_id)
-        return profile_in_org.role
+        return obj.role
+
+
+class RemoveMemberSerializer(serializers.Serializer):
+    """ Custom Serializer to support bulk removal of members from an organization"""
+
+    member_ids = serializers.ListField(write_only=True, required=True)
+    # ToDo: Validate ids?
+
+    def create(self, validated_data):
+        pass
+
+    def update(self, instance, validated_data):
+        pass

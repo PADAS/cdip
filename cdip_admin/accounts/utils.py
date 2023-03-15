@@ -95,3 +95,8 @@ def add_or_create_user_in_org(org_id, role, user_data):
         accountprofile_id=account_profile.id, organization_id=org_id, role=role
     )
     return user
+
+
+def remove_members_from_organization(org_id, profile_ids):
+    removed_qty, _ = AccountProfileOrganization.objects.filter(organization__id=org_id, id__in=profile_ids).delete()
+    return removed_qty
