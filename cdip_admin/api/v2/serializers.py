@@ -3,10 +3,25 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization
+from organizations.models import Organization
 from django.contrib.auth import get_user_model
 
 
 User = get_user_model()
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Organization
+        fields = ["id", "name", "description", "role"]
+
+    def get_role(self, obj):
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return "superuser"
+        return obj.accountprofileorganization_set.filter(accountprofile__user=user).last().role
 
 
 class InviteUserSerializer(serializers.Serializer):
@@ -53,7 +68,9 @@ class InviteUserSerializer(serializers.Serializer):
         return email_clean
 
 
-class OrganizationMemberSerializer(serializers.ModelSerializer):
+class OrganizationMemberRetrieveSerializer(serializers.ModelSerializer):
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
@@ -62,13 +79,21 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
         model = AccountProfileOrganization
         fields = (
             "id",
+            "first_name",
+            "last_name",
             "full_name",
             "email",
             "role",
         )
 
+    def get_first_name(self, obj):
+        return obj.accountprofile.user.first_name
+
+    def get_last_name(self, obj):
+        return obj.accountprofile.user.last_name
+
     def get_full_name(self, obj):
-        return f"{obj.accountprofile.user.first_name} {obj.accountprofile.user.first_name}"
+        return f"{self.get_first_name(obj)} {self.get_last_name(obj)}"
 
     def get_email(self, obj):
         return obj.accountprofile.user.email
@@ -88,3 +113,21 @@ class RemoveMemberSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         pass
+
+
+class OrganizationMemberUpdateSerializer(serializers.Serializer):
+
+    role = serializers.CharField(required=False)
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+
+    def update(self, instance, validated_data):
+        if "role" in validated_data:
+            instance.role = validated_data.pop("role")
+            instance.save()
+        # The rest of the data goes to the user model
+        user = instance.accountprofile.user
+        for k,v in validated_data.items():
+            setattr(user, k, v)
+        user.save()
+        return instance
