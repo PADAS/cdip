@@ -32,6 +32,7 @@ class Organization(TimestampedModel):
 
 
 class OrganizationGroup(TimestampedModel):
+    # ToDo: This model doesn't seem to be used. Remove it?
     name = models.CharField(max_length=200)
     organizations: ManyToManyField = models.ManyToManyField(Organization)
     description = models.TextField(blank=True)
@@ -41,6 +42,7 @@ class OrganizationGroup(TimestampedModel):
 
 
 class UserProfile(models.Model):
+    # ToDo: This model doesn't seem to be used. Remove it?
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
