@@ -122,8 +122,17 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_PAGINATION_CLASS": "proxy_pagination.ProxyPagination",
+    'PAGE_SIZE': 20
 }
 
+PROXY_PAGINATION_PARAM = 'pager'
+PROXY_PAGINATION_DEFAULT = 'rest_framework.pagination.CursorPagination'
+PROXY_PAGINATION_MAPPING = {
+    'cursor': 'rest_framework.pagination.CursorPagination',
+    'limit': 'rest_framework.pagination.LimitOffsetPagination',
+    'page': 'rest_framework.pagination.PageNumberPagination',
+}
 
 AUTHENTICATION_BACKENDS = {
     "django.contrib.auth.backends.ModelBackend",
