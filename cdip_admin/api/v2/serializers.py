@@ -44,7 +44,7 @@ class InviteUserSerializer(serializers.Serializer):
         )
 
     def create(self, validated_data):
-        org_id = self.context.get("view", {}).kwargs.get("pk")
+        org_id = self.context.get("view", {}).kwargs.get("organization_pk")
         role = validated_data.pop("role")
         return add_or_create_user_in_org(org_id=org_id, role=role, user_data=validated_data)
 
