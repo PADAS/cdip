@@ -39,7 +39,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "invite":
             return v2_serializers.InviteUserSerializer
-        if self.action == "remove_members":
+        if self.action == "remove":
             return v2_serializers.RemoveMemberSerializer
         if self.action == "update":
             return v2_serializers.OrganizationMemberUpdateSerializer
@@ -82,7 +82,7 @@ class MemberViewSet(viewsets.ModelViewSet):
         # Consider using some third-party email service
         return Response({'status': 'User invited successfully'})
 
-    @action(detail=False, methods=['post', 'put', 'patch'], url_path="remove-members")
+    @action(detail=False, methods=['post', 'put', 'patch'], url_path="remove")
     def remove(self, request, organization_pk=None):
         requester = self.request.user
         # ToDo: validate Permissions?
