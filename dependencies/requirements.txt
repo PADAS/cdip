@@ -161,6 +161,8 @@ drf-jwt==1.13.4
     # via -r requirements.in
 drf-nested-routers==0.93.4
     # via -r requirements.in
+drf-proxy-pagination==0.2.0
+    # via -r requirements.in
 ecdsa==0.15
     # via
     #   -r requirements.in
