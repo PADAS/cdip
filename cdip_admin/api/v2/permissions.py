@@ -30,10 +30,10 @@ class IsOrgAdmin(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         # Check that the user is an admin in this organization
-        org_id = request.parser_context["kwargs"]["organization_pk"]
-        role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
-        if role != RoleChoices.ADMIN.value:
-            return False
+        if org_id := request.parser_context["kwargs"].get("organization_pk"):
+            role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
+            if role != RoleChoices.ADMIN.value:
+                return False
         # Cannot create or destroy organizations
         return view.action not in ['create', 'destroy']
 
@@ -46,11 +46,11 @@ class IsOrgViewer(permissions.BasePermission):
     Viewers can only do read operations (list, get details, options..)
     """
     def has_permission(self, request, view):
-        # Check that the user is an viewer in this organization
-        org_id = request.parser_context["kwargs"]["organization_pk"]
-        role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
-        if role != RoleChoices.VIEWER.value:
-            return False
+        # Check that the user is a viewer in this organization
+        if org_id := request.parser_context["kwargs"].get("organization_pk"):
+            role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
+            if role != RoleChoices.VIEWER.value:
+                return False
         # Can do read only operations
         return request.method in permissions.SAFE_METHODS
 
