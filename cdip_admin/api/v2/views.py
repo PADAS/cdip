@@ -4,16 +4,16 @@ from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework import mixins
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
 from . import serializers as v2_serializers
+from . import permissions
 
 
 class OrganizationView(viewsets.ModelViewSet):
     """
-    A viewset for managing organizations and it's members
+    An endpoint for managing organizations
     """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
 
     def get_serializer_class(self):
         return v2_serializers.OrganizationSerializer
@@ -35,7 +35,11 @@ class OrganizationView(viewsets.ModelViewSet):
 
 
 class MemberViewSet(viewsets.ModelViewSet):
-    # ToDo: validate Permissions?
+    """
+    An endpoint for managing organization members
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+
     def get_serializer_class(self):
         if self.action == "invite":
             return v2_serializers.InviteUserSerializer
@@ -67,8 +71,6 @@ class MemberViewSet(viewsets.ModelViewSet):
         """
         Invite members to an Organization
         """
-        # ToDo: Check permissions
-        # Only superusers or org admins can invite members
         # Validations
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
@@ -78,17 +80,16 @@ class MemberViewSet(viewsets.ModelViewSet):
             )
         # Create user
         self.perform_create(serializer)
-        # ToDo: Analyze new cases when we want to send emails
+        # ToDo: Send email
         # Consider using some third-party email service
         return Response({'status': 'User invited successfully'})
 
     @action(detail=False, methods=['post', 'put', 'patch'], url_path="remove")
     def remove(self, request, organization_pk=None):
-        requester = self.request.user
-        # ToDo: validate Permissions?
-        serializer = self.get_serializer(
-            data=request.data
-        )
+        """
+        Invite members to an Organization
+        """
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # Remove members from organization
         removed_qty = remove_members_from_organization(org_id=organization_pk, profile_ids=serializer.validated_data["member_ids"])
