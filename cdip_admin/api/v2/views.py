@@ -2,7 +2,7 @@ import logging
 from organizations.models import Organization
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import serializers as v2_serializers
@@ -14,6 +14,9 @@ class OrganizationView(viewsets.ModelViewSet):
     An endpoint for managing organizations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['id', 'name']
+    ordering = ['id']
 
     def get_serializer_class(self):
         return v2_serializers.OrganizationSerializer
@@ -39,6 +42,9 @@ class MemberViewSet(viewsets.ModelViewSet):
     An endpoint for managing organization members
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['id']
+    ordering = ['id']
 
     def get_serializer_class(self):
         if self.action == "invite":
