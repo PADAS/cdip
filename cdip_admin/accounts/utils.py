@@ -59,7 +59,7 @@ def add_or_create_user_in_org(org_id, role, user_data):
     first_name = user_data["first_name"]
     last_name = user_data["last_name"]
     username = email
-
+    user_created = False
     try:
         user = User.objects.get(email=email)
         if not user.groups.filter(
@@ -85,6 +85,7 @@ def add_or_create_user_in_org(org_id, role, user_data):
                 name=DjangoGroups.ORGANIZATION_MEMBER
             ).id
             user.groups.add(group_id)
+            user_created = True
         else:
             raise SuspiciousOperation
 
@@ -94,9 +95,13 @@ def add_or_create_user_in_org(org_id, role, user_data):
     apo, created = AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id, organization_id=org_id, role=role
     )
-    return user
+    return user, user_created
 
 
 def remove_members_from_organization(org_id, profile_ids):
     removed_qty, _ = AccountProfileOrganization.objects.filter(organization__id=org_id, id__in=profile_ids).delete()
     return removed_qty
+
+
+def get_password_reset_link(user):
+    return f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/login-actions/reset-credentials?client_id={KEYCLOAK_CLIENT}"
