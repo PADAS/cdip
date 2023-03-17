@@ -2,6 +2,7 @@ import logging
 from organizations.models import Organization
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
+from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -84,10 +85,13 @@ class MemberViewSet(viewsets.ModelViewSet):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # Create user
-        self.perform_create(serializer)
-        # ToDo: Send email
-        # Consider using some third-party email service
+        # Add or create user
+        user, created = serializer.save()
+        send_invite_email_task.delay(
+            user_id=user.id,
+            org_id=organization_pk,
+            is_new_user=created
+        )
         return Response({'status': 'User invited successfully'})
 
     @action(detail=False, methods=['post', 'put', 'patch'], url_path="remove")

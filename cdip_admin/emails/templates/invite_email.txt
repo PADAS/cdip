@@ -1,0 +1,9 @@
+Welcome {{name}}
+
+You has been invited to collaborate with {{organization}} in Gundi.
+{% if is_new_user %}
+    You will need to reset your password clicking in "Forgot Password?".
+{% endif %}
+Please click the following link to continue
+{{login_url}}
+

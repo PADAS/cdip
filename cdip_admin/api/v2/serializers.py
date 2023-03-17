@@ -116,10 +116,12 @@ class RemoveMemberSerializer(serializers.Serializer):
 
 
 class OrganizationMemberUpdateSerializer(serializers.Serializer):
-
     role = serializers.CharField(required=False)
     first_name = serializers.CharField(required=False)
     last_name = serializers.CharField(required=False)
+
+    def create(self, validated_data):
+        pass
 
     def update(self, instance, validated_data):
         if "role" in validated_data:
@@ -127,7 +129,7 @@ class OrganizationMemberUpdateSerializer(serializers.Serializer):
             instance.save()
         # The rest of the data goes to the user model
         user = instance.accountprofile.user
-        for k,v in validated_data.items():
+        for k, v in validated_data.items():
             setattr(user, k, v)
         user.save()
         return instance
