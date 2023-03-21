@@ -2,9 +2,10 @@ from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
-from accounts.models import AccountProfileOrganization
+from accounts.models import AccountProfileOrganization, AccountProfile
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 
 User = get_user_model()
@@ -57,14 +58,19 @@ class InviteUserSerializer(serializers.Serializer):
         """
         email_clean = value.strip().lower()
         try:
-            user = User.objects.get(email=email_clean)
+            user = User.objects.get(Q(username=email_clean) | Q(email=email_clean))
         except User.DoesNotExist:
             pass  # New user
         else:  # Existent user
             org_id = self.context.get("view", {}).kwargs.get("pk")
-            is_organization_member = user.accountprofile.organizations.filter(id=org_id).exists()
+            try:  # Check if user belongs to the organization
+                is_organization_member = user.accountprofile.organizations.filter(id=org_id).exists()
+            except AccountProfile.DoesNotExist:
+                is_organization_member = False  # Superusers or other users created through the django admin
+
             if is_organization_member:
                 raise drf_exceptions.ValidationError("The user is already a member of this organization.")
+
         return email_clean
 
 
@@ -96,7 +102,7 @@ class OrganizationMemberRetrieveSerializer(serializers.ModelSerializer):
         return f"{self.get_first_name(obj)} {self.get_last_name(obj)}"
 
     def get_email(self, obj):
-        return obj.accountprofile.user.email
+        return obj.accountprofile.user.email or obj.accountprofile.user.username
 
     def get_role(self, obj):
         return obj.role
