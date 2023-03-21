@@ -3,6 +3,7 @@ import requests
 from django.http import JsonResponse
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import SuspiciousOperation
+from django.db.models import Q
 from core.enums import DjangoGroups
 from cdip_admin import settings
 from core.utils import get_admin_access_token
@@ -61,7 +62,7 @@ def add_or_create_user_in_org(org_id, role, user_data):
     username = email
     user_created = False
     try:
-        user = User.objects.get(email=email)
+        user = User.objects.get(Q(username=email) | Q(email=email))
         if not user.groups.filter(
                 name=DjangoGroups.ORGANIZATION_MEMBER.value
         ).exists():

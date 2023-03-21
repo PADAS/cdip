@@ -14,11 +14,12 @@ def send_invite_email(user, organization, is_new_user):
     }
     email_html_message = render_to_string('invite_email.html', context)
     email_plaintext_message = render_to_string('invite_email.txt', context)
+    to_email = user.email or user.username  # Fallback to username if email field isn't set
     return send_mail(
         subject=subject,
         message=email_plaintext_message,
         html_message=email_html_message,
         from_email=settings.EMAIL_FROM_DEFAULT,
-        recipient_list=[user.email],
+        recipient_list=[to_email],
         fail_silently=False
     )
