@@ -6,7 +6,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
-from core.enums import DjangoGroups
+from core.enums import DjangoGroups, RoleChoices
 from integrations.models import (
     InboundIntegrationType,
     OutboundIntegrationType,
@@ -29,6 +29,77 @@ def api_client():
     https://www.django-rest-framework.org/api-guide/testing/#apiclient
     """
     return APIClient()
+
+
+@pytest.fixture
+def superuser():
+    email = "superuser@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="John",
+        last_name="Doe",
+        is_superuser=True
+    )
+    return user
+
+
+@pytest.fixture
+def org_admin_user(organization, org_members_group):
+    email = "orgadmin@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Caroline",
+        last_name="West"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=organization.id,
+        role=RoleChoices.ADMIN.value
+    )
+    return user
+
+
+@pytest.fixture
+def org_viewer_user(organization, org_members_group):
+    email = "orgadmin@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Colin",
+        last_name="Gray"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=organization.id,
+        role=RoleChoices.VIEWER.value
+    )
+    return user
+
+
+@pytest.fixture
+def organization():
+    org, _ = Organization.objects.get_or_create(
+        name="Test Organization",
+        description="A reserve in Africa"
+    )
+    return org
+
+
+@pytest.fixture
+def org_members_group():
+    return Group.objects.create(
+        name=DjangoGroups.ORGANIZATION_MEMBER.value
+    )
 
 
 @pytest.fixture
