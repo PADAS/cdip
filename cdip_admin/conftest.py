@@ -21,6 +21,7 @@ from integrations.models import (
 from organizations.models import Organization
 
 
+
 @pytest.fixture
 def api_client():
     """
@@ -87,23 +88,36 @@ def org_viewer_user(organization, org_members_group):
 
 
 @pytest.fixture
-def organization():
+def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
-        name="Test Organization",
+        name=f"Test Organization {get_random_id()}",
         description="A reserve in Africa"
     )
     return org
 
 
 @pytest.fixture
-def org_members_group():
-    return Group.objects.create(
-        name=DjangoGroups.ORGANIZATION_MEMBER.value
-    )
+def organizations_list(get_random_id):
+    orgs = []
+    for i in range(10):
+        org, _ = Organization.objects.get_or_create(
+            name=f"Test Organization {get_random_id()}",
+            description="A reserve in Africa"
+        )
+        orgs.append(org)
+    return orgs
 
 
 @pytest.fixture
-def get_device_id():
+def org_members_group():
+    group, _ = Group.objects.get_or_create(
+        name=DjangoGroups.ORGANIZATION_MEMBER.value
+    )
+    return group
+
+
+@pytest.fixture
+def get_random_id():
     """
     A helper function that generates a ramdom alphanumeric id, to be used as external_id of Devices
     """
