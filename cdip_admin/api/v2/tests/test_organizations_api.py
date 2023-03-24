@@ -277,7 +277,7 @@ def test_invite_new_user_org_admin_as_superuser(
         api_client=api_client,
         inviter=superuser,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.ADMIN.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -295,7 +295,7 @@ def test_invite_new_user_org_admin_as_org_admin(
         api_client=api_client,
         inviter=org_admin_user,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.ADMIN.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -313,7 +313,7 @@ def test_cannot_invite_new_user_org_admin_as_org_viewer(
         api_client=api_client,
         inviter=org_viewer_user,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.ADMIN.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -331,7 +331,7 @@ def test_invite_new_user_org_viewer_as_superuser(
         api_client=api_client,
         inviter=superuser,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.VIEWER.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -349,7 +349,7 @@ def test_invite_new_user_org_viewer_as_org_admin(
         api_client=api_client,
         inviter=org_admin_user,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.VIEWER.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -367,7 +367,7 @@ def test_cannot_invite_new_org_viewer_as_org_viewer(
         api_client=api_client,
         inviter=org_viewer_user,
         organization=organization,
-        user_email=new_user_email,
+        user_email=new_user_email(),
         role=RoleChoices.VIEWER.value,
         is_new=True,
         org_members_group=org_members_group,
@@ -385,7 +385,7 @@ def test_invite_existent_user_org_admin_as_superuser(
         api_client=api_client,
         inviter=superuser,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.ADMIN.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -403,7 +403,7 @@ def test_invite_existent_user_org_admin_as_org_admin(
         api_client=api_client,
         inviter=org_admin_user,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.ADMIN.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -421,7 +421,7 @@ def test_cannot_invite_existent_user_org_admin_as_org_viewer(
         api_client=api_client,
         inviter=org_viewer_user,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.ADMIN.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -439,7 +439,7 @@ def test_invite_existent_user_org_viewer_as_superuser(
         api_client=api_client,
         inviter=superuser,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.VIEWER.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -457,7 +457,7 @@ def test_invite_existent_user_org_viewer_as_org_admin(
         api_client=api_client,
         inviter=org_admin_user,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.VIEWER.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -475,7 +475,7 @@ def test_cannot_invite_existent_user_org_viewer_as_org_viewer(
         api_client=api_client,
         inviter=org_viewer_user,
         organization=organization,
-        user_email=new_random_user.email,
+        user_email=new_random_user().email,
         role=RoleChoices.VIEWER.value,
         is_new=False,
         org_members_group=org_members_group,
@@ -484,21 +484,55 @@ def test_cannot_invite_existent_user_org_viewer_as_org_viewer(
         mock_send_invite_email_task=mock_send_invite_email_task
     )
 
-# def test_list_organization_members_as_superuser(api_client, superuser, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_list_organization_members_as_org_admin(api_client, org_admin_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_list_organization_members_as_org_viewer(api_client, org_viewer_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
+
+def _test_list_organization_members(api_client, user, organization, members_apo_list):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("members-list", kwargs={"organization_pk": organization.id}),
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    # Check that the superuser can see all the members
+    expected_member_ids = [m.id for m in members_apo_list]
+    # The requester user should also be in the organization, unless it's a superuser
+    if not user.is_superuser:
+        user_apo = AccountProfileOrganization.objects.get(accountprofile__user=user)
+        expected_member_ids.append(user_apo.id)
+    for member in response_data["results"]:
+        assert member.get("id") in expected_member_ids
+        assert "first_name" in member
+        assert "last_name" in member
+        assert "role" in member
+
+
+def test_list_organization_members_as_superuser(api_client, superuser, organization, members_apo_list):
+    _test_list_organization_members(
+        api_client=api_client,
+        user=superuser,
+        organization=organization,
+        members_apo_list=members_apo_list
+    )
+
+
+def test_list_organization_members_as_org_admin(api_client, org_admin_user, organization, members_apo_list):
+    _test_list_organization_members(
+        api_client=api_client,
+        user=org_admin_user,
+        organization=organization,
+        members_apo_list=members_apo_list
+    )
+
+
+def test_list_organization_members_as_org_viewer(api_client, org_viewer_user, organization, members_apo_list):
+    _test_list_organization_members(
+        api_client=api_client,
+        user=org_viewer_user,
+        organization=organization,
+        members_apo_list=members_apo_list
+    )
+
+
+
 # def test_retrieve_member_details_as_superuser(api_client, superuser, setup_data):
 #     # ToDo: Implement
 #     pass
