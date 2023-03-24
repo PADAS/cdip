@@ -89,29 +89,32 @@ def org_viewer_user(organization, org_members_group):
 
 @pytest.fixture
 def new_random_user(new_user_email, org_members_group):
-    email = new_user_email
-    user = User.objects.create(
-        username=email,
-        email=email
-    )
-    user.groups.add(org_members_group.id)
-    AccountProfile.objects.create(
-        user_id=user.id,
-    )
-    return user
-
+    def _make_random_user():
+        email = new_user_email()
+        user = User.objects.create(
+            username=email,
+            email=email
+        )
+        user.groups.add(org_members_group.id)
+        AccountProfile.objects.create(
+            user_id=user.id,
+        )
+        return user
+    return _make_random_user
 
 @pytest.fixture
 def new_user_email(get_random_id):
-    unique_id = get_random_id()
-    while True:
-        try:
-            email = f"testuser-{unique_id}@gundiservice.org"
-            User.objects.get(username=email)
-        except User.DoesNotExist:
-            return email
-        else:  # Try a new email
-            unique_id = get_random_id()
+    def _make_random_email():
+        unique_id = get_random_id()
+        while True:
+            try:
+                email = f"testuser-{unique_id}@gundiservice.org"
+                User.objects.get(username=email)
+            except User.DoesNotExist:
+                return email
+            else:  # Try a new email
+                unique_id = get_random_id()
+    return _make_random_email
 
 @pytest.fixture
 def organization(get_random_id):
@@ -120,6 +123,20 @@ def organization(get_random_id):
         description="A reserve in Africa"
     )
     return org
+
+
+@pytest.fixture
+def members_apo_list(organization, new_random_user):
+    members_apo_list = []
+    for i in range(10):
+        user = new_random_user()
+        apo = AccountProfileOrganization.objects.create(
+            accountprofile_id=user.accountprofile.id,
+            organization_id=organization.id,
+            role=RoleChoices.VIEWER.value
+        )
+        members_apo_list.append(apo)
+    return members_apo_list
 
 
 @pytest.fixture
