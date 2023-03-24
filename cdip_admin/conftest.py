@@ -88,6 +88,32 @@ def org_viewer_user(organization, org_members_group):
 
 
 @pytest.fixture
+def new_random_user(new_user_email, org_members_group):
+    email = new_user_email
+    user = User.objects.create(
+        username=email,
+        email=email
+    )
+    user.groups.add(org_members_group.id)
+    AccountProfile.objects.create(
+        user_id=user.id,
+    )
+    return user
+
+
+@pytest.fixture
+def new_user_email(get_random_id):
+    unique_id = get_random_id()
+    while True:
+        try:
+            email = f"testuser-{unique_id}@gundiservice.org"
+            User.objects.get(username=email)
+        except User.DoesNotExist:
+            return email
+        else:  # Try a new email
+            unique_id = get_random_id()
+
+@pytest.fixture
 def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
         name=f"Test Organization {get_random_id()}",
@@ -97,8 +123,8 @@ def organization(get_random_id):
 
 
 @pytest.fixture
-def organizations_list(get_random_id):
-    orgs = []
+def organizations_list(get_random_id, organization):
+    orgs = [organization]  # Organization having an admin and a viewer
     for i in range(10):
         org, _ = Organization.objects.get_or_create(
             name=f"Test Organization {get_random_id()}",
@@ -114,6 +140,18 @@ def org_members_group():
         name=DjangoGroups.ORGANIZATION_MEMBER.value
     )
     return group
+
+
+@pytest.fixture
+def mock_add_account(mocker):
+    add_account = mocker.MagicMock()
+    add_account.return_value = True
+    return add_account
+
+
+@pytest.fixture
+def mock_send_invite_email_task(mocker):
+    return mocker.MagicMock()
 
 
 @pytest.fixture
