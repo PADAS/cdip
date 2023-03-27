@@ -122,8 +122,17 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_PAGINATION_CLASS": "proxy_pagination.ProxyPagination",
+    'PAGE_SIZE': 20
 }
 
+PROXY_PAGINATION_PARAM = 'pager'
+PROXY_PAGINATION_DEFAULT = 'rest_framework.pagination.CursorPagination'
+PROXY_PAGINATION_MAPPING = {
+    'cursor': 'rest_framework.pagination.CursorPagination',
+    'limit': 'rest_framework.pagination.LimitOffsetPagination',
+    'page': 'rest_framework.pagination.PageNumberPagination',
+}
 
 AUTHENTICATION_BACKENDS = {
     "django.contrib.auth.backends.ModelBackend",
@@ -151,7 +160,7 @@ ROOT_URLCONF = "cdip_admin.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        'DIRS': [os.path.join(BASE_DIR, 'emails/templates')],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -259,3 +268,14 @@ CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES = env.int(
 )
 
 USE_SMART_CACHE = env.bool("USE_SMART_CACHE", False)
+
+# Email settings
+EMAIL_HOST = env.str("EMAIL_HOST", "email-smtp.us-west-2.amazonaws.com")
+EMAIL_PORT = env.int("EMAIL_PORT", 2587)
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env.str("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD", "")
+EMAIL_FROM_DEFAULT = env.str("EMAIL_FROM_DEFAULT", "notifications.cdip@pamdas.org")
+EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifications")
+EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
+EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")

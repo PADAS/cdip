@@ -6,7 +6,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
-from core.enums import DjangoGroups
+from core.enums import DjangoGroups, RoleChoices
 from integrations.models import (
     InboundIntegrationType,
     OutboundIntegrationType,
@@ -21,6 +21,7 @@ from integrations.models import (
 from organizations.models import Organization
 
 
+
 @pytest.fixture
 def api_client():
     """
@@ -32,7 +33,146 @@ def api_client():
 
 
 @pytest.fixture
-def get_device_id():
+def superuser():
+    email = "superuser@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="John",
+        last_name="Doe",
+        is_superuser=True
+    )
+    return user
+
+
+@pytest.fixture
+def org_admin_user(organization, org_members_group):
+    email = "orgadmin@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Caroline",
+        last_name="West"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=organization.id,
+        role=RoleChoices.ADMIN.value
+    )
+    return user
+
+
+@pytest.fixture
+def org_viewer_user(organization, org_members_group):
+    email = "orgadmin@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Colin",
+        last_name="Gray"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=organization.id,
+        role=RoleChoices.VIEWER.value
+    )
+    return user
+
+
+@pytest.fixture
+def new_random_user(new_user_email, org_members_group):
+    def _make_random_user():
+        email = new_user_email()
+        user = User.objects.create(
+            username=email,
+            email=email
+        )
+        user.groups.add(org_members_group.id)
+        AccountProfile.objects.create(
+            user_id=user.id,
+        )
+        return user
+    return _make_random_user
+
+@pytest.fixture
+def new_user_email(get_random_id):
+    def _make_random_email():
+        unique_id = get_random_id()
+        while True:
+            try:
+                email = f"testuser-{unique_id}@gundiservice.org"
+                User.objects.get(username=email)
+            except User.DoesNotExist:
+                return email
+            else:  # Try a new email
+                unique_id = get_random_id()
+    return _make_random_email
+
+@pytest.fixture
+def organization(get_random_id):
+    org, _ = Organization.objects.get_or_create(
+        name=f"Test Organization {get_random_id()}",
+        description="A reserve in Africa"
+    )
+    return org
+
+
+@pytest.fixture
+def members_apo_list(organization, new_random_user):
+    members_apo_list = []
+    for i in range(10):
+        user = new_random_user()
+        apo = AccountProfileOrganization.objects.create(
+            accountprofile_id=user.accountprofile.id,
+            organization_id=organization.id,
+            role=RoleChoices.VIEWER.value
+        )
+        members_apo_list.append(apo)
+    return members_apo_list
+
+
+@pytest.fixture
+def organizations_list(get_random_id, organization):
+    orgs = [organization]  # Organization having an admin and a viewer
+    for i in range(10):
+        org, _ = Organization.objects.get_or_create(
+            name=f"Test Organization {get_random_id()}",
+            description="A reserve in Africa"
+        )
+        orgs.append(org)
+    return orgs
+
+
+@pytest.fixture
+def org_members_group():
+    group, _ = Group.objects.get_or_create(
+        name=DjangoGroups.ORGANIZATION_MEMBER.value
+    )
+    return group
+
+
+@pytest.fixture
+def mock_add_account(mocker):
+    add_account = mocker.MagicMock()
+    add_account.return_value = True
+    return add_account
+
+
+@pytest.fixture
+def mock_send_invite_email_task(mocker):
+    return mocker.MagicMock()
+
+
+@pytest.fixture
+def get_random_id():
     """
     A helper function that generates a ramdom alphanumeric id, to be used as external_id of Devices
     """
