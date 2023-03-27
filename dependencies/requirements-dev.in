@@ -1,9 +1,10 @@
 django-sslserver==0.22
-pytest==5.4.3
-pytest-django==3.9.0
-pytest-pythonpath==0.7.3
+pytest==6.2.5
+pytest-django==4.5.2
+pytest-pythonpath==0.7.4
 pytest-mimesis==1.1.0
-pytest-cov==2.10.0
-pytest-xdist==1.33.0
+pytest-cov==4.0.0
+pytest-xdist==3.2.1
 xmlunittest==0.5.0
-pre-commit==2.15.0
+pre-commit==3.2.0
+pytest-mock==3.10.0
