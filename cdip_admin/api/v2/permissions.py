@@ -26,14 +26,17 @@ class IsSuperuser(permissions.BasePermission):
 class IsOrgAdmin(permissions.BasePermission):
     """
     Organization admin can do anything within the organizations they belong.
-    But they cannot create od delete organizations
+    But they cannot create or delete organizations
     """
     def has_permission(self, request, view):
         # Check that the user is an admin in this organization
-        if org_id := request.parser_context["kwargs"].get("organization_pk"):
+        context = request.parser_context["kwargs"]
+        if org_id := context.get("organization_pk") or context.get("pk"):
             role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
             if role != RoleChoices.ADMIN.value:
                 return False
+        else:  # No organization selected
+            return False
         # Cannot create or destroy organizations
         return view.action not in ['create', 'destroy']
 
@@ -47,7 +50,8 @@ class IsOrgViewer(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         # Check that the user is a viewer in this organization
-        if org_id := request.parser_context["kwargs"].get("organization_pk"):
+        context = request.parser_context["kwargs"]
+        if org_id := context.get("organization_pk") or context.get("pk"):
             role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
             if role != RoleChoices.VIEWER.value:
                 return False
