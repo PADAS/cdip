@@ -574,20 +574,63 @@ def test_retrieve_member_details_as_org_viewer(api_client, org_viewer_user, orga
     )
 
 
-# def test_update_member_details_as_superuser(api_client, superuser, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_update_member_details_as_org_admin(api_client, org_admin_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_cannot_update_member_details_as_org_viewer(api_client, org_viewer_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
+def _test_update_member_details(api_client, user, organization, member_apo):
+    request_data = {
+        "first_name": "John",
+        "last_name": "Doe",
+        "role": RoleChoices.ADMIN.value
+    }
+    api_client.force_authenticate(user)
+    response = api_client.put(
+        reverse("members-detail", kwargs={"organization_pk": organization.id, "pk": member_apo.id}),
+        data=request_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    # Check the response
+    assert response_data["first_name"] == request_data["first_name"]
+    assert response_data["last_name"] == request_data["last_name"]
+    assert response_data["role"] == request_data["role"]
+    # Check the data was updated in the database
+    member_user = member_apo.accountprofile.user
+    member_user.refresh_from_db()
+    assert member_user.first_name == request_data["first_name"]
+    assert member_user.last_name == request_data["last_name"]
+    member_apo.refresh_from_db()
+    assert member_apo.role == request_data["role"]
+
+
+def test_update_member_details_as_superuser(api_client, superuser, organization, members_apo_list):
+    _test_update_member_details(
+        api_client=api_client,
+        user=superuser,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_update_member_details_as_org_admin(api_client, org_admin_user, organization, members_apo_list):
+    _test_update_member_details(
+        api_client=api_client,
+        user=org_admin_user,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_cannot_update_member_details_as_org_viewer(api_client, org_viewer_user, organization, members_apo_list):
+    member_apo = members_apo_list[0]
+    request_data = {
+        "first_name": "John",
+        "last_name": "Doe",
+        "role": RoleChoices.ADMIN.value
+    }
+    api_client.force_authenticate(org_viewer_user)
+    response = api_client.put(
+        reverse("members-detail", kwargs={"organization_pk": organization.id, "pk": member_apo.id}),
+        data=request_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def _test_remove_members(api_client, user, organization, member_apo):
