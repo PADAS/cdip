@@ -532,22 +532,48 @@ def test_list_organization_members_as_org_viewer(api_client, org_viewer_user, or
     )
 
 
+def _test_retrieve_member_details(api_client, user, organization, member_apo):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("members-detail", kwargs={"organization_pk": organization.id, "pk": member_apo.id}),
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    user = member_apo.accountprofile.user
+    assert response_data.get("id") == member_apo.id
+    assert response_data.get("role") == member_apo.role
+    assert response_data.get("email") == user.username
+    assert response_data.get("first_name") == user.first_name
+    assert response_data.get("last_name") == user.last_name
 
-# def test_retrieve_member_details_as_superuser(api_client, superuser, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_retrieve_member_details_as_org_admin(api_client, org_admin_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_cannot_retrieve_other_member_details_as_org_viewer(api_client, org_viewer_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
+
+def test_retrieve_member_details_as_superuser(api_client, superuser, organization, members_apo_list):
+    _test_retrieve_member_details(
+        api_client=api_client,
+        user=superuser,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_retrieve_member_details_as_org_admin(api_client, org_admin_user, organization, members_apo_list):
+    _test_retrieve_member_details(
+        api_client=api_client,
+        user=org_admin_user,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_retrieve_member_details_as_org_viewer(api_client, org_viewer_user, organization, members_apo_list):
+    _test_retrieve_member_details(
+        api_client=api_client,
+        user=org_viewer_user,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
 # def test_update_member_details_as_superuser(api_client, superuser, setup_data):
 #     # ToDo: Implement
 #     pass
@@ -562,18 +588,62 @@ def test_list_organization_members_as_org_viewer(api_client, org_viewer_user, or
 #     # ToDo: Implement
 #     pass
 #
-#
-# def test_remove_member_as_superuser(api_client, superuser, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_remove_member_as_org_admin(api_client, org_admin_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_cannot_remove_member_as_org_viewer(api_client, org_viewer_user, setup_data):
-#     # ToDo: Implement
-#     pass
 
+
+def _test_remove_members(api_client, user, organization, member_apo):
+    member_user_id = member_apo.accountprofile.user.id
+    apo_id = member_apo.id
+    request_data = {
+      "member_ids": [apo_id]
+    }
+    api_client.force_authenticate(user)
+    response = api_client.put(
+        reverse("members-remove", kwargs={"organization_pk": organization.id}),
+        data=request_data
+    )
+    # Check the request response
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    assert response_data.get("removed") == 1
+    # Check that the user still exist in the DB
+    assert User.objects.filter(id=member_user_id).exists()
+    # Check that the user is no longer a member of the organization
+    assert not AccountProfileOrganization.objects.filter(id=apo_id).exists()
+
+
+def test_remove_member_as_superuser(api_client, superuser, organization, members_apo_list):
+    _test_remove_members(
+        api_client=api_client,
+        user=superuser,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_remove_member_as_org_admin(api_client, org_admin_user, organization, members_apo_list):
+    _test_remove_members(
+        api_client=api_client,
+        user=org_admin_user,
+        organization=organization,
+        member_apo=members_apo_list[0]
+    )
+
+
+def test_cannot_remove_member_as_org_viewer(api_client, org_viewer_user, organization, members_apo_list):
+    member_apo = members_apo_list[0]
+    member_user_id = member_apo.accountprofile.user.id
+    apo_id = member_apo.id
+    request_data = {
+      "member_ids": [apo_id]
+    }
+    api_client.force_authenticate(org_viewer_user)
+    response = api_client.put(
+        reverse("members-remove", kwargs={"organization_pk": organization.id}),
+        data=request_data
+    )
+    # Check the request response
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    # Check that the apo was NOT deleted in the database
+    assert AccountProfileOrganization.objects.filter(id=apo_id).exists()
+    # Check that the user still exist in the DB
+    assert User.objects.filter(id=member_user_id).exists()
