@@ -177,7 +177,7 @@ def test_cannot_retrieve_unrelated_organization_details_as_org_admin_user(api_cl
     response = api_client.get(
         reverse("organizations-detail", kwargs={"pk": unrelated_organization.id})
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_cannot_retrieve_unrelated_organization_details_as_org_viewer(api_client, org_viewer_user, organization, organizations_list):
@@ -187,18 +187,58 @@ def test_cannot_retrieve_unrelated_organization_details_as_org_viewer(api_client
     response = api_client.get(
         reverse("organizations-detail", kwargs={"pk": unrelated_organization.id})
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-# def test_update_organization_details_as_superuser(api_client, superuser, setup_data):
-#     # ToDo: Implement
-#     pass
-#
-#
-# def test_update_organization_details_as_org_admin(api_client, org_admin_user, setup_data):
-#     # ToDo: Implement
-#     pass
-#
+def _test_update_organization_details(api_client, user, organization):
+    request_data = {
+      "name": "Grumeti Reserve",
+      "description": "Wild life preservation in Tanzania"
+    }
+    api_client.force_authenticate(user)
+    response = api_client.put(
+        reverse("organizations-detail", kwargs={"pk": organization.id}),
+        data=request_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    # Check the response
+    assert response_data["name"] == request_data["name"]
+    assert response_data["description"] == request_data["description"]
+    # Check the data was updated in the database
+    organization.refresh_from_db()
+    assert organization.name == request_data["name"]
+    assert organization.description == request_data["description"]
+
+
+def test_update_organization_details_as_superuser(api_client, superuser, organization):
+    _test_update_organization_details(
+        api_client=api_client,
+        user=superuser,
+        organization=organization
+    )
+
+
+def test_update_organization_details_as_org_admin(api_client, org_admin_user, organization):
+    _test_update_organization_details(
+        api_client=api_client,
+        user=org_admin_user,
+        organization=organization
+    )
+
+
+def test_cannot_update_organization_details_as_org_viewer(api_client, org_viewer_user, organization):
+    request_data = {
+      "name": "Grumeti Reserve",
+      "description": "Wild life preservation in Tanzania"
+    }
+    api_client.force_authenticate(org_viewer_user)
+    response = api_client.put(
+        reverse("organizations-detail", kwargs={"pk": organization.id}),
+        data=request_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
 
 def _test_invite_user(
         api_client, inviter, organization, user_email, role, is_new, org_members_group,
