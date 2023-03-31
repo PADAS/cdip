@@ -61,6 +61,8 @@ whitenoise==5.2.0
 python-json-logger==2.0.2
 packaging==20.9
 django-extensions==3.2.0
+drf-nested-routers==0.93.4
+drf-proxy-pagination==0.2.0
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
 https://github.com/PADAS/smartconnect-client/releases/download/v1.2.8/smartconnect_client-1.2.8-py3-none-any.whl
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.2.11/cdip_connector-1.2.11-py3-none-any.whl

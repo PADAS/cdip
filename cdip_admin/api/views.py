@@ -39,6 +39,7 @@ class OrganizationsListView(generics.ListAPIView):
     serializer_class = OrganizationSerializer
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
     filter_class = OrganizationFilter
+    pagination_class = None
 
     def get_queryset(self):
         user = self.request.user
@@ -71,6 +72,7 @@ class InboundIntegrationTypeListView(generics.ListAPIView):
     queryset = InboundIntegrationType.objects.all()
     serializer_class = InboundIntegrationTypeSerializer
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
+    pagination_class = None
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
@@ -93,6 +95,7 @@ class OutboundIntegrationTypeListView(generics.ListAPIView):
     queryset = OutboundIntegrationType.objects.all()
     serializer_class = OutboundIntegrationTypeSerializer
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
+    pagination_class = None
 
     # filter_class = OutboundIntegrationTypeFilter
     def get(self, request, *args, **kwargs):
@@ -117,6 +120,7 @@ class InboundIntegrationConfigurationListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = InboundIntegrationConfigurationFilter
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
+    pagination_class = None
 
     queryset = InboundIntegrationConfiguration.objects.all()
 
@@ -135,6 +139,7 @@ class CeresTagIdentifiersListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = CeresTagIdentifiersFilter
     permission_classes = (rest_framework.permissions.IsAuthenticated,)
+    pagination_class = None
 
     queryset = InboundIntegrationConfiguration.objects.all()
 
@@ -182,6 +187,7 @@ class OutboundIntegrationConfigurationListView(generics.ListAPIView):
 
     serializer_class = OutboundIntegrationConfigurationSerializer
     permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount,)
+    pagination_class = None
 
     # filter_backends =
     def get_queryset(self):
@@ -283,6 +289,7 @@ class DeviceListView(generics.ListCreateAPIView):
     serializer_class = DeviceSerializer
     permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount,)
     queryset = Device.objects.all()
+    pagination_class = None
 
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["external_id", "inbound_configuration__type__slug"]
@@ -321,6 +328,7 @@ class BridgeIntegrationListView(generics.ListAPIView):
     serializer_class = BridgeSerializer
     permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount,)
     queryset = BridgeIntegration.objects.all()
+    pagination_class = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -362,6 +370,7 @@ class DeviceStateListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = DeviceStateFilter
     permission_classes = (IsGlobalAdmin | IsOrganizationMember | IsServiceAccount,)
+    pagination_class = None
 
     def get_queryset(self):
 
