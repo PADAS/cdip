@@ -1,20 +1,17 @@
 import logging
-
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation, PermissionDenied
-from django.forms import modelformset_factory
 from django.views.generic import ListView, FormView, UpdateView
-from django.contrib.auth.models import User, Group
-
+from django.contrib.auth.models import User
 from cdip_admin import settings
-from core.enums import RoleChoices, DjangoGroups
+from core.enums import RoleChoices
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
 from .forms import AccountForm, AccountUpdateForm, AccountProfileForm
 from .models import AccountProfile, AccountProfileOrganization
-from .utils import add_account
+from .utils import add_or_create_user_in_org
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
@@ -84,48 +81,9 @@ class AccountsAddView(LoginRequiredMixin, FormView):
         form = AccountForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-
-            email = data["email"]
-            first_name = data["firstName"]
-            last_name = data["lastName"]
-            org_id = data["organization"]
-            role = data["role"]
-            username = email
-
-            try:
-                user = User.objects.get(email=email)
-                if not user.groups.filter(
-                    name=DjangoGroups.ORGANIZATION_MEMBER.value
-                ).exists():
-                    group_id = Group.objects.get(
-                        name=DjangoGroups.ORGANIZATION_MEMBER
-                    ).id
-                    user.groups.add(group_id)
-
-            except User.DoesNotExist:
-                # create keycloak user
-                response = add_account(data)
-                # create django user
-                if response:
-                    user = User.objects.create(
-                        email=email,
-                        username=username,
-                        first_name=first_name,
-                        last_name=last_name,
-                    )
-                    group_id = Group.objects.get(
-                        name=DjangoGroups.ORGANIZATION_MEMBER
-                    ).id
-                    user.groups.add(group_id)
-                else:
-                    raise SuspiciousOperation
-
-            account_profile, created = AccountProfile.objects.get_or_create(
-                user_id=user.id,
-            )
-            apo, created = AccountProfileOrganization.objects.get_or_create(
-                accountprofile_id=account_profile.id, organization_id=org_id, role=role
-            )
+            role = data.pop("role")
+            org_id = data.pop("organization")
+            add_or_create_user_in_org(org_id=org_id, role=role, user_data=data)
             return redirect("organizations_detail", module_id=org_id)
         else:
             raise SuspiciousOperation
