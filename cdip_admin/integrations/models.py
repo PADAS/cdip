@@ -91,6 +91,7 @@ class OutboundIntegrationType(TimestampedModel):
         blank=True,
         help_text="Optional - general description of the destination system.",
     )
+    # ToDo. Split configuration and state, each on having a schema?
     configuration_schema = models.JSONField(blank=True,
                                             default=dict, verbose_name='JSON Schema for configuration value')
     objects = OutboundIntegrationTypeManager()
@@ -165,11 +166,17 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     # state = models.JSONField(
     #     blank=True, null=True, help_text="Additional configuration(s)."
     # )
+    # ToDo: Rename to state_schema and separate state from configuration?
     state = JSONField(schema=OutboundIntegrationType.objects.configuration_schema, blank=True, default=dict)
+    configuration = models.JSONField(default=dict, blank=True)  # New configuration field for Gundi 2.0
     endpoint = models.URLField(blank=True)
+    ##########################################################
+    # We keep these fields for backward compatibility.
+    # Now they will be moved into the configuration json field
     login = models.CharField(max_length=200, blank=True)
     password = EncryptedCharField(max_length=200, blank=True)
     token = EncryptedCharField(max_length=200, blank=True)
+    ##########################################################
     additional = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
     history = HistoricalRecords()
