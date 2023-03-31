@@ -172,11 +172,18 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configuration",
-            # "status"  # ToDo: Implement status once the requirements are more stable
+            "status"
         )
 
     def get_url(self, obj):
         return obj.endpoint
 
     def get_status(self, obj):
-        return obj.endpoint
+        # ToDo: Review this after remodeling configurations
+        return {
+            "id": "mockid-b16a-4dbd-ad32-197c58aeef59",
+            "is_healthy": True,
+            "details": "Last observation has been delivered with success.",
+            "observation_delivered_24hrs": 50231,
+            "last_observation_delivered_at": "2023-03-31 11:20:00+0200"
+        }
