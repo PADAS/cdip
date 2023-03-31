@@ -3,6 +3,7 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
+from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -139,3 +140,43 @@ class OrganizationMemberUpdateSerializer(serializers.Serializer):
             setattr(user, k, v)
         user.save()
         return instance
+
+
+class DestinationTypeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = OutboundIntegrationType
+        fields = ["id", "name"]
+
+
+class OwnerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Organization
+        fields = ["id", "name", "description"]
+
+
+class DestinationRetrieveSerializer(serializers.ModelSerializer):
+    type = DestinationTypeSerializer()
+    owner = OwnerSerializer()
+    url = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        fields = (
+            "id",
+            "name",
+            "url",
+            "enabled",
+            "type",
+            "owner",
+            "configuration",
+            # "status"  # ToDo: Implement status once the requirements are more stable
+        )
+
+    def get_url(self, obj):
+        return obj.endpoint
+
+    def get_status(self, obj):
+        return obj.endpoint
