@@ -187,3 +187,29 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
             "observation_delivered_24hrs": 50231,
             "last_observation_delivered_at": "2023-03-31T11:20:00+0200"
         }
+
+
+class DestinationCreateSerializer(serializers.ModelSerializer):
+    url = serializers.URLField(source="endpoint")
+    configuration = serializers.JSONField()
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        fields = (
+            "type",
+            "name",
+            "url",
+            "enabled",
+            "owner",
+            "configuration"
+        )
+
+    def validate(self, data):
+        """
+        Validate the configuration schema
+        """
+        destination_type = OutboundIntegrationType.objects.get(id=data["type"])
+        configuration_schema = destination_type.configuration_schema
+        configuration = data["configuration"]
+        # ToDo: validate schema
+        return data

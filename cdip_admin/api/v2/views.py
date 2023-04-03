@@ -107,7 +107,10 @@ class MemberViewSet(viewsets.ModelViewSet):
         return Response(data={"removed": removed_qty}, status=status.HTTP_200_OK)
 
 
-class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
+class DestinationView(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet):
     """
     An endpoint for managing destinations
     """
@@ -117,7 +120,10 @@ class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
     ordering = ['id']
 
     def get_serializer_class(self):
-        return v2_serializers.DestinationRetrieveSerializer
+        if self.action == "list":
+            return v2_serializers.DestinationRetrieveSerializer
+        if self.action == "create":
+            return v2_serializers.DestinationCreateSerializer
 
     def get_queryset(self):
         """
