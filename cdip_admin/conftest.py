@@ -102,6 +102,7 @@ def new_random_user(new_user_email, org_members_group):
         return user
     return _make_random_user
 
+
 @pytest.fixture
 def new_user_email(get_random_id):
     def _make_random_email():
@@ -116,11 +117,21 @@ def new_user_email(get_random_id):
                 unique_id = get_random_id()
     return _make_random_email
 
+
 @pytest.fixture
 def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
         name=f"Test Organization {get_random_id()}",
         description="A reserve in Africa"
+    )
+    return org
+
+
+@pytest.fixture
+def other_organization(get_random_id):
+    org, _ = Organization.objects.get_or_create(
+        name=f"Test Organization 2 {get_random_id()}",
+        description="A different reserve in Africa"
     )
     return org
 
@@ -183,6 +194,50 @@ def get_random_id():
     return _make_device_id
 
 
+@pytest.fixture
+def destination_type_er():
+    return OutboundIntegrationType.objects.create(
+        name="EarthRanger",
+        slug="earth_ranger",
+        description="Standard outbound integration type for distributing data to EarthRanger sites.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "site_name": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def destinations_list(organization, other_organization, destination_type_er, get_random_id):
+    destinations = []
+    for i in range(10):
+        dest, _ = OutboundIntegrationConfiguration.objects.get_or_create(
+            type=destination_type_er,
+            name=f"ER Site {get_random_id()}",
+            owner=organization if i < 5 else other_organization,
+            configuration={
+                "site_name": f"{get_random_id()}.pamdas.org",
+                "username": f"username{get_random_id()}",
+                "password": get_random_id()
+            }
+        )
+        destinations.append(dest)
+    return destinations
+
+
+########################################################################################################################
 class RemoteUser(NamedTuple):
     user: Any = None
     user_info: bytes = None
