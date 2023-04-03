@@ -1,3 +1,4 @@
+import jsonschema
 from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
@@ -190,12 +191,14 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
 
 
 class DestinationCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     url = serializers.URLField(source="endpoint")
-    configuration = serializers.JSONField()
+    configuration = serializers.JSONField(required=True)
 
     class Meta:
         model = OutboundIntegrationConfiguration
         fields = (
+            "id",
             "type",
             "name",
             "url",
@@ -208,8 +211,15 @@ class DestinationCreateSerializer(serializers.ModelSerializer):
         """
         Validate the configuration schema
         """
-        destination_type = OutboundIntegrationType.objects.get(id=data["type"])
+        destination_type = data["type"]
         configuration_schema = destination_type.configuration_schema
         configuration = data["configuration"]
-        # ToDo: validate schema
+        if configuration_schema and not configuration:  # Blank or None
+            raise drf_exceptions.ValidationError("The configuration can't be null or empty")
+
+        try:  # Validate schema
+            jsonschema.validate(instance=configuration, schema=configuration_schema)
+        except jsonschema.exceptions.ValidationError as err:
+            print(err)
+            raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
         return data
