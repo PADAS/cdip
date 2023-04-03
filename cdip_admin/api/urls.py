@@ -89,5 +89,6 @@ urlpatterns = [
         name="bridge-integration-view",
     ),
     url(r"^docs/", schema_view),
+    # API v2 (Gundi 2.0)
     path(r'v2/', include(api_v2.urls)),
 ]

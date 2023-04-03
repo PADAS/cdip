@@ -1,9 +1,10 @@
 import logging
+from integrations.models import OutboundIntegrationConfiguration
 from organizations.models import Organization
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
 from emails.tasks import send_invite_email_task
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import serializers as v2_serializers
@@ -104,3 +105,33 @@ class MemberViewSet(viewsets.ModelViewSet):
         # Remove members from organization
         removed_qty = remove_members_from_organization(org_id=organization_pk, profile_ids=serializer.validated_data["member_ids"])
         return Response(data={"removed": removed_qty}, status=status.HTTP_200_OK)
+
+
+class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    An endpoint for managing destinations
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['id', 'name']
+    ordering = ['id']
+
+    def get_serializer_class(self):
+        return v2_serializers.DestinationRetrieveSerializer
+
+    def get_queryset(self):
+        """
+        Return a list with the organizations that the currently authenticated user is allowed to see.
+        """
+        user = self.request.user
+        # Superusers can see all the destinations
+        if user.is_superuser:
+            return OutboundIntegrationConfiguration.objects.all()
+        # Members can only see the destinations owned by the organizations they belong too
+        try:
+            profile = user.accountprofile
+        except AccountProfile.DoesNotExist as e:
+            return OutboundIntegrationConfiguration.objects.none()
+        user_organizations = user.accountprofile.organizations.values_list("id", flat=True)
+        destinations = OutboundIntegrationConfiguration.objects.filter(owner__in=user_organizations)
+        return destinations
