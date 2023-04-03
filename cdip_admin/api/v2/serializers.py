@@ -185,5 +185,5 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
             "is_healthy": True,
             "details": "Last observation has been delivered with success.",
             "observation_delivered_24hrs": 50231,
-            "last_observation_delivered_at": "2023-03-31 11:20:00+0200"
+            "last_observation_delivered_at": "2023-03-31T11:20:00+0200"
         }
