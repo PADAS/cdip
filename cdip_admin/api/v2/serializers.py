@@ -212,7 +212,7 @@ class DestinationCreateSerializer(serializers.ModelSerializer):
         Validate the configuration schema
         """
         destination_type = data["type"]
-        configuration_schema = destination_type.configuration_schema
+        configuration_schema = destination_type.dest_configuration_schema
         configuration = data["configuration"]
         if configuration_schema and not configuration:  # Blank or None
             raise drf_exceptions.ValidationError("The configuration can't be null or empty")
