@@ -91,9 +91,16 @@ class OutboundIntegrationType(TimestampedModel):
         blank=True,
         help_text="Optional - general description of the destination system.",
     )
-    # ToDo. Split configuration and state, each on having a schema?
+    # configuration_schema is used for the state field of OutboundIntegrationConfiguration
     configuration_schema = models.JSONField(blank=True,
                                             default=dict, verbose_name='JSON Schema for configuration value')
+    # dest_configuration_schema is used in Gundi 2.0
+    # for the configuration field of OutboundIntegrationConfiguration (a.k.a. destination)
+    dest_configuration_schema = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name='JSON Schema for destination configuration'
+    )
     objects = OutboundIntegrationTypeManager()
     use_endpoint = models.BooleanField(default=False)
     use_login = models.BooleanField(default=False)
