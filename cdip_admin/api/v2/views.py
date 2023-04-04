@@ -1,5 +1,4 @@
-import logging
-from integrations.models import OutboundIntegrationConfiguration
+from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType
 from organizations.models import Organization
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization
@@ -107,7 +106,11 @@ class MemberViewSet(viewsets.ModelViewSet):
         return Response(data={"removed": removed_qty}, status=status.HTTP_200_OK)
 
 
-class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
+class DestinationView(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
     """
     An endpoint for managing destinations
     """
@@ -117,7 +120,10 @@ class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
     ordering = ['id']
 
     def get_serializer_class(self):
-        return v2_serializers.DestinationRetrieveSerializer
+        if self.action == "list":
+            return v2_serializers.DestinationRetrieveSerializer
+        if self.action == "create":
+            return v2_serializers.DestinationCreateSerializer
 
     def get_queryset(self):
         """
@@ -135,3 +141,21 @@ class DestinationView(mixins.ListModelMixin, viewsets.GenericViewSet):
         user_organizations = user.accountprofile.organizations.values_list("id", flat=True)
         destinations = OutboundIntegrationConfiguration.objects.filter(owner__in=user_organizations)
         return destinations
+
+
+class DestinationTypeView(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for managing destination types
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['id', 'name']
+    ordering = ['id']
+    queryset = OutboundIntegrationType.objects.all()
+
+    def get_serializer_class(self):
+        return v2_serializers.DestinationTypeRetrieveSerializer
+

@@ -28,17 +28,30 @@ class IsOrgAdmin(permissions.BasePermission):
     Organization admin can do anything within the organizations they belong.
     But they cannot create or delete organizations
     """
+
+    org_admin_allowed_actions = {
+        "organizations": ["list", "retrieve", "update"],
+        "members": ["list", "invite", "retrieve", "update", "remove"],
+        "destinations": ["list", "create", "retrieve", "update", "destroy"]
+    }
+
     def has_permission(self, request, view):
         # Check that the user is an admin in this organization
         context = request.parser_context["kwargs"]
-        if org_id := context.get("organization_pk") or context.get("pk"):
-            role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
-            if role != RoleChoices.ADMIN.value:
-                return False
-        else:  # No organization selected
+        if view.basename == "organizations":
+            org_id = context.get("pk")
+        elif view.basename == "members":
+            org_id = context.get("organization_pk")
+        elif view.basename == "destinations":
+            org_id = request.data.get("owner")
+        else:  # Can't relate this user with an organization
             return False
-        # Cannot create or destroy organizations
-        return view.action not in ['create', 'destroy']
+        # Get the user role within the organization
+        role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
+        if role != RoleChoices.ADMIN.value:
+            return False  # It's not an admin in this org
+
+        return view.action in self.org_admin_allowed_actions.get(view.basename, [])
 
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)

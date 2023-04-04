@@ -203,7 +203,7 @@ def destination_type_er():
         configuration_schema={
             "type": "object",
             "keys": {
-                "site_name": {
+                "site": {
                     "type": "string"
                 },
                 "username": {
