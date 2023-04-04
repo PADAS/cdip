@@ -1,3 +1,4 @@
+import jsonschema
 from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
@@ -156,6 +157,17 @@ class OwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description"]
 
 
+class DestinationTypeRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OutboundIntegrationType
+        fields = (
+            "id",
+            "name",
+            "description",
+            "dest_configuration_schema"
+        )
+
+
 class DestinationRetrieveSerializer(serializers.ModelSerializer):
     type = DestinationTypeSerializer()
     owner = OwnerSerializer()
@@ -187,3 +199,40 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
             "observation_delivered_24hrs": 50231,
             "last_observation_delivered_at": "2023-03-31T11:20:00+0200"
         }
+
+
+class DestinationCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    url = serializers.URLField(source="endpoint")
+    configuration = serializers.JSONField(required=True)
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        fields = (
+            "id",
+            "type",
+            "name",
+            "url",
+            "enabled",
+            "owner",
+            "configuration"
+        )
+
+    def validate(self, data):
+        """
+        Validate the configuration schema
+        """
+        destination_type = data["type"]
+        configuration_schema = destination_type.dest_configuration_schema
+        configuration = data["configuration"]
+        if configuration_schema and not configuration:  # Blank or None
+            raise drf_exceptions.ValidationError("The configuration can't be null or empty")
+
+        try:  # Validate schema
+            jsonschema.validate(instance=configuration, schema=configuration_schema)
+        except jsonschema.exceptions.ValidationError as err:
+            print(err)
+            raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
+        return data
+
+
