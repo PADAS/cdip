@@ -157,6 +157,17 @@ class OwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description"]
 
 
+class DestinationTypeRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OutboundIntegrationType
+        fields = (
+            "id",
+            "name",
+            "description",
+            "dest_configuration_schema"
+        )
+
+
 class DestinationRetrieveSerializer(serializers.ModelSerializer):
     type = DestinationTypeSerializer()
     owner = OwnerSerializer()
@@ -223,3 +234,5 @@ class DestinationCreateSerializer(serializers.ModelSerializer):
             print(err)
             raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
         return data
+
+
