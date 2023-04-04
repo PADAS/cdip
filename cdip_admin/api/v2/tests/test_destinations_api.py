@@ -66,3 +66,86 @@ def test_list_destinations_as_org_viewer(api_client, org_viewer_user, organizati
         user=org_viewer_user,
         organization=organization
     )
+
+
+def _test_create_destination(api_client, user, owner, destination_type, destination_name, configuration):
+    request_data = {
+      "name": destination_name,
+      "type": str(destination_type.id),
+      "owner": str(owner.id),
+      "url": "https://reservex.pamdas.org",
+      "configuration": configuration
+    }
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("destinations-list"),
+        data=request_data,
+        format='json'
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    response_data = response.json()
+    assert "id" in response_data
+    # Check that the destination was created in the database
+    assert OutboundIntegrationConfiguration.objects.filter(name=request_data["name"]).exists()
+
+
+def test_create_destination_as_superuser(api_client, superuser, organization, destination_type_er, get_random_id):
+    _test_create_destination(
+        api_client=api_client,
+        user=superuser,
+        owner=organization,
+        destination_type=destination_type_er,
+        destination_name=f"Reserve X {get_random_id()}",
+        configuration={
+            "site": "https://reservex.pamdas.org",
+            "username": "reservex@pamdas.org",
+            "password": "P4sSW0rD"
+        }
+    )
+
+
+def test_create_destination_as_org_admin(api_client, org_admin_user, organization, destination_type_er, get_random_id):
+    _test_create_destination(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        destination_type=destination_type_er,
+        destination_name=f"Reserve Y {get_random_id()}",
+        configuration={
+            "site": "https://reservey.pamdas.org",
+            "username": "reservey@pamdas.org",
+            "password": "P4sSW0rD"
+        }
+    )
+
+
+def _test_cannot_create_destination(api_client, user, owner, destination_type, destination_name, configuration):
+    request_data = {
+      "name": destination_name,
+      "type": str(destination_type.id),
+      "owner": str(owner.id),
+      "url": "https://reservex.pamdas.org",
+      "configuration": configuration
+    }
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("destinations-list"),
+        data=request_data,
+        format='json'
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_create_destination_as_org_viewer(api_client, org_viewer_user, organization, destination_type_er, get_random_id):
+    _test_cannot_create_destination(
+        api_client=api_client,
+        user=org_viewer_user,
+        owner=organization,
+        destination_type=destination_type_er,
+        destination_name=f"Reserve Z {get_random_id()}",
+        configuration={
+            "site": "https://reservez.pamdas.org",
+            "username": "reservez@pamdas.org",
+            "password": "P4sSW0rD"
+        }
+    )
