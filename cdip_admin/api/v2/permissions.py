@@ -35,10 +35,14 @@ class IsOrgAdmin(permissions.BasePermission):
             role = get_user_role_in_org(user_id=request.user.id, org_id=org_id)
             if role != RoleChoices.ADMIN.value:
                 return False
-        else:  # No organization selected
-            return False
-        # Cannot create or destroy organizations
-        return view.action not in ['create', 'destroy']
+        # No organization selected
+        # Org admin Cannot create or destroy organizations
+        if view.basename == "organizations":
+            return view.action not in ['create', 'destroy']
+        # but has full crud permissions on other resources (members, destinations, ..)
+        if view.basename in ["destinations", "members"]:
+            return True
+        return False  # Just in case, denny by default
 
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)
