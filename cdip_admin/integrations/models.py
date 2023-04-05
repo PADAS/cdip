@@ -254,6 +254,20 @@ class InboundIntegrationConfiguration(TimestampedModel):
     def __str__(self):
         return f"Owner: {self.owner.name} Name: {self.name} Type: {self.type.name}"
 
+    @property
+    def routing_rules(self):
+        routing_rules = DeviceGroup.objects.filter(
+            devices__inbound_configuration__id=self.id
+        ).distinct()
+        return routing_rules
+
+    @property
+    def destinations(self):
+        destinations = OutboundIntegrationConfiguration.objects.filter(
+            devicegroup__in=models.Subquery(self.routing_rules.values('id'))
+        ).distinct()
+        return destinations
+
     def _pre_save(self, *args, **kwargs):
         # Slug generation
         # ToDo: We could use a better slug generator like django.utils.text.slugify
