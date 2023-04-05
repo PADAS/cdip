@@ -4,7 +4,8 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType
+from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
+    InboundIntegrationConfiguration
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -236,3 +237,53 @@ class DestinationCreateSerializer(serializers.ModelSerializer):
         return data
 
 
+class ConnectionSourceSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = InboundIntegrationConfiguration
+        fields = ("id", "name")
+
+
+class ConnectionDestinationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = OutboundIntegrationConfiguration
+        fields = ("id", "name")
+
+
+class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DeviceGroup
+        fields = ("id", "name")
+
+
+class ConnectionRetrieveSerializer(serializers.ModelSerializer):
+    source = serializers.SerializerMethodField()
+    destinations = serializers.SerializerMethodField()
+    routing_rules = serializers.SerializerMethodField()
+    owner = OwnerSerializer()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InboundIntegrationConfiguration
+        fields = (
+            "source",
+            "destinations",
+            "routing_rules",
+            "owner",
+            "status"
+        )
+
+    def get_source(self, obj):
+        return ConnectionSourceSerializer(instance=obj).data
+
+    def get_destinations(self, obj):
+        return ConnectionDestinationSerializer(instance=obj.destinations, many=True).data
+
+    def get_routing_rules(self, obj):
+        return ConnectionRoutingRuleSerializer(instance=obj.routing_rules, many=True).data
+
+    def get_status(self, obj):
+        # ToDo: Review this after remodeling configurations
+        return "healthy"
