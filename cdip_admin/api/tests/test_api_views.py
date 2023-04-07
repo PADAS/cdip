@@ -67,7 +67,7 @@ def test_get_outbound_by_ibc(client, global_admin_user, setup_data):
     assert not str(other_oi.id) in [item["id"] for item in response]
 
 
-def test_getting_outbound_for_absent_device(client, global_admin_user, get_device_id, setup_data):
+def test_getting_outbound_for_absent_device(client, global_admin_user, get_random_id, setup_data):
     '''
     Test for case described at https://allenai.atlassian.net/browse/SIK-1262
     It is the case where a client queries for OutboundIntegration data by
@@ -83,7 +83,7 @@ def test_getting_outbound_for_absent_device(client, global_admin_user, get_devic
 
     client.force_login(global_admin_user.user)
 
-    an_external_id = get_device_id()
+    an_external_id = get_random_id()
     view = reverse("outboundintegrationconfiguration_list")
 
     # Get destinations by inbound-id.
@@ -390,7 +390,8 @@ def test_get_device_state_list_client_user(client, client_user, setup_data):
     ]
 
 
-def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_client, global_admin_user, get_device_id, setup_data):
+def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_client, global_admin_user,
+                                                                            get_random_id, setup_data):
     """
     Test for case described at https://allenai.atlassian.net/browse/SIK-1267
     Given an observation from an unknown device
@@ -399,7 +400,7 @@ def test_new_device_from_location_is_added_to_default_group_as_global_admin(api_
     And the Device is added to the default DeviceGroup of the related InboundIntegrationConfiguration
     """
     inbound_configuration = setup_data["ii1"]
-    device_external_id = get_device_id()
+    device_external_id = get_random_id()
     request_data = {
         "inbound_configuration": str(inbound_configuration.id),
         "external_id": device_external_id,

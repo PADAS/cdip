@@ -1,8 +1,8 @@
 from django.conf.urls import url
-from django.urls import path
+from django.urls import path, include
 from rest_framework_swagger.views import get_swagger_view
-
 from api.views import *
+from . import v2 as api_v2
 
 schema_view = get_swagger_view(title="CDIP ADMIN API")
 
@@ -89,4 +89,6 @@ urlpatterns = [
         name="bridge-integration-view",
     ),
     url(r"^docs/", schema_view),
+    # API v2 (Gundi 2.0)
+    path(r'v2/', include(api_v2.urls)),
 ]
