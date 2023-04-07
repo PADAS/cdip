@@ -256,7 +256,7 @@ class InboundIntegrationTypeForm(forms.ModelForm):
 class OutboundIntegrationConfigurationForm(forms.ModelForm):
     class Meta:
         model = OutboundIntegrationConfiguration
-        fields = ("type", "owner", "name", "state", "endpoint", "login", "password", "token",
+        fields = ("type", "owner", "name", "state", "configuration", "endpoint", "login", "password", "token",
                   "additional", "enabled")
         exclude = ["id"]
         widgets = {

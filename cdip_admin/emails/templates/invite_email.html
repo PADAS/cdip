@@ -1,0 +1,20 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Welcome</title>
+</head>
+<body>
+    <h2>Welcome {{name}}</h2>
+    <p>
+        You has been invited to collaborate with {{organization}} in Gundi.
+    </p>
+    {% if is_new_user %}
+    <p>
+        You will need to reset your password clicking in "Forgot Password?".
+    </p>
+    {% endif %}
+    <p>
+        <a href="{{action_url}}">Go to Gundi</a>
+    </p>
+</body>
+</html>

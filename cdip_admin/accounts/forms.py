@@ -10,8 +10,8 @@ from django.forms.models import BaseModelFormSet
 class AccountForm(forms.Form):
     email = forms.EmailField(max_length=200, label="Email", required=True)
     role = forms.ChoiceField(choices=[(tag.value, tag.value) for tag in RoleChoices])
-    firstName = forms.CharField(max_length=200, label="First Name", required=False)
-    lastName = forms.CharField(max_length=200, label="Last Name", required=False)
+    first_name = forms.CharField(max_length=200, label="First Name", required=False)
+    last_name = forms.CharField(max_length=200, label="Last Name", required=False)
     organization = forms.CharField(widget=forms.HiddenInput, required=True)
 
     helper = FormHelper()
