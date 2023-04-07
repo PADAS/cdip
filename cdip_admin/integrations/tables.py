@@ -81,12 +81,18 @@ class InboundIntegrationConfigurationTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    has_error = tables.BooleanColumn(
+        verbose_name='Has Errors?',
+        accessor="state__error",
+        linkify=False
+    )
 
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type__name", "organization", "endpoint", "enabled")
-        row_attrs = {"inbound-config-id": lambda record: record.id}
+        fields = ("name", "type__name", "organization", "endpoint", "enabled", "has_error")
+        row_attrs = {"inbound-config-id": lambda record: record.id,
+                     "has_error": lambda record: str('error' in record.state).lower()}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
         order_by = "type__name"
 
