@@ -1,8 +1,6 @@
 import uuid
-
 from django.contrib.auth.models import User
 from django.db import models
-
 from core.enums import RoleChoices
 from organizations.models import Organization
 
