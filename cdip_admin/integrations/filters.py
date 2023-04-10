@@ -215,11 +215,6 @@ def filter_has_error_key(queryset, name, value):
     fn = queryset.filter if value else queryset.exclude
     return fn(state__has_key='error')
 
-class ErrorBooleanFilter(django_filters.BooleanFilter):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.choices = (("", "All"), ("true", "Has Error"), ("false", "All good"))
-
 
 class InboundIntegrationFilter(django_filters.FilterSet):
 
@@ -352,7 +347,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
-    enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget, )
+    enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
 
     class Meta:
         model = BridgeIntegration
