@@ -7,6 +7,7 @@ from django.db.models import Q
 from core.enums import DjangoGroups
 from cdip_admin import settings
 from core.utils import get_admin_access_token
+from organizations.models import Organization
 from .models import AccountProfile, AccountProfileOrganization
 
 
@@ -106,3 +107,14 @@ def remove_members_from_organization(org_id, profile_ids):
 
 def get_password_reset_link(user):
     return f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/login-actions/reset-credentials?client_id={KEYCLOAK_CLIENT}"
+
+
+def get_user_organizations_qs(user):
+    # Returns a queryset with the organizations that the user is allowed to see
+    if user.is_superuser:
+        return Organization.objects.all()
+    try:
+        profile = user.accountprofile
+    except AccountProfile.DoesNotExist as e:
+        return Organization.objects.none()
+    return profile.organizations.all()
