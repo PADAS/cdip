@@ -259,7 +259,7 @@ class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
 
 
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
-    source = serializers.SerializerMethodField()
+    source = serializers.SerializerMethodField()  # ToDo: rename to "provider"?
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
     owner = OwnerSerializer()
@@ -268,7 +268,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = InboundIntegrationConfiguration
         fields = (
-            "source",
+            "source",  # ToDo: rename to "provider"?
             "destinations",
             "routing_rules",
             "owner",
