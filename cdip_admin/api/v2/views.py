@@ -1,7 +1,8 @@
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType
-from organizations.models import Organization
+from django.db.models import Subquery
+from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
+    InboundIntegrationConfiguration
 from accounts.models import AccountProfile, AccountProfileOrganization
-from accounts.utils import remove_members_from_organization
+from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, filters, mixins
 from rest_framework.decorators import action
@@ -26,16 +27,7 @@ class OrganizationView(viewsets.ModelViewSet):
         """
         Return a list with the organizations that the currently authenticated user is allowed to see.
         """
-        user = self.request.user
-        # Superusers can see all the organizations
-        if user.is_superuser:
-            return Organization.objects.all()
-        # Members can only see the organizations they belong too
-        try:
-            profile = user.accountprofile
-        except AccountProfile.DoesNotExist as e:
-            return Organization.objects.none()
-        return user.accountprofile.organizations.all()
+        return get_user_organizations_qs(user=self.request.user)
 
 
 class MemberViewSet(viewsets.ModelViewSet):
@@ -127,19 +119,12 @@ class DestinationView(
 
     def get_queryset(self):
         """
-        Return a list with the organizations that the currently authenticated user is allowed to see.
+        Return a list with the destinations that the currently authenticated user is allowed to see.
         """
-        user = self.request.user
-        # Superusers can see all the destinations
-        if user.is_superuser:
-            return OutboundIntegrationConfiguration.objects.all()
-        # Members can only see the destinations owned by the organizations they belong too
-        try:
-            profile = user.accountprofile
-        except AccountProfile.DoesNotExist as e:
-            return OutboundIntegrationConfiguration.objects.none()
-        user_organizations = user.accountprofile.organizations.values_list("id", flat=True)
-        destinations = OutboundIntegrationConfiguration.objects.filter(owner__in=user_organizations)
+        user_organizations = get_user_organizations_qs(user=self.request.user)
+        destinations = OutboundIntegrationConfiguration.objects.filter(
+            owner__in=Subquery(user_organizations.values('id'))
+        )
         return destinations
 
 
@@ -159,3 +144,28 @@ class DestinationTypeView(
     def get_serializer_class(self):
         return v2_serializers.DestinationTypeRetrieveSerializer
 
+
+class ConnectionsView(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for managing destination types
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['id', 'name']
+    ordering = ['id']
+
+    def get_queryset(self):
+        """
+        Return a list of sources used to get the connections
+        """
+        user_organizations = get_user_organizations_qs(user=self.request.user)
+        sources = InboundIntegrationConfiguration.objects.filter(
+            owner__in=Subquery(user_organizations.values('id'))
+        )
+        return sources
+
+    def get_serializer_class(self):
+        return v2_serializers.ConnectionRetrieveSerializer

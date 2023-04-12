@@ -195,6 +195,76 @@ def get_random_id():
 
 
 @pytest.fixture
+def provider_type_lotek(organization):
+    return InboundIntegrationType.objects.create(
+        name="Lotek",
+        slug="lotek",
+        description="Standard inbound integration type for pulling data from Lotek API.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "endpoint": {
+                    "type": "string"
+                },
+                "login": {
+                    "type": "string",
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def provider_type_movebank(organization):
+    return InboundIntegrationType.objects.create(
+        name="Movebank",
+        slug="movebank",
+        description="Standard inbound integration type for pulling data from Movebank API.",
+        configuration_schema={
+            "type": "object",
+            "keys": {
+                "endpoint": {
+                    "type": "string"
+                },
+                "login": {
+                    "type": "string",
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def provider_lotek_panthera(get_random_id, organization, provider_type_lotek):
+    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
+        type=provider_type_lotek,
+        name=f"Lotek Provider For Panthera {get_random_id()}",
+        owner=organization,
+        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+    )
+    return provider
+
+
+@pytest.fixture
+def provider_movebank_ewt(get_random_id, other_organization, provider_type_movebank):
+    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
+        type=provider_type_movebank,
+        name=f"Movebank Provider For EWT {get_random_id()}",
+        owner=other_organization,
+        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+    )
+    return provider
+
+
+@pytest.fixture
 def destination_type_er():
     return OutboundIntegrationType.objects.create(
         name="EarthRanger",
@@ -235,6 +305,54 @@ def destinations_list(organization, other_organization, destination_type_er, get
         )
         destinations.append(dest)
     return destinations
+
+
+@pytest.fixture
+def make_random_devices(get_random_id):
+    def _make_devices(provider, qty):
+        devices = []
+        for i in range(qty):
+            device, _ = Device.objects.get_or_create(
+                external_id=f"device-{get_random_id()}",
+                inbound_configuration=provider
+            )
+            devices.append(device)
+        return devices
+    return _make_devices
+
+
+@pytest.fixture
+def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_devices):
+    return make_random_devices(provider=provider_lotek_panthera, qty=5)
+
+
+@pytest.fixture
+def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_devices):
+    return make_random_devices(provider=provider_movebank_ewt, qty=3)
+
+
+@pytest.fixture
+def routing_rule_1(get_random_id, organization, device_group_1, destinations_list):
+    rule, _ = DeviceGroup.objects.get_or_create(
+        name=f"Device Set to multiple destinations",
+        owner=organization,
+        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+    )
+    rule.devices.add(*device_group_1)
+    rule.destinations.add(*destinations_list)
+    return rule
+
+
+@pytest.fixture
+def routing_rule_2(get_random_id, organization, device_group_2, destinations_list):
+    rule, _ = DeviceGroup.objects.get_or_create(
+        name=f"Device Set to single destination",
+        owner=organization,
+        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+    )
+    rule.devices.add(*device_group_2)
+    rule.destinations.add(destinations_list[0])
+    return rule
 
 
 ########################################################################################################################
