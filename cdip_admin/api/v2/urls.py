@@ -11,7 +11,8 @@ default_router.register('organizations', views.OrganizationView, basename="organ
 organizations_router = NestedSimpleRouter(default_router, r'organizations', lookup='organization')
 organizations_router.register(r'members', views.MemberViewSet, basename='members')
 default_router.register('destinations', views.DestinationView, basename="destinations")
-default_router.register(r'destinations/types', views.DestinationTypeView, basename='destination-types')
+default_router.register('destinations/types', views.DestinationTypeView, basename='destination-types')
+default_router.register('connections', views.ConnectionsView, basename="connections")
 
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
