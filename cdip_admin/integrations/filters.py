@@ -14,7 +14,7 @@ from integrations.models import (
     OutboundIntegrationType,
     BridgeIntegration
 )
-from core.widgets import CustomBooleanWidget
+from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
 
 
@@ -211,6 +211,11 @@ class DeviceFilter(django_filters.FilterSet):
         return qs
 
 
+def filter_has_error_key(queryset, name, value):
+    fn = queryset.filter if value else queryset.exclude
+    return fn(state__has_key='error')
+
+
 class InboundIntegrationFilter(django_filters.FilterSet):
 
     name = django_filters.CharFilter(
@@ -234,6 +239,11 @@ class InboundIntegrationFilter(django_filters.FilterSet):
     )
 
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+
+    has_errors =  django_filters.BooleanFilter(widget=HasErrorBooleanWidget,
+        field_name='state',
+        method=filter_has_error_key
+       )
 
     class Meta:
         model = InboundIntegrationConfiguration
