@@ -293,12 +293,14 @@ def destination_type_er():
 def destinations_list(organization, other_organization, destination_type_er, get_random_id):
     destinations = []
     for i in range(10):
+        site_url = f"{get_random_id()}.pamdas.org"
         dest, _ = OutboundIntegrationConfiguration.objects.get_or_create(
             type=destination_type_er,
             name=f"ER Site {get_random_id()}",
             owner=organization if i < 5 else other_organization,
+            endpoint=site_url,
             configuration={
-                "site_name": f"{get_random_id()}.pamdas.org",
+                "site_name": site_url,
                 "username": f"username{get_random_id()}",
                 "password": get_random_id()
             }
