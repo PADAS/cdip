@@ -149,3 +149,126 @@ def test_cannot_create_destination_as_org_viewer(api_client, org_viewer_user, or
             "password": "P4sSW0rD"
         }
     )
+
+
+def _test_filter_destinations(api_client, user, filters, expected_destinations):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("destinations-list"),
+        data=filters
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    destinations = response_data["results"]
+    # Check that the returned destinations are the expected ones
+    expected_destinations_ids = [str(uid) for uid in expected_destinations.values_list("id", flat=True)]
+    assert len(destinations) == len(expected_destinations_ids)
+    for dest in destinations:
+        assert dest.get("id") in expected_destinations_ids
+
+
+def test_filter_destinations_exact_as_superuser(api_client, superuser, organization, destinations_list):
+    destination = destinations_list[0]
+    _test_filter_destinations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "owner": str(destination.owner.id),
+            "enabled": True,
+            "type": str(destination.type.id),
+            "endpoint": str(destination.endpoint)
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner=destination.owner,
+            enabled=True,
+            type=destination.type,
+            endpoint=destination.endpoint
+        )
+    )
+
+
+def test_filter_destinations_exact_as_org_admin(api_client, org_admin_user, organization, destinations_list):
+    _test_filter_destinations(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "owner": str(organization.id),
+            "enabled": True
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner=organization,
+            enabled=True
+        )
+    )
+
+
+def test_filter_destinations_exact_as_org_viewer(api_client, org_viewer_user, organization, destination_type_er, destinations_list):
+    # Viewer belongs to organization which owns the first 5 destinations of type EarthRanger
+    _test_filter_destinations(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={
+            "owner": str(organization.id),
+            "type": str(destination_type_er.id)
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner=organization,
+            type=destination_type_er
+        )
+    )
+
+
+def test_filter_destinations_multiselect_as_superuser(api_client, superuser, organization, other_organization, destinations_list):
+    # Superuser can see destinations owned by any organizations
+    owners = [organization, other_organization]
+    endpoints = [d.endpoint for d in destinations_list[1::2]]
+    _test_filter_destinations(
+        api_client=api_client,
+        user=superuser,
+        filters={  # Multiple owners and Multiple endpoints allowed
+            "owner__in": ",".join([str(o.id) for o in owners]),
+            "endpoint__in": ",".join(endpoints)
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner__in=owners,
+            endpoint__in=endpoints
+        )
+    )
+
+
+def test_filter_destinations_multiselect_as_org_admin(api_client, org_admin_user, organization, other_organization, destinations_list):
+    # Org Admins can see destinations owned by the organizations they belong to
+    # This org admin belongs to "organization" owning the first 5 destinations of "destinations_list"
+    owners = org_admin_user.accountprofile.organizations.all()
+    endpoints = [d.endpoint for d in destinations_list[:3]]  # Select three out of five possible endpoints
+    _test_filter_destinations(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={  # Multiple owners and Multiple endpoints allowed
+            "owner__in": ",".join([str(o.id) for o in owners]),
+            "endpoint__in": ",".join(endpoints)
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner__in=owners,
+            endpoint__in=endpoints
+        )
+    )
+
+
+def test_filter_destinations_multiselect_as_org_viewer(api_client, org_viewer_user, organization, other_organization, destinations_list):
+    # Org Viewer can see destinations owned by the organizations they belong to
+    # This org viewer belongs to "organization" owning the first 5 destinations of "destinations_list"
+    owners = org_viewer_user.accountprofile.organizations.all()
+    endpoints = [d.endpoint for d in destinations_list[:2]]  # Select two out of five possible endpoints
+    _test_filter_destinations(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={  # Multiple owners and Multiple endpoints allowed
+            "owner__in": ",".join([str(o.id) for o in owners]),
+            "endpoint__in": ",".join(endpoints)
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner__in=owners,
+            endpoint__in=endpoints
+        )
+    )
