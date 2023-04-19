@@ -187,6 +187,22 @@ def test_filter_destinations_exact_as_superuser(api_client, superuser, organizat
     )
 
 
+def test_filter_destinations_iexact_as_superuser(api_client, superuser, organization, destinations_list):
+    destination = destinations_list[0]
+    _test_filter_destinations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "endpoint__iexact": str(destination.endpoint).capitalize()
+        },
+        expected_destinations=OutboundIntegrationConfiguration.objects.filter(
+            owner=destination.owner,
+            enabled=True,
+            type=destination.type,
+            endpoint=destination.endpoint
+        )
+    )
+
 def test_filter_destinations_exact_as_org_admin(api_client, org_admin_user, organization, destinations_list):
     _test_filter_destinations(
         api_client=api_client,
