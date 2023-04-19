@@ -1,3 +1,4 @@
+import django_filters
 from django.db.models import Subquery
 from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
     InboundIntegrationConfiguration
@@ -107,9 +108,15 @@ class DestinationView(
     An endpoint for managing destinations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
     ordering_fields = ['id', 'name']
     ordering = ['id']
+    filterset_fields = {
+        'endpoint': ['exact', 'iexact', 'in'],
+        'enabled': ['exact', 'in'],
+        'type': ['exact', 'in'],
+        'owner': ['exact', 'in']
+    }
 
     def get_serializer_class(self):
         if self.action == "list":
