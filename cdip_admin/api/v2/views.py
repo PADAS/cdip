@@ -112,7 +112,7 @@ class DestinationView(
     ordering_fields = ['id', 'name']
     ordering = ['id']
     filterset_fields = {
-        'endpoint': ['exact', 'in'],
+        'endpoint': ['exact', 'iexact', 'in'],
         'enabled': ['exact', 'in'],
         'type': ['exact', 'in'],
         'owner': ['exact', 'in']
