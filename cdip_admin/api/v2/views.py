@@ -109,7 +109,7 @@ class DestinationView(
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
-    ordering_fields = ['id', 'name']
+    ordering_fields = ['id', 'name', 'endpoint', 'type__name', 'owner__name']
     ordering = ['id']
     filterset_fields = {
         'endpoint': ['exact', 'iexact', 'in'],
