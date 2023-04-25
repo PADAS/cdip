@@ -4,12 +4,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
-
 from cdip_admin import celery
 from core.models import TimestampedModel
-from core.fields import APIConsumerField
-from organizations.models import Organization, OrganizationGroup
-
+from organizations.models import Organization
 from simple_history.models import HistoricalRecords
 
 
