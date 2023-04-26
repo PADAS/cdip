@@ -12,6 +12,9 @@ from .models import (
     BridgeIntegrationType,
     BridgeIntegration,
     SubjectType,
+    IntegrationType,
+    IntegrationAction,
+    Integration,
 )
 
 from .forms import (
@@ -176,3 +179,26 @@ class BridgeIntegrationAdmin(SimpleHistoryAdmin):
         "type__name",
         "owner__name",
     )
+
+
+@admin.register(IntegrationType)
+class IntegrationTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "slug",
+        "description",
+    )
+
+
+@admin.register(IntegrationAction)
+class IntegrationActionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration_type",
+        "type",
+        "name",
+        "slug",
+        "description",
+    )
+
