@@ -19,10 +19,21 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
 
 
 class IntegrationAction(UUIDAbstractModel, TimestampedModel):
-    name = models.CharField(max_length=200, verbose_name="Type")
+
+    class ActionTypes(models.TextChoices):
+        AUTHENTICATION = "auth", "Authentication"  # Value, Display
+        PULL_DATA = "pull", "Pull Data"
+        PUSH_DATA = "push", "Push Data"
+        GENERIC = "generic", "Generic Action"
+
+    type = models.CharField(
+        max_length=20,
+        choices=ActionTypes.choices,
+        default=ActionTypes.GENERIC
+    )
+    name = models.CharField(max_length=200)
     slug = models.SlugField(
         max_length=200,
-        unique=True,
         verbose_name="Slug Identifier"
     )
     description = models.TextField(
