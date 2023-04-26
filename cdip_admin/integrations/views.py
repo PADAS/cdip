@@ -538,7 +538,7 @@ class InboundIntegrationConfigurationUpdateView(
     @staticmethod
     @requires_csrf_token
     def type_modal(request, integration_id):
-        if request.GET.get("type") is not '':
+        if request.GET.get("type"):
             integration_type = request.GET.get("type")
             selected_type = InboundIntegrationType.objects.get(id=integration_type)
         else:
@@ -949,7 +949,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     @staticmethod
     @requires_csrf_token
     def type_modal(request, integration_id):
-        if request.GET.get("type") is not '':
+        if request.GET.get("type"):
             integration_type = request.GET.get("type")
             selected_type = BridgeIntegrationType.objects.get(id=integration_type)
         else:
