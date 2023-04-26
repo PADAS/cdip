@@ -2,6 +2,7 @@ import django_filters
 from django.db.models import Subquery
 from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
     InboundIntegrationConfiguration
+from integrations.models import IntegrationType, Integration
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -99,57 +100,53 @@ class MemberViewSet(viewsets.ModelViewSet):
         return Response(data={"removed": removed_qty}, status=status.HTTP_200_OK)
 
 
-class DestinationView(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    viewsets.GenericViewSet
-):
+class IntegrationsView(viewsets.ModelViewSet):
     """
-    An endpoint for managing destinations
+    An endpoint for managing integrations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
-    ordering_fields = ['id', 'name', 'endpoint', 'type__name', 'owner__name']
+    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
     filterset_fields = {
-        'endpoint': ['exact', 'iexact', 'in'],
+        'base_url': ['exact', 'iexact', 'in'],
         'enabled': ['exact', 'in'],
         'type': ['exact', 'in'],
-        'owner': ['exact', 'in']
+        'owner': ['exact', 'in'],
+        'type__actions__type': ['exact', 'in'],
     }
 
     def get_serializer_class(self):
-        if self.action == "list":
-            return v2_serializers.DestinationRetrieveSerializer
-        if self.action == "create":
-            return v2_serializers.DestinationCreateSerializer
+        if self.action in ["create", "update"]:
+            return v2_serializers.IntegrationCreateUpdateSerializer
+        return v2_serializers.IntegrationRetrieveSerializer
 
     def get_queryset(self):
         """
-        Return a list with the destinations that the currently authenticated user is allowed to see.
+        Return a list with the integrations that the currently authenticated user is allowed to see.
         """
         user_organizations = get_user_organizations_qs(user=self.request.user)
-        destinations = OutboundIntegrationConfiguration.objects.filter(
+        integrations = Integration.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
         )
-        return destinations
+        return integrations
 
 
-class DestinationTypeView(
+class IntegrationTypeView(
     mixins.ListModelMixin,
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for managing destination types
+    An endpoint for managing integration types
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['id', 'name']
     ordering = ['id']
-    queryset = OutboundIntegrationType.objects.all()
+    queryset = IntegrationType.objects.all()
 
     def get_serializer_class(self):
-        return v2_serializers.DestinationTypeRetrieveSerializer
+        return v2_serializers.IntegrationTypeFullSerializer
 
 
 class ConnectionsView(

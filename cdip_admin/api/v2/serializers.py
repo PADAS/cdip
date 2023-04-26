@@ -5,7 +5,8 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration
+    InboundIntegrationConfiguration, IntegrationConfiguration
+from integrations.models import IntegrationType, IntegrationAction, Integration
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -144,10 +145,10 @@ class OrganizationMemberUpdateSerializer(serializers.Serializer):
         return instance
 
 
-class DestinationTypeSerializer(serializers.ModelSerializer):
+class IntegrationTypeBriefSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = OutboundIntegrationType
+        model = IntegrationType
         fields = ["id", "name"]
 
 
@@ -158,41 +159,73 @@ class OwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description"]
 
 
-class DestinationTypeRetrieveSerializer(serializers.ModelSerializer):
+class IntegrationActionBriefSerializer(serializers.ModelSerializer):
     class Meta:
-        model = OutboundIntegrationType
+        model = IntegrationAction
+        fields = (
+            "id",
+            "type",
+            "name",
+            "slug"
+        )
+
+
+class IntegrationActionFullSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationAction
+        fields = (
+            "id",
+            "type",
+            "name",
+            "slug",
+            "description",
+            "schema"
+        )
+
+
+class IntegrationTypeFullSerializer(serializers.ModelSerializer):
+    actions = IntegrationActionFullSerializer(many=True)
+
+    class Meta:
+        model = IntegrationType
         fields = (
             "id",
             "name",
             "description",
-            "dest_configuration_schema"
+            "actions"
         )
 
 
-class DestinationRetrieveSerializer(serializers.ModelSerializer):
-    type = DestinationTypeSerializer()
+class IntegrationConfigurationSerializer(serializers.ModelSerializer):
+    action = IntegrationActionBriefSerializer()
+
+    class Meta:
+        model = IntegrationConfiguration
+        fields = ["id", "action", "data"]
+
+
+class IntegrationRetrieveSerializer(serializers.ModelSerializer):
+    type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
-    url = serializers.SerializerMethodField()
+    configurations = IntegrationConfigurationSerializer(many=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
-        model = OutboundIntegrationConfiguration
+        model = Integration
         fields = (
             "id",
             "name",
-            "url",
+            "base_url",
             "enabled",
             "type",
             "owner",
-            "configuration",
+            "configurations",
             "status"
         )
 
-    def get_url(self, obj):
-        return obj.endpoint
 
     def get_status(self, obj):
-        # ToDo: Review this after remodeling configurations
+        # ToDo: Review this after implenting events related to health status
         return {
             "id": "mockid-b16a-4dbd-ad32-197c58aeef59",
             "is_healthy": True,
@@ -202,21 +235,23 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
         }
 
 
-class DestinationCreateSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    url = serializers.URLField(source="endpoint")
-    configuration = serializers.JSONField(required=True)
+class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
+    type = IntegrationTypeBriefSerializer()
+    owner = OwnerSerializer()
+    configurations = IntegrationConfigurationSerializer(many=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
-        model = OutboundIntegrationConfiguration
+        model = Integration
         fields = (
             "id",
-            "type",
             "name",
-            "url",
+            "base_url",
             "enabled",
+            "type",
             "owner",
-            "configuration"
+            "configurations",
+            "status"
         )
 
     def validate(self, data):
