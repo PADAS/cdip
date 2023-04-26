@@ -97,6 +97,10 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
+    @property
+    def configurations(self):
+        return self.configurations_by_integration.all()
+
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
     integration = models.ForeignKey(

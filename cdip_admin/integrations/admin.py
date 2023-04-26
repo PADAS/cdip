@@ -15,6 +15,7 @@ from .models import (
     IntegrationType,
     IntegrationAction,
     Integration,
+    IntegrationConfiguration,
 )
 
 from .forms import (
@@ -202,3 +203,22 @@ class IntegrationActionAdmin(admin.ModelAdmin):
         "description",
     )
 
+
+@admin.register(Integration)
+class IntegrationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "type",
+        "owner",
+        "name",
+        "enabled",
+    )
+
+
+@admin.register(IntegrationConfiguration)
+class IntegrationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration",
+        "action",
+    )
