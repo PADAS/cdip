@@ -4,10 +4,10 @@ from django.db import models
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
-    slug = models.SlugField(
+    value = models.SlugField(
         max_length=200,
         unique=True,
-        verbose_name="Slug Identifier"
+        verbose_name="Value (Identifier)"
     )
     description = models.TextField(blank=True)
 
@@ -32,9 +32,9 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         default=ActionTypes.GENERIC
     )
     name = models.CharField(max_length=200)
-    slug = models.SlugField(
+    value = models.SlugField(
         max_length=200,
-        verbose_name="Slug Identifier"
+        verbose_name="Value (Identifier)"
     )
     description = models.TextField(
         blank=True,

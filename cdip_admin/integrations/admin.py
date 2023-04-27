@@ -187,7 +187,7 @@ class IntegrationTypeAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        "slug",
+        "value",
         "description",
     )
 
@@ -199,8 +199,12 @@ class IntegrationActionAdmin(admin.ModelAdmin):
         "integration_type",
         "type",
         "name",
-        "slug",
+        "value",
         "description",
+    )
+    list_filter = (
+        "integration_type",
+        "type",
     )
 
 
@@ -213,12 +217,21 @@ class IntegrationAdmin(admin.ModelAdmin):
         "name",
         "enabled",
     )
+    list_filter = (
+        "owner",
+        "type",
+    )
 
 
 @admin.register(IntegrationConfiguration)
-class IntegrationAdmin(admin.ModelAdmin):
+class IntegrationConfigurationAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "integration",
         "action",
+    )
+    list_filter = (
+        "integration__owner",
+        "integration__type",
+        "action__type",
     )
