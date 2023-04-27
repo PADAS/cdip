@@ -166,7 +166,7 @@ class IntegrationActionBriefSerializer(serializers.ModelSerializer):
             "id",
             "type",
             "name",
-            "slug"
+            "value"
         )
 
 
@@ -177,7 +177,7 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
             "id",
             "type",
             "name",
-            "slug",
+            "value",
             "description",
             "schema"
         )
