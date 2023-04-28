@@ -180,13 +180,19 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         related_name="routing_rules_by_owner",
         help_text="Organization that owns the data.",
     )
+    data_providers = models.ManyToManyField(
+        "integrations.Integration",
+        related_name="routing_rules_by_provider",
+        blank=True,
+        help_text="Source Integrations where the data is extracted from",
+    )
     destinations = models.ManyToManyField(
         "integrations.Integration",
-        related_name="routing_rules",
+        related_name="routing_rules_by_destination",
         blank=True,
         help_text="Destination Integrations where the data will be delivered.",
     )
-    source_selector = models.JSONField(
+    source_filter = models.JSONField(
         blank=True,
         default=dict,
         verbose_name="JSON Selector"
@@ -205,5 +211,86 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         return f"{self.type.name}: {self.name}"
 
 
+class Source(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200, blank=True)
+    external_id = models.CharField(
+        max_length=200, help_text="Id sent by the data provider"
+    )
+    integration = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="sources_by_integration"
+    )
+    configuration = models.ForeignKey(
+        "integrations.Source",
+        on_delete=models.CASCADE,
+        related_name="sources_by_configuration",
+        blank=True,
+        null=True
+    )
+    additional = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text="Additional config(s)",
+    )
+
+    def __str__(self):
+        return f"{self.external_id} - {self.integration.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        # Ensure the device is added to the default group after creation
+        default_routing_rule = self.integration.default_routing_rule
+        default_routing_rule.devices.add(self)
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
+
+    class Meta:
+        ordering = ("integration", "external_id")
+        unique_together = ("integration", "external_id")
 
 
+class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200, blank=True)
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Configuration"
+    )
+
+    class Meta:
+        ordering = ("name", )
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class SourceState(UUIDAbstractModel, TimestampedModel):
+    source = models.OneToOneField(
+        "integrations.Source",
+        on_delete=models.CASCADE,
+        related_name="state"
+    )
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON State"
+    )
+
+    @property
+    def owner(self):
+        return self.source.integration.owner
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["source", "created_at"]),
+        ]
+        ordering = ("source", "-created_at")
+
+    def __str__(self):
+        return f"{self.data}"
