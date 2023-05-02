@@ -165,42 +165,57 @@ class RoutingRuleType(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
+class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200, blank=True)
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Configuration"
+    )
+
+    class Meta:
+        ordering = ("name", )
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class RoutingRule(UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
         "integrations.RoutingRuleType",
         on_delete=models.CASCADE,
         related_name="routing_rules_by_type",
-        verbose_name="Type",
-        help_text="The type of routing rule.",
+        verbose_name="Routing Rule Type"
     )
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.CASCADE,
         related_name="routing_rules_by_owner",
-        help_text="Organization that owns the data.",
+        verbose_name="Owner"
     )
     data_providers = models.ManyToManyField(
         "integrations.Integration",
         related_name="routing_rules_by_provider",
         blank=True,
-        help_text="Source Integrations where the data is extracted from",
+        verbose_name="Data Providers"
     )
     destinations = models.ManyToManyField(
         "integrations.Integration",
         related_name="routing_rules_by_destination",
         blank=True,
-        help_text="Destination Integrations where the data will be delivered.",
+        verbose_name="Destinations"
     )
     source_filter = models.JSONField(
         blank=True,
         default=dict,
-        verbose_name="JSON Selector"
+        verbose_name="JSON Filter"
     )
     configuration = models.ForeignKey(
         "integrations.RoutingRuleConfiguration",
         on_delete=models.SET_NULL,
         related_name="routing_rules_by_configuration",
+        verbose_name="Routing Rule Configuration",
         blank=True,
         null=True
     )
@@ -218,7 +233,7 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         return f"{self.type.name}: {self.name}"
 
 
-class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
+class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -236,7 +251,8 @@ class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
 class Source(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
-        max_length=200, help_text="Id sent by the data provider"
+        max_length=200,
+        verbose_name="External Source ID"
     )
     integration = models.ForeignKey(
         "integrations.Integration",
@@ -247,13 +263,14 @@ class Source(UUIDAbstractModel, TimestampedModel):
         "integrations.Source",
         on_delete=models.SET_NULL,
         related_name="sources_by_configuration",
+        verbose_name="Source Configuration",
         blank=True,
         null=True
     )
     additional = models.JSONField(
         blank=True,
         default=dict,
-        help_text="Additional config(s)",
+        verbose_name="Additional JSON Configuration",
     )
 
     def __str__(self):
@@ -275,21 +292,6 @@ class Source(UUIDAbstractModel, TimestampedModel):
     class Meta:
         ordering = ("integration", "external_id")
         unique_together = ("integration", "external_id")
-
-
-class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
-    name = models.CharField(max_length=200, blank=True)
-    data = models.JSONField(
-        blank=True,
-        default=dict,
-        verbose_name="JSON Configuration"
-    )
-
-    class Meta:
-        ordering = ("name", )
-
-    def __str__(self):
-        return f"{self.name}"
 
 
 class SourceState(UUIDAbstractModel, TimestampedModel):
