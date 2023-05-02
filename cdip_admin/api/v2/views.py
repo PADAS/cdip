@@ -154,7 +154,7 @@ class ConnectionsView(
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for managing destination types
+    An endpoint for retrieving connections
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter]
