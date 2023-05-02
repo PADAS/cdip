@@ -1,8 +1,9 @@
 import django_filters
 from django.db.models import Subquery
 from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration
+    InboundIntegrationConfiguration, RoutingRule
 from integrations.models import IntegrationType, Integration
+from integrations.filters import IntegrationFilter
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -106,15 +107,9 @@ class IntegrationsView(viewsets.ModelViewSet):
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
-    filterset_fields = {
-        'base_url': ['exact', 'iexact', 'in'],
-        'enabled': ['exact', 'in'],
-        'type': ['exact', 'in'],
-        'owner': ['exact', 'in'],
-        'type__actions__type': ['exact', 'in'],
-    }
 
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
@@ -166,7 +161,7 @@ class ConnectionsView(
         Return a list of sources used to get the connections
         """
         user_organizations = get_user_organizations_qs(user=self.request.user)
-        sources = InboundIntegrationConfiguration.objects.filter(
+        sources = RoutingRule.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
         )
         return sources
