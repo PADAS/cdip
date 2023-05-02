@@ -4,9 +4,7 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration, IntegrationConfiguration
-from integrations.models import IntegrationType, IntegrationAction, Integration
+from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -201,7 +199,7 @@ class IntegrationConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationConfiguration
-        fields = ["id", "action", "data"]
+        fields = ["id", "integration", "action", "data"]
 
 
 class IntegrationRetrieveSerializer(serializers.ModelSerializer):
@@ -223,7 +221,6 @@ class IntegrationRetrieveSerializer(serializers.ModelSerializer):
             "status"
         )
 
-
     def get_status(self, obj):
         # ToDo: Review this after implenting events related to health status
         return {
@@ -239,7 +236,6 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     type = IntegrationTypeBriefSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationSerializer(many=True)
-    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
@@ -250,8 +246,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "enabled",
             "type",
             "owner",
-            "configurations",
-            "status"
+            "configurations"
         )
 
     def validate(self, data):
@@ -275,21 +270,21 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 class ConnectionSourceSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = InboundIntegrationConfiguration
+        model = Integration
         fields = ("id", "name")
 
 
 class ConnectionDestinationSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = OutboundIntegrationConfiguration
+        model = Integration
         fields = ("id", "name")
 
 
 class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = DeviceGroup
+        model = RoutingRule
         fields = ("id", "name")
 
 
@@ -301,9 +296,9 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
 
     class Meta:
-        model = InboundIntegrationConfiguration
+        model = Integration
         fields = (
-            "source",  # ToDo: rename to "provider"?
+            "data_providers",
             "destinations",
             "routing_rules",
             "owner",

@@ -1,7 +1,6 @@
 from django.utils.translation import ugettext_lazy as _
-
 import django_filters
-
+from django_filters import rest_framework as django_filters_rest
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -12,7 +11,8 @@ from integrations.models import (
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
-    BridgeIntegration
+    BridgeIntegration,
+    Integration
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -352,3 +352,23 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
     class Meta:
         model = BridgeIntegration
         fields = ("enabled",)
+
+
+class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):
+    pass
+
+
+class IntegrationFilter(django_filters_rest.FilterSet):
+    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact")
+    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in")
+    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact")
+    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in")
+
+    class Meta:
+        model = Integration
+        fields = {
+            'base_url': ['exact', 'iexact', 'in'],
+            'enabled': ['exact', 'in'],
+            'type': ['exact', 'in'],
+            'owner': ['exact', 'in'],
+        }
