@@ -197,6 +197,13 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Selector"
     )
+    configuration = models.ForeignKey(
+        "integrations.RoutingRuleConfiguration",
+        on_delete=models.SET_NULL,
+        related_name="routing_rules_by_configuration",
+        blank=True,
+        null=True
+    )
     # extra settings such as subject_type or provider_key maybe set here
     additional = models.JSONField(
         blank=True,
@@ -211,6 +218,21 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         return f"{self.type.name}: {self.name}"
 
 
+class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200, blank=True)
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Configuration"
+    )
+
+    class Meta:
+        ordering = ("name", )
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class Source(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
@@ -223,7 +245,7 @@ class Source(UUIDAbstractModel, TimestampedModel):
     )
     configuration = models.ForeignKey(
         "integrations.Source",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="sources_by_configuration",
         blank=True,
         null=True

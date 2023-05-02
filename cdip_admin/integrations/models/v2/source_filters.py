@@ -2,18 +2,18 @@ from pydantic import BaseModel
 from typing import List, Union
 
 
-# Selectors are modeled as pydantic models
+# Filters are modeled as pydantic models
 
-class ListSelector(BaseModel):
+class ListFilter(BaseModel):
     # Select specific devices by id
     ids: List[str]
 
 
-class AreaSelector(BaseModel):
+class GEOFilter(BaseModel):
     # Select devices within a polygon representing a geographic area
     points: List[Point]
 
 
 class SourceSelector(BaseModel):
     type: str
-    configuration: Union[ListSelector, AreaSelector]
+    configuration: Union[ListFilter, GEOFilter]
