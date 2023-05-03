@@ -268,10 +268,19 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
-        fields = ("id", "name", "base_url", )
+        fields = ("id", "name", "type", "base_url", "status", )
+
+    def get_type(self, obj):
+        return obj.type.value
+
+    def get_status(self, obj):
+        # ToDo: revisit this once we implement monitoring & troubleshooting
+        return "healthy"
 
 
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
