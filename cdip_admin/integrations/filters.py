@@ -16,6 +16,7 @@ from integrations.models import (
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
+from django.contrib.postgres.aggregates import ArrayAgg
 
 
 # set the organization filter options to the organizations that user is member of
@@ -375,11 +376,39 @@ class IntegrationFilter(django_filters_rest.FilterSet):
 
 
 class ConnectionFilter(django_filters_rest.FilterSet):
+    provider_type = django_filters_rest.CharFilter(field_name="type__value", lookup_expr="iexact")
+    provider_type__in = CharInFilter(field_name="type__value", lookup_expr="in")
+    destination_type = django_filters_rest.CharFilter(method='filter_by_destination_type')
+    destination_type__in = CharInFilter(method='filter_by_destination_type', lookup_expr="in")
+    destination_url = django_filters_rest.CharFilter(method='filter_by_destination_url')
+    destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
 
     class Meta:
         model = Integration
         fields = {
-            'enabled': ['exact', 'in'],
-            'type': ['exact', 'in'],
             'owner': ['exact', 'in'],
         }
+
+    def filter_by_destination_type(self, queryset, name, value):
+        destinations = value if isinstance(value, list) else [value]
+        # Annotate the destination types
+        qs_with_destination_types = queryset.annotate(
+            destination_types=ArrayAgg(
+                "routing_rules_by_provider__destinations__type__value",
+                filter=Q(routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with a type matching at least one of the provided values
+        return qs_with_destination_types.filter(destination_types__overlap=destinations)
+
+    def filter_by_destination_url(self, queryset, name, value):
+        destination_urls = value if isinstance(value, list) else [value]
+        # Annotate the destination urls
+        qs_with_destination_types = queryset.annotate(
+            destination_urls=ArrayAgg(
+                "routing_rules_by_provider__destinations__base_url",
+                filter=Q(routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with an url matching at least one of the provided values
+        return qs_with_destination_types.filter(destination_urls__overlap=destination_urls)
