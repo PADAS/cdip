@@ -16,6 +16,8 @@ from .models import (
     IntegrationAction,
     Integration,
     IntegrationConfiguration,
+    RoutingRule,
+    RoutingRuleType,
 )
 
 from .forms import (
@@ -234,4 +236,26 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
         "integration__owner",
         "integration__type",
         "action__type",
+    )
+
+
+@admin.register(RoutingRuleType)
+class RoutingRuleTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "value",
+    )
+
+
+@admin.register(RoutingRule)
+class RoutingRuleAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "type",
+    )
+    list_filter = (
+        "type",
+        "owner",
     )

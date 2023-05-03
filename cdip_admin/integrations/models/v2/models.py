@@ -1,5 +1,6 @@
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
+from django.db.models import Subquery
 
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
@@ -55,7 +56,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         ordering = ("name",)
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.integration_type} - {self.name}"
 
 
 class Integration(UUIDAbstractModel, TimestampedModel):
@@ -100,6 +101,15 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     @property
     def configurations(self):
         return self.configurations_by_integration.all()
+
+    @property
+    def routing_rules(self):
+        return self.routing_rules_by_provider.all()
+
+    @property
+    def destinations(self):
+        destinations = self.routing_rules.values("destinations").distinct()
+        return Integration.objects.filter(id__in=Subquery(destinations))
 
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
@@ -147,7 +157,7 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
 
 class RoutingRuleType(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
-    slug = models.SlugField(
+    value = models.SlugField(
         max_length=200,
         unique=True
     )

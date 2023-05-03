@@ -3,7 +3,7 @@ from django.db.models import Subquery
 from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
     InboundIntegrationConfiguration, RoutingRule
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter
+from integrations.filters import IntegrationFilter, ConnectionFilter
 from accounts.models import AccountProfile, AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -114,7 +114,7 @@ class IntegrationsView(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
             return v2_serializers.IntegrationCreateUpdateSerializer
-        return v2_serializers.IntegrationRetrieveSerializer
+        return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
         """
@@ -146,25 +146,27 @@ class IntegrationTypeView(
 
 class ConnectionsView(
     mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
     viewsets.GenericViewSet
 ):
     """
     An endpoint for retrieving connections
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = ConnectionFilter
     ordering_fields = ['id', 'name']
     ordering = ['id']
 
     def get_queryset(self):
         """
-        Return a list of sources used to get the connections
+        Return a list of providers used to get the connections
         """
         user_organizations = get_user_organizations_qs(user=self.request.user)
-        sources = RoutingRule.objects.filter(
+        providers = RoutingRule.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
-        )
-        return sources
+        ).values("data_providers")
+        return Integration.objects.filter(id__in=Subquery(providers))
 
     def get_serializer_class(self):
         return v2_serializers.ConnectionRetrieveSerializer
