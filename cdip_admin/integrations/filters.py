@@ -372,3 +372,14 @@ class IntegrationFilter(django_filters_rest.FilterSet):
             'type': ['exact', 'in'],
             'owner': ['exact', 'in'],
         }
+
+
+class ConnectionFilter(django_filters_rest.FilterSet):
+
+    class Meta:
+        model = Integration
+        fields = {
+            'enabled': ['exact', 'in'],
+            'type': ['exact', 'in'],
+            'owner': ['exact', 'in'],
+        }

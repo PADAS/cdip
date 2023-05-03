@@ -143,7 +143,7 @@ class OrganizationMemberUpdateSerializer(serializers.Serializer):
         return instance
 
 
-class IntegrationTypeBriefSerializer(serializers.ModelSerializer):
+class IntegrationTypeSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationType
@@ -157,7 +157,7 @@ class OwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description"]
 
 
-class IntegrationActionBriefSerializer(serializers.ModelSerializer):
+class IntegrationActionSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegrationAction
         fields = (
@@ -195,14 +195,14 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
 
 
 class IntegrationConfigurationSerializer(serializers.ModelSerializer):
-    action = IntegrationActionBriefSerializer()
+    action = IntegrationActionSummarySerializer()
 
     class Meta:
         model = IntegrationConfiguration
         fields = ["id", "integration", "action", "data"]
 
 
-class IntegrationRetrieveSerializer(serializers.ModelSerializer):
+class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationSerializer(many=True)
@@ -233,7 +233,7 @@ class IntegrationRetrieveSerializer(serializers.ModelSerializer):
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
-    type = IntegrationTypeBriefSerializer()
+    type = IntegrationTypeSummarySerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationSerializer(many=True)
 
@@ -267,21 +267,14 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         return data
 
 
-class ConnectionSourceSerializer(serializers.ModelSerializer):
+class IntegrationSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Integration
-        fields = ("id", "name")
+        fields = ("id", "name", "base_url", )
 
 
-class ConnectionDestinationSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Integration
-        fields = ("id", "name")
-
-
-class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
+class RoutingRuleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoutingRule
@@ -289,7 +282,8 @@ class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
 
 
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
-    source = serializers.SerializerMethodField()  # ToDo: rename to "provider"?
+    id = serializers.SerializerMethodField()
+    provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
     owner = OwnerSerializer()
@@ -298,21 +292,25 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Integration
         fields = (
-            "data_providers",
+            "id",
+            "provider",
             "destinations",
             "routing_rules",
             "owner",
             "status"
         )
 
-    def get_source(self, obj):
-        return ConnectionSourceSerializer(instance=obj).data
+    def get_id(self, obj):
+        return str(obj.id)
+
+    def get_provider(self, obj):
+        return IntegrationSummarySerializer(instance=obj).data
 
     def get_destinations(self, obj):
-        return ConnectionDestinationSerializer(instance=obj.destinations, many=True).data
+        return IntegrationSummarySerializer(instance=obj.destinations, many=True).data
 
     def get_routing_rules(self, obj):
-        return ConnectionRoutingRuleSerializer(instance=obj.routing_rules, many=True).data
+        return RoutingRuleSummarySerializer(instance=obj.routing_rules, many=True).data
 
     def get_status(self, obj):
         # ToDo: Review this after remodeling configurations
