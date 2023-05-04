@@ -1,18 +1,14 @@
-from .models import RoutingRuleType, RoutingRule
+from .models import RoutingRule
 
 
 def ensure_default_routing_rule(integration):
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_routing_rule:
         name = integration.name + " - Default Route"
-        default_routing_type, _ = RoutingRuleType.objects.get_or_create(
-            value="default_routing_type",
-            name="Default Routing Type"
-        )
         routing_rule, _ = RoutingRule.objects.get_or_create(
             owner_id=integration.owner.id,
             name=name,
-            type=default_routing_type
+            #type=default_routing_type
         )
         integration.default_routing_rule = routing_rule
         integration.save()
