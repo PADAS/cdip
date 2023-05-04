@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from integrations.models import InboundIntegrationConfiguration
+from integrations.models import Integration
 
 
 pytestmark = pytest.mark.django_db
@@ -17,12 +17,12 @@ def _test_list_connections(api_client, user, provider_list):
     connections = response_data["results"]
     assert len(connections) == len(provider_list)
     sorted_providers = sorted(provider_list, key=lambda p: str(p.id))
-    sorted_connections = sorted(connections, key=lambda c: c["source"]["id"])
+    sorted_connections = sorted(connections, key=lambda c: c["provider"]["id"])
     for provider, connection in zip(sorted_providers, sorted_connections):
-        # Check the source
-        assert "source" in connection
-        assert str(provider.id) == connection["source"].get("id")
-        assert str(provider.name) == connection["source"].get("name")
+        # Check the provider
+        assert "provider" in connection
+        assert str(provider.id) == connection["provider"].get("id")
+        assert str(provider.name) == connection["provider"].get("name")
         # Check destinations
         assert "destinations" in connection
         expected_destination_ids = [str(dest_id) for dest_id in provider.destinations.values_list("id", flat=True)]
@@ -47,7 +47,7 @@ def test_list_connections_as_superuser(api_client, superuser, organization, prov
         api_client=api_client,
         user=superuser,
         # The superuser can see all the connections
-        provider_list=InboundIntegrationConfiguration.objects.all()
+        provider_list=[provider_lotek_panthera, provider_movebank_ewt]
     )
 
 
@@ -56,7 +56,16 @@ def test_list_connections_as_org_admin(api_client, org_admin_user, organization,
         api_client=api_client,
         user=org_admin_user,  # Belongs to one organization
         # Org admins can only see providers of their organizations
-        provider_list=InboundIntegrationConfiguration.objects.filter(owner=organization)
+        provider_list=[provider_lotek_panthera]
+    )
+
+
+def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt, destinations_list, routing_rule_1, routing_rule_2):
+    _test_list_connections(
+        api_client=api_client,
+        user=org_admin_user_2,  # Belongs to one organization
+        # Org admins can only see providers of their organizations
+        provider_list=[provider_movebank_ewt]
     )
 
 
@@ -65,5 +74,5 @@ def test_list_connections_as_org_viewer(api_client, org_viewer_user, organizatio
         api_client=api_client,
         user=org_viewer_user,  # Belongs to one organization
         # Org viewer can only see providers of their organizations
-        provider_list=InboundIntegrationConfiguration.objects.filter(owner=organization)
+        provider_list=[provider_lotek_panthera]
     )
