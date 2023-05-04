@@ -17,6 +17,18 @@ from integrations.models import (
     DeviceGroup,
     Device,
     DeviceState,
+    # New integration models below (Gundi 2.0)
+    Integration,
+    IntegrationType,
+    IntegrationAction,
+    IntegrationConfiguration,
+    RoutingRule,
+    SourceFilter,
+    ensure_default_routing_rule,
+    ListFilter,
+    Source,
+    SourceState,
+    SourceConfiguration
 )
 from organizations.models import Organization
 
@@ -61,6 +73,27 @@ def org_admin_user(organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=organization.id,
+        role=RoleChoices.ADMIN.value
+    )
+    return user
+
+
+@pytest.fixture
+def org_admin_user_2(other_organization, org_members_group):
+    email = "orgadmin2@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Jack",
+        last_name="Pearson"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=other_organization.id,
         role=RoleChoices.ADMIN.value
     )
     return user
@@ -196,96 +229,98 @@ def get_random_id():
 
 @pytest.fixture
 def provider_type_lotek(organization):
-    return InboundIntegrationType.objects.create(
+    return IntegrationType.objects.create(
         name="Lotek",
-        slug="lotek",
+        value="lotek",
         description="Standard inbound integration type for pulling data from Lotek API.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "endpoint": {
-                    "type": "string"
-                },
-                "login": {
-                    "type": "string",
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+        # configuration_schema={
+        #     "type": "object",
+        #     "keys": {
+        #         "base_url": {
+        #             "type": "string"
+        #         },
+        #         "login": {
+        #             "type": "string",
+        #         },
+        #         "password": {
+        #             "type": "string",
+        #             "format": "password"
+        #         }
+        #     }
+        # }
     )
 
 
 @pytest.fixture
 def provider_type_movebank(organization):
-    return InboundIntegrationType.objects.create(
+    return IntegrationType.objects.create(
         name="Movebank",
-        slug="movebank",
+        value="movebank",
         description="Standard inbound integration type for pulling data from Movebank API.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "endpoint": {
-                    "type": "string"
-                },
-                "login": {
-                    "type": "string",
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+        # configuration_schema={
+        #     "type": "object",
+        #     "keys": {
+        #         "base_url": {
+        #             "type": "string"
+        #         },
+        #         "login": {
+        #             "type": "string",
+        #         },
+        #         "password": {
+        #             "type": "string",
+        #             "format": "password"
+        #         }
+        #     }
+        # }
     )
 
 
 @pytest.fixture
 def provider_lotek_panthera(get_random_id, organization, provider_type_lotek):
-    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
+    provider, _ = Integration.objects.get_or_create(
         type=provider_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
         owner=organization,
         # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
     )
+    ensure_default_routing_rule(provider)
     return provider
 
 
 @pytest.fixture
 def provider_movebank_ewt(get_random_id, other_organization, provider_type_movebank):
-    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
+    provider, _ = Integration.objects.get_or_create(
         type=provider_type_movebank,
         name=f"Movebank Provider For EWT {get_random_id()}",
         owner=other_organization,
         # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
     )
+    ensure_default_routing_rule(provider)
     return provider
 
 
 @pytest.fixture
 def destination_type_er():
-    return OutboundIntegrationType.objects.create(
+    return IntegrationType.objects.create(
         name="EarthRanger",
-        slug="earth_ranger",
+        value="earth_ranger",
         description="Standard outbound integration type for distributing data to EarthRanger sites.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "site": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+        # configuration_schema={
+        #     "type": "object",
+        #     "keys": {
+        #         "site": {
+        #             "type": "string"
+        #         },
+        #         "username": {
+        #             "type": "string",
+        #             "format": "email"
+        #         },
+        #         "password": {
+        #             "type": "string",
+        #             "format": "password"
+        #         }
+        #     }
+        # }
     )
 
 
@@ -294,69 +329,93 @@ def destinations_list(organization, other_organization, destination_type_er, get
     destinations = []
     for i in range(10):
         site_url = f"{get_random_id()}.pamdas.org"
-        dest, _ = OutboundIntegrationConfiguration.objects.get_or_create(
+        dest, _ = Integration.objects.get_or_create(
             type=destination_type_er,
             name=f"ER Site {get_random_id()}",
             owner=organization if i < 5 else other_organization,
-            endpoint=site_url,
-            configuration={
-                "site_name": site_url,
-                "username": f"username{get_random_id()}",
-                "password": get_random_id()
-            }
+            base_url=site_url,
+            # configuration={
+            #     "site_name": site_url,
+            #     "username": f"username{get_random_id()}",
+            #     "password": get_random_id()
+            # }
         )
         destinations.append(dest)
     return destinations
 
 
 @pytest.fixture
-def make_random_devices(get_random_id):
+def make_random_sources(get_random_id):
     def _make_devices(provider, qty):
-        devices = []
+        sources = []
         for i in range(qty):
-            device, _ = Device.objects.get_or_create(
+            device, _ = Source.objects.get_or_create(
                 external_id=f"device-{get_random_id()}",
-                inbound_configuration=provider
+                integration=provider
             )
-            devices.append(device)
-        return devices
+            sources.append(device)
+        return sources
     return _make_devices
 
 
 @pytest.fixture
-def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_devices):
-    return make_random_devices(provider=provider_lotek_panthera, qty=5)
+def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_sources):
+    return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
-def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_devices):
-    return make_random_devices(provider=provider_movebank_ewt, qty=3)
+def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_sources):
+    return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, device_group_1, destinations_list):
-    rule, _ = DeviceGroup.objects.get_or_create(
+def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, destinations_list):
+    rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
-    rule.devices.add(*device_group_1)
+    rule.data_providers.add(provider_lotek_panthera)
     rule.destinations.add(*destinations_list)
+    # Filter data coming only from a subset of sources
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        name="Panthera Male Pumas",
+        description="Select collars on male pumas in panthera reserve",
+        order_number=1,
+        selector=ListFilter(
+            ids=[d.external_id for d in device_group_1]
+        ).dict(),
+        routing_rule=rule
+    )
     return rule
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, organization, device_group_2, destinations_list):
-    rule, _ = DeviceGroup.objects.get_or_create(
+def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, destinations_list):
+    rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to single destination",
-        owner=organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        owner=other_organization,
+        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
-    rule.devices.add(*device_group_2)
+    rule.data_providers.add(provider_movebank_ewt)
     rule.destinations.add(destinations_list[0])
+    # Filter data coming only from a subset of sources
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        name="EWT Baby Elephants",
+        description="Select collars on baby elephants in EWT reserve",
+        order_number=1,
+        selector=ListFilter(
+            ids=[d.external_id for d in device_group_2]
+        ).dict(),
+        routing_rule=rule
+    )
     return rule
 
 
+########################################################################################################################
+# GUNDI 1.0
 ########################################################################################################################
 class RemoteUser(NamedTuple):
     user: Any = None
