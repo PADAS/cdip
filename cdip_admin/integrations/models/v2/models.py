@@ -252,7 +252,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
     )
 
     class Meta:
-        ordering = ("order_number",)
+        ordering = ("routing_rule", "order_number",)
 
     def __str__(self):
         return f"{self.name} {self.type}"
@@ -300,19 +300,6 @@ class Source(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.external_id} - {self.integration.type.name}"
-
-    def _pre_save(self, *args, **kwargs):
-        pass
-
-    def _post_save(self, *args, **kwargs):
-        # Ensure the device is added to the default group after creation
-        default_routing_rule = self.integration.default_routing_rule
-        default_routing_rule.devices.add(self)
-
-    def save(self, *args, **kwargs):
-        self._pre_save(self, *args, **kwargs)
-        super().save(*args, **kwargs)
-        self._post_save(self, *args, **kwargs)
 
     class Meta:
         ordering = ("integration", "external_id")
