@@ -155,26 +155,6 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
         return f"{self.data}"
 
 
-class RoutingRuleType(UUIDAbstractModel, TimestampedModel):
-    name = models.CharField(max_length=200)
-    value = models.SlugField(
-        max_length=200,
-        unique=True
-    )
-    description = models.TextField(blank=True)
-    schema = models.JSONField(
-        blank=True,
-        default=dict,
-        verbose_name="JSON Schema"
-    )
-
-    class Meta:
-        ordering = ("name",)
-
-    def __str__(self):
-        return f"{self.name}"
-
-
 class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
@@ -191,12 +171,16 @@ class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
 
 
 class RoutingRule(UUIDAbstractModel, TimestampedModel):
-    type = models.ForeignKey(
-        "integrations.RoutingRuleType",
-        on_delete=models.CASCADE,
-        related_name="routing_rules_by_type",
-        verbose_name="Routing Rule Type"
-    )
+    # # ToDo. Review after talking about bi-directional integrations
+    # class RoutingRuleTypes(models.TextChoices):
+    #     UNIDIRECTIONAL = "unidirectional", "Unidirectional"  # Value, Display
+    #     BIDIRECTIONAL = "bidirectional", "Bidirectional"
+    #
+    # type = models.CharField(
+    #     max_length=20,
+    #     choices=RoutingRuleTypes.choices,
+    #     default=RoutingRuleTypes.UNIDIRECTIONAL
+    # )
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
@@ -215,11 +199,6 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         related_name="routing_rules_by_destination",
         blank=True,
         verbose_name="Destinations"
-    )
-    source_filter = models.JSONField(
-        blank=True,
-        default=dict,
-        verbose_name="JSON Filter"
     )
     configuration = models.ForeignKey(
         "integrations.RoutingRuleConfiguration",
@@ -241,6 +220,42 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.type.name}: {self.name}"
+
+
+class SourceFilter(UUIDAbstractModel, TimestampedModel):
+
+    class SourceFilterTypes(models.TextChoices):
+        SOURCE_LIST = "list", "Select Sources By ID"  # Value, Display
+        GEO_BOUNDARY = "geoboundary", "GEO Boundary"
+        TIME = "time", "Timeframe"
+
+    type = models.CharField(
+        max_length=20,
+        choices=SourceFilterTypes.choices,
+        default=SourceFilterTypes.SOURCE_LIST
+    )
+    order_number = models.PositiveIntegerField(default=0, db_index=True)
+    name = models.CharField(max_length=200, blank=True)
+    description = models.TextField(
+        blank=True,
+    )
+    selector = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Selector"
+    )
+    routing_rule = models.ForeignKey(
+        "integrations.RoutingRule",
+        on_delete=models.CASCADE,
+        related_name="source_filters",
+        verbose_name="Routing Rule"
+    )
+
+    class Meta:
+        ordering = ("order_number",)
+
+    def __str__(self):
+        return f"{self.name} {self.type}"
 
 
 class SourceConfiguration(UUIDAbstractModel, TimestampedModel):

@@ -17,7 +17,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     RoutingRule,
-    RoutingRuleType,
+    SourceFilter,
 )
 
 from .forms import (
@@ -239,23 +239,29 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(RoutingRuleType)
-class RoutingRuleTypeAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "name",
-        "value",
-    )
-
-
 @admin.register(RoutingRule)
 class RoutingRuleAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        #"type",
+    )
+    list_filter = (
+        #"type",
+        "owner",
+    )
+
+
+@admin.register(SourceFilter)
+class SourceFilterAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order_number",
         "type",
+        "name",
+        "description"
     )
     list_filter = (
         "type",
-        "owner",
+        "routing_rule",
     )
