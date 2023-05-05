@@ -1,7 +1,6 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from integrations.models import Integration
 
 
 pytestmark = pytest.mark.django_db
