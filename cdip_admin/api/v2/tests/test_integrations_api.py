@@ -2,67 +2,66 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Integration
+    Integration, IntegrationAction
 )
 
 
 pytestmark = pytest.mark.django_db
 
 
-def _test_list_destinations(api_client, user, organization):
+def _test_list_integrations(api_client, user, organization):
     api_client.force_authenticate(user)
     response = api_client.get(
         reverse("integrations-list"),
     )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.json()
-    destinations = response_data["results"]
+    integrations = response_data["results"]
     if user.is_superuser:
-        # The superuser can see all the destinations
-        destinations_qs = Integration.objects.all()
-    else: # Only see destinations owned by the organization(s) where the user is a member
-        destinations_qs = Integration.objects.filter(owner=organization)
-    expected_destinations_ids = [str(uid) for uid in destinations_qs.values_list("id", flat=True)]
-    assert len(destinations) == len(expected_destinations_ids)
-    for dest in destinations:
-        assert dest.get("id") in expected_destinations_ids
-        assert "name" in dest
-        assert "base_url" in dest
-        assert "enabled" in dest
-        assert "type" in dest
-        owner = dest.get("owner")
+        # The superuser can see all the integrations
+        integrations_qs = Integration.objects.all()
+    else: # Only see integrations owned by the organization(s) where the user is a member
+        integrations_qs = Integration.objects.filter(owner=organization)
+    expected_integrations_ids = [str(uid) for uid in integrations_qs.values_list("id", flat=True)]
+    assert len(integrations) == len(expected_integrations_ids)
+    for integration in integrations:
+        assert integration.get("id") in expected_integrations_ids
+        assert "name" in integration
+        assert "base_url" in integration
+        assert "enabled" in integration
+        assert "type" in integration
+        owner = integration.get("owner")
         assert owner
         assert "id" in owner
         assert "name" in owner
         assert "description" in owner
-        assert "configurations" in dest
-        configurations = dest.get("configurations")
+        # Check the action configurations
+        assert "configurations" in integration
+        configurations = integration.get("configurations")
         for configuration in configurations:
-            assert "site_name" in configuration
-            assert "username" in configuration
-            assert "password" in configuration
-            assert "status" in dest
-            # ToDo test status further once defined/implemented.
+            assert "integration" in configuration
+            assert "action" in configuration
+            assert "data" in configuration
 
 
-def test_list_destinations_as_superuser(api_client, superuser, organization, destinations_list):
-    _test_list_destinations(
+def test_list_integrations_as_superuser(api_client, superuser, organization, integrations_list):
+    _test_list_integrations(
         api_client=api_client,
         user=superuser,
         organization=organization
     )
 
 
-def test_list_destinations_as_org_admin(api_client, org_admin_user, organization, destinations_list):
-    _test_list_destinations(
+def test_list_integrations_as_org_admin(api_client, org_admin_user, organization, integrations_list):
+    _test_list_integrations(
         api_client=api_client,
         user=org_admin_user,
         organization=organization
     )
 
 
-def test_list_destinations_as_org_viewer(api_client, org_viewer_user, organization, destinations_list):
-    _test_list_destinations(
+def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organization, integrations_list):
+    _test_list_integrations(
         api_client=api_client,
         user=org_viewer_user,
         organization=organization
@@ -152,7 +151,7 @@ def test_list_destinations_as_org_viewer(api_client, org_viewer_user, organizati
 #     )
 
 
-def _test_filter_integrations(api_client, user, filters, expected_destinations):
+def _test_filter_integrations(api_client, user, filters, expected_integrations):
     api_client.force_authenticate(user)
     response = api_client.get(
         reverse("integrations-list"),
@@ -160,16 +159,16 @@ def _test_filter_integrations(api_client, user, filters, expected_destinations):
     )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.json()
-    destinations = response_data["results"]
-    # Check that the returned destinations are the expected ones
-    expected_destinations_ids = [str(uid) for uid in expected_destinations.values_list("id", flat=True)]
-    assert len(destinations) == len(expected_destinations_ids)
-    for dest in destinations:
-        assert dest.get("id") in expected_destinations_ids
+    integrations = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_integrations_ids = [str(uid) for uid in expected_integrations.values_list("id", flat=True)]
+    assert len(integrations) == len(expected_integrations_ids)
+    for dest in integrations:
+        assert dest.get("id") in expected_integrations_ids
 
 
-def test_filter_integrations_exact_as_superuser(api_client, superuser, organization, destinations_list):
-    destination = destinations_list[0]
+def test_filter_integrations_exact_as_superuser(api_client, superuser, organization, integrations_list):
+    destination = integrations_list[0]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -179,7 +178,7 @@ def test_filter_integrations_exact_as_superuser(api_client, superuser, organizat
             "type": str(destination.type.id),
             "base_url": str(destination.base_url)
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner=destination.owner,
             enabled=True,
             type=destination.type,
@@ -188,15 +187,15 @@ def test_filter_integrations_exact_as_superuser(api_client, superuser, organizat
     )
 
 
-def test_filter_integrations_iexact_as_superuser(api_client, superuser, organization, destinations_list):
-    destination = destinations_list[0]
+def test_filter_integrations_iexact_as_superuser(api_client, superuser, organization, integrations_list):
+    destination = integrations_list[0]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
         filters={
             "base_url__iexact": str(destination.base_url).capitalize()
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner=destination.owner,
             enabled=True,
             type=destination.type,
@@ -205,7 +204,7 @@ def test_filter_integrations_iexact_as_superuser(api_client, superuser, organiza
     )
 
 
-def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, organization, destinations_list):
+def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, organization, integrations_list):
     _test_filter_integrations(
         api_client=api_client,
         user=org_admin_user,
@@ -213,33 +212,33 @@ def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, orga
             "owner": str(organization.id),
             "enabled": True
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner=organization,
             enabled=True
         )
     )
 
 
-def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, organization, destination_type_er, destinations_list):
-    # Viewer belongs to organization which owns the first 5 destinations of type EarthRanger
+def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, organization, integration_type_er, integrations_list):
+    # Viewer belongs to organization which owns the first 5 integrations of type EarthRanger
     _test_filter_integrations(
         api_client=api_client,
         user=org_viewer_user,
         filters={
             "owner": str(organization.id),
-            "type": str(destination_type_er.id)
+            "type": str(integration_type_er.id)
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner=organization,
-            type=destination_type_er
+            type=integration_type_er
         )
     )
 
 
-def test_filter_integrations_multiselect_as_superuser(api_client, superuser, organization, other_organization, destinations_list):
-    # Superuser can see destinations owned by any organizations
+def test_filter_integrations_multiselect_as_superuser(api_client, superuser, organization, other_organization, integrations_list):
+    # Superuser can see integrations owned by any organizations
     owners = [organization, other_organization]
-    base_urls = [d.base_url for d in destinations_list[1::2]]
+    base_urls = [d.base_url for d in integrations_list[1::2]]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -247,18 +246,18 @@ def test_filter_integrations_multiselect_as_superuser(api_client, superuser, org
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner__in=owners,
             base_url__in=base_urls
         )
     )
 
 
-def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user, organization, other_organization, destinations_list):
-    # Org Admins can see destinations owned by the organizations they belong to
-    # This org admin belongs to "organization" owning the first 5 destinations of "destinations_list"
+def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user, organization, other_organization, integrations_list):
+    # Org Admins can see integrations owned by the organizations they belong to
+    # This org admin belongs to "organization" owning the first 5 integrations of "integrations_list"
     owners = org_admin_user.accountprofile.organizations.all()
-    base_urls = [d.base_url for d in destinations_list[:3]]  # Select three out of five possible base_urls
+    base_urls = [d.base_url for d in integrations_list[:3]]  # Select three out of five possible base_urls
     _test_filter_integrations(
         api_client=api_client,
         user=org_admin_user,
@@ -266,18 +265,18 @@ def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner__in=owners,
             base_url__in=base_urls
         )
     )
 
 
-def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_user, organization, other_organization, destinations_list):
-    # Org Viewer can see destinations owned by the organizations they belong to
-    # This org viewer belongs to "organization" owning the first 5 destinations of "destinations_list"
+def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_user, organization, other_organization, integrations_list):
+    # Org Viewer can see integrations owned by the organizations they belong to
+    # This org viewer belongs to "organization" owning the first 5 integrations of "integrations_list"
     owners = org_viewer_user.accountprofile.organizations.all()
-    base_urls = [d.base_url for d in destinations_list[:2]]  # Select two out of five possible base_urls
+    base_urls = [d.base_url for d in integrations_list[:2]]  # Select two out of five possible base_urls
     _test_filter_integrations(
         api_client=api_client,
         user=org_viewer_user,
@@ -285,8 +284,21 @@ def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_us
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_destinations=Integration.objects.filter(
+        expected_integrations=Integration.objects.filter(
             owner__in=owners,
             base_url__in=base_urls
+        )
+    )
+
+
+def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, organization, other_organization, integrations_list):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={  # Integrations which can be used as destination
+            "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value
+        },
+        expected_integrations=Integration.objects.filter(
+            type__actions__type=IntegrationAction.ActionTypes.PUSH_DATA.value
         )
     )
