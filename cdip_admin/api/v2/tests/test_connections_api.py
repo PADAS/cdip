@@ -42,7 +42,7 @@ def _test_list_connections(api_client, user, provider_list):
         assert provider.owner.description == connection["owner"].get("description")
 
 
-def test_list_connections_as_superuser(api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt, destinations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_superuser(api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
     _test_list_connections(
         api_client=api_client,
         user=superuser,
@@ -51,7 +51,7 @@ def test_list_connections_as_superuser(api_client, superuser, organization, prov
     )
 
 
-def test_list_connections_as_org_admin(api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt, destinations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_admin(api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
     _test_list_connections(
         api_client=api_client,
         user=org_admin_user,  # Belongs to one organization
@@ -60,7 +60,7 @@ def test_list_connections_as_org_admin(api_client, org_admin_user, organization,
     )
 
 
-def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt, destinations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
     _test_list_connections(
         api_client=api_client,
         user=org_admin_user_2,  # Belongs to one organization
@@ -69,7 +69,7 @@ def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organizat
     )
 
 
-def test_list_connections_as_org_viewer(api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt, destinations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_viewer(api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
     _test_list_connections(
         api_client=api_client,
         user=org_viewer_user,  # Belongs to one organization
