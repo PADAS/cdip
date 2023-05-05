@@ -325,8 +325,8 @@ def destination_type_er():
 
 
 @pytest.fixture
-def destinations_list(organization, other_organization, destination_type_er, get_random_id):
-    destinations = []
+def integrations_list(organization, other_organization, destination_type_er, get_random_id):
+    integrations = []
     for i in range(10):
         site_url = f"{get_random_id()}.pamdas.org"
         dest, _ = Integration.objects.get_or_create(
@@ -340,8 +340,8 @@ def destinations_list(organization, other_organization, destination_type_er, get
             #     "password": get_random_id()
             # }
         )
-        destinations.append(dest)
-    return destinations
+        integrations.append(dest)
+    return integrations
 
 
 @pytest.fixture
@@ -369,14 +369,14 @@ def device_group_2(get_random_id, organization, provider_movebank_ewt, make_rand
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, destinations_list):
+def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
         # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_lotek_panthera)
-    rule.destinations.add(*destinations_list)
+    rule.destinations.add(*integrations_list)
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -392,14 +392,14 @@ def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_p
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, destinations_list):
+def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
         # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_movebank_ewt)
-    rule.destinations.add(destinations_list[0])
+    rule.destinations.add(integrations_list[0])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
