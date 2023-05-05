@@ -75,3 +75,40 @@ def test_list_connections_as_org_viewer(api_client, org_viewer_user, organizatio
         # Org viewer can only see providers of their organizations
         provider_list=[provider_lotek_panthera]
     )
+
+
+def _test_filter_connections(api_client, user, filters, expected_integrations):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("connections-list"),
+        data=filters
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    connections = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_integrations_ids = [str(c.id) for c in expected_integrations]
+    assert len(connections) == len(expected_integrations_ids)
+    for dest in connections:
+        assert dest.get("id") in expected_integrations_ids
+
+
+def test_filter_connections_by_provider_type_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "provider_type": provider_movebank_ewt.type.value
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+# ToDo: Add tests for fitlers:
+# destination_url
+# destination_type
+# ordering filters
+
