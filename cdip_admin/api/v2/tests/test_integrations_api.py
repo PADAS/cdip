@@ -302,3 +302,37 @@ def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, 
             type__actions__type=IntegrationAction.ActionTypes.PUSH_DATA.value
         )
     )
+
+
+def test_filter_integrations_by_action_type_as_org_admin(api_client, org_admin_user, organization, other_organization, integrations_list):
+    # Org Admins can see integrations owned by the organizations they belong to
+    # This org admin belongs to "organization" owning the first 5 integrations of "integrations_list"
+    owners = org_admin_user.accountprofile.organizations.all()
+    _test_filter_integrations(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={  # Integrations which can be used as data provider
+            "action_type": IntegrationAction.ActionTypes.PULL_DATA.value
+        },
+        expected_integrations=Integration.objects.filter(
+            owner__in=owners,
+            type__actions__type=IntegrationAction.ActionTypes.PULL_DATA.value
+        )
+    )
+
+
+def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer_user, organization, other_organization, integrations_list):
+    # Org Viewer can see integrations owned by the organizations they belong to
+    # This org viewer belongs to "organization" owning the first 5 integrations of "integrations_list"
+    owners = org_viewer_user.accountprofile.organizations.all()
+    _test_filter_integrations(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={  # Integrations which can be used as data provider
+            "action_type": IntegrationAction.ActionTypes.AUTHENTICATION.value
+        },
+        expected_integrations=Integration.objects.filter(
+            owner__in=owners,
+            type__actions__type=IntegrationAction.ActionTypes.AUTHENTICATION.value
+        )
+    )
