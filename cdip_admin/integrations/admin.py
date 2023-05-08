@@ -244,10 +244,8 @@ class RoutingRuleAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        #"type",
     )
     list_filter = (
-        #"type",
         "owner",
     )
 

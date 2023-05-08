@@ -171,16 +171,6 @@ class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
 
 
 class RoutingRule(UUIDAbstractModel, TimestampedModel):
-    # # ToDo. Review after talking about bi-directional integrations
-    # class RoutingRuleTypes(models.TextChoices):
-    #     UNIDIRECTIONAL = "unidirectional", "Unidirectional"  # Value, Display
-    #     BIDIRECTIONAL = "bidirectional", "Bidirectional"
-    #
-    # type = models.CharField(
-    #     max_length=20,
-    #     choices=RoutingRuleTypes.choices,
-    #     default=RoutingRuleTypes.UNIDIRECTIONAL
-    # )
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
