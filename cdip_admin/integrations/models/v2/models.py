@@ -209,7 +209,7 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         ordering = ("owner", "name", )
 
     def __str__(self):
-        return f"{self.type.name}: {self.name}"
+        return f"{self.owner}: {self.name}"
 
 
 class SourceFilter(UUIDAbstractModel, TimestampedModel):

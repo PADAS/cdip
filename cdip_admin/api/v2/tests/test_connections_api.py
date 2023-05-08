@@ -107,8 +107,206 @@ def test_filter_connections_by_provider_type_as_superuser(
     )
 
 
-# ToDo: Add tests for fitlers:
-# destination_url
-# destination_type
-# ordering filters
+def test_filter_connections_by_provider_type_as_org_admin(
+        api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_admin_user_2,
+        filters={
+            "provider_type": provider_movebank_ewt.type.value
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
 
+
+def test_filter_connections_by_provider_type_as_org_viewer(
+        api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        filters={
+            "provider_type": provider_movebank_ewt.type.value
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_destination_type_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "destination_type": integration_type_er.value
+        },
+        expected_integrations=[provider_lotek_panthera, provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_destination_type_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "destination_type": integration_type_er.value
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_destination_type_as_org_viewer(
+        api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={
+            "destination_type": integration_type_er.value
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_multiple_destination_urls_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    selected_destinations = routing_rule_2.destinations.all()
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "destination_url__in": ",".join(
+                [i.base_url for i in selected_destinations]
+            )
+        },
+        expected_integrations=[provider_lotek_panthera, provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_multiple_destination_urls_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    selected_destinations = routing_rule_1.destinations.all()
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "destination_url__in": ",".join(
+                [i.base_url for i in selected_destinations]
+            )
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_multiple_destination_urls_as_org_viewer(
+        api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    selected_destinations = routing_rule_1.destinations.all()
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        filters={
+            "destination_url__in": ",".join(
+                [i.base_url for i in selected_destinations]
+            )
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_owner_exact_as_superuser(
+        api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "owner": str(other_organization.id)
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_multiple_owners_as_superuser(
+        api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "owner__in": ",".join([str(organization.id), str(other_organization.id)])
+        },
+        expected_integrations=[provider_lotek_panthera, provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_owner_exact_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "owner": str(organization.id)
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_multiple_owners_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "owner__in": ",".join([str(organization.id), str(other_organization.id)])
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_owner_exact_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={
+            "owner": str(organization.id)
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_filter_connections_by_multiple_owners_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        filters={
+            "owner__in": ",".join([str(organization.id), str(other_organization.id)])
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
