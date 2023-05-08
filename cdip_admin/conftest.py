@@ -101,7 +101,7 @@ def org_admin_user_2(other_organization, org_members_group):
 
 @pytest.fixture
 def org_viewer_user(organization, org_members_group):
-    email = "orgadmin@gundiservice.org"
+    email = "orgviewer@gundiservice.org"
     user, _ = User.objects.get_or_create(
         username=email,
         email=email,
@@ -115,6 +115,27 @@ def org_viewer_user(organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=organization.id,
+        role=RoleChoices.VIEWER.value
+    )
+    return user
+
+
+@pytest.fixture
+def org_viewer_user_2(other_organization, org_members_group):
+    email = "orgaviewer2@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Phill",
+        last_name="Wane"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=other_organization.id,
         role=RoleChoices.VIEWER.value
     )
     return user
