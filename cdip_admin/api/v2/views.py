@@ -155,7 +155,7 @@ class ConnectionsView(
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = ConnectionFilter
-    ordering_fields = ['id', 'name']
+    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
 
     def get_queryset(self):
