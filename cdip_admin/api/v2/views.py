@@ -1,7 +1,7 @@
 from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import RoutingRule, get_user_integrations_qs, get_integration_types_in_use_qs
+from integrations.models import RoutingRule, get_user_integrations_qs
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter
 from accounts.models import AccountProfileOrganization
