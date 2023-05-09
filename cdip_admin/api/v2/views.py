@@ -1,10 +1,10 @@
+from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration, RoutingRule
+from integrations.models import RoutingRule, get_user_integrations_qs, get_integration_types_in_use_qs
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter
-from accounts.models import AccountProfile, AccountProfileOrganization
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter
+from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, filters, mixins
@@ -27,9 +27,7 @@ class OrganizationView(viewsets.ModelViewSet):
         return v2_serializers.OrganizationSerializer
 
     def get_queryset(self):
-        """
-        Return a list with the organizations that the currently authenticated user is allowed to see.
-        """
+        # Return a list with the organizations that the currently authenticated user is allowed to see.
         return get_user_organizations_qs(user=self.request.user)
 
 
@@ -117,14 +115,8 @@ class IntegrationsView(viewsets.ModelViewSet):
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
-        """
-        Return a list with the integrations that the currently authenticated user is allowed to see.
-        """
-        user_organizations = get_user_organizations_qs(user=self.request.user)
-        integrations = Integration.objects.filter(
-            owner__in=Subquery(user_organizations.values('id'))
-        )
-        return integrations
+        # Returns a list with the integrations that the user is allowed to see
+        return get_user_integrations_qs(user=self.request.user)
 
 
 class IntegrationTypeView(
@@ -132,13 +124,14 @@ class IntegrationTypeView(
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for managing integration types
+    An endpoint for listing integration types.
     """
-    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['id', 'name']
-    ordering = ['id']
     queryset = IntegrationType.objects.all()
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = IntegrationTypeFilter
+    ordering_fields = ['id', 'name']
+    ordering = ['name']
 
     def get_serializer_class(self):
         return v2_serializers.IntegrationTypeFullSerializer
