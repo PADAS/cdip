@@ -13,7 +13,7 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     BridgeIntegration,
-    Integration, IntegrationType, get_integration_types_in_use_qs, get_user_integrations_qs
+    Integration, IntegrationType, get_user_integrations_qs
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
