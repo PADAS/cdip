@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Integration, IntegrationAction
+    Integration, IntegrationAction, IntegrationType
 )
 
 
@@ -335,4 +335,65 @@ def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer
             owner__in=owners,
             type__actions__type=IntegrationAction.ActionTypes.AUTHENTICATION.value
         )
+    )
+
+
+def _test_filter_integration_types(api_client, user, filters, expected_integration_types):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("integration-types-list"),
+        data=filters
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    integration_types = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_type_ids = [str(t.id) for t in expected_integration_types]
+    assert len(integration_types) == len(expected_type_ids)
+    for type in integration_types:
+        assert type.get("id") in expected_type_ids
+
+
+def test_filter_integrations_types_by_action_type_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=superuser,
+        filters={  # Integrations which can be used as destination
+            "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value
+        },
+        expected_integration_types=[integration_type_er]
+    )
+
+
+def test_filter_integrations_types_by_action_type_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={  # Integrations supporting the authentication action
+            "action_type": IntegrationAction.ActionTypes.AUTHENTICATION.value
+        },
+        expected_integration_types=[integration_type_er, integration_type_movebank, provider_type_lotek]
+    )
+
+
+def test_filter_integrations_types_type_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={  # Integrations which can be used as data provider
+            "action_type": IntegrationAction.ActionTypes.PULL_DATA.value
+        },
+        expected_integration_types=[integration_type_er,  integration_type_movebank, provider_type_lotek]
     )
