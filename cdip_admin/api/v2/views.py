@@ -7,11 +7,13 @@ from integrations.filters import IntegrationFilter, ConnectionFilter, Integratio
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
-from rest_framework import viewsets, status, filters, mixins
+from rest_framework import viewsets, status, mixins
+from rest_framework import filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import serializers as v2_serializers
 from . import permissions
+from . import filters as custom_filters
 
 
 class OrganizationView(viewsets.ModelViewSet):
@@ -19,7 +21,7 @@ class OrganizationView(viewsets.ModelViewSet):
     An endpoint for managing organizations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [drf_filters.OrderingFilter]
     ordering_fields = ['id', 'name']
     ordering = ['id']
 
@@ -36,7 +38,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     An endpoint for managing organization members
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [drf_filters.OrderingFilter]
     ordering_fields = ['id']
     ordering = ['id']
 
@@ -104,7 +106,7 @@ class IntegrationsView(viewsets.ModelViewSet):
     An endpoint for managing integrations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [drf_filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
@@ -128,10 +130,15 @@ class IntegrationTypeView(
     """
     queryset = IntegrationType.objects.all()
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
     filterset_class = IntegrationTypeFilter
-    ordering_fields = ['id', 'name']
-    ordering = ['name']
+    ordering_fields = ["id", "value", "name"]
+    ordering = ["name"]
+    search_fields = ["^value", "^name", "^description"]
 
     def get_serializer_class(self):
         return v2_serializers.IntegrationTypeFullSerializer
@@ -146,7 +153,7 @@ class ConnectionsView(
     An endpoint for retrieving connections
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [drf_filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = ConnectionFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']

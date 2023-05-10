@@ -436,3 +436,5 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
                 id__in=Subquery(user_integrations.values("type").distinct())
             )
         return queryset
+
+
