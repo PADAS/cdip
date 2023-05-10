@@ -416,12 +416,11 @@ class ConnectionFilter(django_filters_rest.FilterSet):
 
 
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
-    action_type = django_filters_rest.CharFilter(field_name="actions__type", lookup_expr="iexact")
-    action_type__in = CharInFilter(field_name="actions__type", lookup_expr="in")
-    action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact")
-    action__in = CharInFilter(field_name="actions__value", lookup_expr="in")
+    action_type = django_filters_rest.CharFilter(field_name="actions__type", lookup_expr="iexact", distinct=True)
+    action_type__in = CharInFilter(field_name="actions__type", lookup_expr="in", distinct=True)
+    action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact", distinct=True)
+    action__in = CharInFilter(field_name="actions__value", lookup_expr="in", distinct=True)
     in_use_only = django_filters_rest.BooleanFilter(method='filter_types_in_use_only')
-
 
     class Meta:
         model = IntegrationType
@@ -434,6 +433,6 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
             # Get only the types under use in integrations related to the current user
             user_integrations = get_user_integrations_qs(user=self.request.user)
             return queryset.filter(
-                id__in=Subquery(user_integrations.values("type"))
+                id__in=Subquery(user_integrations.values("type").distinct())
             )
         return queryset
