@@ -456,3 +456,54 @@ def test_filter_integrations_types_type_and_in_use_as_org_viewer(
         },
         expected_integration_types=[integration_type_er]
     )
+
+
+def test_filter_integrations_types_by_search_term_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "search": "sm",
+            "search_fields": "^value"  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_smart]
+    )
+
+
+def test_filter_integrations_types_by_search_term_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "search": "earth",
+            "search_fields": "^value"  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_er]
+    )
+
+
+def test_filter_integrations_types_by_search_term_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        filters={
+            "search": "Bank",
+            "search_fields": "^value,@name"  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_movebank]
+    )
