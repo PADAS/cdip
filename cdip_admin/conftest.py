@@ -256,6 +256,53 @@ def provider_type_lotek():
         description="Standard inbound integration type for pulling data from Lotek API."
     )
 
+@pytest.fixture
+def lotek_action_auth(provider_type_lotek):
+    return IntegrationAction.objects.create(
+        integration_type=provider_type_lotek,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="Use credentials to authenticate against Lotek API",
+        schema={
+            "type": "object",
+            "required": [
+                "username",
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def lotek_action_pull_positions(provider_type_lotek):
+    return IntegrationAction.objects.create(
+        integration_type=provider_type_lotek,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Positions",
+        value="pull_positions",
+        description="Pull Tracking data from Move Bank API",
+        schema={
+            "type": "object",
+            "required": [
+                "start_time"
+            ],
+            "properties": {
+                "max_records_per_individual": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
 
 @pytest.fixture
 def integration_type_movebank():
@@ -407,11 +454,29 @@ def er_action_pull_events(integration_type_er):
 
 
 @pytest.fixture
-def provider_lotek_panthera(get_random_id, organization, provider_type_lotek):
+def provider_lotek_panthera(
+        get_random_id, organization, provider_type_lotek, lotek_action_auth, lotek_action_pull_positions
+):
     provider, _ = Integration.objects.get_or_create(
         type=provider_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
         owner=organization
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=lotek_action_auth,
+        data={
+            "username": f"user-{get_random_id()}@movebank.com",
+            "password": f"passwd-{get_random_id()}"
+        }
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=lotek_action_pull_positions,
+        data={
+            "start_time": "2023-01-01T00:00:00Z"
+        }
     )
     ensure_default_routing_rule(provider)
     return provider
