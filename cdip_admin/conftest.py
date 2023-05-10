@@ -307,9 +307,9 @@ def lotek_action_pull_positions(integration_type_lotek):
 @pytest.fixture
 def integration_type_movebank():
     return IntegrationType.objects.create(
-        name="Movebank",
+        name="Move Bank",
         value="movebank",
-        description="Standard Integration type for Movebank API."
+        description="Standard Integration type for Move Bank API."
     )
 
 
