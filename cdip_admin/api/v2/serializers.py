@@ -283,6 +283,13 @@ class IntegrationSummarySerializer(serializers.ModelSerializer):
         return "healthy"
 
 
+class IntegrationURLSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Integration
+        fields = ("id", "base_url",)
+
+
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:

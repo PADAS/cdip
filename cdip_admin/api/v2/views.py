@@ -106,19 +106,30 @@ class IntegrationsView(viewsets.ModelViewSet):
     An endpoint for managing integrations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [drf_filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
     filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
+    search_fields = ["^name", "base_url", '^type__name', 'type__value', '^owner__name', ]
 
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
             return v2_serializers.IntegrationCreateUpdateSerializer
+        elif self.action == "urls":
+            return v2_serializers.IntegrationURLSerializer
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
         # Returns a list with the integrations that the user is allowed to see
         return get_user_integrations_qs(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def urls(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
 class IntegrationTypeView(
