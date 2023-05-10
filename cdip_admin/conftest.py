@@ -249,7 +249,7 @@ def get_random_id():
 
 
 @pytest.fixture
-def provider_type_lotek():
+def integration_type_lotek():
     return IntegrationType.objects.create(
         name="Lotek",
         value="lotek",
@@ -257,9 +257,9 @@ def provider_type_lotek():
     )
 
 @pytest.fixture
-def lotek_action_auth(provider_type_lotek):
+def lotek_action_auth(integration_type_lotek):
     return IntegrationAction.objects.create(
-        integration_type=provider_type_lotek,
+        integration_type=integration_type_lotek,
         type=IntegrationAction.ActionTypes.AUTHENTICATION,
         name="Authenticate",
         value="auth",
@@ -283,9 +283,9 @@ def lotek_action_auth(provider_type_lotek):
 
 
 @pytest.fixture
-def lotek_action_pull_positions(provider_type_lotek):
+def lotek_action_pull_positions(integration_type_lotek):
     return IntegrationAction.objects.create(
-        integration_type=provider_type_lotek,
+        integration_type=integration_type_lotek,
         type=IntegrationAction.ActionTypes.PULL_DATA,
         name="Pull Positions",
         value="pull_positions",
@@ -311,6 +311,7 @@ def integration_type_movebank():
         value="movebank",
         description="Standard Integration type for Movebank API."
     )
+
 
 @pytest.fixture
 def mb_action_auth(integration_type_movebank):
@@ -452,13 +453,54 @@ def er_action_pull_events(integration_type_er):
     )
 
 
+@pytest.fixture
+def integration_type_smart():
+    return IntegrationType.objects.create(
+        name="SMART",
+        value="smart",
+        description="Standard integration type for pushing data to SMART Cloud."
+    )
+
+
+@pytest.fixture
+def smart_action_push_events(integration_type_smart):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_smart,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to SMART Cloud API"
+    )
+
+@pytest.fixture
+def smart_action_auth(integration_type_smart):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_smart,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="API Key to authenticate against SMART API",
+        schema={
+            "type": "object",
+            "required": [
+                "api_key"
+            ],
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
 
 @pytest.fixture
 def provider_lotek_panthera(
-        get_random_id, organization, provider_type_lotek, lotek_action_auth, lotek_action_pull_positions
+        get_random_id, organization, integration_type_lotek, lotek_action_auth, lotek_action_pull_positions
 ):
     provider, _ = Integration.objects.get_or_create(
-        type=provider_type_lotek,
+        type=integration_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
         owner=organization
     )
