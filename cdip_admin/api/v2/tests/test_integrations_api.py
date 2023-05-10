@@ -502,7 +502,7 @@ def test_filter_integrations_types_by_search_term_as_org_viewer(
         api_client=api_client,
         user=org_viewer_user_2,
         filters={
-            "search": "Bank",
+            "search": "bank",
             "search_fields": "^value,@name"  # Get Only types in use in integrations that the user can see
         },
         expected_integration_types=[integration_type_movebank]
