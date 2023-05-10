@@ -352,11 +352,15 @@ def _test_filter_integration_types(api_client, user, filters, expected_integrati
     assert len(integration_types) == len(expected_type_ids)
     for type in integration_types:
         assert type.get("id") in expected_type_ids
+        assert "name" in type
+        assert "description" in type
+        assert "actions" in type
 
 
 def test_filter_integrations_types_by_action_type_as_superuser(
         api_client, superuser, organization, other_organization,
-        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
@@ -365,13 +369,14 @@ def test_filter_integrations_types_by_action_type_as_superuser(
         filters={  # Integrations which can be used as destination
             "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value
         },
-        expected_integration_types=[integration_type_er]
+        expected_integration_types=[integration_type_er, integration_type_smart]
     )
 
 
 def test_filter_integrations_types_by_action_type_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
-        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
@@ -380,13 +385,16 @@ def test_filter_integrations_types_by_action_type_as_org_admin(
         filters={  # Integrations supporting the authentication action
             "action_type": IntegrationAction.ActionTypes.AUTHENTICATION.value
         },
-        expected_integration_types=[integration_type_er, integration_type_movebank, provider_type_lotek]
+        expected_integration_types=[
+            integration_type_er, integration_type_movebank, integration_type_lotek, integration_type_smart
+        ]
     )
 
 
 def test_filter_integrations_types_type_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
-        integration_type_er, integration_type_movebank, provider_type_lotek,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
@@ -395,5 +403,56 @@ def test_filter_integrations_types_type_as_org_viewer(
         filters={  # Integrations which can be used as data provider
             "action_type": IntegrationAction.ActionTypes.PULL_DATA.value
         },
-        expected_integration_types=[integration_type_er,  integration_type_movebank, provider_type_lotek]
+        expected_integration_types=[integration_type_er, integration_type_movebank, integration_type_lotek]
+    )
+
+
+def test_filter_integrations_types_by_action_type_and_in_use_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=superuser,
+        filters={  # Types in use in destinations
+            "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value,
+            "in_use_only": True  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_er]
+    )
+
+
+def test_filter_integrations_types_by_action_type_and_in_use_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_admin_user_2,
+        filters={  # Integrations in use supporting the authentication action
+            "action_type": IntegrationAction.ActionTypes.AUTHENTICATION.value,
+            "in_use_only": True  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_er, integration_type_movebank]
+    )
+
+
+def test_filter_integrations_types_type_and_in_use_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+):
+    _test_filter_integration_types(
+        api_client=api_client,
+        user=org_viewer_user,
+        filters={  # Types in use in destinations
+            "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value,
+            "in_use_only": True  # Get Only types in use in integrations that the user can see
+        },
+        expected_integration_types=[integration_type_er]
     )
