@@ -1,7 +1,7 @@
 from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import RoutingRule, get_user_integrations_qs
+from integrations.models import RoutingRule, get_user_integrations_qs, get_integrations_owners_qs
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter
 from accounts.models import AccountProfileOrganization
@@ -119,8 +119,10 @@ class IntegrationsView(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
             return v2_serializers.IntegrationCreateUpdateSerializer
-        elif self.action == "urls":
+        if self.action == "urls":
             return v2_serializers.IntegrationURLSerializer
+        if self.action == "owners":
+            return v2_serializers.IntegrationOwnerSerializer
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
@@ -130,6 +132,21 @@ class IntegrationsView(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def urls(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def owners(self, request, *args, **kwargs):
+        # Filter integrations if any filters are applied
+        integrations_qs = self.filter_queryset(self.get_queryset())
+        # Get the owners of those integrations
+        owners_qs = get_integrations_owners_qs(integrations_qs)
+        # Return a paginated response
+        page = self.paginate_queryset(owners_qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(owners_qs, many=True)
+        return Response(serializer.data)
 
 
 class IntegrationTypeView(

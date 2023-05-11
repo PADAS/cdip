@@ -290,6 +290,13 @@ class IntegrationURLSerializer(serializers.ModelSerializer):
         fields = ("id", "base_url",)
 
 
+class IntegrationOwnerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Organization
+        fields = ("id", "name", )
+
+
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:

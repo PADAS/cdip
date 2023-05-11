@@ -1,7 +1,7 @@
 from django.db.models import Subquery
-
+from organizations.models import Organization
 from accounts.utils import get_user_organizations_qs
-from .models import Integration, IntegrationType, RoutingRule
+from .models import Integration, RoutingRule
 
 
 def ensure_default_routing_rule(integration):
@@ -26,3 +26,9 @@ def get_user_integrations_qs(user):
         owner__in=Subquery(user_organizations.values('id'))
     )
     return integrations
+
+
+def get_integrations_owners_qs(integrations_qs):
+    return Organization.objects.filter(
+        id__in=Subquery(integrations_qs.values("owner_id"))
+    )
