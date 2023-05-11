@@ -502,14 +502,15 @@ def provider_lotek_panthera(
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
-        owner=organization
+        owner=organization,
+        base_url=f"api.test.lotek.com"
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
         integration=provider,
         action=lotek_action_auth,
         data={
-            "username": f"user-{get_random_id()}@movebank.com",
+            "username": f"user-{get_random_id()}@lotek.com",
             "password": f"passwd-{get_random_id()}"
         }
     )
@@ -532,7 +533,7 @@ def provider_movebank_ewt(
         type=integration_type_movebank,
         name=f"Movebank Provider For EWT {get_random_id()}",
         owner=other_organization,
-        base_url="api.movebank.com"
+        base_url=f"https://api.test.movebank.com"
     )
     # Configure actions
     IntegrationConfiguration.objects.create(

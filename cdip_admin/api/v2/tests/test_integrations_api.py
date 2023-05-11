@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Integration, IntegrationAction, IntegrationType
+    Integration, IntegrationAction, IntegrationType, get_user_integrations_qs
 )
 
 
@@ -161,7 +161,7 @@ def _test_filter_integrations(api_client, user, filters, expected_integrations):
     response_data = response.json()
     integrations = response_data["results"]
     # Check that the returned integrations are the expected ones
-    expected_integrations_ids = [str(uid) for uid in expected_integrations.values_list("id", flat=True)]
+    expected_integrations_ids = [str(i.id) for i in expected_integrations]
     assert len(integrations) == len(expected_integrations_ids)
     for dest in integrations:
         assert dest.get("id") in expected_integrations_ids
@@ -178,11 +178,13 @@ def test_filter_integrations_exact_as_superuser(api_client, superuser, organizat
             "type": str(destination.type.id),
             "base_url": str(destination.base_url)
         },
-        expected_integrations=Integration.objects.filter(
-            owner=destination.owner,
-            enabled=True,
-            type=destination.type,
-            base_url=destination.base_url
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner=destination.owner,
+                enabled=True,
+                type=destination.type,
+                base_url=destination.base_url
+            )
         )
     )
 
@@ -195,11 +197,13 @@ def test_filter_integrations_iexact_as_superuser(api_client, superuser, organiza
         filters={
             "base_url__iexact": str(destination.base_url).capitalize()
         },
-        expected_integrations=Integration.objects.filter(
-            owner=destination.owner,
-            enabled=True,
-            type=destination.type,
-            base_url=destination.base_url
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner=destination.owner,
+                enabled=True,
+                type=destination.type,
+                base_url=destination.base_url
+            )
         )
     )
 
@@ -212,9 +216,11 @@ def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, orga
             "owner": str(organization.id),
             "enabled": True
         },
-        expected_integrations=Integration.objects.filter(
-            owner=organization,
-            enabled=True
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner=organization,
+                enabled=True
+            )
         )
     )
 
@@ -228,9 +234,11 @@ def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, or
             "owner": str(organization.id),
             "type": str(integration_type_er.id)
         },
-        expected_integrations=Integration.objects.filter(
-            owner=organization,
-            type=integration_type_er
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner=organization,
+                type=integration_type_er
+            )
         )
     )
 
@@ -246,9 +254,11 @@ def test_filter_integrations_multiselect_as_superuser(api_client, superuser, org
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_integrations=Integration.objects.filter(
-            owner__in=owners,
-            base_url__in=base_urls
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner__in=owners,
+                base_url__in=base_urls
+            )
         )
     )
 
@@ -265,9 +275,11 @@ def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_integrations=Integration.objects.filter(
-            owner__in=owners,
-            base_url__in=base_urls
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner__in=owners,
+                base_url__in=base_urls
+            )
         )
     )
 
@@ -284,9 +296,11 @@ def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_us
             "owner__in": ",".join([str(o.id) for o in owners]),
             "base_url__in": ",".join(base_urls)
         },
-        expected_integrations=Integration.objects.filter(
-            owner__in=owners,
-            base_url__in=base_urls
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner__in=owners,
+                base_url__in=base_urls
+            )
         )
     )
 
@@ -298,26 +312,24 @@ def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, 
         filters={  # Integrations which can be used as destination
             "action_type": IntegrationAction.ActionTypes.PUSH_DATA.value
         },
-        expected_integrations=Integration.objects.filter(
-            type__actions__type=IntegrationAction.ActionTypes.PUSH_DATA.value
-        )
+        expected_integrations=list(
+            Integration.objects.filter(  # Superuser can see all the integrations
+                type__actions__type=IntegrationAction.ActionTypes.PUSH_DATA.value
+            ).distinct()
+        )  # Ensure there are no duplicates
     )
 
 
 def test_filter_integrations_by_action_type_as_org_admin(api_client, org_admin_user, organization, other_organization, integrations_list):
     # Org Admins can see integrations owned by the organizations they belong to
     # This org admin belongs to "organization" owning the first 5 integrations of "integrations_list"
-    owners = org_admin_user.accountprofile.organizations.all()
     _test_filter_integrations(
         api_client=api_client,
         user=org_admin_user,
         filters={  # Integrations which can be used as data provider
             "action_type": IntegrationAction.ActionTypes.PULL_DATA.value
         },
-        expected_integrations=Integration.objects.filter(
-            owner__in=owners,
-            type__actions__type=IntegrationAction.ActionTypes.PULL_DATA.value
-        )
+        expected_integrations=integrations_list[:5]
     )
 
 
@@ -331,9 +343,11 @@ def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer
         filters={  # Integrations which can be used as data provider
             "action_type": IntegrationAction.ActionTypes.AUTHENTICATION.value
         },
-        expected_integrations=Integration.objects.filter(
-            owner__in=owners,
-            type__actions__type=IntegrationAction.ActionTypes.AUTHENTICATION.value
+        expected_integrations=list(
+            Integration.objects.filter(
+                owner__in=owners,
+                type__actions__type=IntegrationAction.ActionTypes.AUTHENTICATION.value
+            ).distinct()
         )
     )
 
@@ -503,7 +517,83 @@ def test_filter_integrations_types_by_search_term_as_org_viewer(
         user=org_viewer_user_2,
         filters={
             "search": "bank",
-            "search_fields": "^value,@name"  # Get Only types in use in integrations that the user can see
+            "search_fields": "^value,name"  # Get Only types in use in integrations that the user can see
         },
         expected_integration_types=[integration_type_movebank]
+    )
+
+
+def _test_filter_integration_urls(api_client, user, search_term, search_fields, extra_filters, expected_integrations):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        f"{reverse('integrations-list')}urls/",
+        data={
+            "search": search_term,
+            "search_fields": search_fields,
+            **extra_filters
+        }
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    integrations = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_integrations_ids = [str(i.id) for i in expected_integrations]
+    assert len(integrations) == len(expected_integrations_ids)
+    for integration in integrations:
+        assert integration.get("id") in expected_integrations_ids
+        assert "base_url" in integration
+        assert search_term in integration["base_url"]
+
+
+def test_filter_integrations_urls_by_search_term_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_urls(
+        api_client=api_client,
+        user=superuser,
+        search_term="mov",
+        search_fields="base_url",
+        extra_filters={
+            "action_type": "pull"
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_integrations_urls_by_search_term_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_urls(
+        api_client=api_client,
+        user=org_admin_user,
+        search_term="pamdas",  # ER Sites
+        search_fields="base_url",
+        extra_filters={
+            "action_type": "push"  # Integrations used as destinations
+        },
+        expected_integrations=integrations_list[:5]  # First 5 ER integrations are owned by organization
+    )
+
+
+def test_filter_integrations_urls_by_search_term_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_urls(
+        api_client=api_client,
+        user=org_viewer_user,
+        search_term="lot",  # Lotek
+        search_fields="base_url",
+        extra_filters={
+            "action_type": "pull"  # Integrations used as providers
+        },
+        expected_integrations=[provider_lotek_panthera]  # First 5 ER integrations are owned by organization
     )
