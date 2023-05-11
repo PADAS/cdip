@@ -361,14 +361,15 @@ class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFil
 
 
 class IntegrationFilter(django_filters_rest.FilterSet):
-    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact")
-    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in")
-    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact")
-    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in")
+    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact", distinct=True)
+    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in", distinct=True)
+    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact", distinct=True)
+    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", distinct=True)
 
     class Meta:
         model = Integration
         fields = {
+            'id': ['exact', 'in'],
             'base_url': ['exact', 'iexact', 'in'],
             'enabled': ['exact', 'in'],
             'type': ['exact', 'in'],
