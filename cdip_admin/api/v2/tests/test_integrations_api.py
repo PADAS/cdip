@@ -482,8 +482,8 @@ def test_filter_integrations_types_by_search_term_as_superuser(
         api_client=api_client,
         user=superuser,
         filters={
-            "search": "sm",
-            "search_fields": "^value"  # Get Only types in use in integrations that the user can see
+            "search": "smar",
+            "search_fields": "value"  # partial match in the value field
         },
         expected_integration_types=[integration_type_smart]
     )
@@ -500,7 +500,7 @@ def test_filter_integrations_types_by_search_term_as_org_admin(
         user=org_admin_user,
         filters={
             "search": "earth",
-            "search_fields": "^value"  # Get Only types in use in integrations that the user can see
+            "search_fields": "^value"  # value starts with "earth"
         },
         expected_integration_types=[integration_type_er]
     )
@@ -517,7 +517,7 @@ def test_filter_integrations_types_by_search_term_as_org_viewer(
         user=org_viewer_user_2,
         filters={
             "search": "bank",
-            "search_fields": "^value,name"  # Get Only types in use in integrations that the user can see
+            "search_fields": "name"  # partial match in the name field
         },
         expected_integration_types=[integration_type_movebank]
     )
@@ -595,5 +595,5 @@ def test_filter_integrations_urls_by_search_term_as_org_viewer(
         extra_filters={
             "action_type": "pull"  # Integrations used as providers
         },
-        expected_integrations=[provider_lotek_panthera]  # First 5 ER integrations are owned by organization
+        expected_integrations=[provider_lotek_panthera]
     )
