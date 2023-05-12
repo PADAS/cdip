@@ -597,3 +597,79 @@ def test_filter_integrations_urls_by_search_term_as_org_viewer(
         },
         expected_integrations=[provider_lotek_panthera]
     )
+
+
+def _test_filter_integration_owners(api_client, user, search_term, search_fields, extra_filters, expected_owners):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        f"{reverse('integrations-list')}owners/",
+        data={
+            "search": search_term,
+            "search_fields": search_fields,
+            **extra_filters
+        }
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    owners = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_owners_ids = [str(i.id) for i in expected_owners]
+    assert len(owners) == len(expected_owners_ids)
+    for owner in owners:
+        assert owner.get("id") in expected_owners_ids
+        assert "name" in owner
+        assert search_term.lower() in owner["name"].lower()
+
+
+def test_filter_integrations_owner_by_search_term_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_owners(
+        api_client=api_client,
+        user=superuser,
+        search_term="tes",  # Test Organizations
+        search_fields="owner__name",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_owners=[organization, other_organization]
+    )
+
+
+def test_filter_integrations_owner_by_search_term_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_owners(
+        api_client=api_client,
+        user=org_admin_user,
+        search_term="lew",  # Test Organization Lewa
+        search_fields="owner__name",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_owners=[organization]
+    )
+
+
+def test_filter_integrations_owner_by_search_term_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_filter_integration_owners(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        search_term="ew",  # Test Organization EWT
+        search_fields="owner__name",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_owners=[other_organization]
+    )

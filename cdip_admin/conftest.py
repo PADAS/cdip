@@ -175,7 +175,7 @@ def new_user_email(get_random_id):
 @pytest.fixture
 def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
-        name=f"Test Organization {get_random_id()}",
+        name=f"Test Organization Lewa {get_random_id()}",
         description="A reserve in Africa"
     )
     return org
@@ -184,7 +184,7 @@ def organization(get_random_id):
 @pytest.fixture
 def other_organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
-        name=f"Test Organization 2 {get_random_id()}",
+        name=f"Test Organization EWT {get_random_id()}",
         description="A different reserve in Africa"
     )
     return org
