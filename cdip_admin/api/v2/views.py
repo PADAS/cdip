@@ -114,7 +114,7 @@ class IntegrationsView(viewsets.ModelViewSet):
     filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
-    search_fields = ["^name", "base_url", '^type__name', '^type__value', '^owner__name', ]
+    search_fields = ["name", "base_url", 'type__name', 'type__value', 'owner__name', ]
 
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
@@ -181,10 +181,21 @@ class ConnectionsView(
     An endpoint for retrieving connections
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [drf_filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
     filterset_class = ConnectionFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
+    search_fields = [  # Default search fields (used in the global search box)
+        "name", "base_url", 'type__name',  # Providers
+        "routing_rules_by_provider__destinations__name",  # Destinations
+        "routing_rules_by_provider__destinations__type__name",
+        "routing_rules_by_provider__destinations__base_url",
+        "owner__name",  # Organizations
+    ]
 
     def get_queryset(self):
         """
