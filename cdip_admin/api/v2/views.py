@@ -1,17 +1,19 @@
+from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration, RoutingRule
+from integrations.models import RoutingRule, get_user_integrations_qs, get_integrations_owners_qs
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter
-from accounts.models import AccountProfile, AccountProfileOrganization
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter
+from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
-from rest_framework import viewsets, status, filters, mixins
+from rest_framework import viewsets, status, mixins
+from rest_framework import filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import serializers as v2_serializers
 from . import permissions
+from . import filters as custom_filters
 
 
 class OrganizationView(viewsets.ModelViewSet):
@@ -19,7 +21,7 @@ class OrganizationView(viewsets.ModelViewSet):
     An endpoint for managing organizations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [drf_filters.OrderingFilter]
     ordering_fields = ['id', 'name']
     ordering = ['id']
 
@@ -27,9 +29,7 @@ class OrganizationView(viewsets.ModelViewSet):
         return v2_serializers.OrganizationSerializer
 
     def get_queryset(self):
-        """
-        Return a list with the organizations that the currently authenticated user is allowed to see.
-        """
+        # Return a list with the organizations that the currently authenticated user is allowed to see.
         return get_user_organizations_qs(user=self.request.user)
 
 
@@ -38,7 +38,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     An endpoint for managing organization members
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [drf_filters.OrderingFilter]
     ordering_fields = ['id']
     ordering = ['id']
 
@@ -106,25 +106,47 @@ class IntegrationsView(viewsets.ModelViewSet):
     An endpoint for managing integrations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
     filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
+    search_fields = ["name", "base_url", 'type__name', 'type__value', 'owner__name', ]
 
     def get_serializer_class(self):
         if self.action in ["create", "update"]:
             return v2_serializers.IntegrationCreateUpdateSerializer
+        if self.action == "urls":
+            return v2_serializers.IntegrationURLSerializer
+        if self.action == "owners":
+            return v2_serializers.IntegrationOwnerSerializer
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
-        """
-        Return a list with the integrations that the currently authenticated user is allowed to see.
-        """
-        user_organizations = get_user_organizations_qs(user=self.request.user)
-        integrations = Integration.objects.filter(
-            owner__in=Subquery(user_organizations.values('id'))
-        )
-        return integrations
+        # Returns a list with the integrations that the user is allowed to see
+        return get_user_integrations_qs(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def urls(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def owners(self, request, *args, **kwargs):
+        # Filter integrations if any filters are applied
+        integrations_qs = self.filter_queryset(self.get_queryset())
+        # Get the owners of those integrations
+        owners_qs = get_integrations_owners_qs(integrations_qs)
+        # Return a paginated response
+        page = self.paginate_queryset(owners_qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(owners_qs, many=True)
+        return Response(serializer.data)
 
 
 class IntegrationTypeView(
@@ -132,13 +154,19 @@ class IntegrationTypeView(
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for managing integration types
+    An endpoint for listing integration types.
     """
-    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['id', 'name']
-    ordering = ['id']
     queryset = IntegrationType.objects.all()
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
+    filterset_class = IntegrationTypeFilter
+    ordering_fields = ["id", "value", "name"]
+    ordering = ["name"]
+    search_fields = ["value", "name", "description"]
 
     def get_serializer_class(self):
         return v2_serializers.IntegrationTypeFullSerializer
@@ -153,10 +181,21 @@ class ConnectionsView(
     An endpoint for retrieving connections
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        custom_filters.CustomizableSearchFilter
+    ]
     filterset_class = ConnectionFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
+    search_fields = [  # Default search fields (used in the global search box)
+        "name", "base_url", 'type__name',  # Providers
+        "routing_rules_by_provider__destinations__name",  # Destinations
+        "routing_rules_by_provider__destinations__type__name",
+        "routing_rules_by_provider__destinations__base_url",
+        "owner__name",  # Organizations
+    ]
 
     def get_queryset(self):
         """
