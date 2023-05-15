@@ -89,8 +89,8 @@ def _test_filter_connections(api_client, user, filters, expected_integrations):
     # Check that the returned integrations are the expected ones
     expected_integrations_ids = [str(c.id) for c in expected_integrations]
     assert len(connections) == len(expected_integrations_ids)
-    for dest in connections:
-        assert dest.get("id") in expected_integrations_ids
+    for conn in connections:
+        assert conn.get("id") in expected_integrations_ids
 
 
 def test_filter_connections_by_provider_type_as_superuser(
@@ -308,5 +308,75 @@ def test_filter_connections_by_multiple_owners_as_org_viewer(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def _test_global_search_connections(
+        api_client, user, search_term, expected_integrations,  extra_filters=None, search_fields=None
+):
+    api_client.force_authenticate(user)
+    query_params = {
+        "search": search_term,
+    }
+    if search_fields:
+        query_params["search_fields"] = search_fields
+    if extra_filters:
+        query_params.update(extra_filters)
+    response = api_client.get(
+        reverse('connections-list'),
+        data=query_params
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    connections = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_integrations_ids = [str(i.id) for i in expected_integrations]
+    assert len(connections) == len(expected_integrations_ids)
+    for conn in connections:
+        assert conn.get("id") in expected_integrations_ids
+
+
+def test_global_search_connections_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        routing_rule_1, routing_rule_2
+):
+    _test_global_search_connections(
+        api_client=api_client,
+        user=superuser,
+        search_term="pamdas.org",  # Looking connections with earth ranger sites
+        expected_integrations=[provider_movebank_ewt, provider_lotek_panthera]  # Connected providers
+    )
+
+
+def test_global_search_connections_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        routing_rule_1, routing_rule_2
+):
+    _test_global_search_connections(
+        api_client=api_client,
+        user=org_admin_user,
+        search_term="Lewa",  # Looking connections owned by Lewa
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_global_search_connections_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        routing_rule_1, routing_rule_2
+):
+    _test_global_search_connections(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        search_term="Move",  # Looking for connections with Movebank
         expected_integrations=[provider_movebank_ewt]
     )
