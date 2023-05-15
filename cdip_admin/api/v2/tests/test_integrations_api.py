@@ -673,3 +673,125 @@ def test_filter_integrations_owner_by_search_term_as_org_viewer(
         },
         expected_owners=[other_organization]
     )
+
+
+def _test_global_search_integrations(
+        api_client, user, search_term, expected_integrations,  extra_filters=None, search_fields=None
+):
+    api_client.force_authenticate(user)
+    query_params = {
+        "search": search_term,
+    }
+    if search_fields:
+        query_params["search_fields"] = search_fields
+    if extra_filters:
+        query_params.update(extra_filters)
+    response = api_client.get(
+        reverse('integrations-list'),
+        data=query_params
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    owners = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_integrations_ids = [str(i.id) for i in expected_integrations]
+    assert len(owners) == len(expected_integrations_ids)
+    for owner in owners:
+        assert owner.get("id") in expected_integrations_ids
+
+
+def test_global_search_integrations_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=superuser,
+        search_term="pamdas.org",  # Looking for earth ranger integrations
+        expected_integrations=integrations_list  # As superuser can see all the integrations
+    )
+
+
+def test_global_search_integrations_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=org_admin_user_2,
+        search_term="bank",  # Looking for Movebank integrations
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_global_search_integrations_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=org_viewer_user,
+        search_term="pAnTHer",  # Looking for integration with Parthera
+        expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_global_search_integrations_combined_with_filters_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=superuser,
+        search_term="earth",  # Looking for earth ranger integrations
+        search_fields="^type__name",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_integrations=integrations_list  # As superuser can see all the integrations
+    )
+
+
+def test_global_search_integrations_combined_with_filters_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=org_admin_user_2,
+        search_term="Bank",  # Looking for Movebank integrations
+        search_fields="name",
+        extra_filters={
+            "action_type": "pull",  # Provider
+            "owner__in": f"{organization.id},{other_organization.id}"  # Selected Owners
+        },
+        expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_global_search_integrations_combined_with_filters_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization,
+        integration_type_er, integration_type_movebank, integration_type_lotek,
+        integration_type_smart, smart_action_auth, smart_action_push_events,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=org_viewer_user,
+        search_term="lot",  # Looking for integration with Parthera
+        search_fields="^type__value",
+        extra_filters={
+            "action_type": "pull",  # Provider
+        },
+        expected_integrations=[provider_lotek_panthera]
+    )
