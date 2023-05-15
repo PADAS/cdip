@@ -1,3 +1,4 @@
+from django.db.models import Subquery
 from django.utils.translation import ugettext_lazy as _
 import django_filters
 from django_filters import rest_framework as django_filters_rest
@@ -12,7 +13,7 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     BridgeIntegration,
-    Integration
+    Integration, IntegrationType, get_user_integrations_qs
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -360,14 +361,15 @@ class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFil
 
 
 class IntegrationFilter(django_filters_rest.FilterSet):
-    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact")
-    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in")
-    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact")
-    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in")
+    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact", distinct=True)
+    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in", distinct=True)
+    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact", distinct=True)
+    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", distinct=True)
 
     class Meta:
         model = Integration
         fields = {
+            'id': ['exact', 'in'],
             'base_url': ['exact', 'iexact', 'in'],
             'enabled': ['exact', 'in'],
             'type': ['exact', 'in'],
@@ -412,3 +414,28 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         )
         # Filter integrations having at least one destination with an url matching at least one of the provided values
         return qs_with_destination_types.filter(destination_urls__overlap=destination_urls)
+
+
+class IntegrationTypeFilter(django_filters_rest.FilterSet):
+    action_type = django_filters_rest.CharFilter(field_name="actions__type", lookup_expr="iexact", distinct=True)
+    action_type__in = CharInFilter(field_name="actions__type", lookup_expr="in", distinct=True)
+    action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact", distinct=True)
+    action__in = CharInFilter(field_name="actions__value", lookup_expr="in", distinct=True)
+    in_use_only = django_filters_rest.BooleanFilter(method='filter_types_in_use_only')
+
+    class Meta:
+        model = IntegrationType
+        fields = {
+            'value': ['exact', 'iexact', 'in'],
+        }
+
+    def filter_types_in_use_only(self, queryset, name, value):
+        if value:  # in_use_only = True
+            # Get only the types under use in integrations related to the current user
+            user_integrations = get_user_integrations_qs(user=self.request.user)
+            return queryset.filter(
+                id__in=Subquery(user_integrations.values("type").distinct())
+            )
+        return queryset
+
+
