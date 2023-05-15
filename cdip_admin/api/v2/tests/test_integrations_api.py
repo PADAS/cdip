@@ -692,11 +692,11 @@ def _test_global_search_integrations(
     )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.json()
-    owners = response_data["results"]
+    integrations = response_data["results"]
     # Check that the returned integrations are the expected ones
     expected_integrations_ids = [str(i.id) for i in expected_integrations]
-    assert len(owners) == len(expected_integrations_ids)
-    for owner in owners:
+    assert len(integrations) == len(expected_integrations_ids)
+    for owner in integrations:
         assert owner.get("id") in expected_integrations_ids
 
 
