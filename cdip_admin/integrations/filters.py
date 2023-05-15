@@ -1,7 +1,6 @@
 from django.utils.translation import ugettext_lazy as _
-
 import django_filters
-
+from django_filters import rest_framework as django_filters_rest
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -12,10 +11,12 @@ from integrations.models import (
     InboundIntegrationConfiguration,
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
-    BridgeIntegration
+    BridgeIntegration,
+    Integration
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
+from django.contrib.postgres.aggregates import ArrayAgg
 
 
 # set the organization filter options to the organizations that user is member of
@@ -352,3 +353,62 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
     class Meta:
         model = BridgeIntegration
         fields = ("enabled",)
+
+
+class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):
+    pass
+
+
+class IntegrationFilter(django_filters_rest.FilterSet):
+    action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact")
+    action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in")
+    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact")
+    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in")
+
+    class Meta:
+        model = Integration
+        fields = {
+            'base_url': ['exact', 'iexact', 'in'],
+            'enabled': ['exact', 'in'],
+            'type': ['exact', 'in'],
+            'owner': ['exact', 'in'],
+        }
+
+
+class ConnectionFilter(django_filters_rest.FilterSet):
+    provider_type = django_filters_rest.CharFilter(field_name="type__value", lookup_expr="iexact")
+    provider_type__in = CharInFilter(field_name="type__value", lookup_expr="in")
+    destination_type = django_filters_rest.CharFilter(method='filter_by_destination_type')
+    destination_type__in = CharInFilter(method='filter_by_destination_type', lookup_expr="in")
+    destination_url = django_filters_rest.CharFilter(method='filter_by_destination_url')
+    destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
+
+    class Meta:
+        model = Integration
+        fields = {
+            'owner': ['exact', 'in'],
+        }
+
+    def filter_by_destination_type(self, queryset, name, value):
+        destinations = value if isinstance(value, list) else [value]
+        # Annotate the destination types
+        qs_with_destination_types = queryset.annotate(
+            destination_types=ArrayAgg(
+                "routing_rules_by_provider__destinations__type__value",
+                filter=Q(routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with a type matching at least one of the provided values
+        return qs_with_destination_types.filter(destination_types__overlap=destinations)
+
+    def filter_by_destination_url(self, queryset, name, value):
+        destination_urls = value if isinstance(value, list) else [value]
+        # Annotate the destination urls
+        qs_with_destination_types = queryset.annotate(
+            destination_urls=ArrayAgg(
+                "routing_rules_by_provider__destinations__base_url",
+                filter=Q(routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with an url matching at least one of the provided values
+        return qs_with_destination_types.filter(destination_urls__overlap=destination_urls)

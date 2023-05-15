@@ -12,6 +12,12 @@ from .models import (
     BridgeIntegrationType,
     BridgeIntegration,
     SubjectType,
+    IntegrationType,
+    IntegrationAction,
+    Integration,
+    IntegrationConfiguration,
+    RoutingRule,
+    SourceFilter,
 )
 
 from .forms import (
@@ -175,4 +181,85 @@ class BridgeIntegrationAdmin(SimpleHistoryAdmin):
         "name",
         "type__name",
         "owner__name",
+    )
+
+
+@admin.register(IntegrationType)
+class IntegrationTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "value",
+        "description",
+    )
+
+
+@admin.register(IntegrationAction)
+class IntegrationActionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration_type",
+        "type",
+        "name",
+        "value",
+        "description",
+    )
+    list_filter = (
+        "integration_type",
+        "type",
+    )
+
+
+@admin.register(Integration)
+class IntegrationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "type",
+        "owner",
+        "name",
+        "enabled",
+    )
+    list_filter = (
+        "owner",
+        "type",
+    )
+
+
+@admin.register(IntegrationConfiguration)
+class IntegrationConfigurationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration",
+        "action",
+    )
+    list_filter = (
+        "integration__owner",
+        "integration__type",
+        "action__type",
+    )
+
+
+@admin.register(RoutingRule)
+class RoutingRuleAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+    )
+    list_filter = (
+        "owner",
+    )
+
+
+@admin.register(SourceFilter)
+class SourceFilterAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order_number",
+        "type",
+        "name",
+        "description"
+    )
+    list_filter = (
+        "type",
+        "routing_rule",
     )
