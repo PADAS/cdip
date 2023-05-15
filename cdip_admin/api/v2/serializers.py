@@ -4,8 +4,7 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType, DeviceGroup, \
-    InboundIntegrationConfiguration
+from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -144,10 +143,10 @@ class OrganizationMemberUpdateSerializer(serializers.Serializer):
         return instance
 
 
-class DestinationTypeSerializer(serializers.ModelSerializer):
+class IntegrationTypeSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = OutboundIntegrationType
+        model = IntegrationType
         fields = ["id", "name"]
 
 
@@ -158,41 +157,72 @@ class OwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description"]
 
 
-class DestinationTypeRetrieveSerializer(serializers.ModelSerializer):
+class IntegrationActionSummarySerializer(serializers.ModelSerializer):
     class Meta:
-        model = OutboundIntegrationType
+        model = IntegrationAction
+        fields = (
+            "id",
+            "type",
+            "name",
+            "value"
+        )
+
+
+class IntegrationActionFullSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationAction
+        fields = (
+            "id",
+            "type",
+            "name",
+            "value",
+            "description",
+            "schema"
+        )
+
+
+class IntegrationTypeFullSerializer(serializers.ModelSerializer):
+    actions = IntegrationActionFullSerializer(many=True)
+
+    class Meta:
+        model = IntegrationType
         fields = (
             "id",
             "name",
             "description",
-            "dest_configuration_schema"
+            "actions"
         )
 
 
-class DestinationRetrieveSerializer(serializers.ModelSerializer):
-    type = DestinationTypeSerializer()
+class IntegrationConfigurationSerializer(serializers.ModelSerializer):
+    action = IntegrationActionSummarySerializer()
+
+    class Meta:
+        model = IntegrationConfiguration
+        fields = ["id", "integration", "action", "data"]
+
+
+class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
+    type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
-    url = serializers.SerializerMethodField()
+    configurations = IntegrationConfigurationSerializer(many=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
-        model = OutboundIntegrationConfiguration
+        model = Integration
         fields = (
             "id",
             "name",
-            "url",
+            "base_url",
             "enabled",
             "type",
             "owner",
-            "configuration",
+            "configurations",
             "status"
         )
 
-    def get_url(self, obj):
-        return obj.endpoint
-
     def get_status(self, obj):
-        # ToDo: Review this after remodeling configurations
+        # ToDo: Review this after implenting events related to health status
         return {
             "id": "mockid-b16a-4dbd-ad32-197c58aeef59",
             "is_healthy": True,
@@ -202,21 +232,21 @@ class DestinationRetrieveSerializer(serializers.ModelSerializer):
         }
 
 
-class DestinationCreateSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    url = serializers.URLField(source="endpoint")
-    configuration = serializers.JSONField(required=True)
+class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
+    type = IntegrationTypeSummarySerializer()
+    owner = OwnerSerializer()
+    configurations = IntegrationConfigurationSerializer(many=True)
 
     class Meta:
-        model = OutboundIntegrationConfiguration
+        model = Integration
         fields = (
             "id",
-            "type",
             "name",
-            "url",
+            "base_url",
             "enabled",
+            "type",
             "owner",
-            "configuration"
+            "configurations"
         )
 
     def validate(self, data):
@@ -237,52 +267,59 @@ class DestinationCreateSerializer(serializers.ModelSerializer):
         return data
 
 
-class ConnectionSourceSerializer(serializers.ModelSerializer):
+class IntegrationSummarySerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
-        model = InboundIntegrationConfiguration
-        fields = ("id", "name")
+        model = Integration
+        fields = ("id", "name", "type", "base_url", "status", )
+
+    def get_type(self, obj):
+        return obj.type.value
+
+    def get_status(self, obj):
+        # ToDo: revisit this once we implement monitoring & troubleshooting
+        return "healthy"
 
 
-class ConnectionDestinationSerializer(serializers.ModelSerializer):
+class RoutingRuleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = OutboundIntegrationConfiguration
-        fields = ("id", "name")
-
-
-class ConnectionRoutingRuleSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = DeviceGroup
+        model = RoutingRule
         fields = ("id", "name")
 
 
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
-    source = serializers.SerializerMethodField()  # ToDo: rename to "provider"?
+    id = serializers.SerializerMethodField()
+    provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
     owner = OwnerSerializer()
     status = serializers.SerializerMethodField()
 
     class Meta:
-        model = InboundIntegrationConfiguration
+        model = Integration
         fields = (
-            "source",  # ToDo: rename to "provider"?
+            "id",
+            "provider",
             "destinations",
             "routing_rules",
             "owner",
             "status"
         )
 
-    def get_source(self, obj):
-        return ConnectionSourceSerializer(instance=obj).data
+    def get_id(self, obj):
+        return str(obj.id)
+
+    def get_provider(self, obj):
+        return IntegrationSummarySerializer(instance=obj).data
 
     def get_destinations(self, obj):
-        return ConnectionDestinationSerializer(instance=obj.destinations, many=True).data
+        return IntegrationSummarySerializer(instance=obj.destinations, many=True).data
 
     def get_routing_rules(self, obj):
-        return ConnectionRoutingRuleSerializer(instance=obj.routing_rules, many=True).data
+        return RoutingRuleSummarySerializer(instance=obj.routing_rules, many=True).data
 
     def get_status(self, obj):
         # ToDo: Review this after remodeling configurations
