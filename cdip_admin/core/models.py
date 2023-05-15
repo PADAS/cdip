@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 
 
@@ -16,3 +17,10 @@ class Task(models.Model):
             ("admin", "Admin Role"),
             ("viewer", "Viewer Role"),
         ]
+
+
+class UUIDAbstractModel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    class Meta:
+        abstract = True
