@@ -17,6 +17,18 @@ from integrations.models import (
     DeviceGroup,
     Device,
     DeviceState,
+    # New integration models below (Gundi 2.0)
+    Integration,
+    IntegrationType,
+    IntegrationAction,
+    IntegrationConfiguration,
+    RoutingRule,
+    SourceFilter,
+    ensure_default_routing_rule,
+    ListFilter,
+    Source,
+    SourceState,
+    SourceConfiguration
 )
 from organizations.models import Organization
 
@@ -67,8 +79,29 @@ def org_admin_user(organization, org_members_group):
 
 
 @pytest.fixture
+def org_admin_user_2(other_organization, org_members_group):
+    email = "orgadmin2@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Jack",
+        last_name="Pearson"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=other_organization.id,
+        role=RoleChoices.ADMIN.value
+    )
+    return user
+
+
+@pytest.fixture
 def org_viewer_user(organization, org_members_group):
-    email = "orgadmin@gundiservice.org"
+    email = "orgviewer@gundiservice.org"
     user, _ = User.objects.get_or_create(
         username=email,
         email=email,
@@ -82,6 +115,27 @@ def org_viewer_user(organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=organization.id,
+        role=RoleChoices.VIEWER.value
+    )
+    return user
+
+
+@pytest.fixture
+def org_viewer_user_2(other_organization, org_members_group):
+    email = "orgaviewer2@gundiservice.org"
+    user, _ = User.objects.get_or_create(
+        username=email,
+        email=email,
+        first_name="Phill",
+        last_name="Wane"
+    )
+    user.groups.add(org_members_group.id)
+    account_profile, _ = AccountProfile.objects.get_or_create(
+        user_id=user.id,
+    )
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id,
+        organization_id=other_organization.id,
         role=RoleChoices.VIEWER.value
     )
     return user
@@ -195,23 +249,42 @@ def get_random_id():
 
 
 @pytest.fixture
-def provider_type_lotek(organization):
-    return InboundIntegrationType.objects.create(
+def provider_type_lotek():
+    return IntegrationType.objects.create(
         name="Lotek",
-        slug="lotek",
-        description="Standard inbound integration type for pulling data from Lotek API.",
-        configuration_schema={
+        value="lotek",
+        description="Standard inbound integration type for pulling data from Lotek API."
+    )
+
+
+@pytest.fixture
+def integration_type_movebank():
+    return IntegrationType.objects.create(
+        name="Movebank",
+        value="movebank",
+        description="Standard Integration type for Movebank API."
+    )
+
+@pytest.fixture
+def mb_action_auth(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_movebank,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="Use credentials to authenticate against Move Bank API",
+        schema={
             "type": "object",
-            "keys": {
-                "endpoint": {
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "password": {
                     "type": "string"
                 },
-                "login": {
-                    "type": "string",
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
+                "email": {
+                    "type": "string"
                 }
             }
         }
@@ -219,144 +292,336 @@ def provider_type_lotek(organization):
 
 
 @pytest.fixture
-def provider_type_movebank(organization):
-    return InboundIntegrationType.objects.create(
-        name="Movebank",
-        slug="movebank",
-        description="Standard inbound integration type for pulling data from Movebank API.",
-        configuration_schema={
+def mb_action_pull_positions(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_movebank,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Positions",
+        value="pull_positions",
+        description="Pull Tracking data from Move Bank API",
+        schema={
             "type": "object",
-            "keys": {
-                "endpoint": {
-                    "type": "string"
-                },
-                "login": {
-                    "type": "string",
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
+            "required": [
+                "max_records_per_individual"
+            ],
+            "properties": {
+                "max_records_per_individual": {
+                    "type": "integer"
                 }
             }
         }
     )
+
+
+@pytest.fixture
+def integration_type_er():
+    # Create an integration type for Earth Ranger
+    integration_type = IntegrationType.objects.create(
+        name="EarthRanger",
+        value="earth_ranger",
+        description="Standard type for distributing data to EarthRanger sites."
+    )
+    return integration_type
+
+
+@pytest.fixture
+def er_action_auth(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="Use credentials to authenticate against Earth Ranger API",
+        schema={
+            "type": "object",
+            "required": [
+                "username",
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def er_action_push_positions(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Positions",
+        value="push_positions",
+        description="Push Tracking data to Earth Ranger API",
+        schema={
+            "type": "object",
+            "required": [
+                "sensor_type"
+            ],
+            "properties": {
+                "sensor_type": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def er_action_push_events(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to Earth Ranger API"
+    )
+
+
+@pytest.fixture
+def er_action_pull_positions(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Positions",
+        value="pull_positions",
+        description="Pull Tracking data from Earth Ranger API"
+    )
+
+
+@pytest.fixture
+def er_action_pull_events(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Events",
+        value="pull_events",
+        description="Pull Event data from Earth Ranger API"
+    )
+
 
 
 @pytest.fixture
 def provider_lotek_panthera(get_random_id, organization, provider_type_lotek):
-    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
+    provider, _ = Integration.objects.get_or_create(
         type=provider_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
-        owner=organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        owner=organization
     )
+    ensure_default_routing_rule(provider)
     return provider
 
 
 @pytest.fixture
-def provider_movebank_ewt(get_random_id, other_organization, provider_type_movebank):
-    provider, _ = InboundIntegrationConfiguration.objects.get_or_create(
-        type=provider_type_movebank,
+def provider_movebank_ewt(
+        get_random_id, other_organization, integration_type_movebank, mb_action_auth, mb_action_pull_positions
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_movebank,
         name=f"Movebank Provider For EWT {get_random_id()}",
         owner=other_organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        base_url="api.movebank.com"
     )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=mb_action_auth,
+        data={
+            "email": f"user-{get_random_id()}@movebank.com",
+            "password": f"passwd-{get_random_id()}"
+        }
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=mb_action_pull_positions,
+        data={
+            "max_records_per_individual": 20000
+        }
+    )
+    ensure_default_routing_rule(provider)
     return provider
 
 
-@pytest.fixture
-def destination_type_er():
-    return OutboundIntegrationType.objects.create(
-        name="EarthRanger",
-        slug="earth_ranger",
-        description="Standard outbound integration type for distributing data to EarthRanger sites.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "site": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
-    )
+
+
+# @pytest.fixture
+# def integration_type_traccar():
+#     # Create an integration type for Traccar
+#     integration_type = IntegrationType.objects.create(
+#         name="EarthRanger",
+#         value="earth_ranger",
+#         description="Standard type for distributing data to EarthRanger sites."
+#     )
+#     # Add actions
+#     # Auth
+#     IntegrationAction.objects.create(
+#         integration_type=integration_type,
+#         type=IntegrationAction.ActionTypes.AUTHENTICATION,
+#         name="Authenticate",
+#         value="auth",
+#         description="Use credentials to authenticate against Earth Ranger API",
+#         schema={
+#             "type": "object",
+#             "required": [
+#                 "username",
+#                 "password"
+#             ],
+#             "properties": {
+#                 "password": {
+#                     "type": "string"
+#                 },
+#                 "username": {
+#                     "type": "string"
+#                 }
+#             }
+#         }
+#     )
+#     # Pull
+#     IntegrationAction.objects.create(
+#         integration_type=integration_type,
+#         type=IntegrationAction.ActionTypes.PULL_DATA,
+#         name="Pull Positions",
+#         value="pull_positions",
+#         description="Pull Tracking data from Traccar API",
+#         schema={
+#             "type": "object",
+#             "required": [
+#                 "start_time"
+#             ],
+#             "properties": {
+#                 "start_time": {
+#                     "type": "string"
+#                 }
+#             }
+#         }
+#     )
+#     return integration_type
 
 
 @pytest.fixture
-def destinations_list(organization, other_organization, destination_type_er, get_random_id):
-    destinations = []
+def integrations_list(
+        organization, other_organization, integration_type_er, get_random_id,
+        er_action_auth, er_action_pull_positions, er_action_pull_events, er_action_push_positions, er_action_push_events
+):
+    integrations = []
     for i in range(10):
+        # Create the integration
         site_url = f"{get_random_id()}.pamdas.org"
-        dest, _ = OutboundIntegrationConfiguration.objects.get_or_create(
-            type=destination_type_er,
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_er,
             name=f"ER Site {get_random_id()}",
             owner=organization if i < 5 else other_organization,
-            endpoint=site_url,
-            configuration={
-                "site_name": site_url,
-                "username": f"username{get_random_id()}",
-                "password": get_random_id()
+            base_url=site_url
+        )
+        # Configure actions
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=er_action_auth,
+            data={
+                "username": f"eruser-{get_random_id()}",
+                "password": f"passwd-{get_random_id()}"
             }
         )
-        destinations.append(dest)
-    return destinations
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=er_action_push_positions,
+            data={
+                "sensor_type": "collar"
+            }
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=er_action_pull_positions
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=er_action_push_events
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=er_action_pull_events
+        )
+        integrations.append(integration)
+    return integrations
 
 
 @pytest.fixture
-def make_random_devices(get_random_id):
+def make_random_sources(get_random_id):
     def _make_devices(provider, qty):
-        devices = []
+        sources = []
         for i in range(qty):
-            device, _ = Device.objects.get_or_create(
+            device, _ = Source.objects.get_or_create(
                 external_id=f"device-{get_random_id()}",
-                inbound_configuration=provider
+                integration=provider
             )
-            devices.append(device)
-        return devices
+            sources.append(device)
+        return sources
     return _make_devices
 
 
 @pytest.fixture
-def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_devices):
-    return make_random_devices(provider=provider_lotek_panthera, qty=5)
+def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_sources):
+    return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
-def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_devices):
-    return make_random_devices(provider=provider_movebank_ewt, qty=3)
+def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_sources):
+    return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, device_group_1, destinations_list):
-    rule, _ = DeviceGroup.objects.get_or_create(
+def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, integrations_list):
+    rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
-    rule.devices.add(*device_group_1)
-    rule.destinations.add(*destinations_list)
+    rule.data_providers.add(provider_lotek_panthera)
+    rule.destinations.add(*integrations_list)
+    # Filter data coming only from a subset of sources
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        name="Panthera Male Pumas",
+        description="Select collars on male pumas in panthera reserve",
+        order_number=1,
+        selector=ListFilter(
+            ids=[d.external_id for d in device_group_1]
+        ).dict(),
+        routing_rule=rule
+    )
     return rule
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, organization, device_group_2, destinations_list):
-    rule, _ = DeviceGroup.objects.get_or_create(
+def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, integrations_list):
+    rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to single destination",
-        owner=organization,
-        # ToDo: Revisit this once we allow dynamic fields and after remodeling integration
+        owner=other_organization,
+        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
-    rule.devices.add(*device_group_2)
-    rule.destinations.add(destinations_list[0])
+    rule.data_providers.add(provider_movebank_ewt)
+    rule.destinations.add(integrations_list[0])
+    # Filter data coming only from a subset of sources
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        name="EWT Baby Elephants",
+        description="Select collars on baby elephants in EWT reserve",
+        order_number=1,
+        selector=ListFilter(
+            ids=[d.external_id for d in device_group_2]
+        ).dict(),
+        routing_rule=rule
+    )
     return rule
 
 
+########################################################################################################################
+# GUNDI 1.0
 ########################################################################################################################
 class RemoteUser(NamedTuple):
     user: Any = None
