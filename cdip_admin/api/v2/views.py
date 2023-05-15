@@ -166,7 +166,7 @@ class IntegrationTypeView(
     filterset_class = IntegrationTypeFilter
     ordering_fields = ["id", "value", "name"]
     ordering = ["name"]
-    search_fields = ["^value", "^name", "^description"]
+    search_fields = ["value", "name", "description"]
 
     def get_serializer_class(self):
         return v2_serializers.IntegrationTypeFullSerializer
