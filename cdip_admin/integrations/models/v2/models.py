@@ -275,7 +275,7 @@ class Source(UUIDAbstractModel, TimestampedModel):
         related_name="sources_by_integration"
     )
     configuration = models.ForeignKey(
-        "integrations.Source",
+        "integrations.SourceConfiguration",
         on_delete=models.SET_NULL,
         related_name="sources_by_configuration",
         verbose_name="Source Configuration",
