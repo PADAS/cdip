@@ -35,39 +35,37 @@ logger = logging.getLogger(__name__)
 
 
 class ER_SMART_Synchronizer:
-    def __init__(self, **kwargs):
-        smart_integration_id = kwargs.get("smart_integration_id")
-        er_integration_id = kwargs.get("er_integration_id")
 
-        smart_config = OutboundIntegrationConfiguration.objects.get(
-            id=smart_integration_id
-        )
-        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
+    def __init__(self, *args, smart_client=None, das_client=None, smart_ca_uuids=None):
 
-        if not smart_config or not er_config:
-            logger.exception(
-                f"No configurations found for integration ids",
-                extra=dict(
-                    smart_integration_id=smart_integration_id,
-                    er_integration_id=er_integration_id,
-                ),
-            )
-            raise Exception("No configurations found for integration ids")
+        self.smart_client = smart_client
+        self.das_client = das_client
+        self.smart_ca_uuids = smart_ca_uuids
+        self.publisher = get_publisher()
+        self.cloud_storage = get_cloud_storage()
 
-        self.smart_client = SmartClient(
+    @classmethod
+    def create_synchronizer(*args, smart_config=None, er_config=None, use_language_code='en'):
+
+        # smart_config = OutboundIntegrationConfiguration.objects.get(
+        #     id=smart_integration_id
+        # )
+        # er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
+
+        smart_client = SmartClient(
             api=smart_config.endpoint,
             username=smart_config.login,
             password=smart_config.password,
             version=smart_config.additional.get("version"),
-            use_language_code="en",
+            use_language_code=use_language_code,
         )
 
-        self.smart_ca_uuids = smart_config.additional.get("ca_uuids")
+        smart_ca_uuids = smart_config.additional.get("ca_uuids")
 
         provider_key = smart_config.type.slug
         url_parse = urlparse(er_config.endpoint)
 
-        self.das_client = DasClient(
+        das_client = DasClient(
             service_root=er_config.endpoint,
             username=er_config.login,
             password=er_config.password,
@@ -77,28 +75,38 @@ class ER_SMART_Synchronizer:
             provider_key=provider_key,
         )
 
-        self.publisher = get_publisher()
-        self.cloud_storage = get_cloud_storage()
+        return ER_SMART_Synchronizer(smart_client=smart_client,
+                                     das_client=das_client,
+                                     smart_ca_uuids=smart_ca_uuids)
 
-    def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
+
+    def push_smart_ca_data_model_to_er_event_types(self, *args, smart_ca_uuid=None, ca=None,
+                                                   configurable_data_model=None):
         dm = self.smart_client.get_data_model(
             ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
         )
-        dm_dict = dm.export_as_dict()
+
+        return self.push_smart_ca_datamodel_to_earthranger(dm=dm, smart_ca_uuid=smart_ca_uuid, ca_label=ca.label,
+                                                           cm_dict=configurable_data_model)
+
+
+    def push_smart_ca_datamodel_to_earthranger(self, *, dm=None, smart_ca_uuid=None, ca_label=None, cm_dict=None):
+
 
         cm_uuid = self.smart_client.get_configurable_datamodel_for_ca(ca_uuid=smart_ca_uuid)
-        cdm_dict = None
         if cm_uuid:
             cdm = self.smart_client.get_configurable_data_model(cm_uuid=cm_uuid, use_cache=settings.USE_SMART_CACHE)
             cdm_dict = cdm.export_as_dict()
 
-        ca_identifier = self.get_identifier_from_ca_label(ca.label)
+        dm_dict = dm.export_as_dict()
+
+        ca_identifier = self.get_identifier_from_ca_label(ca_label)
         event_types = build_earth_ranger_event_types(
             dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifier, cdm=cdm_dict
         )
 
         existing_event_categories = self.das_client.get_event_categories()
-        event_category_value = self.get_event_category_value_from_ca_label(ca.label)
+        event_category_value = self.get_event_category_value_from_ca_label(ca_label)
         event_category = next(
             (
                 x
@@ -110,11 +118,11 @@ class ER_SMART_Synchronizer:
         if not event_category:
             logger.info(
                 "Event Category not found in destination ER, creating now ...",
-                extra=dict(value=event_category_value, display=ca.label),
+                extra=dict(value=event_category_value, display=ca_label),
             )
-            event_category = dict(value=event_category_value, display=ca.label)
+            event_category = dict(value=event_category_value, display=ca_label)
             self.das_client.post_event_category(event_category)
-        self.create_or_update_er_event_types(event_category, event_types)
+        self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
             f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}"
         )
@@ -137,7 +145,7 @@ class ER_SMART_Synchronizer:
             logger.warning(f"Unable to get identifier from ca_label {ca_label}")
             return ""
 
-    def create_or_update_er_event_types(self, event_category: str, event_types: dict):
+    def create_or_update_er_event_types(self, *args, event_category: dict=None, event_types: dict=None):
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
         existing_event_types = self.das_client.get_event_types(
@@ -156,7 +164,7 @@ class ER_SMART_Synchronizer:
                     None,
                 )
                 if event_type_match:
-                    if (
+                    if (True or
                         event_type.is_active != event_type_match.get("is_active")
                         or event_type.display != event_type_match.get("display")
                         or (
