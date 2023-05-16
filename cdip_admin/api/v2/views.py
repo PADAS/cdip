@@ -1,9 +1,9 @@
 from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import RoutingRule, get_user_integrations_qs, get_integrations_owners_qs, get_user_devices_qs
+from integrations.models import RoutingRule, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -223,23 +223,26 @@ class SourcesView(
     lookup_field = 'external_id'
     filter_backends = [
         drf_filters.OrderingFilter,
-        #django_filters.rest_framework.DjangoFilterBackend,
+        django_filters.rest_framework.DjangoFilterBackend,
         custom_filters.CustomizableSearchFilter
     ]
-    # filterset_class = SourceFilter
+    filterset_class = SourceFilter
     ordering_fields = ['external_id', 'integration__name']
     ordering = ['external_id']
     search_fields = [  # Default search fields (used in the global search box)
-        "external_id", "integration__name", 'integration__type__name',  # Providers
+        "external_id",  # Sources
+        "integration__name", "integration__base_url",  # Providers
+        "integration__type__name",  "integration__type__value",
         "integration__routing_rules_by_provider__destinations__name",  # Destinations
         "integration__routing_rules_by_provider__destinations__type__name",
+        "integration__routing_rules_by_provider__destinations__type__value",
         "integration__routing_rules_by_provider__destinations__base_url",
         "integration__owner__name",  # Organizations
     ]
 
     def get_queryset(self):
         # Return a list with the devices that the currently authenticated user is allowed to see
-        return get_user_devices_qs(user=self.request.user)
+        return get_user_sources_qs(user=self.request.user)
 
     def get_serializer_class(self):
         return v2_serializers.SourceRetrieveSerializer
