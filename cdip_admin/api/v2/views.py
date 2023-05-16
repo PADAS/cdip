@@ -220,6 +220,7 @@ class SourcesView(
     An endpoint for retrieving sources
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    lookup_field = 'external_id'
     filter_backends = [
         drf_filters.OrderingFilter,
         #django_filters.rest_framework.DjangoFilterBackend,
