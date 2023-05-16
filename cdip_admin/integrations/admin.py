@@ -17,7 +17,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     RoutingRule,
-    SourceFilter,
+    SourceFilter, Source,
 )
 
 from .forms import (
@@ -263,3 +263,26 @@ class SourceFilterAdmin(admin.ModelAdmin):
         "type",
         "routing_rule",
     )
+
+
+@admin.register(Source)
+class SourceAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "external_id",
+        "integration",
+        "created_at",
+    )
+    list_filter = (
+        "integration__name",
+        "integration__owner",
+        "integration__type",
+    )
+
+    search_fields = (
+        "external_id",
+        "integration__name",
+        "integration__owner__name",
+        "integration__type__name",
+    )
+
+    date_hierarchy = "created_at"
