@@ -267,7 +267,8 @@ class Source(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
         max_length=200,
-        verbose_name="External Source ID"
+        verbose_name="External Source ID",
+        db_index=True
     )
     integration = models.ForeignKey(
         "integrations.Integration",
