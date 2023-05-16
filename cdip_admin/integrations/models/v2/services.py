@@ -34,7 +34,7 @@ def get_integrations_owners_qs(integrations_qs):
     )
 
 
-def get_user_devices_qs(user):
+def get_user_sources_qs(user):
     # Return a list with the devices that the currently authenticated user is allowed to see.
     integrations = get_user_integrations_qs(user=user)
     return Source.objects.filter(integration__in=Subquery(integrations.values("id")))
