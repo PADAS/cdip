@@ -5,7 +5,7 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule, \
-    Source, SourceState
+    Source, SourceState, SourceConfiguration
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -362,13 +362,13 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_update_frequency(self, obj):
         try:  # ToDo: revisit this once we implement monitoring & troubleshooting
-            return obj.state.data.get("update_frequency", "unknown")
-        except SourceState.DoesNotExist:
+            return obj.configuration.data.get("report_every", "unknown")
+        except SourceConfiguration.DoesNotExist:
             return "unknown"
 
     def get_last_update(self, obj):
         try:  # ToDo: revisit this once we implement monitoring & troubleshooting
-            return obj.state.updated_at if obj.state else "unknown"
+            return obj.state.data.get("last_data_received", "unknown")if obj.state else "unknown"
         except SourceState.DoesNotExist:
             return "unknown"
 
