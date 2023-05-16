@@ -224,15 +224,18 @@ class SourcesView(
     filter_backends = [
         drf_filters.OrderingFilter,
         #django_filters.rest_framework.DjangoFilterBackend,
-        #custom_filters.CustomizableSearchFilter
+        custom_filters.CustomizableSearchFilter
     ]
     # filterset_class = SourceFilter
     ordering_fields = ['external_id', 'integration__name']
     ordering = ['external_id']
-    # search_fields = [  # Default search fields (used in the global search box)
-    #     "external_id", "integration__name", 'integration__type__name',  # Providers
-    #     "owner__name",  # Organizations
-    # ]
+    search_fields = [  # Default search fields (used in the global search box)
+        "external_id", "integration__name", 'integration__type__name',  # Providers
+        "integration__routing_rules_by_provider__destinations__name",  # Destinations
+        "integration__routing_rules_by_provider__destinations__type__name",
+        "integration__routing_rules_by_provider__destinations__base_url",
+        "integration__owner__name",  # Organizations
+    ]
 
     def get_queryset(self):
         # Return a list with the devices that the currently authenticated user is allowed to see
