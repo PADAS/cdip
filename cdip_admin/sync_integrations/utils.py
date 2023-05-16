@@ -114,18 +114,38 @@ def run_er_smart_sync_integrations():
 
 def on_smart_integration_save(*, integration_id: str):
     config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
+
+    if not config.state.get('download_data_models', False):
+        return
+
     version = config.additional.get("version", "7.0")
+    use_language_code = config.additional.get("use_language_code", "en")
+
     smart_client = SmartClient(
         api=config.endpoint,
         username=config.login,
         password=config.password,
-        use_language_code="en",
+        use_language_code=use_language_code,
         version=version,
     )
     ca_uuids = config.additional.get("ca_uuids")
+    configurable_models_lists = {}
     for ca_uuid in ca_uuids:
         try:
             smart_client.get_data_model(ca_uuid=ca_uuid)
             smart_client.get_conservation_area(ca_uuid=ca_uuid)
+            cm_values = smart_client.get_configurable_datamodels(ca_uuid=ca_uuid)
+
+            print(json.dumps(cm_values, indent=2))
+
+            configurable_models_lists[ca_uuid] = cm_values
+
+            for cm in cm_values:
+                logger.info('Downloading configurable model %s (%s)', cm['name'], cm['uuid'])
+                smart_client.get_configurable_data_model(cm_uuid=cm['uuid'])
         except Exception as e:
             logger.exception(e, extra=dict(ca_uuid=ca_uuid))
+
+    config.additional['configurable_models_lists'] = configurable_models_lists
+    config.state['download_data_models'] = False
+    config.save()

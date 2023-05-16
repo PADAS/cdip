@@ -5,6 +5,8 @@ from celery_once import QueueOnce
 from django.conf import settings
 
 from cdip_admin import celery
+from integrations.models import OutboundIntegrationConfiguration
+
 from sync_integrations.utils import (
     run_er_smart_sync_integrations,
     on_smart_integration_save,
@@ -31,12 +33,14 @@ def run_sync_integrations():
     run_er_smart_sync_integrations()
 
 
-@celery.app.task
-def run_smart_integration_save_tasks(integration_id):
-    # print(f'\n\narguments: {integration_id}\n\n')
-    _run_smart_integration_save_tasks.apply_async(args=(str(integration_id),))
-
-
 @celery.app.task(base=QueueOnce, once={"graceful": True})
-def _run_smart_integration_save_tasks(integration_id):
-    on_smart_integration_save(integration_id=integration_id)
+def handle_outboundintegration_save(integration_id):
+
+    try:
+        oic = OutboundIntegrationConfiguration.objects.get(id=integration_id)
+    except OutboundIntegrationConfiguration.DoesNotExist:
+        logger.error(f'OutboundIntegrationConfiguration(%s) does not exist.', integration_id)
+    else:
+
+        if oic.type.slug == 'smart_connect':
+            on_smart_integration_save(integration_id=integration_id)
