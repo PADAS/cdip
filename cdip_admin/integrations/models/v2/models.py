@@ -294,6 +294,9 @@ class Source(UUIDAbstractModel, TimestampedModel):
     class Meta:
         ordering = ("integration", "external_id")
         unique_together = ("integration", "external_id")
+        indexes = [
+            models.Index(fields=["integration", "external_id"]),
+        ]
 
 
 class SourceState(UUIDAbstractModel, TimestampedModel):
