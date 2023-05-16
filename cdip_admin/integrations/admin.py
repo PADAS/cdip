@@ -17,7 +17,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     RoutingRule,
-    SourceFilter, Source,
+    SourceFilter, Source, SourceState, SourceConfiguration,
 )
 
 from .forms import (
@@ -286,3 +286,21 @@ class SourceAdmin(SimpleHistoryAdmin):
     )
 
     date_hierarchy = "created_at"
+
+
+@admin.register(SourceState)
+class SourceStateAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "source",
+        "updated_at",
+        "data",
+    )
+
+
+@admin.register(SourceConfiguration)
+class SourceConfigurationAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "name",
+        "updated_at",
+        "data",
+    )
