@@ -4,7 +4,8 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule
+from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule, \
+    Source
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -338,3 +339,40 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         # ToDo: Review this after remodeling configurations
         return "healthy"
+
+
+class SourceRetrieveSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    provider = serializers.SerializerMethodField()
+    destinations = serializers.SerializerMethodField()
+    routing_rules = serializers.SerializerMethodField()
+    update_frequency = serializers.SerializerMethodField()
+    last_update = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Source
+        fields = (
+            "external_id", "status", "provider", "destinations", "routing_rules",
+            "update_frequency", "last_update",
+        )
+
+    def get_status(self, obj):
+        # ToDo: revisit this once we implement monitoring & troubleshooting
+        return "healthy"
+
+    def get_update_frequency(self, obj):
+        # ToDo: revisit this once we implement monitoring & troubleshooting
+        return obj.state.data.get("update_frequency", "unknown") if obj.state else "unknown"
+
+    def get_last_update(self, obj):
+        # ToDo: revisit this once we implement monitoring & troubleshooting
+        return obj.state.updated_at if obj.state else "unknown"
+
+    def get_provider(self, obj):
+        return IntegrationSummarySerializer(instance=obj.integration).data
+
+    def get_destinations(self, obj):
+        return IntegrationSummarySerializer(instance=obj.integration.destinations, many=True).data
+
+    def get_routing_rules(self, obj):
+        return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data

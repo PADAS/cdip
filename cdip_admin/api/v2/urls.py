@@ -13,7 +13,7 @@ organizations_router.register(r'members', views.MemberViewSet, basename='members
 default_router.register('integrations/types', views.IntegrationTypeView, basename='integration-types')
 default_router.register('integrations', views.IntegrationsView, basename="integrations")
 default_router.register('connections', views.ConnectionsView, basename="connections")
-
+default_router.register('sources', views.SourcesView, basename="sources")
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 
