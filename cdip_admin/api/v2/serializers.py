@@ -362,15 +362,19 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_update_frequency(self, obj):
         try:  # ToDo: revisit this once we implement monitoring & troubleshooting
-            return obj.configuration.data.get("report_every", "unknown")
+            source_configuration = obj.configuration
         except SourceConfiguration.DoesNotExist:
             return "unknown"
+        else:
+            return source_configuration.data.get("report_every", "unknown") if source_configuration else "unknown"
 
     def get_last_update(self, obj):
         try:  # ToDo: revisit this once we implement monitoring & troubleshooting
-            return obj.state.data.get("last_data_received", "unknown")if obj.state else "unknown"
+            source_state = obj.state
         except SourceState.DoesNotExist:
             return "unknown"
+        else:
+            return source_state.data.get("last_data_received", "unknown") if obj.state else "unknown"
 
     def get_provider(self, obj):
         return IntegrationSummarySerializer(instance=obj.integration).data
