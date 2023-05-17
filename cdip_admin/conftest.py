@@ -175,7 +175,7 @@ def new_user_email(get_random_id):
 @pytest.fixture
 def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
-        name=f"Test Organization {get_random_id()}",
+        name=f"Test Organization Lewa {get_random_id()}",
         description="A reserve in Africa"
     )
     return org
@@ -184,7 +184,7 @@ def organization(get_random_id):
 @pytest.fixture
 def other_organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
-        name=f"Test Organization 2 {get_random_id()}",
+        name=f"Test Organization EWT {get_random_id()}",
         description="A different reserve in Africa"
     )
     return org
@@ -249,21 +249,69 @@ def get_random_id():
 
 
 @pytest.fixture
-def provider_type_lotek():
+def integration_type_lotek():
     return IntegrationType.objects.create(
         name="Lotek",
         value="lotek",
         description="Standard inbound integration type for pulling data from Lotek API."
     )
 
+@pytest.fixture
+def lotek_action_auth(integration_type_lotek):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_lotek,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="Use credentials to authenticate against Lotek API",
+        schema={
+            "type": "object",
+            "required": [
+                "username",
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def lotek_action_pull_positions(integration_type_lotek):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_lotek,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Positions",
+        value="pull_positions",
+        description="Pull Tracking data from Move Bank API",
+        schema={
+            "type": "object",
+            "required": [
+                "start_time"
+            ],
+            "properties": {
+                "max_records_per_individual": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
 
 @pytest.fixture
 def integration_type_movebank():
     return IntegrationType.objects.create(
-        name="Movebank",
+        name="Move Bank",
         value="movebank",
-        description="Standard Integration type for Movebank API."
+        description="Standard Integration type for Move Bank API."
     )
+
 
 @pytest.fixture
 def mb_action_auth(integration_type_movebank):
@@ -405,13 +453,73 @@ def er_action_pull_events(integration_type_er):
     )
 
 
+@pytest.fixture
+def integration_type_smart():
+    return IntegrationType.objects.create(
+        name="SMART",
+        value="smart",
+        description="Standard integration type for pushing data to SMART Cloud."
+    )
+
 
 @pytest.fixture
-def provider_lotek_panthera(get_random_id, organization, provider_type_lotek):
+def smart_action_push_events(integration_type_smart):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_smart,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to SMART Cloud API"
+    )
+
+@pytest.fixture
+def smart_action_auth(integration_type_smart):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_smart,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="API Key to authenticate against SMART API",
+        schema={
+            "type": "object",
+            "required": [
+                "api_key"
+            ],
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+
+@pytest.fixture
+def provider_lotek_panthera(
+        get_random_id, organization, integration_type_lotek, lotek_action_auth, lotek_action_pull_positions
+):
     provider, _ = Integration.objects.get_or_create(
-        type=provider_type_lotek,
+        type=integration_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
-        owner=organization
+        owner=organization,
+        base_url=f"api.test.lotek.com"
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=lotek_action_auth,
+        data={
+            "username": f"user-{get_random_id()}@lotek.com",
+            "password": f"passwd-{get_random_id()}"
+        }
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=lotek_action_pull_positions,
+        data={
+            "start_time": "2023-01-01T00:00:00Z"
+        }
     )
     ensure_default_routing_rule(provider)
     return provider
@@ -425,7 +533,7 @@ def provider_movebank_ewt(
         type=integration_type_movebank,
         name=f"Movebank Provider For EWT {get_random_id()}",
         owner=other_organization,
-        base_url="api.movebank.com"
+        base_url=f"https://api.test.movebank.com"
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
@@ -554,32 +662,48 @@ def integrations_list(
 def make_random_sources(get_random_id):
     def _make_devices(provider, qty):
         sources = []
+        configuration = SourceConfiguration.objects.create(
+            name="Report every 10 minutes",
+            data={
+                "report_every": "10min"
+            }
+        )
         for i in range(qty):
-            device, _ = Source.objects.get_or_create(
+            source, _ = Source.objects.get_or_create(
                 external_id=f"device-{get_random_id()}",
                 integration=provider
             )
-            sources.append(device)
+            # Add a device state and a device configuration in some of them
+            if i % 2:
+                source.configuration = configuration
+                source.save()
+            else:
+                SourceState.objects.create(
+                    source=source,
+                    data={
+                        "last_data_received": "2023-05-17T09:52:13"
+                    }
+                )
+            sources.append(source)
         return sources
     return _make_devices
 
 
 @pytest.fixture
-def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_sources):
+def lotek_sources(get_random_id, organization, provider_lotek_panthera, make_random_sources):
     return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
-def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_sources):
+def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_random_sources):
     return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, integrations_list):
+def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
-        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_lotek_panthera)
     rule.destinations.add(*integrations_list)
@@ -590,7 +714,7 @@ def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_p
         description="Select collars on male pumas in panthera reserve",
         order_number=1,
         selector=ListFilter(
-            ids=[d.external_id for d in device_group_1]
+            ids=[d.external_id for d in lotek_sources]
         ).dict(),
         routing_rule=rule
     )
@@ -598,11 +722,10 @@ def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_p
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, integrations_list):
+def routing_rule_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
-        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_movebank_ewt)
     rule.destinations.add(integrations_list[0])
@@ -613,7 +736,7 @@ def routing_rule_2(get_random_id, other_organization, device_group_2, provider_m
         description="Select collars on baby elephants in EWT reserve",
         order_number=1,
         selector=ListFilter(
-            ids=[d.external_id for d in device_group_2]
+            ids=[d.external_id for d in movebank_sources]
         ).dict(),
         routing_rule=rule
     )
