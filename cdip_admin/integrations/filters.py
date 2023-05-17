@@ -13,7 +13,10 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     BridgeIntegration,
-    Integration, IntegrationType, get_user_integrations_qs
+    Integration,
+    IntegrationType,
+    get_user_integrations_qs,
+    Source
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -406,14 +409,14 @@ class ConnectionFilter(django_filters_rest.FilterSet):
     def filter_by_destination_url(self, queryset, name, value):
         destination_urls = value if isinstance(value, list) else [value]
         # Annotate the destination urls
-        qs_with_destination_types = queryset.annotate(
+        qs_with_destination_urls = queryset.annotate(
             destination_urls=ArrayAgg(
                 "routing_rules_by_provider__destinations__base_url",
                 filter=Q(routing_rules_by_provider__destinations__isnull=False)
             )
         )
         # Filter integrations having at least one destination with an url matching at least one of the provided values
-        return qs_with_destination_types.filter(destination_urls__overlap=destination_urls)
+        return qs_with_destination_urls.filter(destination_urls__overlap=destination_urls)
 
 
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
@@ -438,4 +441,44 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
             )
         return queryset
 
+
+class SourceFilter(django_filters_rest.FilterSet):
+    provider_type = django_filters_rest.CharFilter(field_name="integration__type__value", lookup_expr="iexact")
+    provider_type__in = CharInFilter(field_name="integration__type__value", lookup_expr="in")
+    destination_type = django_filters_rest.CharFilter(method='filter_by_destination_type')
+    destination_type__in = CharInFilter(method='filter_by_destination_type', lookup_expr="in")
+    destination_url = django_filters_rest.CharFilter(method='filter_by_destination_url')
+    destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
+    owner = django_filters_rest.CharFilter(field_name="integration__owner__id", lookup_expr="iexact")
+    owner__in = CharInFilter(field_name="integration__owner__id", lookup_expr="in")
+
+    class Meta:
+        model = Source
+        fields = {
+            'external_id': ['exact', 'iexact', 'in'],
+        }
+
+    def filter_by_destination_type(self, queryset, name, value):
+        destinations = value if isinstance(value, list) else [value]
+        # Annotate the destination types
+        qs_with_destination_types = queryset.annotate(
+            destination_types=ArrayAgg(
+                "integration__routing_rules_by_provider__destinations__type__value",
+                filter=Q(integration__routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with a type matching at least one of the provided values
+        return qs_with_destination_types.filter(destination_types__overlap=destinations)
+
+    def filter_by_destination_url(self, queryset, name, value):
+        destination_urls = value if isinstance(value, list) else [value]
+        # Annotate the destination urls
+        qs_with_destination_urls = queryset.annotate(
+            destination_urls=ArrayAgg(
+                "integration__routing_rules_by_provider__destinations__base_url",
+                filter=Q(integration__routing_rules_by_provider__destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with an url matching at least one of the provided values
+        return qs_with_destination_urls.filter(destination_urls__overlap=destination_urls)
 
