@@ -662,32 +662,48 @@ def integrations_list(
 def make_random_sources(get_random_id):
     def _make_devices(provider, qty):
         sources = []
+        configuration = SourceConfiguration.objects.create(
+            name="Report every 10 minutes",
+            data={
+                "report_every": "10min"
+            }
+        )
         for i in range(qty):
-            device, _ = Source.objects.get_or_create(
+            source, _ = Source.objects.get_or_create(
                 external_id=f"device-{get_random_id()}",
                 integration=provider
             )
-            sources.append(device)
+            # Add a device state and a device configuration in some of them
+            if i % 2:
+                source.configuration = configuration
+                source.save()
+            else:
+                SourceState.objects.create(
+                    source=source,
+                    data={
+                        "last_data_received": "2023-05-17T09:52:13"
+                    }
+                )
+            sources.append(source)
         return sources
     return _make_devices
 
 
 @pytest.fixture
-def device_group_1(get_random_id, organization, provider_lotek_panthera, make_random_sources):
+def lotek_sources(get_random_id, organization, provider_lotek_panthera, make_random_sources):
     return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
-def device_group_2(get_random_id, organization, provider_movebank_ewt, make_random_sources):
+def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_random_sources):
     return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_panthera, integrations_list):
+def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
-        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_lotek_panthera)
     rule.destinations.add(*integrations_list)
@@ -698,7 +714,7 @@ def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_p
         description="Select collars on male pumas in panthera reserve",
         order_number=1,
         selector=ListFilter(
-            ids=[d.external_id for d in device_group_1]
+            ids=[d.external_id for d in lotek_sources]
         ).dict(),
         routing_rule=rule
     )
@@ -706,11 +722,10 @@ def routing_rule_1(get_random_id, organization, device_group_1, provider_lotek_p
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, other_organization, device_group_2, provider_movebank_ewt, integrations_list):
+def routing_rule_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
     rule, _ = RoutingRule.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
-        # ToDo: Revisit the rule type after talking about bi-directional integrations
     )
     rule.data_providers.add(provider_movebank_ewt)
     rule.destinations.add(integrations_list[0])
@@ -721,7 +736,7 @@ def routing_rule_2(get_random_id, other_organization, device_group_2, provider_m
         description="Select collars on baby elephants in EWT reserve",
         order_number=1,
         selector=ListFilter(
-            ids=[d.external_id for d in device_group_2]
+            ids=[d.external_id for d in movebank_sources]
         ).dict(),
         routing_rule=rule
     )
