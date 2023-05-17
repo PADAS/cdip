@@ -267,7 +267,8 @@ class Source(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
         max_length=200,
-        verbose_name="External Source ID"
+        verbose_name="External Source ID",
+        db_index=True
     )
     integration = models.ForeignKey(
         "integrations.Integration",
@@ -275,7 +276,7 @@ class Source(UUIDAbstractModel, TimestampedModel):
         related_name="sources_by_integration"
     )
     configuration = models.ForeignKey(
-        "integrations.Source",
+        "integrations.SourceConfiguration",
         on_delete=models.SET_NULL,
         related_name="sources_by_configuration",
         verbose_name="Source Configuration",
@@ -294,6 +295,9 @@ class Source(UUIDAbstractModel, TimestampedModel):
     class Meta:
         ordering = ("integration", "external_id")
         unique_together = ("integration", "external_id")
+        indexes = [
+            models.Index(fields=["integration", "external_id"]),
+        ]
 
 
 class SourceState(UUIDAbstractModel, TimestampedModel):
