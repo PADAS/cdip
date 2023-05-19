@@ -5,7 +5,10 @@ from smartconnect import SmartClient
 from smartconnect.models import (
     ConservationArea,
 )
-from cdip_admin import settings
+
+from cdip_admin import celery
+from celery_once import QueueOnce
+from django.conf import settings
 
 from integrations.models import (
     OutboundIntegrationConfiguration,
@@ -18,101 +21,14 @@ import json
 logger = logging.getLogger(__name__)
 
 
-def run_er_smart_sync_integrations():
-    # TODO: Better way to associate in portal which integrations should be synced
-    smart_integrations = OutboundIntegrationConfiguration.objects.filter(
-        enabled=True, type__slug="smart_connect"
-    )
-    for smart_integration in smart_integrations:
-        smart_integration_id = str(smart_integration.id)
-        er_integration_id = (
-            smart_integration.additional.get("er_integration_id")
-            if smart_integration.additional
-            else None
-        )
-        if er_integration_id:
-            # confirm er_integration exists
-            try:
-                er_integration = InboundIntegrationConfiguration.objects.get(
-                    id=er_integration_id
-                )
-            except InboundIntegrationConfiguration.DoesNotExist:
-                logger.error(
-                    f"Earth Ranger Inbound Integration specified was not found: {er_integration_id}"
-                )
-                er_integration = None
-            if not er_integration:
-                er_integration_id = None
-        if smart_integration_id and er_integration_id:
-            logger.info(
-                f"Beginning SMART ER sync process",
-                extra=dict(
-                    smart_integration_id=smart_integration_id,
-                    smart_integration_name=smart_integration.name,
-                    er_integration_id=er_integration_id,
-                    er_integration_name=er_integration.name,
-                ),
-            )
-            er_smart_sync = ER_SMART_Synchronizer(
-                smart_integration_id=smart_integration_id,
-                er_integration_id=er_integration_id,
-            )
+def on_smart_integration_save(*args, integration_id: str):
+    '''
+    This function is called when a SMART integration is saved. It inspects the Integration Configuration
+    and will use a Smart Client to download whichever data models and configurable data models are associated
+    with it.
+    '''
+    assert not args, "This function does not accept positional arguments"
 
-            if not er_smart_sync.smart_ca_uuids:
-                logger.warning(
-                    f"ca_uuids not found in integration configuration",
-                    extra=dict(smart_integration_id=smart_integration_id),
-                )
-                continue
-
-            # Handle Group of CA's associated to single ER site
-            for smart_ca_uuid in er_smart_sync.smart_ca_uuids:
-                try:
-                    extra_dict = dict(
-                        smart_ca_uuid=smart_ca_uuid,
-                        smart_server=er_smart_sync.smart_client.api,
-                        use_smart_cache=settings.USE_SMART_CACHE,
-                    )
-                    logger.debug(f"Processing SMART CA: {smart_ca_uuid}")
-                    ca = er_smart_sync.smart_client.get_conservation_area(
-                        ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
-                    )
-                    if not ca:
-                        logger.warning(
-                            f"Conservation Area not found",
-                            extra=dict(smart_ca_uuid=smart_ca_uuid),
-                        )
-                        return
-                    logger.debug(
-                        f"Beginning sync of event types",
-                        extra=dict(ca_uuid=smart_ca_uuid),
-                    )
-                    er_smart_sync.push_smart_ca_data_model_to_er_event_types(
-                        smart_ca_uuid=smart_ca_uuid, ca=ca
-                    )
-                    er_smart_sync.sync_patrol_datamodel(
-                        smart_ca_uuid=smart_ca_uuid, ca=ca
-                    )
-                except Exception as e:
-                    logger.exception(
-                        f"Error occurred while attempting to process SMART data",
-                        extra=extra_dict,
-                    )
-
-            # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
-            if er_integration:
-                logger.debug(f"Beginning pull of ER objects")
-                er_smart_sync.get_er_events(config=er_integration)
-                er_smart_sync.get_er_patrols(config=er_integration)
-
-        else:
-            logger.warning(
-                f"skipping sync, er_integration_id not found for smart_integration {smart_integration.id}"
-            )
-            continue
-
-
-def on_smart_integration_save(*, integration_id: str):
     config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
 
     if not config.state.get('download_data_models', False):
@@ -134,7 +50,7 @@ def on_smart_integration_save(*, integration_id: str):
         try:
             smart_client.get_data_model(ca_uuid=ca_uuid)
             smart_client.get_conservation_area(ca_uuid=ca_uuid)
-            cm_values = smart_client.get_configurable_datamodels(ca_uuid=ca_uuid)
+            cm_values = smart_client.list_configurable_datamodels(ca_uuid=ca_uuid)
 
             print(json.dumps(cm_values, indent=2))
 
