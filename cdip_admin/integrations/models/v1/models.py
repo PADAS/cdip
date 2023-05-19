@@ -443,9 +443,10 @@ class DeviceGroup(TimestampedModel):
 
 @receiver(post_save, sender=OutboundIntegrationConfiguration)
 def integration_configuration_save_tasks(sender, instance, **kwargs):
+
     transaction.on_commit(
         lambda: celery.app.send_task(
-            "cdip_admin.tasks.handle_outboundintegration_save",
+            "sync_integrations.tasks.handle_outboundintegration_save",
             args=(str(instance.id),),
         )
     )

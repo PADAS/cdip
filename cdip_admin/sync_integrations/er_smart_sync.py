@@ -3,7 +3,7 @@ import logging
 import pathlib
 import uuid
 from datetime import timezone, datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
 from urllib.parse import urlparse
 
 import pydantic
@@ -33,72 +33,97 @@ from integrations.models import (
 
 logger = logging.getLogger(__name__)
 
+class ConfigurableModelTranslation(pydantic.BaseModel):
+    language_code: str = 'en'
+    value: str = ''
+
+class ConfigurableModelMetadata(pydantic.BaseModel):
+    ca_id: str
+    ca_name: str
+    ca_uuid: str
+    name: str
+    translations: List[ConfigurableModelTranslation]
+    uuid: str
+
+class SmartIntegrationAdditional(pydantic.BaseModel):
+
+    ca_uuids: List[str] = []
+    configurable_models_enabled: List[str] = []
+
+    configurable_models_map: Dict[str, List[ConfigurableModelMetadata]] = {}
 
 class ER_SMART_Synchronizer:
 
-    def __init__(self, *args, smart_client=None, das_client=None, smart_ca_uuids=None):
+    def __init__(self, *args, smart_config=None, er_config=None):
 
-        self.smart_client = smart_client
-        self.das_client = das_client
-        self.smart_ca_uuids = smart_ca_uuids
+        assert not args, "ER_SMART_Synchronizer does not support positional arguments"
+
+        self.smart_config = smart_config
+        self.er_config = er_config or InboundIntegrationConfiguration.objects.get(id=smart_config.additional.get("er_integration_id"))
+
         self.publisher = get_publisher()
         self.cloud_storage = get_cloud_storage()
 
-    @classmethod
-    def create_synchronizer(*args, smart_config=None, er_config=None, use_language_code='en'):
-
-        # smart_config = OutboundIntegrationConfiguration.objects.get(
-        #     id=smart_integration_id
-        # )
-        # er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
-
-        smart_client = SmartClient(
+        self.smart_client = SmartClient(
             api=smart_config.endpoint,
             username=smart_config.login,
             password=smart_config.password,
             version=smart_config.additional.get("version"),
-            use_language_code=use_language_code,
+            use_language_code=smart_config.additional.get("use_language_code", "en"),
         )
 
-        smart_ca_uuids = smart_config.additional.get("ca_uuids")
+        provider_key = self.smart_config.type.slug
+        url_parse = urlparse(self.er_config.endpoint)
 
-        provider_key = smart_config.type.slug
-        url_parse = urlparse(er_config.endpoint)
-
-        das_client = DasClient(
-            service_root=er_config.endpoint,
-            username=er_config.login,
-            password=er_config.password,
-            token=er_config.token,
+        # TODO: Replace with er-client
+        self.das_client = DasClient(
+            service_root=self.er_config.endpoint,
+            username=self.er_config.login,
+            password=self.er_config.password,
+            token=self.er_config.token,
             token_url=f"{url_parse.scheme}://{url_parse.hostname}/oauth2/token",
             client_id="das_web_client",
             provider_key=provider_key,
         )
 
-        return ER_SMART_Synchronizer(smart_client=smart_client,
-                                     das_client=das_client,
-                                     smart_ca_uuids=smart_ca_uuids)
+
+    def synchronize_datamodel(self):
+        # Given a single smart integration, synchronize the datamodels for all the CAs and CMs.
+        for ca_uuid in self.smart_config.additional.get('ca_uuids', []):
+            ca = self.smart_client.get_conservation_area(ca_uuid=ca_uuid)
+
+            for cm_uuid in self.smart_config.additional.get('configurable_models_enabled', []):
+                # TODO: confirm cm_uuid is member of ca_uuid models list.
+                self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
 
 
-    def push_smart_ca_data_model_to_er_event_types(self, *args, smart_ca_uuid=None, ca=None,
-                                                   configurable_data_model=None):
-        dm = self.smart_client.get_data_model(
-            ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
-        )
+
+    def push_smart_datamodel_to_earthranger(self, *args, smart_ca_uuid=None, ca=None,
+                                            smart_cm_uuid=None):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
+
+        if smart_cm_uuid:
+            cm = self.smart_client.get_configurable_data_model(cm_uuid=smart_cm_uuid)
+        else:
+            cm = None
 
         return self.push_smart_ca_datamodel_to_earthranger(dm=dm, smart_ca_uuid=smart_ca_uuid, ca_label=ca.label,
-                                                           cm_dict=configurable_data_model)
+                                                           cm=cm)
 
+    def push_smart_ca_datamodel_to_earthranger(self, *args, dm=None, smart_ca_uuid=None, ca_label=None, cm=None):
 
-    def push_smart_ca_datamodel_to_earthranger(self, *, dm=None, smart_ca_uuid=None, ca_label=None, cm_dict=None):
+        assert not args, 'This method does not accept positional arguments'
 
-
-        cm_uuid = self.smart_client.get_configurable_datamodel_for_ca(ca_uuid=smart_ca_uuid)
-        if cm_uuid:
-            cdm = self.smart_client.get_configurable_data_model(cm_uuid=cm_uuid, use_cache=settings.USE_SMART_CACHE)
-            cdm_dict = cdm.export_as_dict()
+        if not dm:
+            raise ValueError('dm is required')
 
         dm_dict = dm.export_as_dict()
+
+        if cm:
+            cdm_dict = cm.export_as_dict()
 
         ca_identifier = self.get_identifier_from_ca_label(ca_label)
         event_types = build_earth_ranger_event_types(
@@ -145,7 +170,9 @@ class ER_SMART_Synchronizer:
             logger.warning(f"Unable to get identifier from ca_label {ca_label}")
             return ""
 
-    def create_or_update_er_event_types(self, *args, event_category: dict=None, event_types: dict=None):
+    def create_or_update_er_event_types(self, *args, event_category: dict = None, event_types: dict = None):
+
+        assert not args, 'This method does not accept positional arguments'
         # TODO: would be nice to be able to specify category here.
         #  Currently event_type keys must be globally unique not just within category though
         existing_event_types = self.das_client.get_event_types(
@@ -165,18 +192,18 @@ class ER_SMART_Synchronizer:
                 )
                 if event_type_match:
                     if (True or
-                        event_type.is_active != event_type_match.get("is_active")
-                        or event_type.display != event_type_match.get("display")
-                        or (
-                            event_type.is_active
-                            and event_type.event_schema
-                            and not er_event_type_schemas_equal(
+                            event_type.is_active != event_type_match.get("is_active")
+                            or event_type.display != event_type_match.get("display")
+                            or (
+                                    event_type.is_active
+                                    and event_type.event_schema
+                                    and not er_event_type_schemas_equal(
                                 json.loads(event_type.event_schema).get("schema"),
                                 json.loads(event_type_match.get("schema")).get(
                                     "schema"
                                 ),
                             )
-                        )
+                            )
                     ):
                         logger.info(
                             f"Updating ER event type",
@@ -214,7 +241,10 @@ class ER_SMART_Synchronizer:
                 extra=dict(event_type=event_type, exception=e),
             )
 
-    def get_er_events(self, *, config: InboundIntegrationConfiguration):
+    def get_er_events(self, *args, config: InboundIntegrationConfiguration):
+
+        assert not args, 'This method does not accept positional arguments'
+
         i_state = get_earth_ranger_last_poll(integration_id=config.id)
 
         event_last_poll_at = i_state.event_last_poll_at or datetime.now(
@@ -291,7 +321,11 @@ class ER_SMART_Synchronizer:
             else:
                 raise Exception("Error processing file")
 
-    def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
+    def sync_patrol_datamodel(self):
+
+        smart_ca_uuid=self.smart_config.additional.get("ca_uuids")[0]
+        ca = self.smart_client.get_conservation_area(ca_uuid=smart_ca_uuid)
+
         patrol_data_model = self.smart_client.download_patrolmodel(
             ca_uuid=smart_ca_uuid
         )
@@ -330,13 +364,15 @@ class ER_SMART_Synchronizer:
                     )
 
     def process_er_patrols(
-        self,
-        *,
-        patrols: List[ERPatrol],
-        integration_id: str,
-        patrol_last_poll_at: datetime,
-        upper: datetime,
+            self,
+            *args,
+            patrols: List[ERPatrol],
+            integration_id: str,
+            patrol_last_poll_at: datetime,
+            upper: datetime,
     ):
+
+        assert not args, 'This method does not accept positional arguments'
         patrol: ERPatrol
         for patrol in patrols:
             logger.info(
@@ -463,7 +499,10 @@ class ER_SMART_Synchronizer:
                     TopicEnum.observations_unprocessed.value, patrol.dict()
                 )
 
-    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
+    def get_er_patrols(self, *args, config: InboundIntegrationConfiguration):
+
+        assert not args, 'This method does not accept positional arguments'
+
         i_state = get_earth_ranger_last_poll(integration_id=config.id)
 
         lower = i_state.patrol_last_poll_at or datetime.now(
