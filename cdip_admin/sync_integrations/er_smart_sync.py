@@ -94,7 +94,8 @@ class ER_SMART_Synchronizer:
 
             self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca)
 
-            for cm_uuid in self.smart_config.additional.get('configurable_models_enabled', []):
+            for cm in self.smart_config.additional.get('configurable_models_lists', {}).get(ca_uuid):
+                cm_uuid = cm.get('uuid')
                 # TODO: confirm cm_uuid is member of ca_uuid models list.
                 self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
 
