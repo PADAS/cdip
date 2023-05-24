@@ -242,11 +242,13 @@ class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
-    configurations = IntegrationConfigurationCreateSerializer(many=True)
+    id = serializers.UUIDField(read_only=True)
+    configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
 
     class Meta:
         model = Integration
         fields = (
+            "id",
             "name",
             "base_url",
             "enabled",
@@ -280,6 +282,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 **configuration
             )
         return integration
+
+    # ToDo. Support updates with nested configurations too?
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
