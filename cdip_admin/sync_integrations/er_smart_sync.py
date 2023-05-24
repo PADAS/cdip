@@ -92,6 +92,8 @@ class ER_SMART_Synchronizer:
         for ca_uuid in self.smart_config.additional.get('ca_uuids', []):
             ca = self.smart_client.get_conservation_area(ca_uuid=ca_uuid)
 
+            self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca)
+
             for cm_uuid in self.smart_config.additional.get('configurable_models_enabled', []):
                 # TODO: confirm cm_uuid is member of ca_uuid models list.
                 self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
@@ -121,9 +123,7 @@ class ER_SMART_Synchronizer:
             raise ValueError('dm is required')
 
         dm_dict = dm.export_as_dict()
-
-        if cm:
-            cdm_dict = cm.export_as_dict()
+        cdm_dict = cm.export_as_dict() if cm else None
 
         ca_identifier = self.get_identifier_from_ca_label(ca_label)
         event_types = build_earth_ranger_event_types(
@@ -131,7 +131,7 @@ class ER_SMART_Synchronizer:
         )
 
         existing_event_categories = self.das_client.get_event_categories()
-        event_category_value = self.get_event_category_value_from_ca_label(ca_label)
+        event_category_value = self.calculate_event_category_value(ca_label=ca_label, cm_label=getattr(cm, '_name', None))
         event_category = next(
             (
                 x
@@ -140,12 +140,14 @@ class ER_SMART_Synchronizer:
             ),
             None,
         )
+
         if not event_category:
             logger.info(
                 "Event Category not found in destination ER, creating now ...",
                 extra=dict(value=event_category_value, display=ca_label),
             )
-            event_category = dict(value=event_category_value, display=ca_label)
+            display_name = f"{ca_label} {cm._name}" if cm else ca_label
+            event_category = dict(value=event_category_value, display=display_name)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
@@ -153,12 +155,12 @@ class ER_SMART_Synchronizer:
         )
 
     @staticmethod
-    def get_event_category_value_from_ca_label(ca_label: str):
-        value = ca_label.replace("[", "")
-        value = value.replace("]", "")
-        value = value.replace(" ", "_")
-        value = value.lower()
-        return value
+    def calculate_event_category_value(ca_label: str=None, cm_label: str=None):
+        translation = {
+            ord("["): '', ord("]"): '', ord(" "): "_"
+        }
+
+        return ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
 
     @staticmethod
     def get_identifier_from_ca_label(ca_label: str):
@@ -251,8 +253,6 @@ class ER_SMART_Synchronizer:
             tz=timezone.utc
         ) - timedelta(days=7)
         current_time = datetime.now(tz=timezone.utc)
-
-        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
         events = parse_obj_as(
             List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at)
