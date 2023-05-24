@@ -12,7 +12,7 @@ SHELL := /bin/sh
 
 .DEFAULT_GOAL := help
 
-gcr_root := us-central1-docker.pkg.dev/cdip-78ca/cdip-portal
+gcr_root := us-central1-docker.pkg.dev/cdip-78ca/gundi/cdip-portal
 semver_file := $(CURDIR)/VERSION
 
 .PHONY: help
