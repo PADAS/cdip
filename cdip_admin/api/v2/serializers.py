@@ -195,7 +195,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
         )
 
 
-class IntegrationConfigurationSerializer(serializers.ModelSerializer):
+class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
     action = IntegrationActionSummarySerializer()
 
     class Meta:
@@ -206,7 +206,7 @@ class IntegrationConfigurationSerializer(serializers.ModelSerializer):
 class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
-    configurations = IntegrationConfigurationSerializer(many=True)
+    configurations = IntegrationConfigurationRetrieveSerializer(many=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -233,15 +233,20 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
         }
 
 
+class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
+    action = serializers.PrimaryKeyRelatedField(queryset=IntegrationAction.objects.all())
+
+    class Meta:
+        model = IntegrationConfiguration
+        fields = ["action", "data"]
+
+
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
-    type = IntegrationTypeSummarySerializer()
-    owner = OwnerSerializer()
-    configurations = IntegrationConfigurationSerializer(many=True)
+    configurations = IntegrationConfigurationCreateSerializer(many=True)
 
     class Meta:
         model = Integration
         fields = (
-            "id",
             "name",
             "base_url",
             "enabled",
@@ -252,20 +257,29 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """
-        Validate the configuration schema
+        Validate the configurations
         """
-        destination_type = data["type"]
-        configuration_schema = destination_type.dest_configuration_schema
-        configuration = data["configuration"]
-        if configuration_schema and not configuration:  # Blank or None
-            raise drf_exceptions.ValidationError("The configuration can't be null or empty")
-
-        try:  # Validate schema
-            jsonschema.validate(instance=configuration, schema=configuration_schema)
-        except jsonschema.exceptions.ValidationError as err:
-            print(err)
-            raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
+        for configuration in data.get("configurations", []):
+            action = configuration["action"]
+            configuration_schema = action.schema
+            if configuration_schema and not configuration:  # Blank or None
+                raise drf_exceptions.ValidationError("The configuration can't be null or empty")
+            try:  # Validate schema
+                action.validate_configuration(configuration["data"])
+            except jsonschema.exceptions.ValidationError as err:
+                print(err)
+                raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
         return data
+
+    def create(self, validated_data):
+        configurations = validated_data.pop('configurations')
+        integration = Integration.objects.create(**validated_data)
+        for configuration in configurations:
+            IntegrationConfiguration.objects.create(
+                integration=integration,
+                **configuration
+            )
+        return integration
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
