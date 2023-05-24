@@ -25,5 +25,5 @@ help: ## show this help
 build_and_push: sha_gcr_tag := $(shell git rev-parse --short --quiet --verify HEAD || exit 1)
 build_and_push: ## build and push
 	@ if [ -z "$(sha_gcr_tag)" ]; then (printf "\e[31m\tCould not resolve sha_gcr_tag with git rev-parse.\e[0m\n" >&2; exit 1); fi
-	docker build --tag $(gcr_root):$(latest_gcr_tag) --tag $(gcr_root):$(sha_gcr_tag) -f docker/Dockerfile .
+	docker build --tag $(gcr_root):$(sha_gcr_tag) -f docker/Dockerfile .
 	docker push $(gcr_root):$(sha_gcr_tag)
