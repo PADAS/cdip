@@ -1,3 +1,4 @@
+import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
@@ -57,6 +58,10 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.integration_type} - {self.name}"
+
+    def validate_configuration(self, configuration: dict):
+        # Helper method to validate a configuration against the Action's schema
+        jsonschema.validate(instance=configuration, schema=self.schema)
 
 
 class Integration(UUIDAbstractModel, TimestampedModel):
