@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "django_extensions",
     "simple_history",
     "django_jsonform",
+    "django_celery_beat",
 ]
 
 
