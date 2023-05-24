@@ -24,7 +24,6 @@ from integrations.models import (
     IntegrationConfiguration,
     RoutingRule,
     SourceFilter,
-    ensure_default_routing_rule,
     ListFilter,
     Source,
     SourceState,
@@ -521,7 +520,6 @@ def provider_lotek_panthera(
             "start_time": "2023-01-01T00:00:00Z"
         }
     )
-    ensure_default_routing_rule(provider)
     return provider
 
 
@@ -551,64 +549,7 @@ def provider_movebank_ewt(
             "max_records_per_individual": 20000
         }
     )
-    ensure_default_routing_rule(provider)
     return provider
-
-
-
-
-# @pytest.fixture
-# def integration_type_traccar():
-#     # Create an integration type for Traccar
-#     integration_type = IntegrationType.objects.create(
-#         name="EarthRanger",
-#         value="earth_ranger",
-#         description="Standard type for distributing data to EarthRanger sites."
-#     )
-#     # Add actions
-#     # Auth
-#     IntegrationAction.objects.create(
-#         integration_type=integration_type,
-#         type=IntegrationAction.ActionTypes.AUTHENTICATION,
-#         name="Authenticate",
-#         value="auth",
-#         description="Use credentials to authenticate against Earth Ranger API",
-#         schema={
-#             "type": "object",
-#             "required": [
-#                 "username",
-#                 "password"
-#             ],
-#             "properties": {
-#                 "password": {
-#                     "type": "string"
-#                 },
-#                 "username": {
-#                     "type": "string"
-#                 }
-#             }
-#         }
-#     )
-#     # Pull
-#     IntegrationAction.objects.create(
-#         integration_type=integration_type,
-#         type=IntegrationAction.ActionTypes.PULL_DATA,
-#         name="Pull Positions",
-#         value="pull_positions",
-#         description="Pull Tracking data from Traccar API",
-#         schema={
-#             "type": "object",
-#             "required": [
-#                 "start_time"
-#             ],
-#             "properties": {
-#                 "start_time": {
-#                     "type": "string"
-#                 }
-#             }
-#         }
-#     )
-#     return integration_type
 
 
 @pytest.fixture
