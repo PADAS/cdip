@@ -1,6 +1,8 @@
+import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
+from .services import ensure_default_routing_rule
 
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
@@ -58,6 +60,10 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.integration_type} - {self.name}"
 
+    def validate_configuration(self, configuration: dict):
+        # Helper method to validate a configuration against the Action's schema
+        jsonschema.validate(instance=configuration, schema=self.schema)
+
 
 class Integration(UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
@@ -97,6 +103,18 @@ class Integration(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        ensure_default_routing_rule(integration=self)
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
+
 
     @property
     def configurations(self):
