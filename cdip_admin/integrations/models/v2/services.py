@@ -1,12 +1,14 @@
 from django.db.models import Subquery
 from organizations.models import Organization
 from accounts.utils import get_user_organizations_qs
-from .models import Integration, RoutingRule, Source
+from django.apps import apps
 
 
 def ensure_default_routing_rule(integration):
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_routing_rule:
+        # Avoid circular imports related to models
+        RoutingRule = apps.get_model('integrations', 'RoutingRule')
         name = integration.name + " - Default Route"
         routing_rule, _ = RoutingRule.objects.get_or_create(
             owner_id=integration.owner.id,
@@ -22,6 +24,7 @@ def ensure_default_routing_rule(integration):
 def get_user_integrations_qs(user):
     # Return a list with the integrations that the currently authenticated user is allowed to see.
     user_organizations = get_user_organizations_qs(user=user)
+    Integration = apps.get_model('integrations', 'Integration')
     integrations = Integration.objects.filter(
         owner__in=Subquery(user_organizations.values('id'))
     )
@@ -37,4 +40,5 @@ def get_integrations_owners_qs(integrations_qs):
 def get_user_sources_qs(user):
     # Return a list with the devices that the currently authenticated user is allowed to see.
     integrations = get_user_integrations_qs(user=user)
+    Source = apps.get_model('integrations', 'Source')
     return Source.objects.filter(integration__in=Subquery(integrations.values("id")))
