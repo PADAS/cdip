@@ -46,7 +46,7 @@ def test_list_connections_as_superuser(api_client, superuser, organization, prov
         api_client=api_client,
         user=superuser,
         # The superuser can see all the connections
-        provider_list=[provider_lotek_panthera, provider_movebank_ewt]
+        provider_list=integrations_list + [provider_lotek_panthera, provider_movebank_ewt]
     )
 
 
@@ -55,7 +55,7 @@ def test_list_connections_as_org_admin(api_client, org_admin_user, organization,
         api_client=api_client,
         user=org_admin_user,  # Belongs to one organization
         # Org admins can only see providers of their organizations
-        provider_list=[provider_lotek_panthera]
+        provider_list=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -64,7 +64,7 @@ def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organizat
         api_client=api_client,
         user=org_admin_user_2,  # Belongs to one organization
         # Org admins can only see providers of their organizations
-        provider_list=[provider_movebank_ewt]
+        provider_list=integrations_list[5:]+ [provider_movebank_ewt]
     )
 
 
@@ -73,7 +73,7 @@ def test_list_connections_as_org_viewer(api_client, org_viewer_user, organizatio
         api_client=api_client,
         user=org_viewer_user,  # Belongs to one organization
         # Org viewer can only see providers of their organizations
-        provider_list=[provider_lotek_panthera]
+        provider_list=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -238,7 +238,7 @@ def test_filter_connections_by_owner_exact_as_superuser(
         filters={
             "owner": str(other_organization.id)
         },
-        expected_integrations=[provider_movebank_ewt]
+        expected_integrations=integrations_list[5:]+[provider_movebank_ewt]
     )
 
 
@@ -252,7 +252,7 @@ def test_filter_connections_by_multiple_owners_as_superuser(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_lotek_panthera, provider_movebank_ewt]
+        expected_integrations=integrations_list + [provider_lotek_panthera, provider_movebank_ewt]
     )
 
 
@@ -266,7 +266,7 @@ def test_filter_connections_by_owner_exact_as_org_admin(
         filters={
             "owner": str(organization.id)
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -280,7 +280,7 @@ def test_filter_connections_by_multiple_owners_as_org_admin(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -294,7 +294,7 @@ def test_filter_connections_by_owner_exact_as_org_viewer(
         filters={
             "owner": str(organization.id)
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -308,7 +308,7 @@ def test_filter_connections_by_multiple_owners_as_org_viewer(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_movebank_ewt]
+        expected_integrations=integrations_list[5:] + [provider_movebank_ewt]
     )
 
 
@@ -348,7 +348,7 @@ def test_global_search_connections_as_superuser(
         api_client=api_client,
         user=superuser,
         search_term="pamdas.org",  # Looking connections with earth ranger sites
-        expected_integrations=[provider_movebank_ewt, provider_lotek_panthera]  # Connected providers
+        expected_integrations=integrations_list + [provider_movebank_ewt, provider_lotek_panthera]  # Connected providers
     )
 
 
@@ -363,7 +363,7 @@ def test_global_search_connections_as_org_admin(
         api_client=api_client,
         user=org_admin_user,
         search_term="Lewa",  # Looking connections owned by Lewa
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5]+[provider_lotek_panthera]
     )
 
 
