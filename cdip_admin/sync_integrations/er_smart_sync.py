@@ -176,8 +176,8 @@ class ER_SMART_Synchronizer:
     def create_or_update_er_event_types(self, *args, event_category: dict = None, event_types: dict = None):
 
         assert not args, 'This method does not accept positional arguments'
-        # TODO: would be nice to be able to specify category here.
-        #  Currently event_type keys must be globally unique not just within category though
+
+        # Note: In EarthRanger, EventType.value must be globally unique (not just within category though)
         existing_event_types = self.das_client.get_event_types(
             include_inactive=True, include_schema=True
         )
@@ -185,24 +185,24 @@ class ER_SMART_Synchronizer:
             event_type: EREventType
             for event_type in event_types:
                 event_type.category = event_category.get("value")
-                event_type_match = next(
+                existing_er_event_type = next(
                     (
                         x
                         for x in existing_event_types
-                        if (x.get("value") == event_type.value)
+                        if (x.get("value") == event_type.value and x.get('category').get('value') == event_type.category)
                     ),
                     None,
                 )
-                if event_type_match:
-                    if (True or
-                            event_type.is_active != event_type_match.get("is_active")
-                            or event_type.display != event_type_match.get("display")
+                if existing_er_event_type:
+                    if (
+                            event_type.is_active != existing_er_event_type.get("is_active")
+                            or event_type.display != existing_er_event_type.get("display")
                             or (
                                     event_type.is_active
                                     and event_type.event_schema
                                     and not er_event_type_schemas_equal(
                                 json.loads(event_type.event_schema).get("schema"),
-                                json.loads(event_type_match.get("schema")).get(
+                                json.loads(existing_er_event_type.get("schema")).get(
                                     "schema"
                                 ),
                             )
@@ -212,7 +212,7 @@ class ER_SMART_Synchronizer:
                             f"Updating ER event type",
                             extra=dict(value=event_type.value),
                         )
-                        event_type.id = event_type_match.get("id")
+                        event_type.id = existing_er_event_type.get("id")
                         try:
                             self.das_client.patch_event_type(
                                 event_type.dict(by_alias=True, exclude_none=True)
