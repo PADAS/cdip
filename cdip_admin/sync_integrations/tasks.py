@@ -57,7 +57,7 @@ def run_er_smart_sync_integrations():
         enabled=True, type__slug="smart_connect"
     )
     for i in smart_integrations:
-        run_er_smart_sync_integration(smart_integration=str(i.id))
+        run_er_smart_sync_integration(smart_integration_id=str(i.id))
 
 @celery.app.task
 def maintain_smart_integrations():
