@@ -1,27 +1,15 @@
-import uuid
-
-import smartconnect
-from smartconnect import SmartClient
-from smartconnect.models import (
-    ConservationArea,
-)
-
-from cdip_admin import celery
-from celery_once import QueueOnce
-from django.conf import settings
-
-from integrations.models import (
-    OutboundIntegrationConfiguration,
-    InboundIntegrationConfiguration,
-)
-from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
-import logging
 import json
+import logging
+from datetime import datetime, timezone
+
+from smartconnect import SmartClient
+
+from integrations.models import OutboundIntegrationConfiguration
 
 logger = logging.getLogger(__name__)
 
 
-def on_smart_integration_save(*args, integration_id: str):
+def maintain_smart_integration(*args, integration_id: str, force=False):
     '''
     This function is called when a SMART integration is saved. It inspects the Integration Configuration
     and will use a Smart Client to download whichever data models and configurable data models are associated
@@ -31,7 +19,7 @@ def on_smart_integration_save(*args, integration_id: str):
 
     config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
 
-    if not config.state.get('download_data_models', False):
+    if not force and not config.state.get('download_data_models', False):
         return
 
     version = config.additional.get("version", "7.0")
@@ -64,4 +52,5 @@ def on_smart_integration_save(*args, integration_id: str):
 
     config.additional['configurable_models_lists'] = configurable_models_lists
     config.state['download_data_models'] = False
+    config.state['data_models_downloaded_at'] = datetime.now(tz=timezone.utc).isoformat()
     config.save()
