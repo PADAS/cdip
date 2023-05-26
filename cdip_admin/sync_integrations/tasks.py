@@ -7,7 +7,7 @@ from integrations.models import OutboundIntegrationConfiguration, InboundIntegra
 
 from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
 from sync_integrations.utils import (
-    on_smart_integration_save,
+    maintain_smart_integration,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def handle_outboundintegration_save(integration_id):
     else:
 
         if oic.type.slug == 'smart_connect':
-            on_smart_integration_save(integration_id=integration_id)
+            maintain_smart_integration(integration_id=integration_id)
 
 
 
@@ -57,14 +57,35 @@ def run_er_smart_sync_integrations():
         enabled=True, type__slug="smart_connect"
     )
     for i in smart_integrations:
-        run_er_smart_sync_integration(smart_integration=i)
+        run_er_smart_sync_integration(smart_integration=str(i.id))
+
+@celery.app.task
+def maintain_smart_integrations():
+    smart_integrations = OutboundIntegrationConfiguration.objects.filter(
+        enabled=True, type__slug="smart_connect"
+    )
+    for i in smart_integrations:
+        _maintain_smart_integration.delay(integration_id=str(i.id))
 
 
 @celery.app.task(base=QueueOnce, once={"graceful": True})
-def run_er_smart_sync_integration(*args, smart_integration=None):
+def _maintain_smart_integration(integration_id:str):
+    maintain_smart_integration(integration_id=integration_id, force=True)
+
+
+@celery.app.task(base=QueueOnce, once={"graceful": True})
+def run_er_smart_sync_integration(*args, smart_integration_id=None):
 
     assert not args, "Only keyword arguments are allowed"
 
+    try:
+        smart_integration = OutboundIntegrationConfiguration.objects.get(id=smart_integration_id,
+                                                                     enabled=True, type__slug="smart_connect")
+    except OutboundIntegrationConfiguration.DoesNotExist:
+        logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
+        return
+
+    #TODO: Get the corresponding ER integration via query through Device Group.
     er_integration_id = (
         smart_integration.additional.get("er_integration_id")
         if smart_integration.additional
