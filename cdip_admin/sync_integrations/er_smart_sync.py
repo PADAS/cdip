@@ -158,7 +158,9 @@ class ER_SMART_Synchronizer:
     @staticmethod
     def calculate_event_category_value(ca_label: str=None, cm_label: str=None):
         translation = {
-            ord("["): '', ord("]"): '', ord(" "): "_"
+            ord("["): '', ord("]"): '', ord(" "): "_", ord("-"): "_", ord("/"): "_", ord("("): '', ord(")"): '',
+            ord("'"): '', ord('"'): '', ord("."): '', ord(","): '', ord(":"): '', ord(";"): '', ord("&"): '',
+            ord("$"): '', ord("#"): '', ord("@"): '', ord("!"): '', ord("?"): '', ord("%"): '', ord("*"): '',
         }
 
         return ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
