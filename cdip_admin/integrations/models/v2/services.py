@@ -8,9 +8,9 @@ def ensure_default_route(integration):
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models
-        RoutingRule = apps.get_model('integrations', 'Route')
+        Route = apps.get_model('integrations', 'Route')
         name = integration.name + " - Default Route"
-        routing_rule, _ = RoutingRule.objects.get_or_create(
+        routing_rule, _ = Route.objects.get_or_create(
             owner_id=integration.owner.id,
             name=name,
         )
@@ -42,3 +42,10 @@ def get_user_sources_qs(user):
     integrations = get_user_integrations_qs(user=user)
     Source = apps.get_model('integrations', 'Source')
     return Source.objects.filter(integration__in=Subquery(integrations.values("id")))
+
+
+def get_user_routes_qs(user):
+    # Return a list with the routes that the currently authenticated user is allowed to see.
+    user_organizations = get_user_organizations_qs(user=user)
+    Route = apps.get_model('integrations', 'Route')
+    return Route.objects.filter(owner__in=Subquery(user_organizations.values('id')))
