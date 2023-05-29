@@ -83,7 +83,7 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         verbose_name="Base URL"
     )
     enabled = models.BooleanField(default=True)
-    default_routing_rule = models.ForeignKey(
+    default_route = models.ForeignKey(
         "integrations.Route",
         blank=True,
         null=True,

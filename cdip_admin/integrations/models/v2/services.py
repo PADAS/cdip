@@ -8,7 +8,7 @@ def ensure_default_route(integration):
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models
-        RoutingRule = apps.get_model('integrations', 'RoutingRule')
+        RoutingRule = apps.get_model('integrations', 'Route')
         name = integration.name + " - Default Route"
         routing_rule, _ = RoutingRule.objects.get_or_create(
             owner_id=integration.owner.id,
