@@ -27,7 +27,7 @@ from integrations.models import (
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration
+    SourceConfiguration, ensure_default_route
 )
 from organizations.models import Organization
 
@@ -596,6 +596,7 @@ def integrations_list(
             action=er_action_pull_events
         )
         integrations.append(integration)
+        ensure_default_route(integration=integration)
     return integrations
 
 
