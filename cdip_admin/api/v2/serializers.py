@@ -4,8 +4,8 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule, \
-    Source, SourceState, SourceConfiguration
+from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
+    Source, SourceState, SourceConfiguration, ensure_default_route
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -206,7 +206,7 @@ class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = RoutingRule
+        model = Route
         fields = ("id", "name")
 
 
@@ -214,7 +214,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationRetrieveSerializer(many=True)
-    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
+    default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -227,7 +227,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
-            "default_routing_rule",
+            "default_route",
             "status"
         )
 
@@ -253,7 +253,8 @@ class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
-    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
+    default_route = RoutingRuleSummarySerializer(read_only=True)
+    create_default_route = serializers.BooleanField(default=True)
 
     class Meta:
         model = Integration
@@ -265,7 +266,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
-            "default_routing_rule"
+            "default_route"
         )
 
     def validate(self, data):
@@ -292,6 +293,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 integration=integration,
                 **configuration
             )
+        if validated_data.pop('create_default_route'):
+            ensure_default_route(integration=integration)
         return integration
 
     # ToDo. Support updates with nested configurations too?
@@ -332,7 +335,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
-    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
+    default_route = RoutingRuleSummarySerializer(read_only=True)
     owner = OwnerSerializer()
     status = serializers.SerializerMethodField()
 
@@ -343,7 +346,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
             "provider",
             "destinations",
             "routing_rules",
-            "default_routing_rule",
+            "default_route",
             "owner",
             "status"
         )

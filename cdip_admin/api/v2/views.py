@@ -1,7 +1,7 @@
 from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
-from integrations.models import RoutingRule, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs
+from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter
 from accounts.models import AccountProfileOrganization
@@ -202,7 +202,7 @@ class ConnectionsView(
         Return a list of providers used to get the connections
         """
         user_organizations = get_user_organizations_qs(user=self.request.user)
-        providers = RoutingRule.objects.filter(
+        providers = Route.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
         ).values("data_providers")
         return Integration.objects.filter(id__in=Subquery(providers))

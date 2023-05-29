@@ -90,7 +90,7 @@ def _test_create_integration(api_client, user, owner, integration_type, base_url
     # Check that the related configurations where created too
     assert integration.configurations.count() == len(configurations)
     # Check that a default routing rule is created
-    assert integration.default_routing_rule
+    assert integration.default_route
 
 
 def test_create_er_integration_as_superuser(
