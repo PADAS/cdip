@@ -4,9 +4,9 @@ from accounts.utils import get_user_organizations_qs
 from django.apps import apps
 
 
-def ensure_default_routing_rule(integration):
+def ensure_default_route(integration):
     # Ensure that a default routing rule group is set for integrations
-    if not integration.default_routing_rule:
+    if not integration.default_route:
         # Avoid circular imports related to models
         RoutingRule = apps.get_model('integrations', 'RoutingRule')
         name = integration.name + " - Default Route"
@@ -14,11 +14,11 @@ def ensure_default_routing_rule(integration):
             owner_id=integration.owner.id,
             name=name,
         )
-        integration.default_routing_rule = routing_rule
+        integration.default_route = routing_rule
         integration.save()
     # Add the integration a provider in its default routing rule
-    if not integration.default_routing_rule.data_providers.filter(id=integration.id).exists():
-        integration.default_routing_rule.data_providers.add(integration)
+    if not integration.default_route.data_providers.filter(id=integration.id).exists():
+        integration.default_route.data_providers.add(integration)
 
 
 def get_user_integrations_qs(user):
