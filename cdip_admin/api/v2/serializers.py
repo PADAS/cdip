@@ -413,3 +413,42 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_routing_rules(self, obj):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
+
+
+class RouteCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    data_providers = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
+    destinations = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
+
+    class Meta:
+        model = Route
+        fields = (
+            "id",
+            "name",
+            "owner",
+            "data_providers",
+            "destinations",
+            "configuration",
+            "additional",
+            # "filters"  # ToDo: Support "filters" or "rules"
+        )
+
+
+class RouteRetrieveFullSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    data_providers = IntegrationSummarySerializer(many=True)
+    destinations = IntegrationSummarySerializer(many=True)
+
+    class Meta:
+        model = Route
+        fields = (
+            "id",
+            "name",
+            "owner",
+            "data_providers",
+            "destinations",
+            "configuration",
+            "additional",
+            # "filters"  # ToDo: Support "filters" or "rules"
+        )
+
