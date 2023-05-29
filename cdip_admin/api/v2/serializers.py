@@ -203,10 +203,18 @@ class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
         fields = ["id", "integration", "action", "data"]
 
 
+class RoutingRuleSummarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = RoutingRule
+        fields = ("id", "name")
+
+
 class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationRetrieveSerializer(many=True)
+    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -219,6 +227,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "default_routing_rule",
             "status"
         )
 
@@ -244,6 +253,7 @@ class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
+    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
 
     class Meta:
         model = Integration
@@ -254,7 +264,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "enabled",
             "type",
             "owner",
-            "configurations"
+            "configurations",
+            "default_routing_rule"
         )
 
     def validate(self, data):
@@ -316,18 +327,12 @@ class IntegrationOwnerSerializer(serializers.ModelSerializer):
         fields = ("id", "name", )
 
 
-class RoutingRuleSummarySerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = RoutingRule
-        fields = ("id", "name")
-
-
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
+    default_routing_rule = RoutingRuleSummarySerializer(read_only=True)
     owner = OwnerSerializer()
     status = serializers.SerializerMethodField()
 
@@ -338,6 +343,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
             "provider",
             "destinations",
             "routing_rules",
+            "default_routing_rule",
             "owner",
             "status"
         )
