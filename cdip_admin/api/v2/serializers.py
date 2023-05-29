@@ -266,7 +266,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
-            "default_route"
+            "default_route",
+            "create_default_route"
         )
 
     def validate(self, data):
@@ -286,14 +287,15 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        configurations = validated_data.pop('configurations')
+        configurations = validated_data.pop("configurations")
+        create_default_route = validated_data.pop("create_default_route")
         integration = Integration.objects.create(**validated_data)
         for configuration in configurations:
             IntegrationConfiguration.objects.create(
                 integration=integration,
                 **configuration
             )
-        if validated_data.pop('create_default_route'):
+        if create_default_route:
             ensure_default_route(integration=integration)
         return integration
 
