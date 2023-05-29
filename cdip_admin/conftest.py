@@ -22,7 +22,7 @@ from integrations.models import (
     IntegrationType,
     IntegrationAction,
     IntegrationConfiguration,
-    RoutingRule,
+    Route,
     SourceFilter,
     ListFilter,
     Source,
@@ -642,7 +642,7 @@ def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_ra
 
 @pytest.fixture
 def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
-    rule, _ = RoutingRule.objects.get_or_create(
+    rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
     )
@@ -664,7 +664,7 @@ def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_pa
 
 @pytest.fixture
 def routing_rule_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
-    rule, _ = RoutingRule.objects.get_or_create(
+    rule, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
     )
