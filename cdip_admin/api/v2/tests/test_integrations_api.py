@@ -68,13 +68,16 @@ def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organizati
     )
 
 
-def _test_create_integration(api_client, user, owner, integration_type, base_url, name, configurations):
+def _test_create_integration(
+        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True
+):
     request_data = {
       "name": name,
       "type": str(integration_type.id),
       "owner": str(owner.id),
       "base_url": base_url,
-      "configurations": configurations
+      "configurations": configurations,
+      "create_default_route": create_default_route
     }
     api_client.force_authenticate(user)
     response = api_client.post(
@@ -90,7 +93,10 @@ def _test_create_integration(api_client, user, owner, integration_type, base_url
     # Check that the related configurations where created too
     assert integration.configurations.count() == len(configurations)
     # Check that a default routing rule is created
-    assert integration.default_route
+    if create_default_route:
+        assert integration.default_route
+    else:
+        assert integration.default_route is None
 
 
 def test_create_er_integration_as_superuser(
@@ -150,6 +156,37 @@ def test_create_er_integration_as_org_admin(
             }
             # Other actions in this example don't require extra settings
         ]
+    )
+
+
+def test_create_er_integration_without_default_route_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                "data": {
+                    "sensor_type": "tracker"
+                }
+            }
+            # Other actions in this example don't require extra settings
+        ],
+        create_default_route=False  # Destination only integration
     )
 
 
