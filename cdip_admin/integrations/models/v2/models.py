@@ -2,7 +2,6 @@ import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
-from .services import ensure_default_routing_rule
 
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
@@ -85,7 +84,7 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     )
     enabled = models.BooleanField(default=True)
     default_routing_rule = models.ForeignKey(
-        "integrations.RoutingRule",
+        "integrations.Route",
         blank=True,
         null=True,
         on_delete=models.PROTECT,
@@ -108,7 +107,7 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         pass
 
     def _post_save(self, *args, **kwargs):
-        ensure_default_routing_rule(integration=self)
+        pass
 
     def save(self, *args, **kwargs):
         self._pre_save(self, *args, **kwargs)
@@ -173,7 +172,7 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
         return f"{self.data}"
 
 
-class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
+class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -188,7 +187,7 @@ class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class RoutingRule(UUIDAbstractModel, TimestampedModel):
+class Route(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
@@ -209,7 +208,7 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         verbose_name="Destinations"
     )
     configuration = models.ForeignKey(
-        "integrations.RoutingRuleConfiguration",
+        "integrations.RouteConfiguration",
         on_delete=models.SET_NULL,
         related_name="routing_rules_by_configuration",
         verbose_name="Routing Rule Configuration",
@@ -253,7 +252,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
         verbose_name="JSON Selector"
     )
     routing_rule = models.ForeignKey(
-        "integrations.RoutingRule",
+        "integrations.Route",
         on_delete=models.CASCADE,
         related_name="source_filters",
         verbose_name="Routing Rule"
