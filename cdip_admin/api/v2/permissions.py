@@ -32,7 +32,8 @@ class IsOrgAdmin(permissions.BasePermission):
     org_admin_allowed_actions = {
         "organizations": ["list", "retrieve", "update"],
         "members": ["list", "invite", "retrieve", "update", "remove"],
-        "integrations": ["list", "create", "retrieve", "update", "destroy"]
+        "integrations": ["list", "create", "retrieve", "update", "destroy"],
+        "routes": ["list", "create", "retrieve", "update", "destroy"]
     }
 
     def has_permission(self, request, view):
