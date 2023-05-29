@@ -246,3 +246,32 @@ class SourcesView(
 
     def get_serializer_class(self):
         return v2_serializers.SourceRetrieveSerializer
+
+
+class RoutesView(viewsets.ModelViewSet):
+    """
+    An endpoint for managing routes
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        # ToDo: Implement search & filter
+        # django_filters.rest_framework.DjangoFilterBackend,
+        # custom_filters.CustomizableSearchFilter
+    ]
+    # filterset_class = RouteFilter
+    # search_fields = ["name", 'owner__name', ]
+    ordering_fields = ['id', 'name', 'owner__name']
+    ordering = ['id']
+
+
+    def get_serializer_class(self):
+        if self.action in ["create", "update", "partial_update"]:
+            return v2_serializers.RouteCreateUpdateSerializer
+        return v2_serializers.RouteRetrieveFullSerializer
+
+    def get_queryset(self):
+        # Returns a list with the routes that the user is allowed to see
+        user_organizations = get_user_organizations_qs(user=self.request.user)
+        return Route.objects.filter(owner__in=Subquery(user_organizations.values('id')))
+
