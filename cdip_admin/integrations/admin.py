@@ -17,6 +17,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     Route,
+    RouteConfiguration,
     SourceFilter, Source, SourceState, SourceConfiguration,
 )
 
@@ -240,13 +241,21 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Route)
-class RoutingRuleAdmin(admin.ModelAdmin):
+class RouteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
     )
     list_filter = (
         "owner",
+    )
+
+
+@admin.register(RouteConfiguration)
+class RouteAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
     )
 
 

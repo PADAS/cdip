@@ -211,7 +211,7 @@ class Route(UUIDAbstractModel, TimestampedModel):
         "integrations.RouteConfiguration",
         on_delete=models.SET_NULL,
         related_name="routing_rules_by_configuration",
-        verbose_name="Routing Rule Configuration",
+        verbose_name="Route Configuration",
         blank=True,
         null=True
     )
