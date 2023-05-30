@@ -161,4 +161,57 @@ def test_create_route_with_configuration_id_as_org_admin(
             "additional": {}
         }
     )
+
+
 # ToDo: Add tests for: retrieve details, update and delete
+def _test_cannot_create_route(api_client, user, data):
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data=data,
+        format='json'
+    )
+    # Check the request response
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_create_route_as_org_viewer(
+        api_client, org_viewer_user, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+):
+    _test_cannot_create_route(
+        api_client=api_client,
+        user=org_viewer_user,
+        data={
+            "name": "Custom Route - Move Bank to ER",
+            "owner": str(other_organization.id),
+            "data_providers": [
+                str(provider_movebank_ewt.id)
+            ],
+            "destinations": [
+                str(integrations_list[5].id)
+            ],
+            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "additional": {}
+        }
+    )
+
+
+def test_cannot_create_route_for_other_organization_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+):
+    _test_cannot_create_route(
+        api_client=api_client,
+        user=org_admin_user,
+        data={
+            "name": "Custom Route - Move Bank to ER",
+            "owner": str(other_organization.id),  # The user doesn't belong to this organization
+            "data_providers": [
+                str(provider_movebank_ewt.id)
+            ],
+            "destinations": [
+                str(integrations_list[5].id)
+            ],
+            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "additional": {}
+        }
+    )
