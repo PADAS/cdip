@@ -460,6 +460,10 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             configuration_data = validated_data.pop("configuration")
         except KeyError:
             configuration_data = None  # This parameter is optional
+        try:
+            configuration_id = validated_data.pop("configuration_id")
+        except KeyError:
+            configuration_id = None  # This parameter is optional
 
         # Create the route and the configuration atomically
         with transaction.atomic():
@@ -468,6 +472,8 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
                     **configuration_data
                 )
                 validated_data["configuration"] = new_configuration
+            elif configuration_id:
+                validated_data["configuration"] = configuration_id
             route = super().create(validated_data)
 
         return route
