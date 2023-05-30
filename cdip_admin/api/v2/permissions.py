@@ -1,6 +1,7 @@
 from rest_framework import permissions
 from core.enums import RoleChoices
 from accounts.models import AccountProfileOrganization
+from integrations.models import Integration
 
 
 def get_user_role_in_org(user_id, org_id):
@@ -33,6 +34,7 @@ class IsOrgAdmin(permissions.BasePermission):
         "organizations": ["list", "retrieve", "update"],
         "members": ["list", "invite", "retrieve", "update", "remove"],
         "integrations": ["list", "create", "retrieve", "update", "destroy"],
+        "sources": ["list", "create", "retrieve", "update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "destroy"]
     }
 
@@ -44,6 +46,11 @@ class IsOrgAdmin(permissions.BasePermission):
         elif view.basename == "members":
             org_id = context.get("organization_pk")
         elif view.basename == "integrations":
+            org_id = request.data.get("owner")
+        elif view.basename == "sources":
+            integration_id = request.data.get("provider")
+            org_id = Integration.objects.get(id=integration_id).owner.id if integration_id else None
+        elif view.basename == "routes":
             org_id = request.data.get("owner")
         else:  # Can't relate this user with an organization
             return False
