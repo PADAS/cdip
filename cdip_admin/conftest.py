@@ -27,7 +27,7 @@ from integrations.models import (
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration, ensure_default_route
+    SourceConfiguration, ensure_default_route, RouteConfiguration
 )
 from organizations.models import Organization
 
@@ -642,7 +642,7 @@ def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_ra
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
+def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
@@ -664,13 +664,13 @@ def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_pa
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
-    rule, _ = Route.objects.get_or_create(
+def route_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
+    route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
     )
-    rule.data_providers.add(provider_movebank_ewt)
-    rule.destinations.add(integrations_list[0])
+    route.data_providers.add(provider_movebank_ewt)
+    route.destinations.add(integrations_list[0])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -680,9 +680,18 @@ def routing_rule_2(get_random_id, other_organization, movebank_sources, provider
         selector=ListFilter(
             ids=[d.external_id for d in movebank_sources]
         ).dict(),
-        routing_rule=rule
+        routing_rule=route
     )
-    return rule
+    # Add a custom configuration
+    route_config = RouteConfiguration.objects.create(
+        name="Elephant Subject Type",
+        data={
+            "subject_type": "elephant"
+        }
+    )
+    route.configuration = route_config
+    route.save()
+    return route
 
 
 ########################################################################################################################
