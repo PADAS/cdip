@@ -5,10 +5,11 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route
+    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.db import transaction
 
 
 User = get_user_model()
@@ -415,10 +416,20 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
 
 
+class RouteConfigurationSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = RouteConfiguration
+        fields = ["id", "name", "data"]
+
+
 class RouteCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     data_providers = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
     destinations = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
+    configuration = RouteConfigurationSerializer(required=False)
+    configuration_id = serializers.PrimaryKeyRelatedField(queryset=RouteConfiguration.objects.all(), required=False)
 
     class Meta:
         model = Route
@@ -429,15 +440,44 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             "data_providers",
             "destinations",
             "configuration",
+            "configuration_id",
             "additional",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
+
+    def validate(self, data):
+        """
+        Validate the configuration
+        """
+        if "configuration_id" in data and "configuration" in data:
+            raise drf_exceptions.ValidationError(detail=f"You can provide only one of these parameters: configuration_id or configuration.")
+        # ToDo: Validate the schema once we support that
+        return data
+
+    def create(self, validated_data):
+        # Sending a nested configuration object will trigger the creation of a configuration
+        try:
+            configuration_data = validated_data.pop("configuration")
+        except KeyError:
+            configuration_data = None  # This parameter is optional
+
+        # Create the route and the configuration atomically
+        with transaction.atomic():
+            if configuration_data:
+                new_configuration = RouteConfiguration.objects.create(
+                    **configuration_data
+                )
+                validated_data["configuration"] = new_configuration
+            route = super().create(validated_data)
+
+        return route
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     data_providers = IntegrationSummarySerializer(many=True)
     destinations = IntegrationSummarySerializer(many=True)
+    configuration = RouteConfigurationSerializer()
 
     class Meta:
         model = Route
