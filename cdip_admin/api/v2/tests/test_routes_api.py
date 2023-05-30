@@ -72,6 +72,9 @@ def _test_create_route(api_client, user, data):
     destinations_ids = sorted([str(d.id) for d in route.destinations.all()])
     assert len(destinations_ids) == len(expected_destinations_ids)
     assert destinations_ids == expected_destinations_ids
+    assert "configuration" in response_data
+    if "configuration" in data or "configuration_id" in data:
+        assert response_data["configuration"] is not None
 
 
 def test_create_route_as_superuser(api_client, superuser, organization, integrations_list, provider_lotek_panthera):
@@ -108,6 +111,26 @@ def test_create_route_as_org_admin(
             "destinations": [
                 str(integrations_list[5].id)
             ],
+            "additional": {}
+        }
+    )
+
+
+def test_create_route_with_configuration_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization, integrations_list, provider_movebank_ewt
+):
+    _test_create_route(
+        api_client=api_client,
+        user=org_admin_user_2,
+        data={
+            "name": "Custom Route - Move Bank to ER",
+            "owner": str(other_organization.id),
+            "data_providers": [
+                str(provider_movebank_ewt.id)
+            ],
+            "destinations": [
+                str(integrations_list[5].id)
+            ],
             "configuration": {
                 "name": "Route settings for EWT",
                 "data": {
@@ -119,4 +142,23 @@ def test_create_route_as_org_admin(
     )
 
 
+def test_create_route_with_configuration_id_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+):
+    _test_create_route(
+        api_client=api_client,
+        user=org_admin_user_2,
+        data={
+            "name": "Custom Route - Move Bank to ER",
+            "owner": str(other_organization.id),
+            "data_providers": [
+                str(provider_movebank_ewt.id)
+            ],
+            "destinations": [
+                str(integrations_list[5].id)
+            ],
+            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "additional": {}
+        }
+    )
 # ToDo: Add tests for: retrieve details, update and delete
