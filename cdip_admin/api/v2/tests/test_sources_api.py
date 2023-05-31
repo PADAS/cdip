@@ -217,7 +217,7 @@ def test_filter_sources_by_multiple_destination_urls_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
         integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
-    selected_destinations = integrations_list[:5]  # All the sources are connected to the first 5
+    selected_destinations = integrations_list[:6]  # All the sources are connected to the first 6
     _test_list_sources(
         api_client=api_client,
         user=superuser,

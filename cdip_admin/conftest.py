@@ -471,6 +471,7 @@ def smart_action_push_events(integration_type_smart):
         description="Push Event data to SMART Cloud API"
     )
 
+
 @pytest.fixture
 def smart_action_auth(integration_type_smart):
     return IntegrationAction.objects.create(
@@ -492,6 +493,30 @@ def smart_action_auth(integration_type_smart):
         }
     )
 
+
+@pytest.fixture
+def smart_integration(
+        organization, other_organization, integration_type_smart, get_random_id,
+        smart_action_auth, smart_action_push_events
+):
+    # Create the integration
+    site_url = f"{get_random_id()}.smart.wps.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=site_url
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        }
+    )
+    ensure_default_route(integration=integration)
+    return integration
 
 
 @pytest.fixture
@@ -520,6 +545,7 @@ def provider_lotek_panthera(
             "start_time": "2023-01-01T00:00:00Z"
         }
     )
+    ensure_default_route(integration=provider)
     return provider
 
 
@@ -549,6 +575,7 @@ def provider_movebank_ewt(
             "max_records_per_individual": 20000
         }
     )
+    ensure_default_route(integration=provider)
     return provider
 
 
@@ -670,7 +697,7 @@ def route_2(get_random_id, other_organization, movebank_sources, provider_moveba
         owner=other_organization,
     )
     route.data_providers.add(provider_movebank_ewt)
-    route.destinations.add(integrations_list[0])
+    route.destinations.add(integrations_list[5])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
