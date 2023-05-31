@@ -5,7 +5,7 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration
+    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -444,6 +444,21 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             "additional",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
+
+    def validate_destinations(self, value):
+        """
+        Check if the user is allowed to manage the selected destinations
+        """
+        user = self.context.get("request").user
+        if user.is_superuser:  # Superusers can do anything
+            return value
+        # Other users can only select integrations within their organizations
+        user_managed_integrations = get_user_integrations_qs(user)
+        if user_managed_integrations.filter(id__in=[i.id for i in value]).count() != len(value):
+            raise drf_exceptions.ValidationError(
+                detail=f"You don't have enough privileges in at least one of the selected destinations"
+            )
+        return value
 
     def validate(self, data):
         """
