@@ -226,6 +226,22 @@ def _test_retrieve_route_details(api_client, user, route):
     assert response_data.get("id") == str(route.id)
     assert response_data.get("name") == route.name
     assert response_data.get("owner") == str(route.owner.id)
+    providers_ids = sorted([p["id"] for p in response_data.get("data_providers", [])])
+    expected_providers_ids = sorted([str(p.id) for p in route.data_providers.all()])
+    assert providers_ids == expected_providers_ids
+    destinations_ids = sorted([p["id"] for p in response_data.get("destinations", [])])
+    expected_destinations_ids = sorted([str(d.id) for d in route.destinations.all()])
+    assert destinations_ids == expected_destinations_ids
+    assert "configuration" in response_data
+    if route.configuration:
+        response_config = response_data.get("configuration")
+        assert response_config is not None
+        assert response_config.get("id") == str(route.configuration.id)
+        assert response_config.get("name") == route.configuration.name
+        assert response_config.get("data") == route.configuration.data
+    else:
+        assert not response_data.get("configuration")
+    assert response_data.get("additional") == route.additional
 
 
 def test_retrieve_route_details_as_superuser(
@@ -284,3 +300,10 @@ def test_cannot_retrieve_unrelated_route_details_as_org_admin(
         user=org_admin_user,
         route=route_2  # This route belongs to an integration owned by other organization
     )
+
+
+# ToDo: Test update
+
+# ToDo: Test partial update
+
+# ToDo: Test destroy
