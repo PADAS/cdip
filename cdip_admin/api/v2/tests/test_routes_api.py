@@ -302,8 +302,130 @@ def test_cannot_retrieve_unrelated_route_details_as_org_admin(
     )
 
 
-# ToDo: Test update
+def _test_partial_update_route(api_client, user, route, new_data):
+    api_client.force_authenticate(user)
+    response = api_client.patch(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+        data=new_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    # Check that the data was updated in teh database
+    route.refresh_from_db()
+    assert response_data.get("id") == str(route.id)
+    if "name" in new_data:
+        assert new_data.get("name") == route.name
+    if "owner" in new_data:
+        assert new_data.get("owner") == str(route.owner.id)
+    if "data_providers" in new_data:
+        expected_providers_ids = sorted(new_data.get("data_providers", []))
+        providers_ids = sorted([str(p.id) for p in route.data_providers.all()])
+        assert providers_ids == expected_providers_ids
+    if "destinations" in new_data:
+        destinations_ids = sorted(new_data.get("destinations", []))
+        expected_destinations_ids = sorted([str(d.id) for d in route.destinations.all()])
+        assert destinations_ids == expected_destinations_ids
+    if "configuration" in new_data:
+        assert route.configuration is not None
+        new_config = new_data.get("configuration")
+        assert new_config.get("id") == str(route.configuration.id)
+        assert new_config.get("name") == route.configuration.name
+        assert new_config.get("data") == route.configuration.data
+    if "additional" in new_data:
+        assert new_data.get("additional") == route.additional
 
-# ToDo: Test partial update
+
+def test_add_destination_in_default_route_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
+):
+    default_route = provider_lotek_panthera.default_route
+    current_destinations = [str(d.id) for d in default_route.destinations.all()]
+    _test_partial_update_route(
+        api_client=api_client,
+        user=superuser,
+        route=default_route,
+        new_data={  # Add one destination
+            "destinations": [*current_destinations, str(integrations_list[1].id)]
+        }
+    )
+
+
+def test_add_destination_in_route_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    current_destinations = [str(d.id) for d in route_2.destinations.all()]
+    _test_partial_update_route(
+        api_client=api_client,
+        user=org_admin_user_2,
+        route=route_2,
+        new_data={  # Add one destination
+            "destinations": [*current_destinations, str(smart_integration.id)]
+        }
+    )
+
+
+def test_cannot_add_destination_in_route_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    current_destinations = [str(d.id) for d in route_2.destinations.all()]
+    api_client.force_authenticate(org_viewer_user_2)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={  # Add one destination
+            "destinations": [*current_destinations, str(smart_integration.id)]
+        }
+    )
+    # Viewers cannot do write operations
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_add_destination_in_unrelated_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    current_destinations = [str(d.id) for d in route_2.destinations.all()]
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),  # Route 2 is owned by other organization
+        data={  # Add one destination
+            "destinations": [*current_destinations, str(smart_integration.id)]
+        }
+    )
+    # Org admin cannot edit routes owned by other organization
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_add_unrelated_destination_in_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    current_destinations = [str(d.id) for d in route_1.destinations.all()]
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={  # smart_integration is owned by another organization that this user have no access
+            "destinations": [*current_destinations, str(smart_integration.id)]
+        }
+    )
+    # Org admin cannot add destinations owned by other unrelated organizations
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_cannot_change_route_owner_to_unrelated_org_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={  # org_admin_user isn't an admin in other_organization
+            "owner": str(other_organization)
+        }
+    )
+    # Org admin cannot add destinations owned by other unrelated organizations
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 # ToDo: Test destroy
