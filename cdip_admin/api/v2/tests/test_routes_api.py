@@ -163,7 +163,6 @@ def test_create_route_with_configuration_id_as_org_admin(
     )
 
 
-# ToDo: Add tests for: retrieve details, update and delete
 def _test_cannot_create_route(api_client, user, data):
     api_client.force_authenticate(user)
     response = api_client.post(
@@ -214,4 +213,46 @@ def test_cannot_create_route_for_other_organization_as_org_admin(
             "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
         }
+    )
+
+
+def _test_retrieve_route_details(api_client, user, route):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    assert response_data.get("id") == str(route.id)
+    assert response_data.get("name") == route.name
+    assert response_data.get("owner") == str(route.owner.id)
+
+
+def test_retrieve_route_details_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_retrieve_route_details(
+        api_client=api_client,
+        user=superuser,
+        route=integrations_list[0].default_route
+    )
+
+
+def test_retrieve_route_details_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_retrieve_route_details(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_1
+    )
+
+
+def test_retrieve_route_details_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_retrieve_route_details(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        route=route_2
     )
