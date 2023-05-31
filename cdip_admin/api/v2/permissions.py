@@ -39,7 +39,7 @@ def get_user_org(request, view) -> str:
         integration_id = request.data.get("provider")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
     elif view.basename == "routes":
-        if view.action in ["retrieve", "destroy"]:
+        if view.action in ["retrieve", "update", "partial_update", "destroy"]:
             route_id = context.get("pk")
             org_id = str(Route.objects.get(id=route_id).owner.id)
         elif request.data.get("owner"):
@@ -58,11 +58,11 @@ class IsOrgAdmin(permissions.BasePermission):
     """
 
     org_admin_allowed_actions = {
-        "organizations": ["list", "retrieve", "update"],
-        "members": ["list", "invite", "retrieve", "update", "remove"],
-        "integrations": ["list", "create", "retrieve", "update", "destroy"],
-        "sources": ["list", "create", "retrieve", "update", "destroy"],
-        "routes": ["list", "create", "retrieve", "update", "destroy"]
+        "organizations": ["list", "retrieve", "update", "partial_update"],
+        "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
+        "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy"]
     }
 
     def has_permission(self, request, view):
