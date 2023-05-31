@@ -256,3 +256,31 @@ def test_retrieve_route_details_as_org_viewer(
         user=org_viewer_user_2,
         route=route_2
     )
+
+
+def _test_cannot_retrieve_unrelated_route_details(api_client, user, route):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_cannot_retrieve_unrelated_route_details_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_cannot_retrieve_unrelated_route_details(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        route=route_1  # This route belongs to an integration owned by other organization
+    )
+
+
+def test_cannot_retrieve_unrelated_route_details_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_cannot_retrieve_unrelated_route_details(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_2  # This route belongs to an integration owned by other organization
+    )
