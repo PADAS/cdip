@@ -713,6 +713,24 @@ def er_route_configuration_rangers():
 
 
 @pytest.fixture
+def smart_route_configuration():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Ranger Subject Type",
+        data={
+            "ca_uuids": [
+                "8f7fbe1b-121a-4ef4-bda8-14f5581e44cf"
+            ],
+            "transformation_rules": {
+                "attribute_map": [],
+                "category_map": []
+            },
+            "version": "7.5.6"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
 def route_2(
         get_random_id, other_organization, movebank_sources, provider_movebank_ewt,
         integrations_list, er_route_configuration_elephants
