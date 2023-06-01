@@ -306,7 +306,8 @@ def _test_partial_update_route(api_client, user, route, new_data):
     api_client.force_authenticate(user)
     response = api_client.patch(
         reverse("routes-detail",  kwargs={"pk": route.id}),
-        data=new_data
+        data=new_data,
+        format="json"
     )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.json()
@@ -330,6 +331,56 @@ def _test_partial_update_route(api_client, user, route, new_data):
         assert new_config == str(route.configuration.id)
     if "additional" in new_data:
         assert new_data.get("additional") == route.additional
+
+
+def _test_full_update_route(api_client, user, route, new_data):
+    api_client.force_authenticate(user)
+    response = api_client.put(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+        data=new_data,
+        format="json"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    # Check that the data was updated in teh database
+    route.refresh_from_db()
+    assert response_data.get("id") == str(route.id)
+    assert new_data.get("name") == route.name
+    assert new_data.get("owner") == str(route.owner.id)
+    expected_providers_ids = sorted(new_data.get("data_providers", []))
+    providers_ids = sorted([str(p.id) for p in route.data_providers.all()])
+    assert providers_ids == expected_providers_ids
+    destinations_ids = sorted(new_data.get("destinations", []))
+    expected_destinations_ids = sorted([str(d.id) for d in route.destinations.all()])
+    assert destinations_ids == expected_destinations_ids
+    new_config = new_data.get("configuration")
+    assert new_config == str(route.configuration.id)
+    assert new_data.get("additional") == route.additional
+
+
+def test_full_update_route_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration, smart_route_configuration
+):
+    _test_full_update_route(
+        api_client=api_client,
+        user=superuser,
+        route=route_1,
+        new_data={
+            "name": "Move Bank to SMART",
+            "owner": str(other_organization.id),
+            "data_providers": [
+                str(provider_movebank_ewt.id)
+            ],
+            "destinations": [
+                str(smart_integration.id)
+            ],
+            "configuration": str(smart_route_configuration.id),
+            "additional": {
+                "extra": "ABC1234"
+            }
+        }
+    )
 
 
 def test_partial_update_route_as_superuser(
