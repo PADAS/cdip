@@ -73,7 +73,7 @@ def _test_create_route(api_client, user, data):
     assert len(destinations_ids) == len(expected_destinations_ids)
     assert destinations_ids == expected_destinations_ids
     assert "configuration" in response_data
-    if "configuration" in data or "configuration_id" in data:
+    if "configuration" in data:
         assert response_data["configuration"] is not None
 
 
@@ -157,7 +157,7 @@ def test_create_route_with_configuration_id_as_org_admin(
             "destinations": [
                 str(integrations_list[5].id)
             ],
-            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
         }
     )
@@ -189,7 +189,7 @@ def test_cannot_create_route_as_org_viewer(
             "destinations": [
                 str(integrations_list[5].id)
             ],
-            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
         }
     )
@@ -210,7 +210,7 @@ def test_cannot_create_route_for_other_organization_as_org_admin(
             "destinations": [
                 str(integrations_list[5].id)
             ],
-            "configuration_id": str(route_2.configuration.id),  # Reuse config from other route
+            "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
         }
     )
@@ -326,13 +326,38 @@ def _test_partial_update_route(api_client, user, route, new_data):
         expected_destinations_ids = sorted([str(d.id) for d in route.destinations.all()])
         assert destinations_ids == expected_destinations_ids
     if "configuration" in new_data:
-        assert route.configuration is not None
         new_config = new_data.get("configuration")
-        assert new_config.get("id") == str(route.configuration.id)
-        assert new_config.get("name") == route.configuration.name
-        assert new_config.get("data") == route.configuration.data
+        assert new_config == str(route.configuration.id)
     if "additional" in new_data:
         assert new_data.get("additional") == route.additional
+
+
+def test_partial_update_route_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
+):
+    _test_partial_update_route(
+        api_client=api_client,
+        user=superuser,
+        route=route_1,
+        new_data={
+            "name": "New Rule Name"
+        }
+    )
+
+
+def test_update_route_configuration_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, er_route_configuration_rangers
+):
+    _test_partial_update_route(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_1,
+        new_data={  # Set another pre-existent configuration
+            "configuration": str(er_route_configuration_rangers.id)
+        }
+    )
 
 
 def test_add_destination_in_default_route_as_superuser(
