@@ -563,4 +563,58 @@ def test_cannot_add_unrelated_provider_in_route_as_org_admin(
     # Org admin cannot add destinations owned by other unrelated organizations
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-# ToDo: Test destroy
+
+def _test_delete_route(api_client, user, route):
+    api_client.force_authenticate(user)
+    response = api_client.delete(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+def _test_cannot_delete_route(api_client, user, route):
+    api_client.force_authenticate(user)
+    response = api_client.delete(
+        reverse("routes-detail",  kwargs={"pk": route.id}),
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_delete_route_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_delete_route(
+        api_client=api_client,
+        user=superuser,
+        route=route_2
+    )
+
+
+def test_delete_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_delete_route(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_1
+    )
+
+
+def test_cannot_delete_route_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_cannot_delete_route(
+        api_client=api_client,
+        user=org_viewer_user_2,
+        route=route_2
+    )
+
+
+def test_cannot_delete_unrelated_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+):
+    _test_cannot_delete_route(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_2  # Route 2 belongs to other organization where this use doesn't have access
+    )
