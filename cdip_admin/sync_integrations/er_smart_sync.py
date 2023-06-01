@@ -2,6 +2,7 @@ import json
 import logging
 import pathlib
 import uuid
+import re
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional, Dict
 from urllib.parse import urlparse
@@ -54,9 +55,14 @@ class SmartIntegrationAdditional(pydantic.BaseModel):
 
 class ER_SMART_Synchronizer:
 
-    def __init__(self, *args, smart_config=None, er_config=None):
+    def __init__(self, *args, smart_config=None, er_config=None, das_client=None):
+
 
         assert not args, "ER_SMART_Synchronizer does not support positional arguments"
+
+        if das_client:
+            self.das_client = das_client
+            return
 
         self.smart_config = smart_config
         self.er_config = er_config or InboundIntegrationConfiguration.objects.get(id=smart_config.additional.get("er_integration_id"))
@@ -132,7 +138,7 @@ class ER_SMART_Synchronizer:
         )
 
         existing_event_categories = self.das_client.get_event_categories()
-        event_category_value = self.calculate_event_category_value(ca_label=ca_label, cm_label=getattr(cm, '_name', None))
+        event_category_value = self.calculate_event_category_value(ca_label=ca_identifier, cm_label=getattr(cm, '_name', None))
         event_category = next(
             (
                 x
@@ -166,14 +172,18 @@ class ER_SMART_Synchronizer:
         return ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
 
     @staticmethod
-    def get_identifier_from_ca_label(ca_label: str):
-        try:
-            start = ca_label.index("[") + 1
-            end = ca_label.index("]")
-            return ca_label[start:end]
-        except ValueError:
-            logger.warning(f"Unable to get identifier from ca_label {ca_label}")
-            return ""
+    def get_identifier_from_ca_label(ca_label: str = ""):
+        """
+        Expect a string like "Some Name [SONM]"
+        Return what's in the brackets (eg. SONM).
+        """
+        match = re.findall("\[(.*?)\]", ca_label)
+
+        if match:
+            return match[-1]
+
+        logger.warning(f"Unable to get identifier from ca_label {ca_label}")
+        return ""
 
     def create_or_update_er_event_types(self, *args, event_category: dict = None, event_types: dict = None):
 
