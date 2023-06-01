@@ -139,6 +139,10 @@ class ER_SMART_Synchronizer:
 
         existing_event_categories = self.das_client.get_event_categories()
         event_category_value = self.calculate_event_category_value(ca_label=ca_identifier, cm_label=getattr(cm, '_name', None))
+
+        # Magic value is 46: Event Category Display should be under 46 characters because EarthRanger
+        # will use this value to create a PermissionSet name, which has a max length of 80 characters.
+        event_category_display = f"{ca_identifier} {cm._name}" if cm else ca_identifier
         event_category = next(
             (
                 x
@@ -151,10 +155,10 @@ class ER_SMART_Synchronizer:
         if not event_category:
             logger.info(
                 "Event Category not found in destination ER, creating now ...",
-                extra=dict(value=event_category_value, display=ca_label),
+                extra=dict(value=event_category_value, display=event_category_display),
             )
-            display_name = f"{ca_label} {cm._name}" if cm else ca_label
-            event_category = dict(value=event_category_value, display=display_name)
+
+            event_category = dict(value=event_category_value, display=event_category_display)
             self.das_client.post_event_category(event_category)
         self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
