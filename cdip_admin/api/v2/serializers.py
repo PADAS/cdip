@@ -9,8 +9,9 @@ from integrations.models import IntegrationConfiguration, IntegrationType, Integ
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.db import transaction
-
+#from django.db import transaction
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ObjectDoesNotExist
 
 User = get_user_model()
 
@@ -424,12 +425,34 @@ class RouteConfigurationSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "data"]
 
 
+class PKRelatedOrNestedField(serializers.PrimaryKeyRelatedField):
+    # This custom field accepts either the id of a related object or a nested serializer
+    default_error_messages = {
+        'required': _('This field is required.'),
+        'does_not_exist': _('Invalid pk "{pk_value}" - object does not exist.'),
+        'incorrect_type': _('Incorrect type. Expected pk value, received {data_type}.'),
+    }
+
+    def __init__(self, **kwargs):
+        self.pk_field = kwargs.pop("pk_field", None)
+        self.nested_serializer = kwargs.pop("nested_serializer", None)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):  # It's a nested object
+            return self.nested_serializer.to_internal_value(data=data)
+        return super().to_internal_value(data=data)  # It's PK Related Field
+
+
 class RouteCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     data_providers = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
     destinations = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
-    configuration = RouteConfigurationSerializer(required=False)
-    configuration_id = serializers.PrimaryKeyRelatedField(queryset=RouteConfiguration.objects.all(), required=False)
+    configuration = PKRelatedOrNestedField(
+        queryset=RouteConfiguration.objects.all(),
+        required=False,
+        nested_serializer=RouteConfigurationSerializer(required=False)
+    )
 
     class Meta:
         model = Route
@@ -440,58 +463,39 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             "data_providers",
             "destinations",
             "configuration",
-            "configuration_id",
             "additional",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 
-    def validate_destinations(self, value):
-        """
-        Check if the user is allowed to manage the selected destinations
-        """
+    def _validate_integrations_selection(self, integration_ids):
         user = self.context.get("request").user
         if user.is_superuser:  # Superusers can do anything
-            return value
+            return integration_ids
         # Other users can only select integrations within their organizations
         user_managed_integrations = get_user_integrations_qs(user)
-        if user_managed_integrations.filter(id__in=[i.id for i in value]).count() != len(value):
+        if user_managed_integrations.filter(id__in=[i.id for i in integration_ids]).count() != len(integration_ids):
             raise drf_exceptions.ValidationError(
                 detail=f"You don't have enough privileges in at least one of the selected destinations"
             )
+        return integration_ids
+
+    def validate_data_providers(self, value):
+        # Check if the user is allowed to manage the selected data providers
+        return self._validate_integrations_selection(integration_ids=value)
+
+    def validate_destinations(self, value):
+        # Check if the user is allowed to manage the selected destinations
+        return self._validate_integrations_selection(integration_ids=value)
+
+    def validate_configuration(self, value):
+        # We support sending an id or a nested configuration object
+        if isinstance(value, dict):
+            # Create the configuration
+            configuration = RouteConfigurationSerializer(data=value)
+            configuration.is_valid()
+            configuration.save()
+            return configuration.instance
         return value
-
-    def validate(self, data):
-        """
-        Validate the configuration
-        """
-        if "configuration_id" in data and "configuration" in data:
-            raise drf_exceptions.ValidationError(detail=f"You can provide only one of these parameters: configuration_id or configuration.")
-        # ToDo: Validate the schema once we support that
-        return data
-
-    def create(self, validated_data):
-        # Sending a nested configuration object will trigger the creation of a configuration
-        try:
-            configuration_data = validated_data.pop("configuration")
-        except KeyError:
-            configuration_data = None  # This parameter is optional
-        try:
-            configuration_id = validated_data.pop("configuration_id")
-        except KeyError:
-            configuration_id = None  # This parameter is optional
-
-        # Create the route and the configuration atomically
-        with transaction.atomic():
-            if configuration_data:
-                new_configuration = RouteConfiguration.objects.create(
-                    **configuration_data
-                )
-                validated_data["configuration"] = new_configuration
-            elif configuration_id:
-                validated_data["configuration"] = configuration_id
-            route = super().create(validated_data)
-
-        return route
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
