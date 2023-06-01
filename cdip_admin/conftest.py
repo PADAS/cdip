@@ -691,7 +691,32 @@ def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera,
 
 
 @pytest.fixture
-def route_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
+def er_route_configuration_elephants():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Elephant Subject Type",
+        data={
+            "subject_type": "elephant"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
+def er_route_configuration_rangers():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Ranger Subject Type",
+        data={
+            "subject_type": "ranger"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
+def route_2(
+        get_random_id, other_organization, movebank_sources, provider_movebank_ewt,
+        integrations_list, er_route_configuration_elephants
+):
     route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
@@ -710,13 +735,7 @@ def route_2(get_random_id, other_organization, movebank_sources, provider_moveba
         routing_rule=route
     )
     # Add a custom configuration
-    route_config = RouteConfiguration.objects.create(
-        name="Elephant Subject Type",
-        data={
-            "subject_type": "elephant"
-        }
-    )
-    route.configuration = route_config
+    route.configuration = er_route_configuration_elephants
     route.save()
     return route
 
