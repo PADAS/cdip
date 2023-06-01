@@ -428,4 +428,63 @@ def test_cannot_change_route_owner_to_unrelated_org_as_org_admin(
     # Org admin cannot add destinations owned by other unrelated organizations
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+
+def test_update_data_provider_in_route_as_superuser(
+        api_client, superuser, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
+):
+    default_route = provider_lotek_panthera.default_route
+    _test_partial_update_route(
+        api_client=api_client,
+        user=superuser,
+        route=default_route,
+        new_data={  # Change the data provider
+            "data_providers": [str(provider_movebank_ewt.id)]
+        }
+    )
+
+
+def test_update_data_provider_in_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
+):
+    _test_partial_update_route(
+        api_client=api_client,
+        user=org_admin_user,
+        route=route_1,
+        new_data={  # Change the data provider
+            "data_providers": [str(integrations_list[2].id)]
+        }
+    )
+
+
+def test_cannot_update_data_provider_in_route_as_org_viewer(
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    api_client.force_authenticate(org_viewer_user_2)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={  # Change the data provider
+            "data_providers": [str(integrations_list[7].id)]
+        }
+    )
+    # Viewers cannot do write operations
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_add_unrelated_provider_in_route_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, integrations_list,
+        provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
+):
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={  # provider_movebank_ewt is owned by another organization that this user have no access
+            "data_providers": [str(provider_movebank_ewt.id)]
+        }
+    )
+    # Org admin cannot add destinations owned by other unrelated organizations
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
 # ToDo: Test destroy
