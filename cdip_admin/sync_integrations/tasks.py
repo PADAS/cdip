@@ -3,7 +3,8 @@ import logging
 from celery_once import QueueOnce
 
 from cdip_admin import celery
-from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration
+from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration,\
+    InboundIntegrationType, OutboundIntegrationType, Device
 
 from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
 from sync_integrations.utils import (
@@ -79,38 +80,42 @@ def run_er_smart_sync_integration(*args, smart_integration_id=None):
     assert not args, "Only keyword arguments are allowed"
 
     try:
-        smart_integration = OutboundIntegrationConfiguration.objects.get(id=smart_integration_id,
-                                                                     enabled=True, type__slug="smart_connect")
+        smart_integration = OutboundIntegrationConfiguration.objects.get(
+            id=smart_integration_id,
+            enabled=True,
+            type__slug=OutboundIntegrationType.SMARTCONNECT)
     except OutboundIntegrationConfiguration.DoesNotExist:
         logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
         return
 
-    #TODO: Get the corresponding ER integration via query through Device Group.
-    er_integration_id = (
-        smart_integration.additional.get("er_integration_id")
-        if smart_integration.additional
-        else None
-    )
+    device_groups = smart_integration.devicegroups.all()
+    devices = Device.objects.filter(devicegroup__in=device_groups,
+                                    inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER
+                                    ).order_by('inbound_configuration_id').distinct('inbound_configuration_id')
 
-    if not er_integration_id:
-        logger.info('No EarthRanger integration is specified for sync. Skipping.')
-        return
+    for device in devices:
 
-    try:
-        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
-    except InboundIntegrationConfiguration.DoesNotExist:
-        logger.error(
-            f"Earth Ranger Inbound Integration specified was not found: {er_integration_id}"
-        )
-        return
+        er_configuration = device.inbound_configuration
 
-    er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_config)
+        try:
+            er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
-    er_smart_sync.synchronize_datamodel()
-    er_smart_sync.sync_patrol_datamodel()
+            logger.info("Synchronizing Data Models for %s (%s) to %s (%s)",
+                         smart_integration.name, smart_integration.id,
+                         er_configuration.name, er_configuration.id)
 
-    # TODO: create non-directional int so we dont have both inbound and outbound int representing same system
-    logger.debug(f"Beginning pull of ER objects")
-    er_smart_sync.get_er_events(config=er_config)
-    er_smart_sync.get_er_patrols(config=er_config)
+            er_smart_sync.synchronize_datamodel()
+            er_smart_sync.sync_patrol_datamodel()
+
+            logger.info("Synchronizing EarthRanger events and patrols for %s (%s) to %s (%s)",
+                         smart_integration.name, smart_integration.id,
+                         er_configuration.name, er_configuration.id)
+
+            er_smart_sync.get_er_events(config=er_configuration)
+            er_smart_sync.get_er_patrols(config=er_configuration)
+
+        except Exception as e:
+            logger.exception('Failed synchronizing data models for %s (%s) to %s (%s)',
+                             smart_integration.name, smart_integration.id,
+                             er_configuration.name, er_configuration.id)
 
