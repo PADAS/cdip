@@ -54,6 +54,8 @@ class InboundIntegrationType(TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
+    EARTHRANGER = "earth_ranger"
+
 
 # This is where the general information for a configuration will be stored
 # This could be an inbound or outbound type
@@ -110,6 +112,8 @@ class OutboundIntegrationType(TimestampedModel):
 
     def __str__(self):
         return f"{self.name}"
+
+    SMARTCONNECT = "smart_connect"
 
 
 class BridgeIntegrationTypeManager(models.Manager):
