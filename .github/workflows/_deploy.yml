@@ -1,0 +1,55 @@
+name: Build the application
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      bucket_name:
+        required: true
+        type: string
+      subdomain:
+        required: true
+        type: string
+      https_domain:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    environment: 
+      name: ${{ inputs.environment }}
+      url: https://${{ inputs.subdomain }}.${{ inputs.https_domain }}
+    
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: build-artifact
+
+    - uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ vars.SERVICE_ACCOUNT }}
+
+    - id: 'upload-files'
+      uses: 'google-github-actions/upload-cloud-storage@v1'
+      with:
+        path: '.'
+        destination: ${{ inputs.bucket_name }}
+        glob: '*'
+        headers: |-
+          cache-control: no-cache
+
+    - id: 'upload-static-files'
+      uses: 'google-github-actions/upload-cloud-storage@v1'
+      with:
+        path: '.'
+        destination: ${{ inputs.bucket_name }}
+        glob: 'static/**'
+        headers: |-
+          cache-control: max-age=31536000
