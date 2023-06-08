@@ -22,6 +22,10 @@ on:
       tag:
         required: true
         type: string
+      namespace:
+        required: false
+        type: string
+        default: application
 
 jobs:
   deploy:
@@ -53,5 +57,6 @@ jobs:
         helm upgrade --install --create-namespace \
         ${{ inputs.chart_name }} ${{ inputs.chart_repository}}/${{ inputs.chart_name }} \
         --version ${{ inputs.chart_version }} \
-        --set image.repository=${{ inputs.repository }}
+        --namespace ${{ inputs.namespace }} \
+        --set image.repository=${{ inputs.repository }} \
         --set image.tag=${{ inputs.tag }}
