@@ -15,6 +15,8 @@ default_router.register('integrations', views.IntegrationsView, basename="integr
 default_router.register('connections', views.ConnectionsView, basename="connections")
 default_router.register('sources', views.SourcesView, basename="sources")
 default_router.register('routes', views.RoutesView, basename="routes")
+default_router.register('events', views.EventsView, basename="events")
+
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 

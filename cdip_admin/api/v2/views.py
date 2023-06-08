@@ -1,8 +1,9 @@
 from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
+from django.db import transaction
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
-    get_user_routes_qs
+    get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter
 from accounts.models import AccountProfileOrganization
@@ -286,3 +287,23 @@ class RoutesView(viewsets.ModelViewSet):
     def get_queryset(self):
         # Returns a list with the routes that the user is allowed to see
         return get_user_routes_qs(user=self.request.user)
+
+
+class EventsView(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for sending Events (a.k.a Reports).
+    """
+    serializer_class = v2_serializers.EventCreateSerializer
+    queryset = GundiTrace.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        # We accept a single event or a list
+        many = isinstance(request.data, list)
+        serializer = self.get_serializer(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, headers=headers)
