@@ -5,43 +5,32 @@ on:
       - SIK-2015
 
 jobs:
-  # vars:
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     stage_bucket_name: ${{ steps.vars.outputs.stage_bucket_name }}
-  #     stage_subdomain: ${{ steps.vars.outputs.stage_subdomain }}
-  #     https_domain: ${{ steps.vars.outputs.https_domain }}
-  #     prod_bucket_name: ${{ steps.vars.outputs.prod_bucket_name }}
-  #     prod_subdomain: ${{ steps.vars.outputs.prod_subdomain }}
-  #   steps:
-  #     - id: vars
-  #       run: |
-  #         echo "stage_bucket_name=gundi-portal-default-2967630079" >> $GITHUB_OUTPUT
-  #         echo "stage_subdomain=stage" >> $GITHUB_OUTPUT
-  #         echo "https_domain=gundiservice.org" >> $GITHUB_OUTPUT
-  #         echo "prod_bucket_name=gundi-portal-default-75032777" >> $GITHUB_OUTPUT
-  #         echo "prod_subdomain=admin" >> $GITHUB_OUTPUT
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_short: ${{ steps.vars.outputs.sha_short }}
+      repository: ${{ steps.vars.outputs.repository }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: vars
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
     uses: ./.github/workflows/_build.yml
-    # needs: vars
+    needs: vars
     with:
       environment: stage
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.sha_short }}
 
-  # deploy_stage:
-  #   uses: ./.github/workflows/_deploy.yml
-  #   needs: [vars, build]
-    # with:
-    #   environment: stage
-  #     bucket_name: ${{ needs.vars.outputs.stage_bucket_name }}
-  #     subdomain: ${{ needs.vars.outputs.stage_subdomain }}
-  #     https_domain: ${{ needs.vars.outputs.https_domain }}
-
-  # deploy_prod:
-  #   uses: ./.github/workflows/_deploy.yml
-  #   needs: [vars, deploy_stage]
-  #   with:
-  #     environment: prod
-  #     bucket_name: ${{ needs.vars.outputs.prod_bucket_name }}
-  #     subdomain: ${{ needs.vars.outputs.prod_subdomain }}
-  #     https_domain: ${{ needs.vars.outputs.https_domain }}
+  deploy_stage:
+    uses: ./.github/workflows/_deploy.yml
+    needs: [vars, build]
+    with:
+      environment: stage
+      chart_name: admin-portal
+      chart_version: '0.1.0'
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.sha_short }}
