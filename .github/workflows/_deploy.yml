@@ -6,13 +6,20 @@ on:
       environment:
         required: true
         type: string
-      bucket_name:
+      chart_repository:
+        required: false
+        type: string
+        default: oci://us-central1-docker.pkg.dev/cdip-78ca/gundi-helm-charts
+      chart_name:
         required: true
         type: string
-      subdomain:
+      chart_version:
         required: true
         type: string
-      https_domain:
+      repository:
+        required: true
+        type: string
+      tag:
         required: true
         type: string
 
@@ -24,32 +31,27 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: ${{ inputs.environment }}
-      url: https://${{ inputs.subdomain }}.${{ inputs.https_domain }}
+      # url: https://${{ inputs.subdomain }}.${{ inputs.https_domain }}
     
     steps:
-    - uses: actions/download-artifact@v3
-      with:
-        name: build-artifact
-
+    - uses: actions/checkout@v3
     - uses: 'google-github-actions/auth@v1'
       with:
+        token_format: 'access_token'
         workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ vars.SERVICE_ACCOUNT }}
-
-    - id: 'upload-files'
-      uses: 'google-github-actions/upload-cloud-storage@v1'
+    - uses: 'google-github-actions/setup-gcloud@v1'
+    - uses: 'google-github-actions/get-gke-credentials@v1'
       with:
-        path: '.'
-        destination: ${{ inputs.bucket_name }}
-        glob: '*'
-        headers: |-
-          cache-control: no-cache
-
-    - id: 'upload-static-files'
-      uses: 'google-github-actions/upload-cloud-storage@v1'
+        cluster_name: ${{ vars.GKE_CLUTER_NAME }}
+        location: 'us-central1'
+    - uses: azure/setup-helm@v3
       with:
-        path: '.'
-        destination: ${{ inputs.bucket_name }}
-        glob: 'static/**'
-        headers: |-
-          cache-control: max-age=31536000
+          version: 'v3.12.0'
+    - run: |
+        gcloud auth configure-docker us-central1-docker.pkg.dev
+        helm upgrade --install --create-namespace \
+        ${{ inputs.chart_name }} ${{ inputs.chart_repository}}/${{ inputs.chart_name }} \
+        --version ${{ inputs.chart_version }} \
+        --set image.repository=${{ inputs.repository }}
+        --set image.tag=${{ inputs.tag }}
