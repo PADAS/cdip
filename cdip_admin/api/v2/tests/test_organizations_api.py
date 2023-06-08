@@ -177,7 +177,7 @@ def test_cannot_retrieve_unrelated_organization_details_as_org_admin_user(api_cl
     response = api_client.get(
         reverse("organizations-detail", kwargs={"pk": unrelated_organization.id})
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_cannot_retrieve_unrelated_organization_details_as_org_viewer(api_client, org_viewer_user, organization, organizations_list):
@@ -187,7 +187,7 @@ def test_cannot_retrieve_unrelated_organization_details_as_org_viewer(api_client
     response = api_client.get(
         reverse("organizations-detail", kwargs={"pk": unrelated_organization.id})
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def _test_update_organization_details(api_client, user, organization):
