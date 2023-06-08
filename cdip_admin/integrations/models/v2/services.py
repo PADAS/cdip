@@ -4,21 +4,21 @@ from accounts.utils import get_user_organizations_qs
 from django.apps import apps
 
 
-def ensure_default_routing_rule(integration):
+def ensure_default_route(integration):
     # Ensure that a default routing rule group is set for integrations
-    if not integration.default_routing_rule:
+    if not integration.default_route:
         # Avoid circular imports related to models
-        RoutingRule = apps.get_model('integrations', 'RoutingRule')
+        Route = apps.get_model('integrations', 'Route')
         name = integration.name + " - Default Route"
-        routing_rule, _ = RoutingRule.objects.get_or_create(
+        routing_rule, _ = Route.objects.get_or_create(
             owner_id=integration.owner.id,
             name=name,
         )
-        integration.default_routing_rule = routing_rule
+        integration.default_route = routing_rule
         integration.save()
     # Add the integration a provider in its default routing rule
-    if not integration.default_routing_rule.data_providers.filter(id=integration.id).exists():
-        integration.default_routing_rule.data_providers.add(integration)
+    if not integration.default_route.data_providers.filter(id=integration.id).exists():
+        integration.default_route.data_providers.add(integration)
 
 
 def get_user_integrations_qs(user):
@@ -42,3 +42,10 @@ def get_user_sources_qs(user):
     integrations = get_user_integrations_qs(user=user)
     Source = apps.get_model('integrations', 'Source')
     return Source.objects.filter(integration__in=Subquery(integrations.values("id")))
+
+
+def get_user_routes_qs(user):
+    # Return a list with the routes that the currently authenticated user is allowed to see.
+    user_organizations = get_user_organizations_qs(user=user)
+    Route = apps.get_model('integrations', 'Route')
+    return Route.objects.filter(owner__in=Subquery(user_organizations.values('id')))
