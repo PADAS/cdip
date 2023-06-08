@@ -5,13 +5,15 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs
+    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
+    GundiTrace, InboundIntegrationConfiguration
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-#from django.db import transaction
 from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction, IntegrityError
+from .utils import send_to_routing
+
 
 User = get_user_model()
 
@@ -534,3 +536,85 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 
+
+class EventBulkCreateSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of events
+    """
+
+    def create(self, validated_data):
+
+        events = [self.child.create(attrs) for attrs in validated_data]
+
+        #with transaction.atomic():
+        try:
+            new_events = GundiTrace.objects.bulk_create(events)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        # ToDo: Add tracing, Add deduplication logic
+        # ToDo: Publish message to topic to be processed by routing
+        # ToDo: Get pydantic models from cdip-api
+        transaction.on_commit(lambda: send_to_routing(message=validated_data))
+        return new_events
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class EventCreateSerializer(serializers.Serializer):
+
+    object_id = serializers.UUIDField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    related_to = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=GundiTrace.objects.all()
+    )
+    source_id = serializers.CharField(write_only=True)
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=True,
+        queryset=Integration.objects.all()
+    )
+    title = serializers.CharField(write_only=True, required=False)
+    recorded_at = serializers.DateTimeField(write_only=True)
+    location = serializers.JSONField(write_only=True, required=False)
+    geometry = serializers.JSONField(write_only=True, required=False)
+    event_details = serializers.JSONField(write_only=True, required=False)
+    annotations = serializers.JSONField(write_only=True, required=False)
+
+    class Meta:
+        list_serializer_class = EventBulkCreateSerializer
+
+    def validate_integration(self, value):
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        # ToDo: Check that the user is allowed to see that integration
+        # user = self.context["request"].user
+        return value
+
+    def validate_location(self, value):
+        # I must contain lat and lon and other extra fields are accepted
+        if "lat" not in value or "lon" not in value:
+            raise drf_exceptions.ValidationError(detail=f"'location' requires 'lat' and 'lon'.")
+        return value
+
+    def validate_geometry(self, value):
+        # ToDo: Validate that it's a valid geojson
+        return value
+
+    def create(self, validated_data):
+        return GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data["integration"],
+            created_by=self.context["request"].user
+            # Other fields are filled in later by the routing services
+        )
+
+    def validate(self, data):
+        # Validate that either location or geometry is provided
+        if not ("location" in data or "geometry" in data):
+            raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
+        return data
+
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement once we support updating events
