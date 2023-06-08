@@ -12,8 +12,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction, IntegrityError
-from .utils import send_to_routing
-
+from cdip_connector.core.schemas import StreamPrefixEnum
+from .utils import send_events_to_routing
 
 User = get_user_model()
 
@@ -543,18 +543,20 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
     """
 
     def create(self, validated_data):
-
         events = [self.child.create(attrs) for attrs in validated_data]
-
         #with transaction.atomic():
         try:
             new_events = GundiTrace.objects.bulk_create(events)
         except IntegrityError as e:
             raise drf_exceptions.ValidationError(e)
-        # ToDo: Add tracing, Add deduplication logic
-        # ToDo: Publish message to topic to be processed by routing
-        # ToDo: Get pydantic models from cdip-api
-        transaction.on_commit(lambda: send_to_routing(message=validated_data))
+        # Publish messages to a topic to be processed by routing services
+        event_ids = [str(event.object_id) for event in new_events]
+        transaction.on_commit(
+            lambda: send_events_to_routing(
+                events=validated_data,
+                gundi_ids=event_ids
+            )
+        )
         return new_events
 
     def update(self, instance, validated_data):
@@ -580,6 +582,7 @@ class EventCreateSerializer(serializers.Serializer):
     recorded_at = serializers.DateTimeField(write_only=True)
     location = serializers.JSONField(write_only=True, required=False)
     geometry = serializers.JSONField(write_only=True, required=False)
+    event_type = serializers.CharField(write_only=True, required=False)
     event_details = serializers.JSONField(write_only=True, required=False)
     annotations = serializers.JSONField(write_only=True, required=False)
 
