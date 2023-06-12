@@ -16,7 +16,8 @@ default_router.register('connections', views.ConnectionsView, basename="connecti
 default_router.register('sources', views.SourcesView, basename="sources")
 default_router.register('routes', views.RoutesView, basename="routes")
 default_router.register('events', views.EventsView, basename="events")
-
+events_router = NestedSimpleRouter(default_router, r'events', lookup='event')
+events_router.register(r'attachments', views.AttachmentViewSet, basename='attachments')
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 
@@ -34,4 +35,5 @@ urlpatterns = [
     ),
     path(r'', include(default_router.urls)),
     path(r'', include(organizations_router.urls)),
+    path(r'', include(events_router.urls)),
 ]

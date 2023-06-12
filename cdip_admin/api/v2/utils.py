@@ -1,9 +1,9 @@
 import json
-from copy import deepcopy
-
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from cdip_connector.core.schemas import StreamPrefixEnum, GeoEvent, Location
+from cdip_connector.core.schemas import StreamPrefixEnum, GeoEvent, Location, Attachment
 
 
 # ToDo: Retry on failure?
@@ -11,6 +11,7 @@ def send_events_to_routing(events, gundi_ids):
     publisher = get_publisher()
 
     for event, gundi_id in zip(events, gundi_ids):
+        # ToDo: Manage tracing and deduplication
         # # Use Consumer.cusumer_custom_id as integration ID.
         # if not message.integration_id and consumer_info.consumer_side_data:
         #     message.integration_id = (
@@ -102,3 +103,90 @@ def send_events_to_routing(events, gundi_ids):
             },
         )
 
+
+def send_attachments_to_routing(attachments_data, gundi_ids):
+
+    publisher = get_publisher()
+
+    for attachment, gundi_id in zip(attachments_data, gundi_ids):
+        # ToDo: Manage tracing and deduplication
+        # # Use Consumer.cusumer_custom_id as integration ID.
+        # if not message.integration_id and consumer_info.consumer_side_data:
+        #     message.integration_id = (
+        #         consumer_info.consumer_side_data.default_integration_id
+        #     )
+
+        # jsonified_data = json.dumps(message.dict(), default=str)
+
+        # # For a short time, check both the legacy, simple hash too.
+        # hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
+        # hash = f"{message.integration_id}.{message.device_id}.{hash_v1}"
+        #
+        # # Trace observations with Open Telemetry
+        # with tracing.tracer.start_as_current_span(
+        #         f"gundi_api.processing_new_observation", kind=trace.SpanKind.PRODUCER
+        # ) as current_span:
+        #     tracing.observations_instrumentation.enrich_span_with_environment(
+        #         span=current_span
+        #     )
+        #     tracing.observations_instrumentation.enrich_span_from_consumer_info(
+        #         span=current_span,
+        #         consumer_info=consumer_info,
+        #         endpoint="/events/",
+        #     )
+        #     tracing.observations_instrumentation.enrich_span_from_event(
+        #         span=current_span, message=message
+        #     )
+        #
+        #     # Discard duplicates
+        #     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
+        #     deduplication_db.setex(
+        #         hash, app.settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
+        #     )
+        #     deduplication_db.delete(hash_v1)
+        #     if is_duplicate:
+        #         current_span.set_attribute("is_duplicate", True)
+        #         current_span.add_event(
+        #             name=f"gundi_api.duplicate_observation_discarded"
+        #         )
+        #         continue
+        #
+        #     # Downstream consumers will want to know the owner by subject.
+        #     message.owner = consumer_info.consumer_username
+        #
+        #     event_stream_key = (
+        #         f"{message.observation_type}.{message.integration_id}.{message.device_id}"
+        #     )
+        #
+        #     device_stream = db.Stream(event_stream_key)
+        #     logger.debug("Post_item. message: %s", message)
+        #
+        #     id = device_stream.add(
+        #         {"data": jsonified_data},
+        #         maxlen=app.settings.GEOEVENT_STREAM_DEFAULT_MAXLEN,
+        #         approximate=True,
+        #     )
+        #     message.id = id
+        # Upload file to the cloud
+        file = attachment["file"]
+        file_path = default_storage.save(f"attachments/{gundi_id}_{file.name}", ContentFile(file.read()))
+        # Convert the event to the schema supported by routing
+        integration = attachment.get("integration")
+        msg_for_routing = Attachment(
+            id=str(gundi_id),
+            integration_id=str(integration.id),
+            related_to=str(attachment.get("related_to")),
+            file_path=file_path,
+            observation_type=StreamPrefixEnum.attachment.value
+        )
+        # Send message to routing services
+        # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
+        publisher.publish(
+            topic=TopicEnum.observations_unprocessed.value,
+            data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
+            extra={
+                "observation_type": StreamPrefixEnum.attachment.value,
+                "gundi_version": "v2",  # Add the version so routing knows how to handle it
+                "gundi_id": str(gundi_id)
+            },
+        )

@@ -1,7 +1,7 @@
-from distutils.util import strtobool
+from copy import deepcopy
+
 import django_filters
 from django.db.models import Subquery
-from django.db import transaction
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
@@ -13,6 +13,7 @@ from rest_framework import viewsets, status, mixins
 from rest_framework import filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from cdip_connector.core.schemas import StreamPrefixEnum
 from . import serializers as v2_serializers
 from . import permissions
 from . import filters as custom_filters
@@ -296,6 +297,8 @@ class EventsView(
     """
     An endpoint for sending Events (a.k.a Reports).
     """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
     serializer_class = v2_serializers.EventCreateSerializer
     queryset = GundiTrace.objects.all()
 
@@ -303,6 +306,44 @@ class EventsView(
         # We accept a single event or a list
         many = isinstance(request.data, list)
         serializer = self.get_serializer(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, headers=headers)
+
+
+class AttachmentViewSet(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for managing event attachments
+    """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
+    serializer_class = v2_serializers.EventAttachmentSerializer
+
+    def get_queryset(self):
+        return GundiTrace.objects.filter(
+            object_type=StreamPrefixEnum.attachment.value,
+            related_to=self.kwargs['event_pk']
+        )
+
+    def create(self, request, *args, **kwargs):
+        # We accept a single attachment or a list
+        if len(request.FILES) > 1:
+            for key in request.FILES.keys():
+                request.data.pop(key)
+            data = [
+                {
+                    **request.data.dict(),
+                    "file": v
+                }
+                for k, v in request.FILES.items()
+            ]
+            serializer = self.get_serializer(data=data, many=True)
+        else:
+            serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
