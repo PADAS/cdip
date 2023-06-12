@@ -285,6 +285,7 @@ openapi-codec==1.3.2
     # via django-rest-swagger
 opentelemetry-api==1.14.0
     # via
+    #   -r requirements.in
     #   cdip-connector
     #   opentelemetry-exporter-gcp-trace
     #   opentelemetry-exporter-otlp-proto-http
@@ -293,10 +294,11 @@ opentelemetry-api==1.14.0
     #   opentelemetry-instrumentation-confluent-kafka
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-propagator-gcp
-    #   opentelemetry-resourcedetector-gcp
     #   opentelemetry-sdk
-opentelemetry-exporter-gcp-trace==1.5.0
-    # via cdip-connector
+opentelemetry-exporter-gcp-trace==1.3.0
+    # via
+    #   -r requirements.in
+    #   cdip-connector
 opentelemetry-exporter-otlp-proto-http==1.15.0
     # via cdip-connector
 opentelemetry-instrumentation==0.35b0
@@ -308,19 +310,21 @@ opentelemetry-instrumentation-aiohttp-client==0.35b0
 opentelemetry-instrumentation-confluent-kafka==0.35b0
     # via cdip-connector
 opentelemetry-instrumentation-requests==0.35b0
-    # via cdip-connector
-opentelemetry-propagator-gcp==1.5.0
-    # via cdip-connector
+    # via
+    #   -r requirements.in
+    #   cdip-connector
+opentelemetry-propagator-gcp==1.3.0
+    # via
+    #   -r requirements.in
+    #   cdip-connector
 opentelemetry-proto==1.15.0
     # via opentelemetry-exporter-otlp-proto-http
-opentelemetry-resourcedetector-gcp==1.5.0a0
-    # via opentelemetry-exporter-gcp-trace
 opentelemetry-sdk==1.14.0
     # via
+    #   -r requirements.in
     #   cdip-connector
     #   opentelemetry-exporter-gcp-trace
     #   opentelemetry-exporter-otlp-proto-http
-    #   opentelemetry-resourcedetector-gcp
 opentelemetry-semantic-conventions==0.35b0
     # via
     #   opentelemetry-instrumentation-aiohttp-client
@@ -439,7 +443,6 @@ requests==2.31.0
     #   google-api-core
     #   google-cloud-storage
     #   opentelemetry-exporter-otlp-proto-http
-    #   opentelemetry-resourcedetector-gcp
     #   python-keycloak-client
     #   requests-oauthlib
     #   smartconnect-client
@@ -497,7 +500,6 @@ typing-extensions==4.7.0
     # via
     #   asgiref
     #   kombu
-    #   opentelemetry-resourcedetector-gcp
     #   opentelemetry-sdk
     #   pydantic
 tzdata==2023.3

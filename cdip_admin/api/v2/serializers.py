@@ -562,8 +562,10 @@ class GundiTraceSerializer(serializers.Serializer):
     def validate(self, data):
         # Check the integration id
         request = self.context["request"]
-        if "integration" in data:
-            if str(data.get("integration").id) != request.integration_id:
+        if integration := data.get("integration"):
+            if request.user.is_authenticated:
+                str(integration.id)
+            elif not request.integration_id or request.integration_id != str(integration.id):
                 raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
         elif request.integration_id:
             try:
