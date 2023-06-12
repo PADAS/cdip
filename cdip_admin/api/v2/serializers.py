@@ -556,6 +556,21 @@ class GundiTraceSerializer(serializers.Serializer):
     # delivered_at
     # external_id  # Object ID in the destination system
 
+    def validate(self, data):
+        # Check the integration id
+        request = self.context["request"]
+        if "integration" in data:
+            if str(data.get("integration").id) != request.integration_id:
+                raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+        elif request.integration_id:
+            try:
+                data["integration"] = Integration.objects.get(id=request.integration_id)
+            except Integration.DoesNotExist:
+                raise drf_exceptions.ValidationError(detail=f"Cannot find the integration associated with this API Key.")
+        else:
+            raise drf_exceptions.ValidationError(detail=f"This API Key isn't associated with an integration.")
+        return data
+
 
 class EventBulkCreateSerializer(serializers.ListSerializer):
     """
@@ -641,10 +656,6 @@ class EventAttachmentListSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of events
     """
-    def validate(self, data):
-        # ToDo: How do we get the integration id injected based on the API Key being used
-        user = self.context["request"].user
-        return data
 
     def create(self, validated_data):
         request = self.context["request"]
@@ -696,8 +707,8 @@ class EventAttachmentSerializer(GundiTraceSerializer):
         )
 
     def validate(self, data):
-        if not data.get("related_to"):  # Relate it to the event
+        data = super().validate(data)
+        if not data.get("related_to"):
+            # Relate the attachment to the current event
             data["related_to"] = self.context["view"].kwargs["event_pk"]
-        # ToDo: How do we get the integration id injected based on the API Key being used
-        request = self.context["request"]
         return data
