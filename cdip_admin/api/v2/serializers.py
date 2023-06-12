@@ -635,13 +635,18 @@ class EventCreateSerializer(GundiTraceSerializer):
         user = self.context["request"].user
         # Store the user when possible. API Key authenticated requests are not related to a user
         created_by = user if user and not user.is_anonymous else None
-        return GundiTrace(
+        # Don't save to the DB if it's a bulk create
+        instance = GundiTrace(
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
         )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+        return instance
 
     def validate(self, data):
         # Validate that either location or geometry is provided
@@ -701,13 +706,18 @@ class EventAttachmentSerializer(GundiTraceSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         created_by = user if user and not user.is_anonymous else None
-        return GundiTrace(
+        # Don't save to teh DB if it's a bulk create
+        instance = GundiTrace(
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data.get("integration"),
             object_type=StreamPrefixEnum.attachment.value,
             created_by=created_by
             # Other fields are filled in later by the routing services
         )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+        return instance
 
     def validate(self, data):
         data = super().validate(data)
