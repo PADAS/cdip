@@ -6,7 +6,7 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace, InboundIntegrationConfiguration
+    GundiTrace
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -310,12 +310,15 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         configurations = validated_data.pop("configurations")
         create_default_route = validated_data.pop("create_default_route")
+        # Create the integration
         integration = Integration.objects.create(**validated_data)
+        # Create configurations if provided
         for configuration in configurations:
             IntegrationConfiguration.objects.create(
                 integration=integration,
                 **configuration
             )
+        # Create a default route as needed
         if create_default_route:
             ensure_default_route(integration=integration)
         return integration
