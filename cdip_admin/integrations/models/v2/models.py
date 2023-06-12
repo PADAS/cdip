@@ -1,9 +1,12 @@
 import uuid
+from functools import cached_property
+
 import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
 from django.contrib.auth import get_user_model
+from integrations.utils import get_api_key
 
 
 User = get_user_model()
@@ -132,6 +135,10 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     def destinations(self):
         destinations = self.routing_rules.values("destinations").distinct()
         return Integration.objects.filter(id__in=Subquery(destinations))
+
+    @cached_property
+    def api_key(self):
+        return get_api_key(integration=self)
 
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):

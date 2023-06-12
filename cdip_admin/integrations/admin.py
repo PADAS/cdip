@@ -219,6 +219,7 @@ class IntegrationAdmin(admin.ModelAdmin):
         "owner",
         "name",
         "enabled",
+        "api_key",  # ToDo: Add an endpoint to manage API Keys to manage them through the Portal UI?
     )
     list_filter = (
         "owner",
