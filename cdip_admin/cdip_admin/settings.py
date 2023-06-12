@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "simple_history",
     "django_jsonform",
     "django_celery_beat",
+    "storages",
 ]
 
 
@@ -282,3 +283,7 @@ EMAIL_FROM_DEFAULT = env.str("EMAIL_FROM_DEFAULT", "notifications.cdip@pamdas.or
 EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifications")
 EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
 EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")
+
+
+DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+GS_BUCKET_NAME = env.str("GS_BUCKET_NAME", "cdip-files-dev")
