@@ -285,6 +285,9 @@ EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifi
 EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
 EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")
 
-
+# Used for storing files such as report attachments
 DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 GS_BUCKET_NAME = env.str("GS_BUCKET_NAME", "cdip-files-dev")
+
+# Used in OTel traces/spans to set the 'environment' attribute, used on metrics calculation
+TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
