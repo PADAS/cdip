@@ -153,6 +153,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "api.v2.middleware.ApiIntegrationIdMiddleware",
     "cdip_admin.auth.middleware.AuthenticationMiddleware",
     "cdip_admin.auth.middleware.OidcRemoteUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
