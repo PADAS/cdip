@@ -13,7 +13,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction, IntegrityError
 from cdip_connector.core.schemas import StreamPrefixEnum
-from .utils import send_events_to_routing
+from .utils import send_events_to_routing, send_attachments_to_routing
 
 User = get_user_model()
 
@@ -537,6 +537,26 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
         )
 
 
+class GundiTraceSerializer(serializers.Serializer):
+    object_id = serializers.UUIDField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    related_to = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=GundiTrace.objects.all()
+    )
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=Integration.objects.all()
+    )
+    # created_by
+    # data_provider
+    # destination
+    # delivered_at
+    # external_id  # Object ID in the destination system
+
+
 class EventBulkCreateSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of events
@@ -563,21 +583,9 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
         pass
 
 
-class EventCreateSerializer(serializers.Serializer):
-
-    object_id = serializers.UUIDField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    related_to = serializers.PrimaryKeyRelatedField(
-        write_only=True,
-        required=False,
-        queryset=GundiTrace.objects.all()
-    )
+class EventCreateSerializer(GundiTraceSerializer):
+    object_type = serializers.HiddenField(default=StreamPrefixEnum.geoevent.value)
     source_id = serializers.CharField(write_only=True)
-    integration = serializers.PrimaryKeyRelatedField(
-        write_only=True,
-        required=True,
-        queryset=Integration.objects.all()
-    )
     title = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
     location = serializers.JSONField(write_only=True, required=False)
@@ -606,10 +614,14 @@ class EventCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        user = self.context["request"].user
+        # Store the user when possible. API Key authenticated requests are not related to a user
+        created_by = user if user and not user.is_anonymous else None
         return GundiTrace(
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
-            created_by=self.context["request"].user
+            object_type=validated_data["object_type"],
+            created_by=created_by
             # Other fields are filled in later by the routing services
         )
 
@@ -617,7 +629,75 @@ class EventCreateSerializer(serializers.Serializer):
         # Validate that either location or geometry is provided
         if not ("location" in data or "geometry" in data):
             raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        # user = self.context["request"].user
         return data
 
     def update(self, instance, validated_data):
         pass  # ToDo: Implement once we support updating events
+
+
+class EventAttachmentListSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of events
+    """
+    def validate(self, data):
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        user = self.context["request"].user
+        return data
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        attachments = [
+            self.child.create(data) for data in validated_data
+        ]
+
+        # Write to the database
+        try:
+            new_attachments = GundiTrace.objects.bulk_create(attachments)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        else:
+            attachment_ids = [str(att.object_id) for att in new_attachments]
+
+        # Publish messages to a topic to be processed by routing services
+        transaction.on_commit(
+            lambda: send_attachments_to_routing(
+                attachments_data=validated_data,
+                gundi_ids=attachment_ids
+            )
+        )
+        return new_attachments
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class EventAttachmentSerializer(GundiTraceSerializer):
+    file = serializers.FileField(write_only=True)
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=Integration.objects.all()
+    )
+
+    class Meta:
+        list_serializer_class = EventAttachmentListSerializer
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        created_by = user if user and not user.is_anonymous else None
+        return GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data.get("integration"),
+            object_type=StreamPrefixEnum.attachment.value,
+            created_by=created_by
+            # Other fields are filled in later by the routing services
+        )
+
+    def validate(self, data):
+        if not data.get("related_to"):  # Relate it to the event
+            data["related_to"] = self.context["view"].kwargs["event_pk"]
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        request = self.context["request"]
+        return data
