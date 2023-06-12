@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import django_filters
 from django.db.models import Subquery
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \

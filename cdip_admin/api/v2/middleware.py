@@ -24,3 +24,5 @@ class ApiIntegrationIdMiddleware(MiddlewareMixin):
             payload = base64.b64decode(encoded_custom_id)
             side_data = json.loads(payload)
             request.integration_id = side_data["integration_ids"][0]
+        else:
+            request.integration_id = None
