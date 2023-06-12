@@ -331,19 +331,20 @@ class AttachmentViewSet(
 
     def create(self, request, *args, **kwargs):
         # We accept a single attachment or a list
-        if len(request.FILES) > 1:
-            for key in request.FILES.keys():
-                request.data.pop(key)
-            data = [
-                {
-                    **request.data.dict(),
-                    "file": v
-                }
-                for k, v in request.FILES.items()
-            ]
-            serializer = self.get_serializer(data=data, many=True)
-        else:
-            serializer = self.get_serializer(data=request.data)
+        many = len(request.FILES) > 1
+        for key in request.FILES.keys():
+            request.data.pop(key)
+        data = [
+            {
+                **request.data.dict(),
+                "file": v
+            }
+            for k, v in request.FILES.items()
+        ]
+        context = self.get_serializer_context()
+        if not many:
+            data = data[0]
+        serializer = self.get_serializer(data=data, many=many, context=context)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
