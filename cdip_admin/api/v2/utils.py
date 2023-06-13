@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from cdip_connector.core.schemas import StreamPrefixEnum, GeoEvent, Location, Attachment
+from cdip_connector.core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event
 from core import tracing, cache
 from opentelemetry import trace
 
@@ -21,7 +21,8 @@ def is_duplicate_event(data: dict):
     # For a short time, check both the legacy, simple hash too.
     hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
     integration_id = str(data['integration'].id)
-    hash = f"{integration_id}.{data['source_id']}.{hash_v1}"
+    source_id = str(data['source'].id)
+    hash = f"{integration_id}.{source_id}.{hash_v1}"
 
     # Discard duplicates
     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
@@ -34,6 +35,7 @@ def is_duplicate_event(data: dict):
 
 def is_duplicate_attachment(data: dict):
     integration_id = str(data["integration"].id)
+    source_id = str(data['source'].id)
     related_to = data["related_to"]
     jsonified_data = json.dumps({
         "filename": data["file"].name,
@@ -43,7 +45,7 @@ def is_duplicate_attachment(data: dict):
 
     # For a short time, check both the legacy, simple hash too.
     hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
-    hash = f"{integration_id}.{related_to}.{hash_v1}"
+    hash = f"{integration_id}.{source_id}.{related_to}.{hash_v1}"
 
     # Discard duplicates
     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
@@ -80,16 +82,17 @@ def send_events_to_routing(events, gundi_ids):
             ) as current_span:
                 # Convert the event to the schema supported by routing
                 integration = event.get("integration")
-                msg_for_routing = GeoEvent(
+                source = event.get("source")
+                msg_for_routing = Event(
                     id=str(gundi_id),
-                    device_id=event.get("source_id"),
                     integration_id=str(integration.id),
+                    source_id=str(source.id),
                     owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
                     recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
                     location=Location(
-                        x=event.get("location", {}).get("lon"),  # Longitude
-                        y=event.get("location", {}).get("lat"),  # Latitude
-                        z=event.get("location", {}).get("alt"),  # Altitude
+                        lon=event.get("location", {}).get("lon"),  # Longitude
+                        lat=event.get("location", {}).get("lat"),  # Latitude
+                        alt=event.get("location", {}).get("alt"),  # Altitude
                         hdop=event.get("location", {}).get("hdop"),
                         vdop=event.get("location", {}).get("vdop")
                     ),
@@ -98,7 +101,7 @@ def send_events_to_routing(events, gundi_ids):
                     event_type=event.get("event_type"),
                     event_details=event.get("event_details", {}),
                     geometry=event.get("geometry", {}),
-                    observation_type=StreamPrefixEnum.geoevent.value
+                    observation_type=StreamPrefixEnum.event.value
                 )
                 tracing.instrumentation.enrich_span_from_event(
                     span=current_span, event=msg_for_routing, gundi_version="v2",
@@ -110,7 +113,7 @@ def send_events_to_routing(events, gundi_ids):
                     topic=TopicEnum.observations_unprocessed.value,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
                     extra={
-                        "observation_type": StreamPrefixEnum.geoevent.value,
+                        "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
                         "gundi_id": str(gundi_id)
                     },
@@ -156,6 +159,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 msg_for_routing = Attachment(
                     id=str(gundi_id),
                     integration_id=str(integration.id),
+                    source_id=str(attachment.get("source")),
                     related_to=str(attachment.get("related_to")),
                     file_path=file_path,
                     observation_type=observation_type

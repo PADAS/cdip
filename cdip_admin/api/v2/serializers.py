@@ -12,7 +12,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction, IntegrityError
-from cdip_connector.core.schemas import StreamPrefixEnum
+from django.core.exceptions import ObjectDoesNotExist
+from cdip_connector.core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing
 
 User = get_user_model()
@@ -553,6 +554,16 @@ class GundiTraceSerializer(serializers.Serializer):
         required=False,
         queryset=Integration.objects.all()
     )
+    source = serializers.CharField(
+        write_only=True,
+        required=True,
+    )
+    # source = serializers.SlugRelatedField(
+    #     write_only=True,
+    #     required=True,
+    #     queryset=Source.objects.all(),
+    #     slug_field="external_id"
+    # )
     # created_by
     # data_provider
     # destination
@@ -563,9 +574,7 @@ class GundiTraceSerializer(serializers.Serializer):
         # Check the integration id
         request = self.context["request"]
         if integration := data.get("integration"):
-            if request.user.is_authenticated:
-                str(integration.id)
-            elif not request.integration_id or request.integration_id != str(integration.id):
+            if not request.integration_id or request.integration_id != str(integration.id):
                 raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
         elif request.integration_id:
             try:
@@ -574,6 +583,12 @@ class GundiTraceSerializer(serializers.Serializer):
                 raise drf_exceptions.ValidationError(detail=f"Cannot find the integration associated with this API Key.")
         else:
             raise drf_exceptions.ValidationError(detail=f"This API Key isn't associated with an integration.")
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=integration,
+            external_id=data["source"]
+        )
+        data["source"] = source
         return data
 
 
@@ -604,8 +619,7 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
 
 
 class EventCreateSerializer(GundiTraceSerializer):
-    object_type = serializers.HiddenField(default=StreamPrefixEnum.geoevent.value)
-    source_id = serializers.CharField(write_only=True)
+    object_type = serializers.HiddenField(default=StreamPrefixEnum.event.value)
     title = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
     location = serializers.JSONField(write_only=True, required=False)
@@ -655,6 +669,7 @@ class EventCreateSerializer(GundiTraceSerializer):
         return instance
 
     def validate(self, data):
+        data = super().validate(data)
         # Validate that either location or geometry is provided
         if not ("location" in data or "geometry" in data):
             raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
