@@ -36,8 +36,8 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
     configurable_models_lists = {}
     for ca_uuid in ca_uuids:
         try:
-            smart_client.get_data_model(ca_uuid=ca_uuid)
-            smart_client.get_conservation_area(ca_uuid=ca_uuid)
+            smart_client.get_data_model(ca_uuid=ca_uuid, force=True)
+            smart_client.get_conservation_area(ca_uuid=ca_uuid, force=True)
             cm_values = smart_client.list_configurable_datamodels(ca_uuid=ca_uuid)
 
             print(json.dumps(cm_values, indent=2))
@@ -45,8 +45,11 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
             configurable_models_lists[ca_uuid] = cm_values
 
             for cm in cm_values:
-                logger.info('Downloading configurable model %s (%s)', cm['name'], cm['uuid'])
-                smart_client.get_configurable_data_model(cm_uuid=cm['uuid'])
+                if cm.get('use_with_earth_ranger', True):
+                    logger.info('Downloading configurable model %s (%s)', cm['name'], cm['uuid'])
+                    smart_client.get_configurable_data_model(cm_uuid=cm['uuid'], force=True)
+                else:
+                    logger.info('Skipping configurable model %s (%s)', cm['name'], cm['uuid'])
         except Exception as e:
             logger.exception(e, extra=dict(ca_uuid=ca_uuid))
 
