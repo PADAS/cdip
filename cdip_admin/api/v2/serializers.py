@@ -648,6 +648,10 @@ class EventCreateSerializer(GundiTraceSerializer):
         # Save if it's a single object create request
         if isinstance(self._kwargs["data"], dict):
             instance.save()
+            send_events_to_routing(
+                events=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
         return instance
 
     def validate(self, data):
@@ -719,6 +723,10 @@ class EventAttachmentSerializer(GundiTraceSerializer):
         # Save if it's a single object create request
         if isinstance(self._kwargs["data"], dict):
             instance.save()
+            send_attachments_to_routing(
+                attachments_data=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
         return instance
 
     def validate(self, data):
