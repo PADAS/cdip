@@ -66,6 +66,7 @@ drf-proxy-pagination==0.2.0
 jsonschema==4.17.3
 django-celery-beat==2.5.0
 django-storages==1.13.2
+walrus==0.8.1
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
 https://github.com/PADAS/smartconnect-client/releases/download/v1.2.10/smartconnect_client-1.2.10-py3-none-any.whl
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.4.3-alpha/cdip_connector-1.4.3-py3-none-any.whl

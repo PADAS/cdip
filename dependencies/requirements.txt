@@ -431,6 +431,7 @@ redis==3.5.3
     # via
     #   celery-once
     #   smartconnect-client
+    #   walrus
 regex==2023.6.3
     # via dateparser
 requests==2.31.0
@@ -522,6 +523,8 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
+walrus==0.8.1
+    # via -r requirements.in
 wcwidth==0.2.6
     # via prompt-toolkit
 whitenoise==5.2.0
