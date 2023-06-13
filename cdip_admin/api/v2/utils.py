@@ -1,62 +1,80 @@
 import json
+from hashlib import md5
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.conf import settings
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
 from cdip_connector.core.schemas import StreamPrefixEnum, GeoEvent, Location, Attachment
-from core import tracing
+from core import tracing, cache
 from opentelemetry import trace
 
 
+deduplication_db = cache.get_deduplication_db()
+
+
 # ToDo: Retry on failure?
+def is_duplicate_event(data: dict):
+
+    jsonified_data = json.dumps(data, default=str)
+
+    # For a short time, check both the legacy, simple hash too.
+    hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
+    integration_id = str(data['integration'].id)
+    hash = f"{integration_id}.{data['source_id']}.{hash_v1}"
+
+    # Discard duplicates
+    is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
+    deduplication_db.setex(
+        hash, settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
+    )
+    deduplication_db.delete(hash_v1)
+    return is_duplicate
+
+
+def is_duplicate_attachment(data: dict):
+    integration_id = str(data["integration"].id)
+    related_to = data["related_to"]
+    jsonified_data = json.dumps({
+        "filename": data["file"].name,
+        "related_to": related_to,
+        "integration_id": integration_id,
+    })
+
+    # For a short time, check both the legacy, simple hash too.
+    hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
+    hash = f"{integration_id}.{related_to}.{hash_v1}"
+
+    # Discard duplicates
+    is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
+    deduplication_db.setex(
+        hash, settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
+    )
+    deduplication_db.delete(hash_v1)
+    return is_duplicate
+
+
 def send_events_to_routing(events, gundi_ids):
     publisher = get_publisher()
 
     for event, gundi_id in zip(events, gundi_ids):
-        # ToDo: Manage tracing and deduplication
-        # jsonified_data = json.dumps(message.dict(), default=str)
-
-        # # For a short time, check both the legacy, simple hash too.
-        # hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
-        # hash = f"{message.integration_id}.{message.device_id}.{hash_v1}"
-        #
-        # # Trace observations with Open Telemetry
+        # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
                 f"gundi_api.process_event", kind=trace.SpanKind.PRODUCER
         ) as current_span:
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
-        #
-        #     # Discard duplicates
-        #     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
-        #     deduplication_db.setex(
-        #         hash, app.settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
-        #     )
-        #     deduplication_db.delete(hash_v1)
-        #     if is_duplicate:
-        #         current_span.set_attribute("is_duplicate", True)
-        #         current_span.add_event(
-        #             name=f"gundi_api.duplicate_observation_discarded"
-        #         )
-        #         continue
-        #
-        #     # Downstream consumers will want to know the owner by subject.
-        #     message.owner = consumer_info.consumer_username
-        #
-        #     event_stream_key = (
-        #         f"{message.observation_type}.{message.integration_id}.{message.device_id}"
-        #     )
-        #
-        #     device_stream = db.Stream(event_stream_key)
-        #     logger.debug("Post_item. message: %s", message)
-        #
-        #     id = device_stream.add(
-        #         {"data": jsonified_data},
-        #         maxlen=app.settings.GEOEVENT_STREAM_DEFAULT_MAXLEN,
-        #         approximate=True,
-        #     )
-        #     message.id = id
+
+            # Check for duplicates
+            is_duplicate = is_duplicate_event(data=event)
+            if is_duplicate:
+                current_span.set_attribute("is_duplicate", True)
+                current_span.add_event(
+                    name=f"gundi_api.duplicate.event_discarded"
+                )
+                continue
+
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.send_event_to_routing", kind=trace.SpanKind.PRODUCER
             ) as current_span:
@@ -112,46 +130,18 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
-            # jsonified_data = json.dumps(message.dict(), default=str)
-
-            # # For a short time, check both the legacy, simple hash too.
-            # hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
-            # hash = f"{message.integration_id}.{message.device_id}.{hash_v1}"
-            #
-
-            #     # Discard duplicates
-            #     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
-            #     deduplication_db.setex(
-            #         hash, app.settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
-            #     )
-            #     deduplication_db.delete(hash_v1)
-            #     if is_duplicate:
-            #         current_span.set_attribute("is_duplicate", True)
-            #         current_span.add_event(
-            #             name=f"gundi_api.duplicate_observation_discarded"
-            #         )
-            #         continue
-            #
-            #     # Downstream consumers will want to know the owner by subject.
-            #     message.owner = consumer_info.consumer_username
-            #
-            #     event_stream_key = (
-            #         f"{message.observation_type}.{message.integration_id}.{message.device_id}"
-            #     )
-            #
-            #     device_stream = db.Stream(event_stream_key)
-            #     logger.debug("Post_item. message: %s", message)
-            #
-            #     id = device_stream.add(
-            #         {"data": jsonified_data},
-            #         maxlen=app.settings.GEOEVENT_STREAM_DEFAULT_MAXLEN,
-            #         approximate=True,
-            #     )
-            #     message.id = id
+            # Check for duplicates
+            is_duplicate = is_duplicate_attachment(data=attachment)
+            if is_duplicate:
+                current_span.set_attribute("is_duplicate", True)
+                current_span.add_event(
+                    name=f"gundi_api.duplicate.attachment_discarded"
+                )
+                continue
             # Upload file to the cloud
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.upload_file_to_gcp", kind=trace.SpanKind.PRODUCER
-            ) as subspan:
+            ):
                 tracing.instrumentation.enrich_span_with_environment(
                     span=current_span
                 )
@@ -159,7 +149,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 file_path = default_storage.save(f"attachments/{gundi_id}_{file.name}", ContentFile(file.read()))
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.send_attachment_to_routing", kind=trace.SpanKind.PRODUCER
-            ) as subspan:
+            ):
                 observation_type = StreamPrefixEnum.attachment.value
                 # Convert the event to the schema supported by routing
                 integration = attachment.get("integration")
