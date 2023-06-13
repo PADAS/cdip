@@ -11,7 +11,7 @@ from rest_framework import viewsets, status, mixins
 from rest_framework import filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from cdip_connector.core.schemas import StreamPrefixEnum
+from cdip_connector.core.schemas.v2 import StreamPrefixEnum
 from . import serializers as v2_serializers
 from . import permissions
 from . import filters as custom_filters
