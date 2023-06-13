@@ -16,13 +16,13 @@ from dasclient.dasclient import DasClient, DasClientException
 from pydantic import parse_obj_as
 from smartconnect import SmartClient, DataModel
 from smartconnect.er_sync_utils import (
-    build_earth_ranger_event_types,
+    build_earthranger_event_types,
     er_event_type_schemas_equal,
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
     EREventType,
-    get_earth_ranger_last_poll,
-    set_earth_ranger_last_poll,
+    get_earthranger_last_poll,
+    set_earthranger_last_poll,
 )
 from packaging import version
 
@@ -103,7 +103,11 @@ class ER_SMART_Synchronizer:
             for cm in self.smart_config.additional.get('configurable_models_lists', {}).get(ca_uuid):
                 cm_uuid = cm.get('uuid')
                 # TODO: confirm cm_uuid is member of ca_uuid models list.
-                self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
+
+                if cm.get('use_with_earth_ranger', True):
+                    self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
+                else:
+                    logger.info('Configurable Model %s (%s) is not enabled for use with EarthRanger', cm.get('name'), cm_uuid)
 
 
 
@@ -133,7 +137,7 @@ class ER_SMART_Synchronizer:
         cdm_dict = cm.export_as_dict() if cm else None
 
         ca_identifier = self.get_identifier_from_ca_label(ca_label)
-        event_types = build_earth_ranger_event_types(
+        event_types = build_earthranger_event_types(
             dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifier, cdm=cdm_dict
         )
 
@@ -264,7 +268,7 @@ class ER_SMART_Synchronizer:
 
         assert not args, 'This method does not accept positional arguments'
 
-        i_state = get_earth_ranger_last_poll(integration_id=config.id)
+        i_state = get_earthranger_last_poll(integration_id=config.id)
 
         event_last_poll_at = i_state.event_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -314,7 +318,7 @@ class ER_SMART_Synchronizer:
                     f"Skipping event {event.serial_number} because it is associated to a patrol"
                 )
         i_state.event_last_poll_at = current_time
-        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        set_earthranger_last_poll(integration_id=config.id, state=i_state)
 
     def update_event_with_smart_data(self, event):
         if not event.event_details.get("smart_observation_uuid"):
@@ -520,7 +524,7 @@ class ER_SMART_Synchronizer:
 
         assert not args, 'This method does not accept positional arguments'
 
-        i_state = get_earth_ranger_last_poll(integration_id=config.id)
+        i_state = get_earthranger_last_poll(integration_id=config.id)
 
         lower = i_state.patrol_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -556,4 +560,4 @@ class ER_SMART_Synchronizer:
         )
 
         i_state.patrol_last_poll_at = upper
-        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        set_earthranger_last_poll(integration_id=config.id, state=i_state)
