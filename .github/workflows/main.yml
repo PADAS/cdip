@@ -18,7 +18,7 @@ jobs:
           echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
-    uses: ./.github/workflows/_build.yml
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v1-stable
     needs: vars
     with:
       environment: stage
@@ -26,11 +26,11 @@ jobs:
       tag: ${{ needs.vars.outputs.sha_short }}
 
   deploy_stage:
-    uses: ./.github/workflows/_deploy.yml
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
     needs: [vars, build]
     with:
       environment: stage
       chart_name: admin-portal
-      chart_version: '0.1.0'
+      chart_version: '0.1.1'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.sha_short }}
