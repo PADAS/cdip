@@ -12,8 +12,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction, IntegrityError
-from django.core.exceptions import ObjectDoesNotExist
-from cdip_connector.core.schemas.v2 import StreamPrefixEnum
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing
 
 User = get_user_model()
@@ -396,6 +395,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
 
 
 class SourceRetrieveSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     status = serializers.SerializerMethodField()
     provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
@@ -406,7 +406,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = (
-            "external_id", "status", "provider", "destinations", "routing_rules",
+            "id", "external_id", "status", "provider", "destinations", "routing_rules",
             "update_frequency", "last_update",
         )
 
@@ -558,17 +558,6 @@ class GundiTraceSerializer(serializers.Serializer):
         write_only=True,
         required=True,
     )
-    # source = serializers.SlugRelatedField(
-    #     write_only=True,
-    #     required=True,
-    #     queryset=Source.objects.all(),
-    #     slug_field="external_id"
-    # )
-    # created_by
-    # data_provider
-    # destination
-    # delivered_at
-    # external_id  # Object ID in the destination system
 
     def validate(self, data):
         # Check the integration id
