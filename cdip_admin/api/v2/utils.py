@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from cdip_connector.core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event
+from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event
 from core import tracing, cache
 from opentelemetry import trace
 
@@ -84,9 +84,10 @@ def send_events_to_routing(events, gundi_ids):
                 integration = event.get("integration")
                 source = event.get("source")
                 msg_for_routing = Event(
-                    id=str(gundi_id),
-                    integration_id=str(integration.id),
+                    gundi_id=str(gundi_id),
+                    data_provider_id=str(integration.id),
                     source_id=str(source.id),
+                    external_source_id=str(source.external_id),
                     owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
                     recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
                     location=Location(
@@ -96,7 +97,7 @@ def send_events_to_routing(events, gundi_ids):
                         hdop=event.get("location", {}).get("hdop"),
                         vdop=event.get("location", {}).get("vdop")
                     ),
-                    additional=event.get("annotations",{}),
+                    annotations=event.get("annotations", {}),
                     title=event.get("title"),
                     event_type=event.get("event_type"),
                     event_details=event.get("event_details", {}),
@@ -156,10 +157,12 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 observation_type = StreamPrefixEnum.attachment.value
                 # Convert the event to the schema supported by routing
                 integration = attachment.get("integration")
+                source = attachment.get("source")
                 msg_for_routing = Attachment(
-                    id=str(gundi_id),
-                    integration_id=str(integration.id),
-                    source_id=str(attachment.get("source")),
+                    gundi_id=str(gundi_id),
+                    data_provider_id=str(integration.id),
+                    source_id=str(source.id),
+                    external_source_id=str(source.external_id),
                     related_to=str(attachment.get("related_to")),
                     file_path=file_path,
                     observation_type=observation_type

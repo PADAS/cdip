@@ -11,7 +11,7 @@ from rest_framework import viewsets, status, mixins
 from rest_framework import filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from cdip_connector.core.schemas.v2 import StreamPrefixEnum
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from . import serializers as v2_serializers
 from . import permissions
 from . import filters as custom_filters
@@ -234,7 +234,7 @@ class SourcesView(
     An endpoint for retrieving sources
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    lookup_field = 'external_id'
+    #lookup_field = 'external_id'
     filter_backends = [
         drf_filters.OrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
