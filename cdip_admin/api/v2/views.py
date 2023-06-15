@@ -17,6 +17,19 @@ from . import permissions
 from . import filters as custom_filters
 
 
+class UsersView(
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for retrieving the details of the logged-in user
+    """
+    serializer_class = v2_serializers.UserDetailsRetrieveSerializer
+
+    def get_object(self):
+        return self.request.user
+
+
 class OrganizationView(viewsets.ModelViewSet):
     """
     An endpoint for managing organizations
