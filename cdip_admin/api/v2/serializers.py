@@ -16,6 +16,23 @@ from django.core.exceptions import ObjectDoesNotExist
 User = get_user_model()
 
 
+class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "full_name",
+            "is_superuser"
+        )
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip().capitalize()
+
+
 class OrganizationSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
 
