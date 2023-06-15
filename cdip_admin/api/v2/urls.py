@@ -20,6 +20,16 @@ schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 
 urlpatterns = [
     url(r"^docs/", schema_view),
+    # User details for any kind of user
+    path(
+        'users/me/',
+        view=views.UsersView.as_view(
+             {
+                 'get': 'retrieve',
+             }
+        ),
+        name="user-details"
+    ),
     path(r'', include(default_router.urls)),
     path(r'', include(organizations_router.urls)),
 ]
