@@ -572,12 +572,6 @@ class GundiTraceSerializer(serializers.Serializer):
                 raise drf_exceptions.ValidationError(detail=f"Cannot find the integration associated with this API Key.")
         else:
             raise drf_exceptions.ValidationError(detail=f"This API Key isn't associated with an integration.")
-        # Get or create sources as they are discovered
-        source, created = Source.objects.get_or_create(
-            integration=integration,
-            external_id=data["source"]
-        )
-        data["source"] = source
         return data
 
 
@@ -662,8 +656,12 @@ class EventCreateSerializer(GundiTraceSerializer):
         # Validate that either location or geometry is provided
         if not ("location" in data or "geometry" in data):
             raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
-        # ToDo: How do we get the integration id injected based on the API Key being used
-        # user = self.context["request"].user
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=data["integration"],
+            external_id=data["source"]
+        )
+        data["source"] = source
         return data
 
     def update(self, instance, validated_data):
@@ -703,6 +701,10 @@ class EventAttachmentListSerializer(serializers.ListSerializer):
 
 
 class EventAttachmentSerializer(GundiTraceSerializer):
+    source = serializers.CharField(
+        write_only=True,
+        required=False,
+    )
     file = serializers.FileField(write_only=True)
     integration = serializers.PrimaryKeyRelatedField(
         write_only=True,
@@ -738,4 +740,5 @@ class EventAttachmentSerializer(GundiTraceSerializer):
         if not data.get("related_to"):
             # Relate the attachment to the current event
             data["related_to"] = self.context["view"].kwargs["event_pk"]
+        # ToDo: Get source from id from the related event
         return data
