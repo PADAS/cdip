@@ -35,7 +35,8 @@ def is_duplicate_event(data: dict):
 
 def is_duplicate_attachment(data: dict):
     integration_id = str(data["integration"].id)
-    source_id = str(data['source'].id)
+    source = data.get('source')
+    source_id = str(source.id if source else None)  # FixMe: Get source from event
     related_to = data["related_to"]
     jsonified_data = json.dumps({
         "filename": data["file"].name,
@@ -161,8 +162,8 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 msg_for_routing = Attachment(
                     gundi_id=str(gundi_id),
                     data_provider_id=str(integration.id),
-                    source_id=str(source.id),
-                    external_source_id=str(source.external_id),
+                    source_id=str(source.id if source else None),  # ToDo: Can be null?
+                    external_source_id=str(source.external_id if source else None),
                     related_to=str(attachment.get("related_to")),
                     file_path=file_path,
                     observation_type=observation_type
