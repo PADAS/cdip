@@ -140,7 +140,10 @@ class IntegrationsView(viewsets.ModelViewSet):
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
-        # Returns a list with the integrations that the user is allowed to see
+        # Superusers can see all
+        if self.request.user.is_superuser:
+            return Integration.objects.all()
+        # Return the list of connections that the user is allowed to see
         return get_user_integrations_qs(user=self.request.user)
 
     @action(detail=False, methods=['get'])
@@ -215,6 +218,10 @@ class ConnectionsView(
         """
         Return a list of providers used to get the connections
         """
+        # Superusers can see all
+        if self.request.user.is_superuser:
+            return Integration.objects.all()
+        # Return the list of connections that the user is allowed to see
         user_organizations = get_user_organizations_qs(user=self.request.user)
         providers = Route.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
