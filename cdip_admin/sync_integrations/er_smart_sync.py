@@ -100,11 +100,16 @@ class ER_SMART_Synchronizer:
 
             self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca)
 
-            for cm in self.smart_config.additional.get('configurable_models_lists', {}).get(ca_uuid):
+            configurable_model_list = self.smart_config.additional.get('configurable_models_lists', {}).get(ca_uuid)
+            if not configurable_model_list:
+                logger.info('No configurable models found for CA %s (%s)', ca.label, ca_uuid)
+                continue
+
+            for cm in configurable_model_list:
                 cm_uuid = cm.get('uuid')
-                # TODO: confirm cm_uuid is member of ca_uuid models list.
 
                 if cm.get('use_with_earth_ranger', True):
+                    logger.info('Pushing Configurable Model %s (%s) to EarthRanger', cm.get('name'), cm_uuid)
                     self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
                 else:
                     logger.info('Configurable Model %s (%s) is not enabled for use with EarthRanger', cm.get('name'), cm_uuid)
