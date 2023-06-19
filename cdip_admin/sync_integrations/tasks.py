@@ -1,5 +1,6 @@
 import logging
 
+from django.db.models import Q
 from celery_once import QueueOnce
 
 from cdip_admin import celery
@@ -89,13 +90,21 @@ def run_er_smart_sync_integration(*args, smart_integration_id=None):
         return
 
     device_groups = smart_integration.devicegroups.all()
+
+    # Get all devices that are in the device groups and have an EarthRanger inbound integration
     devices = Device.objects.filter(devicegroup__in=device_groups,
-                                    inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER
-                                    ).order_by('inbound_configuration_id').distinct('inbound_configuration_id')
+                                    inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER).order_by(
+        'inbound_configuration_id').distinct('inbound_configuration_id').values('inbound_configuration_id')
 
-    for device in devices:
+    idlist = [dev.get('inbound_configuration_id') for dev in devices]
 
-        er_configuration = device.inbound_configuration
+    # Also include any Inbound Configuration that is associated by its default device group.
+    er_integrations = InboundIntegrationConfiguration.objects.filter(
+        type__slug=InboundIntegrationType.EARTHRANGER).filter(
+        Q(default_devicegroup__in=device_groups) | Q(id__in=idlist)
+    )
+
+    for er_configuration in er_integrations:
 
         try:
             er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
