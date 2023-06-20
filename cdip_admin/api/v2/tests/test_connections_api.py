@@ -41,39 +41,47 @@ def _test_list_connections(api_client, user, provider_list):
         assert provider.owner.description == connection["owner"].get("description")
 
 
-def test_list_connections_as_superuser(api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_superuser(api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list,
+                                       route_1,
+                                       route_2):
     _test_list_connections(
         api_client=api_client,
         user=superuser,
         # The superuser can see all the connections
-        provider_list=[provider_lotek_panthera, provider_movebank_ewt]
+        provider_list=integrations_list + [provider_lotek_panthera, provider_movebank_ewt]
     )
 
 
-def test_list_connections_as_org_admin(api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_admin(api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list,
+                                       route_1,
+                                       route_2):
     _test_list_connections(
         api_client=api_client,
         user=org_admin_user,  # Belongs to one organization
         # Org admins can only see providers of their organizations
-        provider_list=[provider_lotek_panthera]
+        provider_list=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
-def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_admin_2(api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list,
+                                         route_1,
+                                         route_2):
     _test_list_connections(
         api_client=api_client,
         user=org_admin_user_2,  # Belongs to one organization
         # Org admins can only see providers of their organizations
-        provider_list=[provider_movebank_ewt]
+        provider_list=integrations_list[5:]+ [provider_movebank_ewt]
     )
 
 
-def test_list_connections_as_org_viewer(api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list, routing_rule_1, routing_rule_2):
+def test_list_connections_as_org_viewer(api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt, integrations_list,
+                                        route_1,
+                                        route_2):
     _test_list_connections(
         api_client=api_client,
         user=org_viewer_user,  # Belongs to one organization
         # Org viewer can only see providers of their organizations
-        provider_list=[provider_lotek_panthera]
+        provider_list=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
@@ -95,7 +103,7 @@ def _test_filter_connections(api_client, user, filters, expected_integrations):
 
 def test_filter_connections_by_provider_type_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2
+        integrations_list, route_1, route_2
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -109,7 +117,7 @@ def test_filter_connections_by_provider_type_as_superuser(
 
 def test_filter_connections_by_provider_type_as_org_admin(
         api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2
+        integrations_list, route_1, route_2
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -123,7 +131,7 @@ def test_filter_connections_by_provider_type_as_org_admin(
 
 def test_filter_connections_by_provider_type_as_org_viewer(
         api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2
+        integrations_list, route_1, route_2
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -137,7 +145,7 @@ def test_filter_connections_by_provider_type_as_org_viewer(
 
 def test_filter_connections_by_destination_type_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -151,7 +159,7 @@ def test_filter_connections_by_destination_type_as_superuser(
 
 def test_filter_connections_by_destination_type_as_org_admin(
         api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -165,7 +173,7 @@ def test_filter_connections_by_destination_type_as_org_admin(
 
 def test_filter_connections_by_destination_type_as_org_viewer(
         api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -179,9 +187,9 @@ def test_filter_connections_by_destination_type_as_org_viewer(
 
 def test_filter_connections_by_multiple_destination_urls_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
-    selected_destinations = routing_rule_2.destinations.all()
+    selected_destinations = route_2.destinations.all()
     _test_filter_connections(
         api_client=api_client,
         user=superuser,
@@ -196,9 +204,9 @@ def test_filter_connections_by_multiple_destination_urls_as_superuser(
 
 def test_filter_connections_by_multiple_destination_urls_as_org_admin(
         api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
-    selected_destinations = routing_rule_1.destinations.all()
+    selected_destinations = route_1.destinations.all()
     _test_filter_connections(
         api_client=api_client,
         user=org_admin_user,
@@ -213,9 +221,9 @@ def test_filter_connections_by_multiple_destination_urls_as_org_admin(
 
 def test_filter_connections_by_multiple_destination_urls_as_org_viewer(
         api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
-    selected_destinations = routing_rule_1.destinations.all()
+    selected_destinations = route_1.destinations.all()
     _test_filter_connections(
         api_client=api_client,
         user=org_viewer_user_2,
@@ -230,7 +238,7 @@ def test_filter_connections_by_multiple_destination_urls_as_org_viewer(
 
 def test_filter_connections_by_owner_exact_as_superuser(
         api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -238,13 +246,13 @@ def test_filter_connections_by_owner_exact_as_superuser(
         filters={
             "owner": str(other_organization.id)
         },
-        expected_integrations=[provider_movebank_ewt]
+        expected_integrations=integrations_list[5:]+[provider_movebank_ewt]
     )
 
 
 def test_filter_connections_by_multiple_owners_as_superuser(
         api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -252,13 +260,13 @@ def test_filter_connections_by_multiple_owners_as_superuser(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_lotek_panthera, provider_movebank_ewt]
+        expected_integrations=integrations_list + [provider_lotek_panthera, provider_movebank_ewt]
     )
 
 
 def test_filter_connections_by_owner_exact_as_org_admin(
         api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -266,13 +274,13 @@ def test_filter_connections_by_owner_exact_as_org_admin(
         filters={
             "owner": str(organization.id)
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
 def test_filter_connections_by_multiple_owners_as_org_admin(
         api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -280,13 +288,13 @@ def test_filter_connections_by_multiple_owners_as_org_admin(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
 def test_filter_connections_by_owner_exact_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -294,13 +302,13 @@ def test_filter_connections_by_owner_exact_as_org_viewer(
         filters={
             "owner": str(organization.id)
         },
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5] + [provider_lotek_panthera]
     )
 
 
 def test_filter_connections_by_multiple_owners_as_org_viewer(
         api_client, org_viewer_user_2, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, routing_rule_1, routing_rule_2, integration_type_er
+        integrations_list, route_1, route_2, integration_type_er
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -308,7 +316,7 @@ def test_filter_connections_by_multiple_owners_as_org_viewer(
         filters={
             "owner__in": ",".join([str(organization.id), str(other_organization.id)])
         },
-        expected_integrations=[provider_movebank_ewt]
+        expected_integrations=integrations_list[5:] + [provider_movebank_ewt]
     )
 
 
@@ -342,13 +350,13 @@ def test_global_search_connections_as_superuser(
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera,
-        routing_rule_1, routing_rule_2
+        route_1, route_2
 ):
     _test_global_search_connections(
         api_client=api_client,
         user=superuser,
         search_term="pamdas.org",  # Looking connections with earth ranger sites
-        expected_integrations=[provider_movebank_ewt, provider_lotek_panthera]  # Connected providers
+        expected_integrations=integrations_list + [provider_movebank_ewt, provider_lotek_panthera]  # Connected providers
     )
 
 
@@ -357,13 +365,13 @@ def test_global_search_connections_as_org_admin(
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera,
-        routing_rule_1, routing_rule_2
+        route_1, route_2
 ):
     _test_global_search_connections(
         api_client=api_client,
         user=org_admin_user,
         search_term="Lewa",  # Looking connections owned by Lewa
-        expected_integrations=[provider_lotek_panthera]
+        expected_integrations=integrations_list[:5]+[provider_lotek_panthera]
     )
 
 
@@ -372,7 +380,7 @@ def test_global_search_connections_as_org_viewer(
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
         integrations_list, provider_movebank_ewt, provider_lotek_panthera,
-        routing_rule_1, routing_rule_2
+        route_1, route_2
 ):
     _test_global_search_connections(
         api_client=api_client,

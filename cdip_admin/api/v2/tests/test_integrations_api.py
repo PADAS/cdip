@@ -67,88 +67,235 @@ def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organizati
         organization=organization
     )
 
-#  ToDo: Refactor after integrations creation is supported
-# def _test_create_destination(api_client, user, owner, destination_type, destination_name, configuration):
-#     request_data = {
-#       "name": destination_name,
-#       "type": str(destination_type.id),
-#       "owner": str(owner.id),
-#       "base_url": "https://reservex.pamdas.org",
-#       "configuration": configuration
-#     }
-#     api_client.force_authenticate(user)
-#     response = api_client.post(
-#         reverse("integrations-list"),
-#         data=request_data,
-#         format='json'
-#     )
-#     assert response.status_code == status.HTTP_201_CREATED
-#     response_data = response.json()
-#     assert "id" in response_data
-#     # Check that the destination was created in the database
-#     assert Integration.objects.filter(name=request_data["name"]).exists()
-#
-#
-# def test_create_destination_as_superuser(api_client, superuser, organization, destination_type_er, get_random_id):
-#     _test_create_destination(
-#         api_client=api_client,
-#         user=superuser,
-#         owner=organization,
-#         destination_type=destination_type_er,
-#         destination_name=f"Reserve X {get_random_id()}",
-#         configuration={
-#             "site": "https://reservex.pamdas.org",
-#             "username": "reservex@pamdas.org",
-#             "password": "P4sSW0rD"
-#         }
-#     )
-#
-#
-# def test_create_destination_as_org_admin(api_client, org_admin_user, organization, destination_type_er, get_random_id):
-#     _test_create_destination(
-#         api_client=api_client,
-#         user=org_admin_user,
-#         owner=organization,
-#         destination_type=destination_type_er,
-#         destination_name=f"Reserve Y {get_random_id()}",
-#         configuration={
-#             "site": "https://reservey.pamdas.org",
-#             "username": "reservey@pamdas.org",
-#             "password": "P4sSW0rD"
-#         }
-#     )
-#
-#
-# def _test_cannot_create_destination(api_client, user, owner, destination_type, destination_name, configuration):
-#     request_data = {
-#       "name": destination_name,
-#       "type": str(destination_type.id),
-#       "owner": str(owner.id),
-#       "base_url": "https://reservex.pamdas.org",
-#       "configuration": configuration
-#     }
-#     api_client.force_authenticate(user)
-#     response = api_client.post(
-#         reverse("integrations-list"),
-#         data=request_data,
-#         format='json'
-#     )
-#     assert response.status_code == status.HTTP_403_FORBIDDEN
-#
-#
-# def test_cannot_create_destination_as_org_viewer(api_client, org_viewer_user, organization, destination_type_er, get_random_id):
-#     _test_cannot_create_destination(
-#         api_client=api_client,
-#         user=org_viewer_user,
-#         owner=organization,
-#         destination_type=destination_type_er,
-#         destination_name=f"Reserve Z {get_random_id()}",
-#         configuration={
-#             "site": "https://reservez.pamdas.org",
-#             "username": "reservez@pamdas.org",
-#             "password": "P4sSW0rD"
-#         }
-#     )
+
+def _test_create_integration(
+        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True
+):
+    request_data = {
+      "name": name,
+      "type": str(integration_type.id),
+      "owner": str(owner.id),
+      "base_url": base_url,
+      "configurations": configurations,
+      "create_default_route": create_default_route
+    }
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("integrations-list"),
+        data=request_data,
+        format='json'
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    response_data = response.json()
+    assert "id" in response_data
+    # Check that the integration was created in the database
+    integration = Integration.objects.get(id=response_data["id"])
+    # Check that the related configurations where created too
+    assert integration.configurations.count() == len(configurations)
+    # Check that a default routing rule is created
+    if create_default_route:
+        assert integration.default_route
+    else:
+        assert integration.default_route is None
+
+
+def test_create_er_integration_as_superuser(
+        api_client, superuser, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=superuser,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservex.pamdas.org",
+        name=f"Reserve X {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservex@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                "data": {
+                    "sensor_type": "tracker"
+                }
+            }
+            # Other actions in this example don't require extra settings
+        ]
+    )
+
+
+def test_create_er_integration_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservey.pamdas.org",
+        name=f"Reserve Y {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservey@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                "data": {
+                    "sensor_type": "tracker"
+                }
+            }
+            # Other actions in this example don't require extra settings
+        ]
+    )
+
+
+def test_create_er_integration_without_default_route_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                "data": {
+                    "sensor_type": "tracker"
+                }
+            }
+            # Other actions in this example don't require extra settings
+        ],
+        create_default_route=False  # Destination only integration
+    )
+
+
+def _test_cannot_create_integration(api_client, user, owner, integration_type, base_url, name, configurations):
+    request_data = {
+      "name": name,
+      "type": str(integration_type.id),
+      "owner": str(owner.id),
+      "base_url": base_url,
+      "configurations": configurations
+    }
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("integrations-list"),
+        data=request_data,
+        format='json'
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_create_integrations_as_org_viewer(api_client, org_viewer_user, organization, integration_type_er, get_random_id):
+    _test_cannot_create_integration(
+        api_client=api_client,
+        user=org_viewer_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservez.pamdas.org",
+        name=f"Reserve Z {get_random_id()}",
+        configurations=[]
+    )
+
+
+def _test_cannot_create_integration_with_invalid_params(api_client, user, owner, integration_type, base_url, name, configurations):
+    request_data = {
+      "name": name,
+      "type": str(integration_type.id),
+      "owner": str(owner.id),
+      "base_url": base_url,
+      "configurations": configurations
+    }
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("integrations-list"),
+        data=request_data,
+        format='json'
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_cannot_create_integrations_with_invalid_config_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_cannot_create_integration_with_invalid_params(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservei.pamdas.org",
+        name=f"Reserve Invalid {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservey@pamdas.org",
+                    # "password": "P4sSW0rD"  #  Password left out intentionally for this test
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                # Action data left out intentionally for this test
+                # "data": {
+                #     "sensor_type": "tracker"
+                # }
+            }
+            # Other actions in this example don't require extra settings
+        ]
+    )
+
+
+def test_cannot_create_integrations_with_invalid_url_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_cannot_create_integration_with_invalid_params(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="notaurl",
+        name=f"Reserve Invalid {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservey@pamdas.org",
+                    "password": "P4sSW0rD"  #  Password left out intentionally for this test
+                }
+            },
+            {
+                "action": str(er_action_push_positions.id),
+                "data": {
+                    "sensor_type": "tracker"
+                }
+            }
+            # Other actions in this example don't require extra settings
+        ]
+    )
+# ToDo: Add more tests for configuration schema validations
 
 
 def _test_filter_integrations(api_client, user, filters, expected_integrations):

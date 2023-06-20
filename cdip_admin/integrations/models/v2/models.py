@@ -1,3 +1,4 @@
+import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
@@ -58,6 +59,10 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.integration_type} - {self.name}"
 
+    def validate_configuration(self, configuration: dict):
+        # Helper method to validate a configuration against the Action's schema
+        jsonschema.validate(instance=configuration, schema=self.schema)
+
 
 class Integration(UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
@@ -78,8 +83,8 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         verbose_name="Base URL"
     )
     enabled = models.BooleanField(default=True)
-    default_routing_rule = models.ForeignKey(
-        "integrations.RoutingRule",
+    default_route = models.ForeignKey(
+        "integrations.Route",
         blank=True,
         null=True,
         on_delete=models.PROTECT,
@@ -97,6 +102,18 @@ class Integration(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        pass
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
+
 
     @property
     def configurations(self):
@@ -155,7 +172,7 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
         return f"{self.data}"
 
 
-class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
+class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -170,7 +187,7 @@ class RoutingRuleConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class RoutingRule(UUIDAbstractModel, TimestampedModel):
+class Route(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
@@ -191,10 +208,10 @@ class RoutingRule(UUIDAbstractModel, TimestampedModel):
         verbose_name="Destinations"
     )
     configuration = models.ForeignKey(
-        "integrations.RoutingRuleConfiguration",
+        "integrations.RouteConfiguration",
         on_delete=models.SET_NULL,
         related_name="routing_rules_by_configuration",
-        verbose_name="Routing Rule Configuration",
+        verbose_name="Route Configuration",
         blank=True,
         null=True
     )
@@ -235,7 +252,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
         verbose_name="JSON Selector"
     )
     routing_rule = models.ForeignKey(
-        "integrations.RoutingRule",
+        "integrations.Route",
         on_delete=models.CASCADE,
         related_name="source_filters",
         verbose_name="Routing Rule"
