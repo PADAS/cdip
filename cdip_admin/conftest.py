@@ -22,13 +22,12 @@ from integrations.models import (
     IntegrationType,
     IntegrationAction,
     IntegrationConfiguration,
-    RoutingRule,
+    Route,
     SourceFilter,
-    ensure_default_routing_rule,
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration
+    SourceConfiguration, ensure_default_route, RouteConfiguration
 )
 from organizations.models import Organization
 
@@ -472,6 +471,7 @@ def smart_action_push_events(integration_type_smart):
         description="Push Event data to SMART Cloud API"
     )
 
+
 @pytest.fixture
 def smart_action_auth(integration_type_smart):
     return IntegrationAction.objects.create(
@@ -493,6 +493,30 @@ def smart_action_auth(integration_type_smart):
         }
     )
 
+
+@pytest.fixture
+def smart_integration(
+        organization, other_organization, integration_type_smart, get_random_id,
+        smart_action_auth, smart_action_push_events
+):
+    # Create the integration
+    site_url = f"{get_random_id()}.smart.wps.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=site_url
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        }
+    )
+    ensure_default_route(integration=integration)
+    return integration
 
 
 @pytest.fixture
@@ -521,7 +545,7 @@ def provider_lotek_panthera(
             "start_time": "2023-01-01T00:00:00Z"
         }
     )
-    ensure_default_routing_rule(provider)
+    ensure_default_route(integration=provider)
     return provider
 
 
@@ -551,64 +575,8 @@ def provider_movebank_ewt(
             "max_records_per_individual": 20000
         }
     )
-    ensure_default_routing_rule(provider)
+    ensure_default_route(integration=provider)
     return provider
-
-
-
-
-# @pytest.fixture
-# def integration_type_traccar():
-#     # Create an integration type for Traccar
-#     integration_type = IntegrationType.objects.create(
-#         name="EarthRanger",
-#         value="earth_ranger",
-#         description="Standard type for distributing data to EarthRanger sites."
-#     )
-#     # Add actions
-#     # Auth
-#     IntegrationAction.objects.create(
-#         integration_type=integration_type,
-#         type=IntegrationAction.ActionTypes.AUTHENTICATION,
-#         name="Authenticate",
-#         value="auth",
-#         description="Use credentials to authenticate against Earth Ranger API",
-#         schema={
-#             "type": "object",
-#             "required": [
-#                 "username",
-#                 "password"
-#             ],
-#             "properties": {
-#                 "password": {
-#                     "type": "string"
-#                 },
-#                 "username": {
-#                     "type": "string"
-#                 }
-#             }
-#         }
-#     )
-#     # Pull
-#     IntegrationAction.objects.create(
-#         integration_type=integration_type,
-#         type=IntegrationAction.ActionTypes.PULL_DATA,
-#         name="Pull Positions",
-#         value="pull_positions",
-#         description="Pull Tracking data from Traccar API",
-#         schema={
-#             "type": "object",
-#             "required": [
-#                 "start_time"
-#             ],
-#             "properties": {
-#                 "start_time": {
-#                     "type": "string"
-#                 }
-#             }
-#         }
-#     )
-#     return integration_type
 
 
 @pytest.fixture
@@ -655,6 +623,7 @@ def integrations_list(
             action=er_action_pull_events
         )
         integrations.append(integration)
+        ensure_default_route(integration=integration)
     return integrations
 
 
@@ -700,8 +669,8 @@ def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_ra
 
 
 @pytest.fixture
-def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
-    rule, _ = RoutingRule.objects.get_or_create(
+def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
+    rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
     )
@@ -722,13 +691,56 @@ def routing_rule_1(get_random_id, organization, lotek_sources, provider_lotek_pa
 
 
 @pytest.fixture
-def routing_rule_2(get_random_id, other_organization, movebank_sources, provider_movebank_ewt, integrations_list):
-    rule, _ = RoutingRule.objects.get_or_create(
+def er_route_configuration_elephants():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Elephant Subject Type",
+        data={
+            "subject_type": "elephant"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
+def er_route_configuration_rangers():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Ranger Subject Type",
+        data={
+            "subject_type": "ranger"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
+def smart_route_configuration():
+    route_config = RouteConfiguration.objects.create(
+        name="Set Ranger Subject Type",
+        data={
+            "ca_uuids": [
+                "8f7fbe1b-121a-4ef4-bda8-14f5581e44cf"
+            ],
+            "transformation_rules": {
+                "attribute_map": [],
+                "category_map": []
+            },
+            "version": "7.5.6"
+        }
+    )
+    return route_config
+
+
+@pytest.fixture
+def route_2(
+        get_random_id, other_organization, movebank_sources, provider_movebank_ewt,
+        integrations_list, er_route_configuration_elephants
+):
+    route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
         owner=other_organization,
     )
-    rule.data_providers.add(provider_movebank_ewt)
-    rule.destinations.add(integrations_list[0])
+    route.data_providers.add(provider_movebank_ewt)
+    route.destinations.add(integrations_list[5])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -738,9 +750,12 @@ def routing_rule_2(get_random_id, other_organization, movebank_sources, provider
         selector=ListFilter(
             ids=[d.external_id for d in movebank_sources]
         ).dict(),
-        routing_rule=rule
+        routing_rule=route
     )
-    return rule
+    # Add a custom configuration
+    route.configuration = er_route_configuration_elephants
+    route.save()
+    return route
 
 
 ########################################################################################################################

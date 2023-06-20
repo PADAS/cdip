@@ -4,14 +4,33 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
-from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, RoutingRule, \
-    Source, SourceState, SourceConfiguration
+from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
+    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-
+#from django.db import transaction
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ObjectDoesNotExist
 
 User = get_user_model()
+
+
+class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "full_name",
+            "is_superuser"
+        )
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip().capitalize()
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -195,7 +214,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
         )
 
 
-class IntegrationConfigurationSerializer(serializers.ModelSerializer):
+class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
     action = IntegrationActionSummarySerializer()
 
     class Meta:
@@ -203,10 +222,18 @@ class IntegrationConfigurationSerializer(serializers.ModelSerializer):
         fields = ["id", "integration", "action", "data"]
 
 
+class RoutingRuleSummarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Route
+        fields = ("id", "name")
+
+
 class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
-    configurations = IntegrationConfigurationSerializer(many=True)
+    configurations = IntegrationConfigurationRetrieveSerializer(many=True)
+    default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -219,6 +246,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "default_route",
             "status"
         )
 
@@ -233,10 +261,19 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
         }
 
 
+class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
+    action = serializers.PrimaryKeyRelatedField(queryset=IntegrationAction.objects.all())
+
+    class Meta:
+        model = IntegrationConfiguration
+        fields = ["action", "data"]
+
+
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
-    type = IntegrationTypeSummarySerializer()
-    owner = OwnerSerializer()
-    configurations = IntegrationConfigurationSerializer(many=True)
+    id = serializers.UUIDField(read_only=True)
+    configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
+    default_route = RoutingRuleSummarySerializer(read_only=True)
+    create_default_route = serializers.BooleanField(default=True)
 
     class Meta:
         model = Integration
@@ -247,25 +284,41 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "enabled",
             "type",
             "owner",
-            "configurations"
+            "configurations",
+            "default_route",
+            "create_default_route"
         )
 
     def validate(self, data):
         """
-        Validate the configuration schema
+        Validate the configurations
         """
-        destination_type = data["type"]
-        configuration_schema = destination_type.dest_configuration_schema
-        configuration = data["configuration"]
-        if configuration_schema and not configuration:  # Blank or None
-            raise drf_exceptions.ValidationError("The configuration can't be null or empty")
-
-        try:  # Validate schema
-            jsonschema.validate(instance=configuration, schema=configuration_schema)
-        except jsonschema.exceptions.ValidationError as err:
-            print(err)
-            raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
+        for configuration in data.get("configurations", []):
+            action = configuration["action"]
+            configuration_schema = action.schema
+            if configuration_schema and not configuration:  # Blank or None
+                raise drf_exceptions.ValidationError("The configuration can't be null or empty")
+            try:  # Validate schema
+                action.validate_configuration(configuration["data"])
+            except jsonschema.exceptions.ValidationError as err:
+                print(err)
+                raise drf_exceptions.ValidationError(detail=f"configuration: {err.message}")
         return data
+
+    def create(self, validated_data):
+        configurations = validated_data.pop("configurations")
+        create_default_route = validated_data.pop("create_default_route")
+        integration = Integration.objects.create(**validated_data)
+        for configuration in configurations:
+            IntegrationConfiguration.objects.create(
+                integration=integration,
+                **configuration
+            )
+        if create_default_route:
+            ensure_default_route(integration=integration)
+        return integration
+
+    # ToDo. Support updates with nested configurations too?
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
@@ -298,18 +351,12 @@ class IntegrationOwnerSerializer(serializers.ModelSerializer):
         fields = ("id", "name", )
 
 
-class RoutingRuleSummarySerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = RoutingRule
-        fields = ("id", "name")
-
-
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
     routing_rules = serializers.SerializerMethodField()
+    default_route = RoutingRuleSummarySerializer(read_only=True)
     owner = OwnerSerializer()
     status = serializers.SerializerMethodField()
 
@@ -320,6 +367,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
             "provider",
             "destinations",
             "routing_rules",
+            "default_route",
             "owner",
             "status"
         )
@@ -384,3 +432,105 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_routing_rules(self, obj):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
+
+
+class RouteConfigurationSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = RouteConfiguration
+        fields = ["id", "name", "data"]
+
+
+class PKRelatedOrNestedField(serializers.PrimaryKeyRelatedField):
+    # This custom field accepts either the id of a related object or a nested serializer
+    default_error_messages = {
+        'required': _('This field is required.'),
+        'does_not_exist': _('Invalid pk "{pk_value}" - object does not exist.'),
+        'incorrect_type': _('Incorrect type. Expected pk value, received {data_type}.'),
+    }
+
+    def __init__(self, **kwargs):
+        self.pk_field = kwargs.pop("pk_field", None)
+        self.nested_serializer = kwargs.pop("nested_serializer", None)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):  # It's a nested object
+            return self.nested_serializer.to_internal_value(data=data)
+        return super().to_internal_value(data=data)  # It's PK Related Field
+
+
+class RouteCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    data_providers = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
+    destinations = serializers.PrimaryKeyRelatedField(many=True, queryset=Integration.objects.all())
+    configuration = PKRelatedOrNestedField(
+        queryset=RouteConfiguration.objects.all(),
+        required=False,
+        nested_serializer=RouteConfigurationSerializer(required=False)
+    )
+
+    class Meta:
+        model = Route
+        fields = (
+            "id",
+            "name",
+            "owner",
+            "data_providers",
+            "destinations",
+            "configuration",
+            "additional",
+            # "filters"  # ToDo: Support "filters" or "rules"
+        )
+
+    def _validate_integrations_selection(self, integration_ids):
+        user = self.context.get("request").user
+        if user.is_superuser:  # Superusers can do anything
+            return integration_ids
+        # Other users can only select integrations within their organizations
+        user_managed_integrations = get_user_integrations_qs(user)
+        if user_managed_integrations.filter(id__in=[i.id for i in integration_ids]).count() != len(integration_ids):
+            raise drf_exceptions.ValidationError(
+                detail=f"You don't have enough privileges in at least one of the selected destinations"
+            )
+        return integration_ids
+
+    def validate_data_providers(self, value):
+        # Check if the user is allowed to manage the selected data providers
+        return self._validate_integrations_selection(integration_ids=value)
+
+    def validate_destinations(self, value):
+        # Check if the user is allowed to manage the selected destinations
+        return self._validate_integrations_selection(integration_ids=value)
+
+    def validate_configuration(self, value):
+        # We support sending an id or a nested configuration object
+        if isinstance(value, dict):
+            # Create the configuration
+            configuration = RouteConfigurationSerializer(data=value)
+            configuration.is_valid()
+            configuration.save()
+            return configuration.instance
+        return value
+
+
+class RouteRetrieveFullSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    data_providers = IntegrationSummarySerializer(many=True)
+    destinations = IntegrationSummarySerializer(many=True)
+    configuration = RouteConfigurationSerializer()
+
+    class Meta:
+        model = Route
+        fields = (
+            "id",
+            "name",
+            "owner",
+            "data_providers",
+            "destinations",
+            "configuration",
+            "additional",
+            # "filters"  # ToDo: Support "filters" or "rules"
+        )
+
