@@ -248,6 +248,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "additional",
             "default_route",
             "status"
         )
