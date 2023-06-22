@@ -16,7 +16,7 @@ from integrations.models import (
     Integration,
     IntegrationType,
     get_user_integrations_qs,
-    Source
+    Source, Route
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -482,3 +482,17 @@ class SourceFilter(django_filters_rest.FilterSet):
         # Filter integrations having at least one destination with an url matching at least one of the provided values
         return qs_with_destination_urls.filter(destination_urls__overlap=destination_urls)
 
+
+class RouteFilter(django_filters_rest.FilterSet):
+    data_providers = django_filters_rest.CharFilter(
+        method='filter_by_data_providers'
+    )
+
+    class Meta:
+        model = Route
+        fields = {
+            'data_providers': ['exact', 'iexact'],
+        }
+
+    def filter_by_data_providers(self, queryset, name, value):
+        return queryset.filter(data_providers=value).distinct()
