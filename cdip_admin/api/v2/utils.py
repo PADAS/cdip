@@ -86,6 +86,7 @@ def send_events_to_routing(events, gundi_ids):
                 source = event.get("source")
                 msg_for_routing = Event(
                     gundi_id=str(gundi_id),
+                    related_to=str(event.get("related_to")),
                     data_provider_id=str(integration.id),
                     source_id=str(source.id),
                     external_source_id=str(source.external_id),
