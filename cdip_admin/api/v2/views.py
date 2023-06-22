@@ -3,7 +3,7 @@ from django.db.models import Subquery
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -276,11 +276,11 @@ class RoutesView(viewsets.ModelViewSet):
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
         drf_filters.OrderingFilter,
-        # ToDo: Implement search & filter
-        # django_filters.rest_framework.DjangoFilterBackend,
+        django_filters.rest_framework.DjangoFilterBackend,
+        # ToDo: Implement search
         # custom_filters.CustomizableSearchFilter
     ]
-    # filterset_class = RouteFilter
+    filterset_class = RouteFilter
     # search_fields = ["name", 'owner__name', ]
     ordering_fields = ['id', 'name', 'owner__name']
     ordering = ['id']
