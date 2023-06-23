@@ -100,6 +100,7 @@ def run_er_smart_sync_integration(*args, smart_integration_id=None):
 
     # Also include any Inbound Configuration that is associated by its default device group.
     er_integrations = InboundIntegrationConfiguration.objects.filter(
+        enabled=True,
         type__slug=InboundIntegrationType.EARTHRANGER).filter(
         Q(default_devicegroup__in=device_groups) | Q(id__in=idlist)
     )
