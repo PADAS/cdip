@@ -32,6 +32,6 @@ jobs:
     with:
       environment: stage
       chart_name: admin-portal
-      chart_version: '0.1.2'
+      chart_version: '0.2.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.sha_short }}
