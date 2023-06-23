@@ -296,8 +296,10 @@ class ER_SMART_Synchronizer:
                         self.update_event_with_smart_data(event=event)
                     except:
                         logger.error(
-                            "Error patching event_type with smart_observation_uuid, event not processed",
-                            extra=dict(event_id=event.id, event_title=event.title),
+                            "Error patching event %s (%s) with smart_observation_uuid, event not processed",
+                            event.serial_number, event.id,
+                            extra=dict(event_id=event.id, event_title=event.title,
+                                       event_serial_number=event.serial_number),
                         )
                 for file in event.files:
                     try:
@@ -312,8 +314,8 @@ class ER_SMART_Synchronizer:
                             ),
                         )
                 logger.info(
-                    f"Publishing observation for event",
-                    extra=dict(event_id=event.id, event_title=event.title),
+                    f"Publishing observation for event {event.serial_number}",
+                    extra=dict(event_id=event.id, event_title=event.title, event_serial_number=event.serial_number)
                 )
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, event.dict()
