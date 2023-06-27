@@ -6,15 +6,13 @@ import re
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional, Dict
 from urllib.parse import urlparse
-
-import pydantic
 from cdip_connector.core.cloudstorage import get_cloud_storage
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from cdip_connector.core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
-from dasclient.dasclient import DasClient, DasClientException
+from gundi_core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
+from dasclient.dasclient import DasClient
 from pydantic import parse_obj_as
-from smartconnect import SmartClient, DataModel
+from smartconnect import SmartClient
 from smartconnect.er_sync_utils import (
     build_earthranger_event_types,
     er_event_type_schemas_equal,
@@ -25,7 +23,6 @@ from smartconnect.er_sync_utils import (
     set_earthranger_last_poll,
 )
 from packaging import version
-
 from cdip_admin import settings
 from integrations.models import (
     OutboundIntegrationConfiguration,
