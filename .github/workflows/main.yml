@@ -2,7 +2,7 @@ name: Build and deploy admin-portal
 on:
   push:
     branches:
-      - SIK-2074
+      - main
 
 jobs:
   vars:
