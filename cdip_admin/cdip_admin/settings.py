@@ -84,11 +84,13 @@ INSTALLED_APPS = [
     "phonenumber_field",
     "rest_framework",
     "rest_framework_swagger",
+    "sync_integrations",
     "bootstrap4",
     "cdip_admin",
     "django_extensions",
     "simple_history",
     "django_jsonform",
+    "django_celery_beat",
 ]
 
 

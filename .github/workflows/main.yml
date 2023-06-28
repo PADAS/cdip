@@ -34,3 +34,4 @@ jobs:
       chart_version: '0.2.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+
