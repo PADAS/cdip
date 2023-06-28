@@ -2,8 +2,9 @@ import json
 import logging
 import pathlib
 import uuid
+import re
 from datetime import timezone, datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
 from urllib.parse import urlparse
 
 import pydantic
@@ -15,13 +16,13 @@ from dasclient.dasclient import DasClient, DasClientException
 from pydantic import parse_obj_as
 from smartconnect import SmartClient, DataModel
 from smartconnect.er_sync_utils import (
-    build_earth_ranger_event_types,
+    build_earthranger_event_types,
     er_event_type_schemas_equal,
     get_subjects_from_patrol_data_model,
     er_subjects_equal,
     EREventType,
-    get_earth_ranger_last_poll,
-    set_earth_ranger_last_poll,
+    get_earthranger_last_poll,
+    set_earthranger_last_poll,
 )
 from packaging import version
 
@@ -33,72 +34,124 @@ from integrations.models import (
 
 logger = logging.getLogger(__name__)
 
+class ConfigurableModelTranslation(pydantic.BaseModel):
+    language_code: str = 'en'
+    value: str = ''
+
+class ConfigurableModelMetadata(pydantic.BaseModel):
+    ca_id: str
+    ca_name: str
+    ca_uuid: str
+    name: str
+    translations: List[ConfigurableModelTranslation]
+    uuid: str
+
+class SmartIntegrationAdditional(pydantic.BaseModel):
+
+    ca_uuids: List[str] = []
+    configurable_models_enabled: List[str] = []
+
+    configurable_models_map: Dict[str, List[ConfigurableModelMetadata]] = {}
 
 class ER_SMART_Synchronizer:
-    def __init__(self, **kwargs):
-        smart_integration_id = kwargs.get("smart_integration_id")
-        er_integration_id = kwargs.get("er_integration_id")
 
-        smart_config = OutboundIntegrationConfiguration.objects.get(
-            id=smart_integration_id
-        )
-        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
+    def __init__(self, *args, smart_config=None, er_config=None, das_client=None):
 
-        if not smart_config or not er_config:
-            logger.exception(
-                f"No configurations found for integration ids",
-                extra=dict(
-                    smart_integration_id=smart_integration_id,
-                    er_integration_id=er_integration_id,
-                ),
-            )
-            raise Exception("No configurations found for integration ids")
+
+        assert not args, "ER_SMART_Synchronizer does not support positional arguments"
+
+        if das_client:
+            self.das_client = das_client
+            return
+
+        self.smart_config = smart_config
+        self.er_config = er_config or InboundIntegrationConfiguration.objects.get(id=smart_config.additional.get("er_integration_id"))
+
+        self.publisher = get_publisher()
+        self.cloud_storage = get_cloud_storage()
 
         self.smart_client = SmartClient(
             api=smart_config.endpoint,
             username=smart_config.login,
             password=smart_config.password,
             version=smart_config.additional.get("version"),
-            use_language_code="en",
+            use_language_code=smart_config.additional.get("use_language_code", "en"),
         )
 
-        self.smart_ca_uuids = smart_config.additional.get("ca_uuids")
+        provider_key = self.smart_config.type.slug
+        url_parse = urlparse(self.er_config.endpoint)
 
-        provider_key = smart_config.type.slug
-        url_parse = urlparse(er_config.endpoint)
-
+        # TODO: Replace with er-client
         self.das_client = DasClient(
-            service_root=er_config.endpoint,
-            username=er_config.login,
-            password=er_config.password,
-            token=er_config.token,
+            service_root=self.er_config.endpoint,
+            username=self.er_config.login,
+            password=self.er_config.password,
+            token=self.er_config.token,
             token_url=f"{url_parse.scheme}://{url_parse.hostname}/oauth2/token",
             client_id="das_web_client",
             provider_key=provider_key,
         )
 
-        self.publisher = get_publisher()
-        self.cloud_storage = get_cloud_storage()
 
-    def push_smart_ca_data_model_to_er_event_types(self, *, smart_ca_uuid, ca):
-        dm = self.smart_client.get_data_model(
-            ca_uuid=smart_ca_uuid, use_cache=settings.USE_SMART_CACHE
-        )
+    def synchronize_datamodel(self):
+        # Given a single smart integration, synchronize the datamodels for all the CAs and CMs.
+        for ca_uuid in self.smart_config.additional.get('ca_uuids', []):
+            ca = self.smart_client.get_conservation_area(ca_uuid=ca_uuid)
+
+            self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca)
+
+            configurable_model_list = self.smart_config.additional.get('configurable_models_lists', {}).get(ca_uuid)
+            if not configurable_model_list:
+                logger.info('No configurable models found for CA %s (%s)', ca.label, ca_uuid)
+                continue
+
+            for cm in configurable_model_list:
+                cm_uuid = cm.get('uuid')
+
+                if cm.get('use_with_earth_ranger', True):
+                    logger.info('Pushing Configurable Model %s (%s) to EarthRanger', cm.get('name'), cm_uuid)
+                    self.push_smart_datamodel_to_earthranger(smart_ca_uuid=ca_uuid, ca=ca, smart_cm_uuid=cm_uuid)
+                else:
+                    logger.info('Configurable Model %s (%s) is not enabled for use with EarthRanger', cm.get('name'), cm_uuid)
+
+
+
+    def push_smart_datamodel_to_earthranger(self, *args, smart_ca_uuid=None, ca=None,
+                                            smart_cm_uuid=None):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
+
+        if smart_cm_uuid:
+            cm = self.smart_client.get_configurable_data_model(cm_uuid=smart_cm_uuid)
+        else:
+            cm = None
+
+        return self.push_smart_ca_datamodel_to_earthranger(dm=dm, smart_ca_uuid=smart_ca_uuid, ca_label=ca.label,
+                                                           cm=cm)
+
+    def push_smart_ca_datamodel_to_earthranger(self, *args, dm=None, smart_ca_uuid=None, ca_label=None, cm=None):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        if not dm:
+            raise ValueError('dm is required')
+
         dm_dict = dm.export_as_dict()
+        cdm_dict = cm.export_as_dict() if cm else None
 
-        cm_uuid = self.smart_client.get_configurable_datamodel_for_ca(ca_uuid=smart_ca_uuid)
-        cdm_dict = None
-        if cm_uuid:
-            cdm = self.smart_client.get_configurable_data_model(cm_uuid=cm_uuid, use_cache=settings.USE_SMART_CACHE)
-            cdm_dict = cdm.export_as_dict()
-
-        ca_identifier = self.get_identifier_from_ca_label(ca.label)
-        event_types = build_earth_ranger_event_types(
+        ca_identifier = self.get_identifier_from_ca_label(ca_label)
+        event_types = build_earthranger_event_types(
             dm=dm_dict, ca_uuid=smart_ca_uuid, ca_identifier=ca_identifier, cdm=cdm_dict
         )
 
         existing_event_categories = self.das_client.get_event_categories()
-        event_category_value = self.get_event_category_value_from_ca_label(ca.label)
+        event_category_value = self.calculate_event_category_value(ca_label=ca_identifier, cm_label=getattr(cm, '_name', None))
+
+        # Magic value is 46: Event Category Display should be under 46 characters because EarthRanger
+        # will use this value to create a PermissionSet name, which has a max length of 80 characters.
+        event_category_display = f"{ca_identifier} {cm._name}" if cm else ca_identifier
         event_category = next(
             (
                 x
@@ -107,39 +160,49 @@ class ER_SMART_Synchronizer:
             ),
             None,
         )
+
         if not event_category:
             logger.info(
                 "Event Category not found in destination ER, creating now ...",
-                extra=dict(value=event_category_value, display=ca.label),
+                extra=dict(value=event_category_value, display=event_category_display),
             )
-            event_category = dict(value=event_category_value, display=ca.label)
+
+            event_category = dict(value=event_category_value, display=event_category_display)
             self.das_client.post_event_category(event_category)
-        self.create_or_update_er_event_types(event_category, event_types)
+        self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
             f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}"
         )
 
     @staticmethod
-    def get_event_category_value_from_ca_label(ca_label: str):
-        value = ca_label.replace("[", "")
-        value = value.replace("]", "")
-        value = value.replace(" ", "_")
-        value = value.lower()
-        return value
+    def calculate_event_category_value(ca_label: str=None, cm_label: str=None):
+        translation = {
+            ord("["): '', ord("]"): '', ord(" "): "_", ord("-"): "_", ord("/"): "_", ord("("): '', ord(")"): '',
+            ord("'"): '', ord('"'): '', ord("."): '', ord(","): '', ord(":"): '', ord(";"): '', ord("&"): '',
+            ord("$"): '', ord("#"): '', ord("@"): '', ord("!"): '', ord("?"): '', ord("%"): '', ord("*"): '',
+        }
+
+        return ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
 
     @staticmethod
-    def get_identifier_from_ca_label(ca_label: str):
-        try:
-            start = ca_label.index("[") + 1
-            end = ca_label.index("]")
-            return ca_label[start:end]
-        except ValueError:
-            logger.warning(f"Unable to get identifier from ca_label {ca_label}")
-            return ""
+    def get_identifier_from_ca_label(ca_label: str = ""):
+        """
+        Expect a string like "Some Name [SONM]"
+        Return what's in the brackets (eg. SONM).
+        """
+        match = re.findall("\[(.*?)\]", ca_label)
 
-    def create_or_update_er_event_types(self, event_category: str, event_types: dict):
-        # TODO: would be nice to be able to specify category here.
-        #  Currently event_type keys must be globally unique not just within category though
+        if match:
+            return match[-1]
+
+        logger.warning(f"Unable to get identifier from ca_label {ca_label}")
+        return ""
+
+    def create_or_update_er_event_types(self, *args, event_category: dict = None, event_types: dict = None):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        # Note: In EarthRanger, EventType.value must be globally unique (not just within category though)
         existing_event_types = self.das_client.get_event_types(
             include_inactive=True, include_schema=True
         )
@@ -147,34 +210,34 @@ class ER_SMART_Synchronizer:
             event_type: EREventType
             for event_type in event_types:
                 event_type.category = event_category.get("value")
-                event_type_match = next(
+                existing_er_event_type = next(
                     (
                         x
                         for x in existing_event_types
-                        if (x.get("value") == event_type.value)
+                        if (x.get("value") == event_type.value and x.get('category').get('value') == event_type.category)
                     ),
                     None,
                 )
-                if event_type_match:
+                if existing_er_event_type:
                     if (
-                        event_type.is_active != event_type_match.get("is_active")
-                        or event_type.display != event_type_match.get("display")
-                        or (
-                            event_type.is_active
-                            and event_type.event_schema
-                            and not er_event_type_schemas_equal(
+                            event_type.is_active != existing_er_event_type.get("is_active")
+                            or event_type.display != existing_er_event_type.get("display")
+                            or (
+                                    event_type.is_active
+                                    and event_type.event_schema
+                                    and not er_event_type_schemas_equal(
                                 json.loads(event_type.event_schema).get("schema"),
-                                json.loads(event_type_match.get("schema")).get(
+                                json.loads(existing_er_event_type.get("schema")).get(
                                     "schema"
                                 ),
                             )
-                        )
+                            )
                     ):
                         logger.info(
                             f"Updating ER event type",
                             extra=dict(value=event_type.value),
                         )
-                        event_type.id = event_type_match.get("id")
+                        event_type.id = existing_er_event_type.get("id")
                         try:
                             self.das_client.patch_event_type(
                                 event_type.dict(by_alias=True, exclude_none=True)
@@ -206,15 +269,16 @@ class ER_SMART_Synchronizer:
                 extra=dict(event_type=event_type, exception=e),
             )
 
-    def get_er_events(self, *, config: InboundIntegrationConfiguration):
-        i_state = get_earth_ranger_last_poll(integration_id=config.id)
+    def get_er_events(self, *args, config: InboundIntegrationConfiguration):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        i_state = get_earthranger_last_poll(integration_id=config.id)
 
         event_last_poll_at = i_state.event_last_poll_at or datetime.now(
             tz=timezone.utc
         ) - timedelta(days=7)
         current_time = datetime.now(tz=timezone.utc)
-
-        FILTER_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
         events = parse_obj_as(
             List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at)
@@ -232,8 +296,10 @@ class ER_SMART_Synchronizer:
                         self.update_event_with_smart_data(event=event)
                     except:
                         logger.error(
-                            "Error patching event_type with smart_observation_uuid, event not processed",
-                            extra=dict(event_id=event.id, event_title=event.title),
+                            "Error patching event %s (%s) with smart_observation_uuid, event not processed",
+                            event.serial_number, event.id,
+                            extra=dict(event_id=event.id, event_title=event.title,
+                                       event_serial_number=event.serial_number),
                         )
                 for file in event.files:
                     try:
@@ -248,8 +314,8 @@ class ER_SMART_Synchronizer:
                             ),
                         )
                 logger.info(
-                    f"Publishing observation for event",
-                    extra=dict(event_id=event.id, event_title=event.title),
+                    f"Publishing observation for event {event.serial_number}",
+                    extra=dict(event_id=event.id, event_title=event.title, event_serial_number=event.serial_number)
                 )
                 self.publisher.publish(
                     TopicEnum.observations_unprocessed.value, event.dict()
@@ -259,7 +325,7 @@ class ER_SMART_Synchronizer:
                     f"Skipping event {event.serial_number} because it is associated to a patrol"
                 )
         i_state.event_last_poll_at = current_time
-        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        set_earthranger_last_poll(integration_id=config.id, state=i_state)
 
     def update_event_with_smart_data(self, event):
         if not event.event_details.get("smart_observation_uuid"):
@@ -283,7 +349,11 @@ class ER_SMART_Synchronizer:
             else:
                 raise Exception("Error processing file")
 
-    def sync_patrol_datamodel(self, *, smart_ca_uuid, ca):
+    def sync_patrol_datamodel(self):
+
+        smart_ca_uuid=self.smart_config.additional.get("ca_uuids")[0]
+        ca = self.smart_client.get_conservation_area(ca_uuid=smart_ca_uuid)
+
         patrol_data_model = self.smart_client.download_patrolmodel(
             ca_uuid=smart_ca_uuid
         )
@@ -322,13 +392,15 @@ class ER_SMART_Synchronizer:
                     )
 
     def process_er_patrols(
-        self,
-        *,
-        patrols: List[ERPatrol],
-        integration_id: str,
-        patrol_last_poll_at: datetime,
-        upper: datetime,
+            self,
+            *args,
+            patrols: List[ERPatrol],
+            integration_id: str,
+            patrol_last_poll_at: datetime,
+            upper: datetime,
     ):
+
+        assert not args, 'This method does not accept positional arguments'
         patrol: ERPatrol
         for patrol in patrols:
             logger.info(
@@ -455,8 +527,11 @@ class ER_SMART_Synchronizer:
                     TopicEnum.observations_unprocessed.value, patrol.dict()
                 )
 
-    def get_er_patrols(self, *, config: InboundIntegrationConfiguration):
-        i_state = get_earth_ranger_last_poll(integration_id=config.id)
+    def get_er_patrols(self, *args, config: InboundIntegrationConfiguration):
+
+        assert not args, 'This method does not accept positional arguments'
+
+        i_state = get_earthranger_last_poll(integration_id=config.id)
 
         lower = i_state.patrol_last_poll_at or datetime.now(
             tz=timezone.utc
@@ -492,4 +567,4 @@ class ER_SMART_Synchronizer:
         )
 
         i_state.patrol_last_poll_at = upper
-        set_earth_ranger_last_poll(integration_id=config.id, state=i_state)
+        set_earthranger_last_poll(integration_id=config.id, state=i_state)

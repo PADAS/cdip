@@ -958,6 +958,11 @@ def setup_data(db, django_user_model):
         }
     )
 
+    oit_smart_connect = OutboundIntegrationType.objects.create(
+        name="Smart Connect",
+        slug='smart_connect',
+    )
+
     bit1 = BridgeIntegrationType.objects.create(
         name="Bridge Type 1",
         slug="bridge-type-one",
@@ -1103,6 +1108,7 @@ def setup_data(db, django_user_model):
         "oit2": oit2,
         "oit3": oit3,
         "oit4": oit4,
+        "oit_smart_connect": oit_smart_connect,  # "smart_connect" is a magic value
         "bit1": bit1,
         "bit2": bit2,
         "bit3": bit3,
