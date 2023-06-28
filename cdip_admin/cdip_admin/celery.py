@@ -51,12 +51,13 @@ app.conf.beat_schedule = {
         "schedule": timedelta(seconds=60),
     },
     # Run sync integrations
-    "run-sync-integrations": {
-        "task": "cdip_admin.tasks.run_sync_integrations",
-        "schedule": timedelta(
-            minutes=settings.CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES
-        ),
-    },
+    # Deprecated: The schedule is managed through the django admin using django_celery_beat (database scheduler)
+    # "run-sync-integrations": {
+    #     "task": "sync_integrations.tasks.run_sync_integrations",
+    #     "schedule": timedelta(
+    #         minutes=settings.CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES
+    #     ),
+    # },
 }
 
 # Patch Celery's configuration with some attributes that Celery_once will
