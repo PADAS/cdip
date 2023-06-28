@@ -54,6 +54,8 @@ class InboundIntegrationType(TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
+    EARTHRANGER = "earth_ranger"
+
 
 # This is where the general information for a configuration will be stored
 # This could be an inbound or outbound type
@@ -110,6 +112,8 @@ class OutboundIntegrationType(TimestampedModel):
 
     def __str__(self):
         return f"{self.name}"
+
+    SMARTCONNECT = "smart_connect"
 
 
 class BridgeIntegrationTypeManager(models.Manager):
@@ -443,10 +447,10 @@ class DeviceGroup(TimestampedModel):
 
 @receiver(post_save, sender=OutboundIntegrationConfiguration)
 def integration_configuration_save_tasks(sender, instance, **kwargs):
-    if type(instance.type) is OutboundIntegrationType:
-        transaction.on_commit(
-            lambda: celery.app.send_task(
-                "cdip_admin.tasks.run_smart_integration_save_tasks",
-                args=(str(instance.id),),
-            )
+
+    transaction.on_commit(
+        lambda: celery.app.send_task(
+            "sync_integrations.tasks.handle_outboundintegration_save",
+            args=(str(instance.id),),
         )
+    )
