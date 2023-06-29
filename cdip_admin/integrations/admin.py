@@ -19,6 +19,7 @@ from .models import (
     Route,
     RouteConfiguration,
     SourceFilter, Source, SourceState, SourceConfiguration,
+    GundiTrace,
 )
 
 from .forms import (
@@ -313,4 +314,18 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
         "name",
         "updated_at",
         "data",
+    )
+
+
+@admin.register(GundiTrace)
+class GundiTraceAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "object_id",
+        "related_to",
+        "object_type",
+        "data_provider",
+        "destination",
+        "external_id",
+        "delivered_at",
+        "created_by",
     )
