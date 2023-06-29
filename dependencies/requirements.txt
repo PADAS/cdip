@@ -34,7 +34,7 @@ cached-property==1.5.1
     # via -r requirements.in
 cachetools==5.3.1
     # via google-auth
-cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.4.3-alpha/cdip_connector-1.4.3-py3-none-any.whl
+cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.4.4-alpha/cdip_connector-1.4.4-py3-none-any.whl
     # via -r requirements.in
 celery==5.2.3
     # via
@@ -297,8 +297,8 @@ opentelemetry-api==1.14.0
     #   opentelemetry-exporter-gcp-trace
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-instrumentation
-    #   opentelemetry-instrumentation-aiohttp-client
     #   opentelemetry-instrumentation-confluent-kafka
+    #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-propagator-gcp
     #   opentelemetry-sdk
@@ -310,11 +310,11 @@ opentelemetry-exporter-otlp-proto-http==1.15.0
     # via cdip-connector
 opentelemetry-instrumentation==0.35b0
     # via
-    #   opentelemetry-instrumentation-aiohttp-client
+    #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-requests
-opentelemetry-instrumentation-aiohttp-client==0.35b0
-    # via cdip-connector
 opentelemetry-instrumentation-confluent-kafka==0.35b0
+    # via cdip-connector
+opentelemetry-instrumentation-httpx==0.35b0
     # via cdip-connector
 opentelemetry-instrumentation-requests==0.35b0
     # via
@@ -334,13 +334,11 @@ opentelemetry-sdk==1.14.0
     #   opentelemetry-exporter-otlp-proto-http
 opentelemetry-semantic-conventions==0.35b0
     # via
-    #   opentelemetry-instrumentation-aiohttp-client
+    #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-sdk
 opentelemetry-util-http==0.35b0
-    # via
-    #   opentelemetry-instrumentation-aiohttp-client
-    #   opentelemetry-instrumentation-requests
+    # via opentelemetry-instrumentation-requests
 packaging==20.9
     # via
     #   -r requirements.in
@@ -543,7 +541,6 @@ wrapt==1.15.0
     # via
     #   deprecated
     #   opentelemetry-instrumentation
-    #   opentelemetry-instrumentation-aiohttp-client
     #   opentelemetry-instrumentation-confluent-kafka
 zipp==3.1.0
     # via
