@@ -3,6 +3,7 @@ import logging
 import pathlib
 import uuid
 import re
+import pydantic
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional, Dict
 from urllib.parse import urlparse
