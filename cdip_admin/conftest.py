@@ -758,6 +758,50 @@ def route_2(
     return route
 
 
+@pytest.fixture
+def integration_type_trap_tagger():
+    # Create an integration type for Trap Tagger
+    integration_type = IntegrationType.objects.create(
+        name="TrapTagger(Push)",
+        value="trap_tagger",
+        description="Standard type Trap Tagger Integration"
+    )
+    return integration_type
+
+
+@pytest.fixture
+def provider_trap_tagger(
+        get_random_id, other_organization, integration_type_trap_tagger,
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_trap_tagger,
+        name=f"Trap Tagger Provider {get_random_id()}",
+        owner=other_organization,
+        base_url=f"https://api.test.traptagger.com"
+    )
+    ensure_default_route(integration=provider)
+    return provider
+
+
+@pytest.fixture
+def keyauth_headers_trap_tagger(provider_trap_tagger):
+    return {
+        "HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_trap_tagger.id)}"
+    }
+
+
+@pytest.fixture
+def mock_get_publisher(mocker):
+    return mocker.MagicMock()
+
+
+@pytest.fixture
+def mock_deduplication(mocker):
+    mock_func = mocker.MagicMock()
+    mock_func.return_value = False
+    return mock_func
+
+
 ########################################################################################################################
 # GUNDI 1.0
 ########################################################################################################################

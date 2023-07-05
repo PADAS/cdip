@@ -583,19 +583,17 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
 
     def create(self, validated_data):
         events = [self.child.create(attrs) for attrs in validated_data]
-        #with transaction.atomic():
         try:
             new_events = GundiTrace.objects.bulk_create(events)
         except IntegrityError as e:
             raise drf_exceptions.ValidationError(e)
-        # Publish messages to a topic to be processed by routing services
-        event_ids = [str(event.object_id) for event in new_events]
-        transaction.on_commit(
-            lambda: send_events_to_routing(
+        else:
+            # Publish messages to a topic to be processed by routing services
+            event_ids = [str(event.object_id) for event in new_events]
+            send_events_to_routing(
                 events=validated_data,
                 gundi_ids=event_ids
             )
-        )
         return new_events
 
     def update(self, instance, validated_data):
