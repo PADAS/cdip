@@ -13,4 +13,4 @@ database:
   connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
 admin_portal:
   env:
-    BROKER_URL: "redis://10.78.161.148:6378"
+    BROKER_URL: "redis://10.208.106.172:6379"
