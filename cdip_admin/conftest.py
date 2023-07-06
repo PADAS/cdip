@@ -27,10 +27,10 @@ from integrations.models import (
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration, ensure_default_route, RouteConfiguration
+    SourceConfiguration, ensure_default_route, RouteConfiguration, GundiTrace
 )
 from organizations.models import Organization
-
+from pathlib import Path
 
 
 @pytest.fixture
@@ -800,6 +800,39 @@ def mock_deduplication(mocker):
     mock_func = mocker.MagicMock()
     mock_func.return_value = False
     return mock_func
+
+
+@pytest.fixture
+def leopard_image_file():
+    file_path = Path(__file__).resolve().parent.joinpath(
+        "api/v2/tests/images/2023-07-05-1358_leopard.jpg"
+    )
+    return open(file_path, "rb")
+
+
+@pytest.fixture
+def wilddog_image_file():
+    file_path = Path(__file__).resolve().parent.joinpath(
+        "api/v2/tests/images/2023-07-05-1358_wilddog.jpg"
+    )
+    return open(file_path, "rb")
+
+
+@pytest.fixture
+def trap_tagger_event_trace(provider_trap_tagger):
+    return GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        object_type="ev",
+        # Other fields are filled in later by the routing services
+    )
+
+
+@pytest.fixture
+def mock_cloud_storage(mocker):
+    mock_cloud_storage = mocker.MagicMock()
+    mock_cloud_storage.save.return_value = "file.jpg"
+    return mock_cloud_storage
 
 
 ########################################################################################################################

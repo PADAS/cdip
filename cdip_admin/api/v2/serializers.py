@@ -673,27 +673,22 @@ class EventAttachmentListSerializer(serializers.ListSerializer):
     """
 
     def create(self, validated_data):
-        request = self.context["request"]
         attachments = [
             self.child.create(data) for data in validated_data
         ]
 
-        # Write to the database
-        try:
+        try:  # Write to the database
             new_attachments = GundiTrace.objects.bulk_create(attachments)
         except IntegrityError as e:
             raise drf_exceptions.ValidationError(e)
         else:
             attachment_ids = [str(att.object_id) for att in new_attachments]
-
-        # Publish messages to a topic to be processed by routing services
-        transaction.on_commit(
-            lambda: send_attachments_to_routing(
+            # Publish messages to a topic to be processed by routing services
+            send_attachments_to_routing(
                 attachments_data=validated_data,
                 gundi_ids=attachment_ids
             )
-        )
-        return new_attachments
+            return new_attachments
 
     def update(self, instance, validated_data):
         pass
