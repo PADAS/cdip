@@ -9,6 +9,7 @@ from accounts.utils import remove_members_from_organization, get_user_organizati
 from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, mixins
 from rest_framework import filters as drf_filters
+from rest_framework import exceptions as drf_exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from gundi_core.schemas.v2 import StreamPrefixEnum
@@ -335,6 +336,8 @@ class AttachmentViewSet(
         )
 
     def create(self, request, *args, **kwargs):
+        if len(request.FILES) == 0:
+            raise drf_exceptions.ValidationError("At least one file must be provided.")
         # We accept a single attachment or a list
         many = len(request.FILES) > 1
         for key in request.FILES.keys():
