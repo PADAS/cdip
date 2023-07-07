@@ -14,3 +14,6 @@ database:
 admin_portal:
   env:
     BROKER_URL: "redis://10.208.106.172:6379"
+kongplugin:
+  cors:
+    - https://gundiservice.org
