@@ -1,17 +1,18 @@
-from distutils.util import strtobool
 import django_filters
 from django.db.models import Subquery
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
-    get_user_routes_qs
+    get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, mixins
 from rest_framework import filters as drf_filters
+from rest_framework import exceptions as drf_exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from . import serializers as v2_serializers
 from . import permissions
 from . import filters as custom_filters
@@ -140,7 +141,10 @@ class IntegrationsView(viewsets.ModelViewSet):
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
-        # Returns a list with the integrations that the user is allowed to see
+        # Superusers can see all
+        if self.request.user.is_superuser:
+            return Integration.objects.all()
+        # Return the list of connections that the user is allowed to see
         return get_user_integrations_qs(user=self.request.user)
 
     @action(detail=False, methods=['get'])
@@ -215,6 +219,10 @@ class ConnectionsView(
         """
         Return a list of providers used to get the connections
         """
+        # Superusers can see all
+        if self.request.user.is_superuser:
+            return Integration.objects.all()
+        # Return the list of connections that the user is allowed to see
         user_organizations = get_user_organizations_qs(user=self.request.user)
         providers = Route.objects.filter(
             owner__in=Subquery(user_organizations.values('id'))
@@ -234,7 +242,7 @@ class SourcesView(
     An endpoint for retrieving sources
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    lookup_field = 'external_id'
+    #lookup_field = 'external_id'
     filter_backends = [
         drf_filters.OrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
@@ -269,11 +277,11 @@ class RoutesView(viewsets.ModelViewSet):
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
         drf_filters.OrderingFilter,
-        # ToDo: Implement search & filter
-        # django_filters.rest_framework.DjangoFilterBackend,
+        django_filters.rest_framework.DjangoFilterBackend,
+        # ToDo: Implement search
         # custom_filters.CustomizableSearchFilter
     ]
-    # filterset_class = RouteFilter
+    filterset_class = RouteFilter
     # search_fields = ["name", 'owner__name', ]
     ordering_fields = ['id', 'name', 'owner__name']
     ordering = ['id']
@@ -286,3 +294,66 @@ class RoutesView(viewsets.ModelViewSet):
     def get_queryset(self):
         # Returns a list with the routes that the user is allowed to see
         return get_user_routes_qs(user=self.request.user)
+
+
+class EventsView(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for sending Events (a.k.a Reports).
+    """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
+    serializer_class = v2_serializers.EventCreateSerializer
+    queryset = GundiTrace.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        # We accept a single event or a list
+        many = isinstance(request.data, list)
+        serializer = self.get_serializer(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, headers=headers)
+
+
+class AttachmentViewSet(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for managing event attachments
+    """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
+    serializer_class = v2_serializers.EventAttachmentSerializer
+
+    def get_queryset(self):
+        return GundiTrace.objects.filter(
+            object_type=StreamPrefixEnum.attachment.value,
+            related_to=self.kwargs['event_pk']
+        )
+
+    def create(self, request, *args, **kwargs):
+        if len(request.FILES) == 0:
+            raise drf_exceptions.ValidationError("At least one file must be provided.")
+        # We accept a single attachment or a list
+        many = len(request.FILES) > 1
+        for key in request.FILES.keys():
+            request.data.pop(key)
+        data = [
+            {
+                **request.data.dict(),
+                "file": v
+            }
+            for k, v in request.FILES.items()
+        ]
+        context = self.get_serializer_context()
+        if not many:
+            data = data[0]
+        serializer = self.get_serializer(data=data, many=many, context=context)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, headers=headers)

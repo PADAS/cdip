@@ -1,7 +1,15 @@
+import uuid
+from functools import cached_property
+
 import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
 from django.db.models import Subquery
+from django.contrib.auth import get_user_model
+from integrations.utils import get_api_key
+
+
+User = get_user_model()
 
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
@@ -127,6 +135,10 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     def destinations(self):
         destinations = self.routing_rules.values("destinations").distinct()
         return Integration.objects.filter(id__in=Subquery(destinations))
+
+    @cached_property
+    def api_key(self):
+        return get_api_key(integration=self)
 
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
@@ -341,3 +353,47 @@ class SourceState(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.data}"
+
+
+class GundiTrace(UUIDAbstractModel, TimestampedModel):
+    object_id = models.UUIDField(db_index=True, default=uuid.uuid4, editable=False)
+    object_type = models.CharField(max_length=20, db_index=True, blank=True)
+    related_to = models.ForeignKey(
+        "integrations.GundiTrace",
+        on_delete=models.CASCADE,
+        related_name="related_objects",
+        null=True,
+        blank=True
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="objects_by_user",
+        null=True,
+        blank=True
+    )
+    # Gundi 2.x uses the new Integration model
+    data_provider = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="objects_by_provider",
+    )
+    destination = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="objects_by_destination",
+        null=True,
+        blank=True
+    )
+    delivered_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    external_id = models.CharField(max_length=250, db_index=True, blank=True)  # Object ID in the destination system
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["updated_at"]),
+        ]
+        ordering = ("-created_at", )
+
+    def __str__(self):
+        return f"{self.object_id}"
