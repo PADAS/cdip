@@ -5,13 +5,15 @@ from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs
+    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
+    GundiTrace
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-#from django.db import transaction
 from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction, IntegrityError
+from gundi_core.schemas.v2 import StreamPrefixEnum
+from .utils import send_events_to_routing, send_attachments_to_routing
 
 User = get_user_model()
 
@@ -246,6 +248,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "additional",
             "default_route",
             "status"
         )
@@ -308,12 +311,15 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         configurations = validated_data.pop("configurations")
         create_default_route = validated_data.pop("create_default_route")
+        # Create the integration
         integration = Integration.objects.create(**validated_data)
+        # Create configurations if provided
         for configuration in configurations:
             IntegrationConfiguration.objects.create(
                 integration=integration,
                 **configuration
             )
+        # Create a default route as needed
         if create_default_route:
             ensure_default_route(integration=integration)
         return integration
@@ -390,6 +396,7 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
 
 
 class SourceRetrieveSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     status = serializers.SerializerMethodField()
     provider = serializers.SerializerMethodField()
     destinations = serializers.SerializerMethodField()
@@ -400,7 +407,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = (
-            "external_id", "status", "provider", "destinations", "routing_rules",
+            "id", "external_id", "status", "provider", "destinations", "routing_rules",
             "update_frequency", "last_update",
         )
 
@@ -534,3 +541,198 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 
+
+class GundiTraceSerializer(serializers.Serializer):
+    object_id = serializers.UUIDField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    related_to = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=GundiTrace.objects.all()
+    )
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=Integration.objects.all()
+    )
+    source = serializers.CharField(
+        write_only=True,
+        required=True,
+    )
+
+    def validate(self, data):
+        # Check the integration id
+        request = self.context["request"]
+        if integration := data.get("integration"):
+            if not request.integration_id or request.integration_id != str(integration.id):
+                raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+        elif request.integration_id:
+            try:
+                data["integration"] = Integration.objects.get(id=request.integration_id)
+            except Integration.DoesNotExist:
+                raise drf_exceptions.ValidationError(detail=f"Cannot find the integration associated with this API Key.")
+        else:
+            raise drf_exceptions.ValidationError(detail=f"This API Key isn't associated with an integration.")
+        return data
+
+
+class EventBulkCreateSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of events
+    """
+
+    def create(self, validated_data):
+        events = [self.child.create(attrs) for attrs in validated_data]
+        try:
+            new_events = GundiTrace.objects.bulk_create(events)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        else:
+            # Publish messages to a topic to be processed by routing services
+            event_ids = [str(event.object_id) for event in new_events]
+            send_events_to_routing(
+                events=validated_data,
+                gundi_ids=event_ids
+            )
+        return new_events
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class EventCreateSerializer(GundiTraceSerializer):
+    object_type = serializers.HiddenField(default=StreamPrefixEnum.event.value)
+    title = serializers.CharField(write_only=True, required=False)
+    recorded_at = serializers.DateTimeField(write_only=True)
+    location = serializers.JSONField(write_only=True, required=False)
+    geometry = serializers.JSONField(write_only=True, required=False)
+    event_type = serializers.CharField(write_only=True, required=False)
+    event_details = serializers.JSONField(write_only=True, required=False)
+    annotations = serializers.JSONField(write_only=True, required=False)
+
+    class Meta:
+        list_serializer_class = EventBulkCreateSerializer
+
+    def validate_integration(self, value):
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        # ToDo: Check that the user is allowed to see that integration
+        # user = self.context["request"].user
+        return value
+
+    def validate_location(self, value):
+        # I must contain lat and lon and other extra fields are accepted
+        if "lat" not in value or "lon" not in value:
+            raise drf_exceptions.ValidationError(detail=f"'location' requires 'lat' and 'lon'.")
+        return value
+
+    def validate_geometry(self, value):
+        # ToDo: Validate that it's a valid geojson
+        return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        # Store the user when possible. API Key authenticated requests are not related to a user
+        created_by = user if user and not user.is_anonymous else None
+        # Don't save to the DB if it's a bulk create
+        instance = GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data["integration"],
+            object_type=validated_data["object_type"],
+            created_by=created_by
+            # Other fields are filled in later by the routing services
+        )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+            send_events_to_routing(
+                events=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
+        return instance
+
+    def validate(self, data):
+        data = super().validate(data)
+        # Validate that either location or geometry is provided
+        if not ("location" in data or "geometry" in data):
+            raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=data["integration"],
+            external_id=data["source"]
+        )
+        data["source"] = source
+        return data
+
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement once we support updating events
+
+
+class EventAttachmentListSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of events
+    """
+
+    def create(self, validated_data):
+        attachments = [
+            self.child.create(data) for data in validated_data
+        ]
+
+        try:  # Write to the database
+            new_attachments = GundiTrace.objects.bulk_create(attachments)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        else:
+            attachment_ids = [str(att.object_id) for att in new_attachments]
+            # Publish messages to a topic to be processed by routing services
+            send_attachments_to_routing(
+                attachments_data=validated_data,
+                gundi_ids=attachment_ids
+            )
+            return new_attachments
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class EventAttachmentSerializer(GundiTraceSerializer):
+    source = serializers.CharField(
+        write_only=True,
+        required=False,
+    )
+    file = serializers.FileField(write_only=True)
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=Integration.objects.all()
+    )
+
+    class Meta:
+        list_serializer_class = EventAttachmentListSerializer
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        created_by = user if user and not user.is_anonymous else None
+        # Don't save to teh DB if it's a bulk create
+        instance = GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data.get("integration"),
+            object_type=StreamPrefixEnum.attachment.value,
+            created_by=created_by
+            # Other fields are filled in later by the routing services
+        )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+            send_attachments_to_routing(
+                attachments_data=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
+        return instance
+
+    def validate(self, data):
+        data = super().validate(data)
+        if not data.get("related_to"):
+            # Relate the attachment to the current event
+            data["related_to"] = self.context["view"].kwargs["event_pk"]
+        # ToDo: Get source from id from the related event
+        return data
