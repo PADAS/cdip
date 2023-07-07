@@ -165,7 +165,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     data_provider_id=str(integration.id),
                     source_id=str(source.id if source else None),  # ToDo: Can be null?
                     external_source_id=str(source.external_id if source else None),
-                    related_to=str(attachment.get("related_to")),
+                    related_to=attachment.get("related_to"),
                     file_path=file_path,
                     observation_type=observation_type
                 )
