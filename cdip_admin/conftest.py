@@ -27,10 +27,10 @@ from integrations.models import (
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration, ensure_default_route, RouteConfiguration
+    SourceConfiguration, ensure_default_route, RouteConfiguration, GundiTrace
 )
 from organizations.models import Organization
-
+from pathlib import Path
 
 
 @pytest.fixture
@@ -756,6 +756,83 @@ def route_2(
     route.configuration = er_route_configuration_elephants
     route.save()
     return route
+
+
+@pytest.fixture
+def integration_type_trap_tagger():
+    # Create an integration type for Trap Tagger
+    integration_type = IntegrationType.objects.create(
+        name="TrapTagger(Push)",
+        value="trap_tagger",
+        description="Standard type Trap Tagger Integration"
+    )
+    return integration_type
+
+
+@pytest.fixture
+def provider_trap_tagger(
+        get_random_id, other_organization, integration_type_trap_tagger,
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_trap_tagger,
+        name=f"Trap Tagger Provider {get_random_id()}",
+        owner=other_organization,
+        base_url=f"https://api.test.traptagger.com"
+    )
+    ensure_default_route(integration=provider)
+    return provider
+
+
+@pytest.fixture
+def keyauth_headers_trap_tagger(provider_trap_tagger):
+    return {
+        "HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_trap_tagger.id)}"
+    }
+
+
+@pytest.fixture
+def mock_get_publisher(mocker):
+    return mocker.MagicMock()
+
+
+@pytest.fixture
+def mock_deduplication(mocker):
+    mock_func = mocker.MagicMock()
+    mock_func.return_value = False
+    return mock_func
+
+
+@pytest.fixture
+def leopard_image_file():
+    file_path = Path(__file__).resolve().parent.joinpath(
+        "api/v2/tests/images/2023-07-05-1358_leopard.jpg"
+    )
+    return open(file_path, "rb")
+
+
+@pytest.fixture
+def wilddog_image_file():
+    file_path = Path(__file__).resolve().parent.joinpath(
+        "api/v2/tests/images/2023-07-05-1358_wilddog.jpg"
+    )
+    return open(file_path, "rb")
+
+
+@pytest.fixture
+def trap_tagger_event_trace(provider_trap_tagger):
+    return GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        object_type="ev",
+        # Other fields are filled in later by the routing services
+    )
+
+
+@pytest.fixture
+def mock_cloud_storage(mocker):
+    mock_cloud_storage = mocker.MagicMock()
+    mock_cloud_storage.save.return_value = "file.jpg"
+    return mock_cloud_storage
 
 
 ########################################################################################################################
