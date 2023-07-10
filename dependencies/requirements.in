@@ -67,8 +67,9 @@ jsonschema==4.17.3
 django-celery-beat==2.5.0
 django-storages==1.13.2
 walrus==0.8.1
+gundi-core==1.1.1
 gundi-client==1.0.1
-gundi-client-v2==2.0.0
+gundi-client-v2==2.0.1
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
 https://github.com/PADAS/smartconnect-client/releases/download/v1.4.0/smartconnect_client-1.4.0-py3-none-any.whl
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.4.4-alpha/cdip_connector-1.4.4-py3-none-any.whl
