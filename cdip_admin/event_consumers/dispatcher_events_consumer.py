@@ -39,8 +39,14 @@ def handle_observation_delivered_event(event_dict: dict):
             )
 
 
+def handle_observation_delivery_failed_event(event_dict: dict):
+    # ToDo: Revisit once we implement the monitoring & activity log
+    pass
+
+
 event_handlers = {
-    "ObservationDelivered": handle_observation_delivered_event
+    "ObservationDelivered": handle_observation_delivered_event,
+    "ObservationDeliveryFailed": handle_observation_delivery_failed_event
 }
 
 
@@ -50,7 +56,7 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
     event_type = event_dict.get("event_type")
     event_handler = event_handlers.get(event_type)
     if not event_handler:
-        print(f"Unknown Event Type {event_type}. Message discarded.")
+        print(f"Unknown Event Type {event_type}. Message ignored.")
         return
     event_handler(event_dict=event_dict)
     message.ack()
