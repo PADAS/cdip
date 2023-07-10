@@ -1,6 +1,5 @@
 import uuid
 from functools import cached_property
-
 import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models
@@ -385,7 +384,7 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
         null=True,
         blank=True
     )
-    delivered_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
     external_id = models.CharField(max_length=250, db_index=True, blank=True)  # Object ID in the destination system
 
     class Meta:
