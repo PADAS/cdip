@@ -16,7 +16,8 @@ admin_portal:
     BROKER_URL: "redis://10.243.180.36:6379"
 kongplugin:
   cors:
-    - https://gundiservice.org
+    - https://stage.gundiservice.org
+    - https://admin.stage.gundiservice.org
 keycloak:
   KEYCLOAK_SERVER: "https://cdip-auth.pamdas.org"
   KEYCLOAK_REALM: "cdip-dev"
