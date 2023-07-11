@@ -16,27 +16,34 @@ def handle_observation_delivered_event(event_dict: dict):
     traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
     trace_count = traces.count()
     if trace_count == 0:  # This shouldn't happen
-        # Create the trace in the database?
-        pass
-    elif trace_count > 0:
-        # Update with the event data
+        print(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
+        return
+    if trace_count > 0:
+        # Update the db with the event data
         trace = traces.first()
+        try:
+            destination_integration = Integration.objects.get(id=str(event_data.destination_id))
+        except Integration.DoesNotExist:
+            print(f"Unknown Destination with id {event_data.destination_id}. Event Ignored.")
+            return
         if not trace.destination:  # Single destination
-            trace.destination = Integration.objects.get(id=event_data.destination_id)
+            trace.destination = destination_integration
             trace.delivered_at = event_data.delivered_at
             trace.external_id = event_data.external_id
             trace.save()
-        else:  # Multiple destinations
+        elif str(event_data.destination_id) != str(trace.destination.id):  # Multiple destinations
             GundiTrace.objects.create(
                 object_id=trace.object_id,
                 object_type=trace.object_type,
                 related_to=event_data.related_to,
                 created_by=trace.created_by,
                 data_provider=trace.data_provider,
-                destination=event_data.destination_id,
+                destination=destination_integration,
                 delivered_at=event_data.delivered_at,
                 external_id=event_data.external_id
             )
+        else:
+
 
 
 def handle_observation_delivery_failed_event(event_dict: dict):
@@ -54,9 +61,15 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
     print(f"Received Dispatcher Event {message}.")
     event_dict = json.loads(message.data)
     event_type = event_dict.get("event_type")
+    schema_version = event_dict.get("schema_version")
+    if schema_version != "v1":
+        print(f"Schema version '{schema_version}' is not supported. Message discarded.")
+        message.ack()
+        return
     event_handler = event_handlers.get(event_type)
     if not event_handler:
-        print(f"Unknown Event Type {event_type}. Message ignored.")
+        print(f"Unknown Event Type {event_type}. Message discarded.")
+        message.ack()
         return
     event_handler(event_dict=event_dict)
     message.ack()
