@@ -79,7 +79,7 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
     logger.info(f"Dispatcher Event Processed successfully.")
 
 
-if __name__ == '__main__':
+def main():
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscriber.subscription_path(
         settings.GCP_PROJECT_ID,
@@ -99,3 +99,7 @@ if __name__ == '__main__':
             logger.error(f"Internal Error {e}. Shutting down..\n")
             streaming_pull_future.cancel()  # Trigger the shutdown.
             streaming_pull_future.result()  # Block until the shutdown is complete.
+
+
+if __name__ == '__main__':
+    main()
