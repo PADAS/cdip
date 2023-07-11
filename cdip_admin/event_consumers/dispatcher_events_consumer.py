@@ -1,11 +1,16 @@
 import json
 import logging
 import django
+from event_consumers import logging_settings
+logging_settings.init()
 django.setup()  # To use the django ORM
 from google.cloud import pubsub_v1
 from django.conf import settings
 from gundi_core import events as system_events
 from integrations.models import GundiTrace, Integration
+
+
+logger = logging.getLogger(__name__)
 
 
 def handle_observation_delivered_event(event_dict: dict):
@@ -16,7 +21,7 @@ def handle_observation_delivered_event(event_dict: dict):
     traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
     trace_count = traces.count()
     if trace_count == 0:  # This shouldn't happen
-        print(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
+        logger.warning(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
         return
     if trace_count > 0:
         # Update the db with the event data
@@ -24,7 +29,7 @@ def handle_observation_delivered_event(event_dict: dict):
         try:
             destination_integration = Integration.objects.get(id=str(event_data.destination_id))
         except Integration.DoesNotExist:
-            print(f"Unknown Destination with id {event_data.destination_id}. Event Ignored.")
+            logger.warning(f"Unknown Destination with id {event_data.destination_id}. Event Ignored.")
             return
         if not trace.destination:  # Single destination
             trace.destination = destination_integration
@@ -42,8 +47,6 @@ def handle_observation_delivered_event(event_dict: dict):
                 delivered_at=event_data.delivered_at,
                 external_id=event_data.external_id
             )
-        else:
-
 
 
 def handle_observation_delivery_failed_event(event_dict: dict):
@@ -58,22 +61,22 @@ event_handlers = {
 
 
 def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
-    print(f"Received Dispatcher Event {message}.")
+    logger.info(f"Received Dispatcher Event {message}.")
     event_dict = json.loads(message.data)
     event_type = event_dict.get("event_type")
     schema_version = event_dict.get("schema_version")
     if schema_version != "v1":
-        print(f"Schema version '{schema_version}' is not supported. Message discarded.")
+        logger.warning(f"Schema version '{schema_version}' is not supported. Message discarded.")
         message.ack()
         return
     event_handler = event_handlers.get(event_type)
     if not event_handler:
-        print(f"Unknown Event Type {event_type}. Message discarded.")
+        logger.warning(f"Unknown Event Type {event_type}. Message discarded.")
         message.ack()
         return
     event_handler(event_dict=event_dict)
     message.ack()
-    print(f"Dispatcher Event Processed successfully.")
+    logger.info(f"Dispatcher Event Processed successfully.")
 
 
 if __name__ == '__main__':
@@ -86,12 +89,13 @@ if __name__ == '__main__':
         subscription_path,
         callback=process_event
     )
-    print(f"Dispatcher Events Consumer > Listening for messages on {subscription_path}..\n")
+    logger.info(f"Dispatcher Events Consumer > Listening for messages on {subscription_path}..\n")
 
     # Wrap subscriber in a 'with' block to automatically call close() when done.
     with subscriber:
         try:
             streaming_pull_future.result()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Internal Error {e}. Shutting down..\n")
             streaming_pull_future.cancel()  # Trigger the shutdown.
             streaming_pull_future.result()  # Block until the shutdown is complete.
