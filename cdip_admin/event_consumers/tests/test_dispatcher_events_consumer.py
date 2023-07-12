@@ -43,3 +43,15 @@ def test_process_observation_delivered_event_with_two_destinations(
         destination__id=event_data["destination_id"]
     )
     assert str(trace_two.external_id) == str(event_data["external_id"])
+
+
+def test_process_observation_delivery_failed_event(
+        trap_tagger_event_trace, trap_tagger_observation_delivery_failed_event
+):
+    # Test the case when an observation fails to get delivered and we receive the event notification
+    process_event(trap_tagger_observation_delivery_failed_event)
+    trap_tagger_event_trace.refresh_from_db()
+    # Destination related field must not be updated as the delivery has failed
+    assert not trap_tagger_event_trace.destination
+    assert not trap_tagger_event_trace.external_id
+    assert not trap_tagger_event_trace.delivered_at
