@@ -13,7 +13,9 @@ database:
   connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
 admin_portal:
   env:
+    TRACE_ENVIRONMENT: "prod"
     BROKER_URL: "redis://10.208.106.172:6379"
+    GCP_PROJECT_ID: cdip-prod1-78ca
 kongplugin:
   cors:
     - https://gundiservice.org
