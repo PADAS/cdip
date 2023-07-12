@@ -56,22 +56,28 @@ event_handlers = {
 
 
 def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
-    logger.info(f"Received Dispatcher Event {message}.")
-    event_dict = json.loads(message.data)
-    event_type = event_dict.get("event_type")
-    schema_version = event_dict.get("schema_version")
-    if schema_version != "v1":
-        logger.warning(f"Schema version '{schema_version}' is not supported. Message discarded.")
+    try:
+        logger.info(f"Received Dispatcher Event {message}.")
+        event_dict = json.loads(message.data)
+        logger.debug(f"Event Details", extra={"event": event_dict})
+        event_type = event_dict.get("event_type")
+        schema_version = event_dict.get("schema_version")
+        if schema_version != "v1":
+            logger.warning(f"Schema version '{schema_version}' is not supported. Message discarded.")
+            message.ack()
+            return
+        event_handler = event_handlers.get(event_type)
+        if not event_handler:
+            logger.warning(f"Unknown Event Type {event_type}. Message discarded.")
+            message.ack()
+            return
+        event_handler(event_dict=event_dict)
+    except Exception as e:
+        logger.error(f"Error Processing Dispatcher Event: {e}", extra={"event": json.loads(message.data)})
+    else:
+        logger.info(f"Dispatcher Event Processed successfully.")
+    finally:
         message.ack()
-        return
-    event_handler = event_handlers.get(event_type)
-    if not event_handler:
-        logger.warning(f"Unknown Event Type {event_type}. Message discarded.")
-        message.ack()
-        return
-    event_handler(event_dict=event_dict)
-    message.ack()
-    logger.info(f"Dispatcher Event Processed successfully.")
 
 
 def main():
