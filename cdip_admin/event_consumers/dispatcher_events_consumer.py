@@ -26,13 +26,8 @@ def handle_observation_delivered_event(event_dict: dict):
     if trace_count > 0:
         # Update the db with the event data
         trace = traces.first()
-        try:
-            destination_integration = Integration.objects.get(id=str(event_data.destination_id))
-        except Integration.DoesNotExist:
-            logger.warning(f"Unknown Destination with id {event_data.destination_id}. Event Ignored.")
-            return
         if not trace.destination:  # Single destination
-            trace.destination = destination_integration
+            trace.destination_id = event_data.destination_id
             trace.delivered_at = event_data.delivered_at
             trace.external_id = event_data.external_id
             trace.save()
@@ -40,10 +35,10 @@ def handle_observation_delivered_event(event_dict: dict):
             GundiTrace.objects.create(
                 object_id=trace.object_id,
                 object_type=trace.object_type,
-                related_to=event_data.related_to,
+                related_to_id=event_data.related_to,
                 created_by=trace.created_by,
                 data_provider=trace.data_provider,
-                destination=destination_integration,
+                destination_id=event_data.destination_id,
                 delivered_at=event_data.delivered_at,
                 external_id=event_data.external_id
             )
