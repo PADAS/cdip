@@ -883,6 +883,27 @@ def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace,
     message.data = data_bytes
     return message
 
+
+@pytest.fixture
+def trap_tagger_observation_delivery_failed_event(mocker, trap_tagger_event_trace, integrations_list):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDeliveryFailed",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id":  str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
+
+
 ########################################################################################################################
 # GUNDI 1.0
 ########################################################################################################################
