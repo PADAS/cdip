@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - sik-2114-dispatcher-events
 
 jobs:
   vars:
@@ -25,12 +26,12 @@ jobs:
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
-  deploy_stage:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
-    needs: [vars, build]
-    with:
-      environment: stage
-      chart_name: admin-portal
-      chart_version: '0.2.0'
-      repository: ${{ needs.vars.outputs.repository }}
-      tag: ${{ needs.vars.outputs.tag }}
+#  deploy_stage:
+#    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+#    needs: [vars, build]
+#    with:
+#      environment: stage
+#      chart_name: admin-portal
+#      chart_version: '0.2.0'
+#      repository: ${{ needs.vars.outputs.repository }}
+#      tag: ${{ needs.vars.outputs.tag }}
