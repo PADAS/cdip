@@ -1,7 +1,7 @@
 import json
 import logging
 import django
-from event_consumers import logging_settings
+from settings import logging_settings
 logging_settings.init()
 django.setup()  # To use the django ORM
 from google.cloud import pubsub_v1
