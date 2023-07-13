@@ -357,13 +357,7 @@ class SourceState(UUIDAbstractModel, TimestampedModel):
 class GundiTrace(UUIDAbstractModel, TimestampedModel):
     object_id = models.UUIDField(db_index=True, default=uuid.uuid4, editable=False)
     object_type = models.CharField(max_length=20, db_index=True, blank=True)
-    related_to = models.ForeignKey(
-        "integrations.GundiTrace",
-        on_delete=models.CASCADE,
-        related_name="related_objects",
-        null=True,
-        blank=True
-    )
+    related_to = models.UUIDField(db_index=True, null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
