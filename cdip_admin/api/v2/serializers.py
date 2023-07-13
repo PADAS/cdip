@@ -11,7 +11,8 @@ from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError
+from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing
 
@@ -542,10 +543,45 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
         )
 
 
+class KeyRelatedField(serializers.RelatedField):
+    """
+    Similar to a PKRelatedField but supports using any other non-unique column as related key.
+    If there are many related objects it returns the first one.
+    """
+    default_error_messages = {
+        'required': _('This field is required.'),
+        'does_not_exist': _('Invalid key "{key_value}" - object does not exist.'),
+        'incorrect_type': _('Incorrect type. Expected uuid value, received {data_type}.'),
+    }
+
+    def __init__(self, **kwargs):
+        self.key_field = kwargs.pop('key_field', None)
+        assert self.key_field is not None, 'The `key_field` argument is required.'
+        super().__init__(**kwargs)
+
+    def use_pk_only_optimization(self):
+        return True
+
+    def to_internal_value(self, data):
+        data = self.key_field.to_internal_value(data)
+        try:
+            related_object = self.get_queryset().filter(**{self.key_field: data}).first()
+        except (TypeError, ValueError):
+            self.fail('incorrect_type', data_type=type(data).__name__)
+        else:
+            if not related_object:
+                self.fail('does_not_exist', key_value=data)
+            return related_object
+
+    def to_representation(self, value):
+        return getattr(value, self.key_field)
+
+
 class GundiTraceSerializer(serializers.Serializer):
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
-    related_to = serializers.PrimaryKeyRelatedField(
+    related_to = KeyRelatedField(
+        key_field="object_id",
         write_only=True,
         required=False,
         queryset=GundiTrace.objects.all()
@@ -637,6 +673,7 @@ class EventCreateSerializer(GundiTraceSerializer):
         instance = GundiTrace(
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
+            related_to=validated_data.get("related_to"),
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -716,6 +753,7 @@ class EventAttachmentSerializer(GundiTraceSerializer):
         instance = GundiTrace(
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data.get("integration"),
+            related_to=validated_data.get("related_to"),
             object_type=StreamPrefixEnum.attachment.value,
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -733,6 +771,8 @@ class EventAttachmentSerializer(GundiTraceSerializer):
         data = super().validate(data)
         if not data.get("related_to"):
             # Relate the attachment to the current event
-            data["related_to"] = self.context["view"].kwargs["event_pk"]
-        # ToDo: Get source from id from the related event
+            data["related_to"] = GundiTrace.objects.filter(
+                object_id=self.context["view"].kwargs["event_pk"]
+            ).first().object_id
+        # ToDo: Get source from id from the related event?
         return data
