@@ -1,7 +1,7 @@
 import json
 import logging
 import django
-from settings import logging_settings
+from event_consumers.settings import logging_settings
 logging_settings.init()
 django.setup()  # To use the django ORM
 from google.cloud import pubsub_v1
@@ -35,7 +35,7 @@ def handle_observation_delivered_event(event_dict: dict):
             GundiTrace.objects.create(
                 object_id=trace.object_id,
                 object_type=trace.object_type,
-                related_to_id=event_data.related_to,
+                related_to=event_data.related_to,
                 created_by=trace.created_by,
                 data_provider=trace.data_provider,
                 destination_id=event_data.destination_id,
