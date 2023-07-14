@@ -776,3 +776,19 @@ class EventAttachmentSerializer(GundiTraceSerializer):
             ).first().object_id
         # ToDo: Get source from id from the related event?
         return data
+
+
+class GundiTraceRetrieveSerializer(serializers.Serializer):
+    object_id = serializers.UUIDField(read_only=True)
+    object_type = serializers.CharField(read_only=True)
+    related_to = serializers.UUIDField(read_only=True)
+    data_provider = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+    )
+    destination = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+    )
+    delivered_at = serializers.DateTimeField(read_only=True)
+    external_id = serializers.CharField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
