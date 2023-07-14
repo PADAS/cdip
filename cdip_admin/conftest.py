@@ -836,6 +836,51 @@ def trap_tagger_event_trace(provider_trap_tagger):
 
 
 @pytest.fixture
+def event_delivered_trace(provider_trap_tagger, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=None,
+        object_type="ev",
+        destination=integrations_list[0],
+        delivered_at="2023-07-10T19:35:34.425974Z",
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def event_delivered_trace2(provider_trap_tagger, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=None,
+        object_type="ev",
+        destination=integrations_list[1],
+        delivered_at="2023-07-10T19:36:15.425974Z",
+        external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f"
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def attachment_delivered_trace(provider_trap_tagger, event_delivered_trace, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=event_delivered_trace.object_id,
+        object_type="ev",
+        destination=integrations_list[0],
+        delivered_at="2023-07-10T19:37:48.425974Z",
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
 def mock_cloud_storage(mocker):
     mock_cloud_storage = mocker.MagicMock()
     mock_cloud_storage.save.return_value = "file.jpg"
