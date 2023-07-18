@@ -1,6 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
+import deployments.models
 from .models import (
     OutboundIntegrationType,
     InboundIntegrationType,
@@ -212,6 +213,13 @@ class IntegrationActionAdmin(admin.ModelAdmin):
     )
 
 
+class DispatcherDeploymentInline(admin.StackedInline):
+    model = deployments.models.DispatcherDeployment
+    readonly_fields = (
+        "status",
+    )
+
+
 @admin.register(Integration)
 class IntegrationAdmin(admin.ModelAdmin):
     list_display = (
@@ -226,6 +234,9 @@ class IntegrationAdmin(admin.ModelAdmin):
         "owner",
         "type",
     )
+    inlines = [
+        DispatcherDeploymentInline,
+    ]
 
 
 @admin.register(IntegrationConfiguration)
