@@ -3,7 +3,8 @@ from django.db.models import Subquery
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
-from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter
+from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
+    GundiTraceFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -357,3 +358,19 @@ class AttachmentViewSet(
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, headers=headers)
+
+
+class GundiTraceViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint retrieving traces.
+    """
+    permission_classes = [permissions.IsSuperuser]
+    filter_backends = [drf_filters.OrderingFilter, django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = GundiTraceFilter
+    ordering_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
+    serializer_class = v2_serializers.GundiTraceRetrieveSerializer
+    queryset = GundiTrace.objects.all()
