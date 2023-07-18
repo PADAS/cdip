@@ -37,7 +37,7 @@ def is_duplicate_attachment(data: dict):
     integration_id = str(data["integration"].id)
     source = data.get('source')
     source_id = str(source.id if source else None)  # FixMe: Get source from event
-    related_to = data["related_to"]
+    related_to = str(data["related_to"])
     jsonified_data = json.dumps({
         "filename": data["file"].name,
         "related_to": related_to,

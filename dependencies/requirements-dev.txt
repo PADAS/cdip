@@ -250,10 +250,11 @@ gundi-client==1.0.1
     # via
     #   -r requirements.in
     #   cdip-connector
-gundi-client-v2==2.0.0
+gundi-client-v2==2.0.1
     # via -r requirements.in
-gundi-core==1.0.5
+gundi-core==1.1.1
     # via
+    #   -r requirements.in
     #   cdip-connector
     #   gundi-client
     #   gundi-client-v2
