@@ -16,7 +16,7 @@ from integrations.models import (
     Integration,
     IntegrationType,
     get_user_integrations_qs,
-    Source, Route
+    Source, Route, GundiTrace
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -496,3 +496,16 @@ class RouteFilter(django_filters_rest.FilterSet):
 
     def filter_by_data_providers(self, queryset, name, value):
         return queryset.filter(data_providers=value).distinct()
+
+
+class GundiTraceFilter(django_filters_rest.FilterSet):
+
+    class Meta:
+        model = GundiTrace
+        fields = {
+            'object_id': ['exact', ],
+            'related_to': ['exact', ],
+            'data_provider': ['exact', ],
+            'destination': ['exact', ],
+            'external_id': ['exact', ]
+        }

@@ -31,6 +31,7 @@ from integrations.models import (
 )
 from organizations.models import Organization
 from pathlib import Path
+from google.cloud import pubsub_v1
 
 
 @pytest.fixture
@@ -153,6 +154,7 @@ def new_random_user(new_user_email, org_members_group):
             user_id=user.id,
         )
         return user
+
     return _make_random_user
 
 
@@ -168,6 +170,7 @@ def new_user_email(get_random_id):
                 return email
             else:  # Try a new email
                 unique_id = get_random_id()
+
     return _make_random_email
 
 
@@ -254,6 +257,7 @@ def integration_type_lotek():
         value="lotek",
         description="Standard inbound integration type for pulling data from Lotek API."
     )
+
 
 @pytest.fixture
 def lotek_action_auth(integration_type_lotek):
@@ -655,6 +659,7 @@ def make_random_sources(get_random_id):
                 )
             sources.append(source)
         return sources
+
     return _make_devices
 
 
@@ -820,12 +825,59 @@ def wilddog_image_file():
 
 @pytest.fixture
 def trap_tagger_event_trace(provider_trap_tagger):
-    return GundiTrace(
+    trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         object_type="ev",
         # Other fields are filled in later by the routing services
     )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def event_delivered_trace(provider_trap_tagger, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=None,
+        object_type="ev",
+        destination=integrations_list[0],
+        delivered_at="2023-07-10T19:35:34.425974Z",
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def event_delivered_trace2(provider_trap_tagger, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=None,
+        object_type="ev",
+        destination=integrations_list[1],
+        delivered_at="2023-07-10T19:36:15.425974Z",
+        external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f"
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def attachment_delivered_trace(provider_trap_tagger, event_delivered_trace, integrations_list):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        related_to=event_delivered_trace.object_id,
+        object_type="ev",
+        destination=integrations_list[0],
+        delivered_at="2023-07-10T19:37:48.425974Z",
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+    )
+    trace.save()
+    return trace
 
 
 @pytest.fixture
@@ -833,6 +885,68 @@ def mock_cloud_storage(mocker):
     mock_cloud_storage = mocker.MagicMock()
     mock_cloud_storage.save.return_value = "file.jpg"
     return mock_cloud_storage
+
+
+@pytest.fixture
+def trap_tagger_observation_delivered_event(mocker, trap_tagger_event_trace, integrations_list):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": None,
+            "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id":  str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace, integrations_list):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "505535df-1b9b-412b-9fd5-e29b09582910", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": None,
+            "external_id": "45983ced-1216-4d43-81da-01ee90ba9b81",
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id":  str(integrations_list[1].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_delivery_failed_event(mocker, trap_tagger_event_trace, integrations_list):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDeliveryFailed",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id":  str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
 
 
 ########################################################################################################################
