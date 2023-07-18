@@ -121,7 +121,6 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         super().save(*args, **kwargs)
         self._post_save(self, *args, **kwargs)
 
-
     @property
     def configurations(self):
         return self.configurations_by_integration.all()
