@@ -15,6 +15,12 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         choices=Status.choices,
         default=Status.SCHEDULED
     )
+    status_details = models.CharField(
+        max_length=500,
+        default="",
+        blank=True,
+        null=True
+    )
     name = models.CharField(
         max_length=63,
         blank=True,
@@ -61,8 +67,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
             transaction.on_commit(
                 lambda: deploy_serverless_dispatcher.delay(
                     deployment_id=self.id,
-                    model_version="v2",
-                    update=config_changed
+                    model_version="v2"
                 )
             )
 
