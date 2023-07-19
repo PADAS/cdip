@@ -1,5 +1,6 @@
 from core.models import UUIDAbstractModel, TimestampedModel
-from django.db import models
+from django.db import models, transaction
+from model_utils import FieldTracker
 from .tasks import deploy_serverless_dispatcher
 
 
@@ -41,6 +42,8 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         verbose_name="JSON Configuration",
     )
 
+    tracker = FieldTracker()
+
     class Meta:
         ordering = ("-created_at",)
 
@@ -51,11 +54,20 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         pass
 
     def _post_save(self, *args, **kwargs):
-        # Trigger the deployment of a dispatcher
-        if self.status == DispatcherDeployment.Status.SCHEDULED:
-            deploy_serverless_dispatcher.delay(deployment_id=self.id, model_version="v2")
+        # Trigger the deployment of a dispatcher.
+        # https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
+        config_changed = self.tracker.has_changed("configuration")
+        if self.status == DispatcherDeployment.Status.SCHEDULED or config_changed:
+            transaction.on_commit(
+                lambda: deploy_serverless_dispatcher.delay(
+                    deployment_id=self.id,
+                    model_version="v2",
+                    update=config_changed
+                )
+            )
 
     def save(self, *args, **kwargs):
-        self._pre_save(self, *args, **kwargs)
-        super().save(*args, **kwargs)
-        self._post_save(self, *args, **kwargs)
+        with self.tracker:
+            self._pre_save(self, *args, **kwargs)
+            super().save(*args, **kwargs)
+            self._post_save(self, *args, **kwargs)
