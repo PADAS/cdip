@@ -17,10 +17,17 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
     deployment.status = DispatcherDeployment.Status.IN_PROGRESS
     deployment.save()
     # Get settings from the database
-    if model_version == "v2":
+    if deployment.integration:  # v2 models
         integration = deployment.integration
-    else:  # Default to v1
+    elif deployment.legacy_integration:  # legacy models
         integration = deployment.legacy_integration
+    else:
+        error_msg = f"Either integration or legacy_integration field must be set"
+        print(error_msg)
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg
+        deployment.save()
+        return
     print(f"Deploying dispatcher for integration {integration}..")
     configuration = deployment.configuration
     deployment_settings = configuration.get("deployment_settings", {})

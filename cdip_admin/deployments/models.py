@@ -32,7 +32,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         null=True,
         on_delete=models.PROTECT,
         related_name="dispatcher_by_outbound",
-        verbose_name="Destination Integration",
+        verbose_name="Legacy Outbound Integration",
     )
     integration = models.OneToOneField(
         "integrations.Integration",
@@ -65,10 +65,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         config_changed = self.tracker.has_changed("configuration")
         if self.status == DispatcherDeployment.Status.SCHEDULED or config_changed:
             transaction.on_commit(
-                lambda: deploy_serverless_dispatcher.delay(
-                    deployment_id=self.id,
-                    model_version="v2"
-                )
+                lambda: deploy_serverless_dispatcher.delay(deployment_id=self.id)
             )
 
     def save(self, *args, **kwargs):
