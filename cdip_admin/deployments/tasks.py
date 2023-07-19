@@ -10,7 +10,7 @@ functions_client = functions_v2.FunctionServiceClient()
 
 
 @shared_task
-def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
+def deploy_serverless_dispatcher(deployment_id):
     # ToDo: make it idempotent
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
