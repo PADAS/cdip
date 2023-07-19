@@ -26,6 +26,6 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
         "status",
     )
     readonly_fields = (
-        "status",
+        "status", "status_details",
     )
     actions = [restart_deployments]
