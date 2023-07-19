@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.forms import ModelForm
 from simple_history.admin import SimpleHistoryAdmin
 
 import deployments.models
@@ -133,6 +134,19 @@ class InboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     )
 
 
+class DispatcherDeploymentInline(admin.StackedInline):
+    model = deployments.models.DispatcherDeployment
+    fields = (
+        "name",
+        "configuration",
+        "status",
+        "status_details"
+    )
+    readonly_fields = (
+        "status", "status_details",
+    )
+
+
 @admin.register(OutboundIntegrationConfiguration)
 class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     readonly_fields = [
@@ -161,6 +175,10 @@ class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
         "_name",
         "owner",
     )
+
+    inlines = [
+        DispatcherDeploymentInline,
+    ]
 
 
 @admin.register(BridgeIntegrationType)
@@ -213,11 +231,7 @@ class IntegrationActionAdmin(admin.ModelAdmin):
     )
 
 
-class DispatcherDeploymentInline(admin.StackedInline):
-    model = deployments.models.DispatcherDeployment
-    readonly_fields = (
-        "status",
-    )
+
 
 
 @admin.register(Integration)
