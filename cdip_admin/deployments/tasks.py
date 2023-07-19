@@ -10,7 +10,7 @@ functions_client = functions_v2.FunctionServiceClient()
 
 
 @shared_task
-def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
+def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False):
     # ToDo: make it idempotent
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
@@ -23,8 +23,10 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
         integration = deployment.legacy_integration
     print(f"Deploying dispatcher for integration {integration}..")
     configuration = deployment.configuration
+    deployment_settings = configuration.get("deployment_settings", {})
     env_vars = configuration.get("env_vars", {})
-
+    print(f"Deployment Settings:\n{deployment_settings}")
+    print(f"Env vars:\n{env_vars}")
     # Create the topic
     # project_id = publisher.project # os.getenv('GOOGLE_CLOUD_PROJECT') # FixMe
     project_id = env_vars.get("GCP_PROJECT_ID")
@@ -36,16 +38,14 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
     except AlreadyExists as e:
         print(f"Topic {topic} already exists. Skipping creation.")
     except Exception as e:
-        print(e)
         print(f"Error creating topic {topic}: {e}")
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.save()
         return
+    print(f"Topic {topic} ready.")
 
-    try:  # Deploy the function
-        # Prepare the settings for the cloud function
+    try:  # Prepare the settings for the cloud function
         function_name = deployment.name or f"disptch-{integration.id}-dev"
-        deployment_settings = configuration.get("deployment_settings", {})
         region = deployment_settings.get("region", "us-central1")
         parent = f"projects/{project_id}/locations/{region}"
         function_id = function_name.lower()
@@ -87,24 +87,55 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
             event_trigger=event_trigger,
             service_config=service_config
         )
-        request = functions_v2.CreateFunctionRequest(
-            parent=parent,
-            function=function,
-            function_id=function_id
-        )
-        # Make the request
-        print(f"Creating function {function_name}..")
-        operation = functions_client.create_function(request=request)
-        response = operation.result()
-    except AlreadyExists as e:
-        print(f"Function {function_id} already exists. Skipping creation.")
-    except Exception as e:
-        print(f"Error deploying function:{e}")
+    except Exception as e:  # ToDo: Catch more specific errors like validation errors?
+        print(f"Error preparing function data {topic}: {e}")
         deployment.status = DispatcherDeployment.Status.ERROR
-    else:
-        # Handle the response
-        print(f"Deploy complete:")
-        print(response)
-        deployment.status = DispatcherDeployment.Status.COMPLETE
-    finally:
         deployment.save()
+        return
+
+    if update:
+        try:  # Deploy a new function
+            print(f"Updating function {function_name}..")
+            request = functions_v2.UpdateFunctionRequest(
+                function=function
+            )
+            # Make the request
+            operation = functions_client.update_function(request=request)
+            print(f"Waiting fo the operation to finish..")
+            print(operation)
+            response = operation.result()
+        except Exception as e:
+            print(f"Error updating function:{e}")
+            deployment.status = DispatcherDeployment.Status.ERROR
+        else:
+            # Handle the response
+            print(response)
+            print(f"Update complete.")
+            deployment.status = DispatcherDeployment.Status.COMPLETE
+        finally:
+            deployment.save()
+    else:
+        try:  # Deploy a new function
+            print(f"Creating function {function_name}..")
+            request = functions_v2.CreateFunctionRequest(
+                parent=parent,
+                function=function,
+                function_id=function_id
+            )
+            # Make the request
+            operation = functions_client.create_function(request=request)
+            print(f"Waiting fo the operation to finish..")
+            print(operation)
+            response = operation.result()
+        except AlreadyExists as e:
+            print(f"Function {function_id} already exists. Skipping creation.")
+        except Exception as e:
+            print(f"Error deploying function:{e}")
+            deployment.status = DispatcherDeployment.Status.ERROR
+        else:
+            # Handle the response
+            print(response)
+            print(f"Deploy complete.")
+            deployment.status = DispatcherDeployment.Status.COMPLETE
+        finally:
+            deployment.save()
