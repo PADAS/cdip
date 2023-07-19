@@ -10,7 +10,7 @@ functions_client = functions_v2.FunctionServiceClient()
 
 
 @shared_task
-def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False):
+def deploy_serverless_dispatcher(deployment_id, model_version="v1"):
     # ToDo: make it idempotent
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
@@ -38,8 +38,10 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False
     except AlreadyExists as e:
         print(f"Topic {topic} already exists. Skipping creation.")
     except Exception as e:
-        print(f"Error creating topic {topic}: {e}")
+        error_msg = f"Error creating topic {topic}: {e}"
+        print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg
         deployment.save()
         return
     print(f"Topic {topic} ready.")
@@ -88,12 +90,27 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False
             service_config=service_config
         )
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
-        print(f"Error preparing function data {topic}: {e}")
+        error_msg = f"Error preparing function data: {e}"
+        print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg
         deployment.save()
         return
 
-    if update:
+    try:  # Deploy a new function
+        print(f"Creating function {function_name}..")
+        request = functions_v2.CreateFunctionRequest(
+            parent=parent,
+            function=function,
+            function_id=function_id
+        )
+        # Make the request
+        operation = functions_client.create_function(request=request)
+        print(f"Waiting fo the operation to finish..")
+        print(operation)
+        response = operation.result()
+    except AlreadyExists as e:
+        print(f"Function {function_id} already exists.")
         try:  # Deploy a new function
             print(f"Updating function {function_name}..")
             request = functions_v2.UpdateFunctionRequest(
@@ -105,8 +122,10 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False
             print(operation)
             response = operation.result()
         except Exception as e:
-            print(f"Error updating function:{e}")
+            error_msg = f"Error updating function:{e}"
+            print(error_msg)
             deployment.status = DispatcherDeployment.Status.ERROR
+            deployment.status_details = error_msg
         else:
             # Handle the response
             print(response)
@@ -114,28 +133,15 @@ def deploy_serverless_dispatcher(deployment_id, model_version="v1", update=False
             deployment.status = DispatcherDeployment.Status.COMPLETE
         finally:
             deployment.save()
+    except Exception as e:
+        error_msg = f"Error deploying function:{e}"
+        print(error_msg)
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg
     else:
-        try:  # Deploy a new function
-            print(f"Creating function {function_name}..")
-            request = functions_v2.CreateFunctionRequest(
-                parent=parent,
-                function=function,
-                function_id=function_id
-            )
-            # Make the request
-            operation = functions_client.create_function(request=request)
-            print(f"Waiting fo the operation to finish..")
-            print(operation)
-            response = operation.result()
-        except AlreadyExists as e:
-            print(f"Function {function_id} already exists. Skipping creation.")
-        except Exception as e:
-            print(f"Error deploying function:{e}")
-            deployment.status = DispatcherDeployment.Status.ERROR
-        else:
-            # Handle the response
-            print(response)
-            print(f"Deploy complete.")
-            deployment.status = DispatcherDeployment.Status.COMPLETE
-        finally:
-            deployment.save()
+        # Handle the response
+        print(response)
+        print(f"Deploy complete.")
+        deployment.status = DispatcherDeployment.Status.COMPLETE
+    finally:
+        deployment.save()
