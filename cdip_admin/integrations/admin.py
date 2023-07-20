@@ -19,6 +19,7 @@ from .models import (
     Route,
     RouteConfiguration,
     SourceFilter, Source, SourceState, SourceConfiguration,
+    GundiTrace,
 )
 
 from .forms import (
@@ -219,6 +220,7 @@ class IntegrationAdmin(admin.ModelAdmin):
         "owner",
         "name",
         "enabled",
+        "api_key",  # ToDo: Add an endpoint to manage API Keys to manage them through the Portal UI?
     )
     list_filter = (
         "owner",
@@ -312,4 +314,18 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
         "name",
         "updated_at",
         "data",
+    )
+
+
+@admin.register(GundiTrace)
+class GundiTraceAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "object_id",
+        "related_to",
+        "object_type",
+        "data_provider",
+        "destination",
+        "external_id",
+        "delivered_at",
+        "created_by",
     )
