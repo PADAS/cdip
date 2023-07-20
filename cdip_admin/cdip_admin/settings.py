@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "simple_history",
     "django_jsonform",
     "django_celery_beat",
+    "storages",
 ]
 
 
@@ -152,6 +153,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "api.v2.middleware.ApiIntegrationIdMiddleware",
     "cdip_admin.auth.middleware.AuthenticationMiddleware",
     "cdip_admin.auth.middleware.OidcRemoteUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -282,3 +284,34 @@ EMAIL_FROM_DEFAULT = env.str("EMAIL_FROM_DEFAULT", "notifications.cdip@pamdas.or
 EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifications")
 EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
 EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")
+
+# Used for storing files such as report attachments
+DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+GS_BUCKET_NAME = env.str("GS_BUCKET_NAME", "cdip-files-dev")
+
+# Settings for stream, where this API writes.
+REDIS_HOST = env.str("REDIS_HOST", "localhost")
+REDIS_PORT = env.int("REDIS_PORT", 6379)
+REDIS_DB = env.int("REDIS_DB", 0)
+
+# Settings for redis cache and deduplication
+STREAMS_DEFAULT_MAXLEN = env.int("STREAMS_DEFAULT_MAXLEN", 10000)
+GEOEVENT_STREAM_DEFAULT_MAXLEN = env.int("GEOEVENT_STREAM_DEFAULT_MAXLEN", 10000)
+
+# N-seconds window to keep hash of position record for duplicate detection.
+POSITIONS_DUPLICATE_CHECK_SECONDS = env.int("POSITIONS_DUPLICATE_CHECK_SECONDS", 1800)
+# N-seconds window to keep hash of Geo Event record for duplicate detection.
+GEOEVENT_DUPLICATE_CHECK_SECONDS = env.int("GEOEVENT_DUPLICATE_CHECK_SECONDS", 3600)
+# N-seconds window to keep hash of Message record for duplicate detection.
+MESSAGES_DUPLICATE_CHECK_SECONDS = env.int("MESSAGES_DUPLICATE_CHECK_SECONDS", 1800)
+# N-seconds window to keep hash of camera trap record for duplicate detection.
+CAMERA_TRAP_DUPLICATE_CHECK_SECONDS = env.int("CAMERA_TRAP_DUPLICATE_CHECK_SECONDS", 1800)
+# N-seconds window to keep hash of generic sensor record for duplicate detection.
+OBSERVATION_DUPLICATE_CHECK_SECONDS = env.int("OBSERVATION_DUPLICATE_CHECK_SECONDS", 1800)
+
+# Used in OTel traces/spans to set the 'environment' attribute, used on metrics calculation
+TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
+
+# Subscriptions to read system events from pub/sub topics
+GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
+DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-dev")
