@@ -1,4 +1,4 @@
-serviceAccount: cloudsqlproxy-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+serviceAccount: gundi-app-sa-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
     - host: "admin.stage.gundiservice.org"
