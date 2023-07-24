@@ -13,8 +13,6 @@ ingress:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.gundiservice.org"
-    - secretName: "admin-portal-tls"
-      hosts:
         - "sensors.api.gundiservice.org"
 celery:
   worker:
