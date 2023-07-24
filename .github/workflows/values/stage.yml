@@ -5,10 +5,22 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+    - host: "sensors.api.stage.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
   tls:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.stage.gundiservice.org"
+    - secretName: "admin-portal-tls"
+      hosts:
+        - "sensors.api.stage.gundiservice.org"
+celery:
+  worker:
+    replicaCount: 2
+eventsConsumer:
+  replicaCount: 1
 database:
   connection_name: "cdip-stage-78ca:us-central1:sintegrate-5bbf9d1f"
 admin_portal:
@@ -26,4 +38,4 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
-replicaCount: 6
+replicaCount: 2
