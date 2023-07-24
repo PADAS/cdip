@@ -5,10 +5,22 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+    - host: "sensors.api.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
   tls:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.gundiservice.org"
+    - secretName: "admin-portal-tls"
+      hosts:
+        - "sensors.api.gundiservice.org"
+celery:
+  worker:
+    replicaCount: 2
+eventsConsumer:
+  replicaCount: 2
 database:
   connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
 admin_portal:
@@ -26,4 +38,4 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-prod"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 6
+replicaCount: 2
