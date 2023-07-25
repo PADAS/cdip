@@ -5,10 +5,12 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+          serviceName: admin-portal
     - host: "sensors.api.gundiservice.org"
       paths:
         - path: /
           pathType: ImplementationSpecific
+          serviceName: admin-portal-sensors
   tls:
     - secretName: "admin-portal-tls"
       hosts:
