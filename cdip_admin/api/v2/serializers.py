@@ -212,6 +212,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
+            "value",
             "description",
             "actions"
         )
