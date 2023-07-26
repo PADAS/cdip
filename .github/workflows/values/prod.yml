@@ -5,10 +5,22 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+          serviceName: admin-portal
+    - host: "sensors.api.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          serviceName: admin-portal-sensors
   tls:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.gundiservice.org"
+        - "sensors.api.gundiservice.org"
+celery:
+  worker:
+    replicaCount: 2
+eventsConsumer:
+  replicaCount: 2
 database:
   connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
 admin_portal:
@@ -16,6 +28,9 @@ admin_portal:
     TRACE_ENVIRONMENT: "prod"
     BROKER_URL: "redis://10.208.106.172:6379"
     GCP_PROJECT_ID: cdip-prod1-78ca
+    DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-prod
+    REDIS_HOST: "10.208.106.172"
+    KAFKA_BROKER: "pkc-lgk0v.us-west1.gcp.confluent.cloud:9092"
 kongplugin:
   cors:
     - https://gundiservice.org
@@ -26,4 +41,4 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-prod"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 6
+replicaCount: 2
