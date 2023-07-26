@@ -5,17 +5,32 @@ ingress:
       paths:
         - path: /
           pathType: ImplementationSpecific
+          serviceName: admin-portal
+    - host: "sensors.api.stage.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          serviceName: admin-portal-sensors
   tls:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.stage.gundiservice.org"
+        - "sensors.api.stage.gundiservice.org"
+celery:
+  worker:
+    replicaCount: 2
+eventsConsumer:
+  replicaCount: 1
 database:
-  connection_name: "cdip-stage-78ca:us-central1:sintegrate-5bbf9d1f"
+  connection_name: "cdip-78ca:us-central1:postgres-cdip-dev"
 admin_portal:
   env:
     TRACE_ENVIRONMENT: "stage"
     BROKER_URL: "redis://10.243.180.36:6379"
     GCP_PROJECT_ID: cdip-stage-78ca
+    DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
+    REDIS_HOST: "10.243.180.36"
+    KAFKA_BROKER: "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092"
 kongplugin:
   cors:
     - https://stage.gundiservice.org
@@ -26,4 +41,4 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
-replicaCount: 6
+replicaCount: 2
