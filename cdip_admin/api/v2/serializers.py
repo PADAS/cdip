@@ -170,7 +170,7 @@ class IntegrationTypeSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationType
-        fields = ["id", "name"]
+        fields = ["id", "name", "value"]
 
 
 class OwnerSerializer(serializers.ModelSerializer):
@@ -212,6 +212,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
+            "value",
             "description",
             "actions"
         )
@@ -329,7 +330,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
-    type = serializers.SerializerMethodField()
+    type = IntegrationTypeSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:

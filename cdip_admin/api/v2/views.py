@@ -218,17 +218,14 @@ class ConnectionsView(
 
     def get_queryset(self):
         """
-        Return a list of providers used to get the connections
+        Return the integrations used as providers in at least one route
         """
-        # Superusers can see all
+        providers = Integration.objects.filter(routing_rules_by_provider__isnull=False).distinct()
         if self.request.user.is_superuser:
-            return Integration.objects.all()
-        # Return the list of connections that the user is allowed to see
+            return providers  # Superusers can see all the providers
+        # Filter providers to return only the ones that the user is allowed to see
         user_organizations = get_user_organizations_qs(user=self.request.user)
-        providers = Route.objects.filter(
-            owner__in=Subquery(user_organizations.values('id'))
-        ).values("data_providers")
-        return Integration.objects.filter(id__in=Subquery(providers))
+        return providers.filter(owner__in=Subquery(user_organizations.values('id')))
 
     def get_serializer_class(self):
         return v2_serializers.ConnectionRetrieveSerializer

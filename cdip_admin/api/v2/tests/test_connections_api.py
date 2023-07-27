@@ -20,8 +20,14 @@ def _test_list_connections(api_client, user, provider_list):
     for provider, connection in zip(sorted_providers, sorted_connections):
         # Check the provider
         assert "provider" in connection
-        assert str(provider.id) == connection["provider"].get("id")
-        assert str(provider.name) == connection["provider"].get("name")
+        connection_provider = connection["provider"]
+        assert str(provider.id) == connection_provider.get("id")
+        assert str(provider.name) == connection_provider.get("name")
+        assert "type" in connection_provider
+        provider_type = connection_provider.get("type")
+        assert "id" in provider_type
+        assert "name" in provider_type
+        assert "value" in provider_type
         # Check destinations
         assert "destinations" in connection
         expected_destination_ids = [str(dest_id) for dest_id in provider.destinations.values_list("id", flat=True)]

@@ -514,6 +514,7 @@ def _test_filter_integration_types(api_client, user, filters, expected_integrati
     for type in integration_types:
         assert type.get("id") in expected_type_ids
         assert "name" in type
+        assert "value" in type
         assert "description" in type
         assert "actions" in type
 
