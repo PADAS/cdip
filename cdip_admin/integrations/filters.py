@@ -443,6 +443,7 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
 
 
 class SourceFilter(django_filters_rest.FilterSet):
+    provider = django_filters_rest.CharFilter(field_name="integration__id", lookup_expr="iexact")
     provider_type = django_filters_rest.CharFilter(field_name="integration__type__value", lookup_expr="iexact")
     provider_type__in = CharInFilter(field_name="integration__type__value", lookup_expr="in")
     destination_type = django_filters_rest.CharFilter(method='filter_by_destination_type')
