@@ -508,6 +508,10 @@ class RouteFilter(django_filters_rest.FilterSet):
     destination_url = django_filters_rest.CharFilter(
         method='filter_by_destination_url'
     )
+    destination_url__in = CharInFilter(
+        method='filter_by_destination_url',
+        lookup_expr="in"
+    )
 
     class Meta:
         model = Route
