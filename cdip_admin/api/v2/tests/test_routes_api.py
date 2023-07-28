@@ -666,7 +666,7 @@ def test_filter_routes_by_destination_as_superuser(
     _test_filter_routes(
         api_client=api_client,
         user=superuser,
-        filters={  # Routes having Movebank as provider
+        filters={
             "destination": str(selected_destination.id)
         },
         expected_routes=[route_1]
@@ -682,7 +682,7 @@ def test_filter_routes_by_destination_url_as_superuser(
     _test_filter_routes(
         api_client=api_client,
         user=superuser,
-        filters={  # Routes having Movebank as provider
+        filters={
             "destination_url": str(selected_destination.base_url)
         },
         expected_routes=[route_1, route_2]
@@ -698,9 +698,42 @@ def test_filter_routes_by_destination_url_as_org_admin(
     _test_filter_routes(
         api_client=api_client,
         user=org_admin_user_2,
-        filters={  # Routes having Movebank as provider
+        filters={
             "provider": str(provider_movebank_ewt.id),
             "destination_url__in": str(selected_destination.base_url)
         },
         expected_routes=[route_2]
+    )
+
+
+def test_global_search_routes_by_route_name_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    _test_filter_routes(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "search_fields": "name",
+            "search": "Lotek"
+        },
+        expected_routes=[provider_lotek_panthera.default_route]
+    )
+
+
+def test_global_search_routes_by_destination_url_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    selected_destination = route_1.destinations.last()
+    _test_filter_routes(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "search_fields": "destinations__base_url",
+            "search": str(selected_destination.base_url)
+        },
+        expected_routes=[route_1]
     )
