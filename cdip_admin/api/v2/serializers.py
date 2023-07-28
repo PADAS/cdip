@@ -173,6 +173,13 @@ class IntegrationTypeSummarySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "value"]
 
 
+class OwnerSummarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Organization
+        fields = ["id", "name", ]
+
+
 class OwnerSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -330,15 +337,13 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
+    owner = OwnerSummarySerializer(read_only=True)
     type = IntegrationTypeSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
-        fields = ("id", "name", "type", "base_url", "status", )
-
-    def get_type(self, obj):
-        return obj.type.value
+        fields = ("id", "name", "owner", "type", "base_url", "status", )
 
     def get_status(self, obj):
         # ToDo: revisit this once we implement monitoring & troubleshooting
