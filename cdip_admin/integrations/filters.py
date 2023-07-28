@@ -485,18 +485,47 @@ class SourceFilter(django_filters_rest.FilterSet):
 
 
 class RouteFilter(django_filters_rest.FilterSet):
-    data_providers = django_filters_rest.CharFilter(
-        method='filter_by_data_providers'
+    provider = django_filters_rest.CharFilter(
+        field_name="data_providers__id",
+        lookup_expr="iexact",
+        distinct=True
+    )
+    provider__in = CharInFilter(
+        field_name="data_providers__id",
+        lookup_expr="in",
+        distinct=True
+    )
+    destination = django_filters_rest.CharFilter(
+        field_name="destinations__id",
+        lookup_expr="iexact",
+        distinct=True
+    )
+    destination__in = CharInFilter(
+        field_name="destinations__id",
+        lookup_expr="in",
+        distinct=True
+    )
+    destination_url = django_filters_rest.CharFilter(
+        method='filter_by_destination_url'
     )
 
     class Meta:
         model = Route
         fields = {
-            'data_providers': ['exact', 'iexact'],
+            'id': ['exact', 'iexact', 'in'],
         }
 
-    def filter_by_data_providers(self, queryset, name, value):
-        return queryset.filter(data_providers=value).distinct()
+    def filter_by_destination_url(self, queryset, name, value):
+        destination_urls = value if isinstance(value, list) else [value]
+        # Annotate the destination urls
+        qs_with_destination_urls = queryset.annotate(
+            destination_urls=ArrayAgg(
+                "destinations__base_url",
+                filter=Q(destinations__isnull=False)
+            )
+        )
+        # Filter integrations having at least one destination with an url matching at least one of the provided values
+        return qs_with_destination_urls.filter(destination_urls__overlap=destination_urls)
 
 
 class GundiTraceFilter(django_filters_rest.FilterSet):
