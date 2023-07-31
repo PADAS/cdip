@@ -22,6 +22,7 @@ celery:
 eventsConsumer:
   replicaCount: 1
 database:
+  private_ip_enabled: True
   connection_name: "cdip-dev-78ca:us-central1:sintegrate-b2b9960e"
 admin_portal:
   env:

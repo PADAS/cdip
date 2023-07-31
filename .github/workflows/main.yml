@@ -32,7 +32,7 @@ jobs:
     with:
       environment: dev
       chart_name: admin-portal
-      chart_version: '0.5.4'
+      chart_version: '0.5.5'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
@@ -43,7 +43,7 @@ jobs:
     with:
       environment: stage
       chart_name: admin-portal
-      chart_version: '0.5.4'
+      chart_version: '0.5.5'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
@@ -54,6 +54,6 @@ jobs:
     with:
       environment: prod
       chart_name: admin-portal
-      chart_version: '0.5.4'
+      chart_version: '0.5.5'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
