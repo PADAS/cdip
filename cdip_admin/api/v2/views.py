@@ -276,13 +276,22 @@ class RoutesView(viewsets.ModelViewSet):
     filter_backends = [
         drf_filters.OrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
-        # ToDo: Implement search
-        # custom_filters.CustomizableSearchFilter
+        custom_filters.CustomizableSearchFilter
     ]
     filterset_class = RouteFilter
-    # search_fields = ["name", 'owner__name', ]
     ordering_fields = ['id', 'name', 'owner__name']
     ordering = ['id']
+    search_fields = [  # Default search fields (used in the global search box)
+        "name", "owner__name",  # Routes
+        "data_providers__name",  # Providers
+        "data_providers__type__name",
+        "data_providers__type__value",
+        "data_providers__base_url",
+        "destinations__name",  # Destinations
+        "destinations__type__name",
+        "destinations__type__value",
+        "destinations__base_url",
+    ]
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
