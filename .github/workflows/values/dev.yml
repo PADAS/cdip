@@ -32,6 +32,7 @@ admin_portal:
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-dev
     REDIS_HOST: "10.3.176.132"
     KAFKA_BROKER: "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092"
+    GS_BUCKET_NAME: "cdip-files-dev"
 kongplugin:
   cors:
     - https://dev.gundiservice.org
