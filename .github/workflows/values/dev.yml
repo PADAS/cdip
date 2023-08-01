@@ -22,13 +22,14 @@ celery:
 eventsConsumer:
   replicaCount: 1
 database:
+  private_ip_enabled: True
   connection_name: "cdip-dev-78ca:us-central1:sintegrate-b2b9960e"
 admin_portal:
   env:
     TRACE_ENVIRONMENT: "dev"
     BROKER_URL: "redis://10.3.176.132:6379"
     GCP_PROJECT_ID: cdip-dev-78ca
-    DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
+    DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-dev
     REDIS_HOST: "10.3.176.132"
     KAFKA_BROKER: "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092"
     GS_BUCKET_NAME: "cdip-files-dev"

@@ -23,6 +23,10 @@ def _test_list_connections(api_client, user, provider_list):
         connection_provider = connection["provider"]
         assert str(provider.id) == connection_provider.get("id")
         assert str(provider.name) == connection_provider.get("name")
+        assert "owner" in connection_provider
+        provider_owner = connection_provider.get("owner")
+        assert "id" in provider_owner
+        assert "name" in provider_owner
         assert "type" in connection_provider
         provider_type = connection_provider.get("type")
         assert "id" in provider_type
@@ -34,6 +38,10 @@ def _test_list_connections(api_client, user, provider_list):
         for destination in connection["destinations"]:
             assert destination.get("id") in expected_destination_ids
             assert "name" in destination
+            assert "owner" in destination
+            destination_owner = destination.get("owner")
+            assert "id" in destination_owner
+            assert "name" in destination_owner
         # Check routing rules
         assert "routing_rules" in connection
         expected_routing_rules_ids = [str(rule_id) for rule_id in provider.routing_rules.values_list("id", flat=True)]
