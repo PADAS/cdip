@@ -247,7 +247,7 @@ class SourcesView(
         custom_filters.CustomizableSearchFilter
     ]
     filterset_class = SourceFilter
-    ordering_fields = ['external_id', 'integration__name']
+    ordering_fields = ['external_id', 'integration__name', 'created_at', 'last_update', 'update_frequency']
     ordering = ['external_id']
     search_fields = [  # Default search fields (used in the global search box)
         "external_id",  # Sources

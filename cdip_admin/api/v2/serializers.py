@@ -415,7 +415,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         model = Source
         fields = (
             "id", "external_id", "status", "provider", "destinations", "routing_rules",
-            "update_frequency", "last_update",
+            "update_frequency", "last_update", "created_at"
         )
 
     def get_status(self, obj):
