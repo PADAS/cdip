@@ -30,6 +30,7 @@ def _test_list_sources(api_client, user, expected_sources, filters=None):
         assert "routing_rules" in source
         assert "update_frequency" in source
         assert "last_update" in source
+        assert "last_update" in source
 
 
 def test_list_sources_as_superuser(
