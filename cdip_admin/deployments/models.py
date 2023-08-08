@@ -10,7 +10,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         IN_PROGRESS = "pro", "Deployment In Progress"
         ERROR = "err", "Deployment Failed"
         COMPLETE = "com", "Deployment Complete"
-        DELETED = "del", "Deployment Deleted"
+        DELETING = "del", "Deleting"
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -31,7 +31,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         "integrations.OutboundIntegrationConfiguration",
         blank=True,
         null=True,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name="dispatcher_by_outbound",
         verbose_name="Legacy Outbound Integration",
     )
@@ -39,7 +39,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         "integrations.Integration",
         blank=True,
         null=True,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name="dispatcher_by_integration",
         verbose_name="Destination Integration",
     )
