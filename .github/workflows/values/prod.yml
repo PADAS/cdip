@@ -22,6 +22,7 @@ celery:
 eventsConsumer:
   replicaCount: 2
 database:
+  private_ip_enabled: True
   connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
 admin_portal:
   env:
@@ -31,6 +32,7 @@ admin_portal:
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-prod
     REDIS_HOST: "10.208.106.172"
     KAFKA_BROKER: "pkc-lgk0v.us-west1.gcp.confluent.cloud:9092"
+    GS_BUCKET_NAME: "cdip-files-prod"
 kongplugin:
   cors:
     - https://gundiservice.org

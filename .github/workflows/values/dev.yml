@@ -1,19 +1,46 @@
-serviceAccount: cloudsqlproxy-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+serviceAccount: gundi-app-sa-b2b9960e@cdip-dev-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
     - host: "admin.dev.gundiservice.org"
       paths:
         - path: /
           pathType: ImplementationSpecific
+          serviceName: admin-portal
+    - host: "sensors.api.dev.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          serviceName: admin-portal-sensors
   tls:
     - secretName: "admin-portal-tls"
       hosts:
         - "admin.dev.gundiservice.org"
+        - "sensors.api.dev.gundiservice.org"
+celery:
+  worker:
+    replicaCount: 1
+eventsConsumer:
+  replicaCount: 1
 database:
-  connection_name: "cdip-stage-78ca:us-central1:sintegrate-5bbf9d1f"
+  private_ip_enabled: True
+  connection_name: "cdip-dev-78ca:us-central1:sintegrate-b2b9960e"
+admin_portal:
+  env:
+    TRACE_ENVIRONMENT: "dev"
+    BROKER_URL: "redis://10.3.176.132:6379"
+    GCP_PROJECT_ID: cdip-dev-78ca
+    DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-dev
+    REDIS_HOST: "10.3.176.132"
+    KAFKA_BROKER: "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092"
+    GS_BUCKET_NAME: "cdip-files-dev"
+kongplugin:
+  cors:
+    - https://dev.gundiservice.org
+    - https://admin.dev.gundiservice.org
 keycloak:
   KEYCLOAK_SERVER: "https://cdip-auth.pamdas.org"
   KEYCLOAK_REALM: "cdip-dev"
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
+replicaCount: 1
