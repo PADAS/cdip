@@ -10,6 +10,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         IN_PROGRESS = "pro", "Deployment In Progress"
         ERROR = "err", "Deployment Failed"
         COMPLETE = "com", "Deployment Complete"
+        DELETED = "del", "Deployment Deleted"
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
