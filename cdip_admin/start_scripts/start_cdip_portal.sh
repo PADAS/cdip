@@ -15,6 +15,6 @@ export GUNICORN_CMD_ARGS=${GUNICORN_CMD_ARGS:-"--bind 0.0.0.0:8000 --workers 4 -
 echo "Notice GUNICORN_CMD_ARGS: ${GUNICORN_CMD_ARGS}"
 
 gunicorn cdip_admin.wsgi --name cdip \
-    --limit-request-line 400 \
+    --limit-request-line 2048 \
     --worker-tmp-dir /dev/shm \
     --log-file - 

@@ -618,3 +618,122 @@ def test_cannot_delete_unrelated_route_as_org_admin(
         user=org_admin_user,
         route=route_2  # Route 2 belongs to other organization where this use doesn't have access
     )
+
+
+def _test_filter_routes(api_client, user, filters, expected_routes):
+    api_client.force_authenticate(user)
+    response = api_client.get(
+        reverse("routes-list"),
+        data=filters
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    routes = response_data["results"]
+    # Check that the returned integrations are the expected ones
+    expected_route_ids = [str(t.id) for t in expected_routes]
+    assert len(routes) == len(expected_route_ids)
+    for route in routes:
+        assert route.get("id") in expected_route_ids
+        assert "name" in route
+        assert "owner" in route
+        assert "data_providers" in route
+        assert "destinations" in route
+        assert "configuration" in route
+        assert "additional" in route
+
+
+def test_filter_routes_by_provider_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    _test_filter_routes(
+        api_client=api_client,
+        user=superuser,
+        filters={  # Routes having Movebank as provider
+            "provider": str(provider_movebank_ewt.id)
+        },
+        expected_routes=[provider_movebank_ewt.default_route, route_2]
+    )
+
+
+def test_filter_routes_by_destination_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    selected_destination = integrations_list[6]
+    _test_filter_routes(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "destination": str(selected_destination.id)
+        },
+        expected_routes=[route_1]
+    )
+
+
+def test_filter_routes_by_destination_url_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    selected_destination = integrations_list[5]
+    _test_filter_routes(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "destination_url": str(selected_destination.base_url)
+        },
+        expected_routes=[route_1, route_2]
+    )
+
+
+def test_filter_routes_by_destination_url_as_org_admin(
+        api_client, org_admin_user_2, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    selected_destination = integrations_list[5]
+    _test_filter_routes(
+        api_client=api_client,
+        user=org_admin_user_2,
+        filters={
+            "provider": str(provider_movebank_ewt.id),
+            "destination_url__in": str(selected_destination.base_url)
+        },
+        expected_routes=[route_2]
+    )
+
+
+def test_global_search_routes_by_route_name_as_superuser(
+        api_client, superuser, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    _test_filter_routes(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "search_fields": "name",
+            "search": "Lotek"
+        },
+        expected_routes=[provider_lotek_panthera.default_route]
+    )
+
+
+def test_global_search_routes_by_destination_url_as_org_admin(
+        api_client, org_admin_user, organization, other_organization,
+        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        route_1, route_2
+):
+    selected_destination = route_1.destinations.last()
+    _test_filter_routes(
+        api_client=api_client,
+        user=org_admin_user,
+        filters={
+            "search_fields": "destinations__base_url",
+            "search": str(selected_destination.base_url)
+        },
+        expected_routes=[route_1]
+    )
