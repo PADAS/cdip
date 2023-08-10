@@ -1,14 +1,14 @@
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models, transaction
 from model_utils import FieldTracker
-from .tasks import deploy_serverless_dispatcher
+from .tasks import deploy_serverless_dispatcher, delete_serverless_dispatcher
 
 
 class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
     class Status(models.TextChoices):
         SCHEDULED = "sch", "Deployment Scheduled"  # Value, Display
         IN_PROGRESS = "pro", "Deployment In Progress"
-        ERROR = "err", "Deployment Failed"
+        ERROR = "err", "Failed"
         COMPLETE = "com", "Deployment Complete"
         DELETING = "del", "Deleting"
     status = models.CharField(
@@ -48,6 +48,12 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Configuration",
     )
+    topic_name = models.CharField(
+        max_length=500,
+        default="",
+        blank=True,
+        null=True
+    )
 
     tracker = FieldTracker()
 
@@ -74,3 +80,14 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
             self._pre_save(self, *args, **kwargs)
             super().save(*args, **kwargs)
             self._post_save(self, *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # First time trigger the deletion task
+        if self.status != DispatcherDeployment.Status.DELETING:
+            delete_serverless_dispatcher.delay(
+                deployment_id=str(self.id),
+                topic=self.topic_name
+            )
+        else:  # status == DELETING
+            # Now it can be truly removed from the DB. This is done by the deletion task.
+            super().delete(*args, **kwargs)

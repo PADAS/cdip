@@ -180,6 +180,21 @@ class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
         DispatcherDeploymentInline,
     ]
 
+    def delete_model(self, request, obj):
+        try:  # Is there a deployment?
+            deployment = obj.dispatcher_by_outbound
+        except Integration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
+            pass  # No deployment to delete
+        else:
+            deployment.delete()  # Trigger the deletion of the deployment
+        # Then delete the integration
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        # Overwritten to call deployment.delete() in bulk deletion
+        for obj in queryset:
+            self.delete_model(request, obj)
+
 
 @admin.register(BridgeIntegrationType)
 class BridgeIntegrationTypeAdmin(SimpleHistoryAdmin):
@@ -251,6 +266,21 @@ class IntegrationAdmin(admin.ModelAdmin):
     inlines = [
         DispatcherDeploymentInline,
     ]
+
+    def delete_model(self, request, obj):
+        try:  # Is there a deployment?
+            deployment = obj.dispatcher_by_integration
+        except Integration.dispatcher_by_integration.RelatedObjectDoesNotExist:
+            pass  # No deployment to delete
+        else:   # Delete deployment
+            deployment.delete()
+        # Delete the integration
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        # Overwritten to call deployment.delete() in bulk deletion
+        for obj in queryset:
+            self.delete_model(request, obj)
 
 
 @admin.register(IntegrationConfiguration)

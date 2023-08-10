@@ -18,6 +18,7 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
         "status",
         "status_details",
         "integration",
+        "topic_name",
         "legacy_integration",
         "created_at",
         "updated_at",
@@ -25,7 +26,8 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
     )
-    readonly_fields = (
-        "status", "status_details",
-    )
     actions = [restart_deployments]
+
+    def delete_queryset(self, request, queryset):
+        for deployment in queryset:
+            deployment.delete()
