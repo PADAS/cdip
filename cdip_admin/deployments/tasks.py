@@ -33,6 +33,8 @@ def deploy_serverless_dispatcher(deployment_id):
     project_id = env_vars.get("GCP_PROJECT_ID")
     topic = integration.additional.get("topic", "")  # ToDo: Use a default name
     topic_path = f'projects/{project_id}/topics/{topic}'
+    deployment.topic_name = topic  # Save the topic for retries or deletions
+    deployment.save()
 
     try:
         function_request = get_function_request(
@@ -60,30 +62,16 @@ def deploy_serverless_dispatcher(deployment_id):
 def delete_serverless_dispatcher(deployment_id, topic):
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
+    deployment.integration = None  # Unlink from integrations as they might be being deleted
+    deployment.legacy_integration = None
     deployment.status = DispatcherDeployment.Status.DELETING
     deployment.save()
 
-    # The integration was already deleted by the time this task runs.
-    # I added the topic name as another argument that this task can receive
-    # # Get settings from the database
-    # if deployment.integration:  # v2 models
-    #     integration = deployment.integration
-    # elif deployment.legacy_integration:  # legacy models
-    #     integration = deployment.legacy_integration
-    # else:
-    #     error_msg = f"Either integration or legacy_integration field must be set"
-    #     print(error_msg)
-    #     deployment.status = DispatcherDeployment.Status.ERROR
-    #     deployment.status_details = error_msg
-    #     deployment.save()
-    #     return
-    function_name = deployment.name  # or f"dispatch-{integration.id}-dev"
-    #topic = integration.additional.get("topic", "")
+    function_name = deployment.name
 
     try:
         function_request = delete_function(function_name=function_name)
         delete_topic(topic_name=topic)
-
         response = create_or_update_function(function_request=function_request)
         print(f"Delete complete.")
         print(response)
@@ -93,7 +81,6 @@ def delete_serverless_dispatcher(deployment_id, topic):
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg
         deployment.save()
-        return
     else:  # No errors deleting resources in GCP
         deployment.delete()  # Remove it from the DB
 
