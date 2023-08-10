@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.forms import ModelForm
 from simple_history.admin import SimpleHistoryAdmin
+from django.contrib import messages
 
 import deployments.models
 from .models import (
@@ -180,6 +181,32 @@ class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
         DispatcherDeploymentInline,
     ]
 
+    def delete_model(self, request, obj):
+        try:  # Is there a deployment?
+            deployment = obj.dispatcher_by_outbound
+        except OutboundIntegrationConfiguration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
+            pass  # No deployment to delete
+        else:  # Delete deployment
+            if deployment.status not in [  # Check if it's in a safe state to delete
+                deployments.models.DispatcherDeployment.Status.COMPLETE,
+                deployments.models.DispatcherDeployment.Status.ERROR
+            ]:
+                msg = f"Warning: related dispatcher cannot be deleted in the current status. You can delete it later from the deployments page."
+                messages.add_message(request, messages.WARNING, message=msg)
+            elif OutboundIntegrationConfiguration.objects.filter(
+                    additional__topic=deployment.topic_name).count() > 1:  # Check if the topic is being used by other integrations
+                msg = f"Warning: related dispatcher won't be deleted as it's being used by other integrations."
+                messages.add_message(request, messages.WARNING, message=msg)
+            else:  # It's safe to delete it
+                deployment.delete()
+        # Then delete the integration
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        # Overwritten to call deployment.delete() in bulk deletion
+        for obj in queryset:
+            self.delete_model(request, obj)
+
 
 @admin.register(BridgeIntegrationType)
 class BridgeIntegrationTypeAdmin(SimpleHistoryAdmin):
@@ -251,6 +278,31 @@ class IntegrationAdmin(admin.ModelAdmin):
     inlines = [
         DispatcherDeploymentInline,
     ]
+
+    def delete_model(self, request, obj):
+        try:  # Is there a deployment?
+            deployment = obj.dispatcher_by_integration
+        except Integration.dispatcher_by_integration.RelatedObjectDoesNotExist:
+            pass  # No deployment to delete
+        else:   # Delete deployment
+            if deployment.status not in [  # Check if it's in a safe state to delete
+                deployments.models.DispatcherDeployment.Status.COMPLETE,
+                deployments.models.DispatcherDeployment.Status.ERROR
+            ]:
+                msg = f"Warning: related dispatcher cannot be deleted in the current status. You can delete it later from the deployments page."
+                messages.add_message(request, messages.WARNING, message=msg)
+            elif Integration.objects.filter(additional__topic=deployment.topic_name).count() > 1:  # Check if the topic is being used by other integrations
+                msg = f"Warning: related dispatcher won't be deleted as it's being used by other integrations."
+                messages.add_message(request, messages.WARNING, message=msg)
+            else:  # It's safe to delete it
+                deployment.delete()
+        # Delete the integration
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        # Overwritten to call deployment.delete() in bulk deletion
+        for obj in queryset:
+            self.delete_model(request, obj)
 
 
 @admin.register(IntegrationConfiguration)
