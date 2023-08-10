@@ -184,10 +184,21 @@ class OutboundIntegrationConfigurationAdmin(SimpleHistoryAdmin):
     def delete_model(self, request, obj):
         try:  # Is there a deployment?
             deployment = obj.dispatcher_by_outbound
-        except Integration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
+        except OutboundIntegrationConfiguration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
             pass  # No deployment to delete
-        else:
-            deployment.delete()  # Trigger the deletion of the deployment
+        else:  # Delete deployment
+            if deployment.status not in [  # Check if it's in a safe state to delete
+                deployments.models.DispatcherDeployment.Status.COMPLETE,
+                deployments.models.DispatcherDeployment.Status.ERROR
+            ]:
+                msg = f"Warning: related dispatcher cannot be deleted in the current status. You can delete it later from the deployments page."
+                messages.add_message(request, messages.WARNING, message=msg)
+            elif OutboundIntegrationConfiguration.objects.filter(
+                    additional__topic=deployment.topic_name).count() > 1:  # Check if the topic is being used by other integrations
+                msg = f"Warning: related dispatcher won't be deleted as it's being used by other integrations."
+                messages.add_message(request, messages.WARNING, message=msg)
+            else:  # It's safe to delete it
+                deployment.delete()
         # Then delete the integration
         super().delete_model(request, obj)
 
