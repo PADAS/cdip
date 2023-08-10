@@ -48,6 +48,7 @@ def deploy_serverless_dispatcher(deployment_id):
         print(f"Deploy complete.")
         print(response)
         deployment.status = DispatcherDeployment.Status.COMPLETE
+        deployment.status_details = ""  # Clean previous errors
         deployment.save()
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
         error_msg = f"Error deploying function: {e}"

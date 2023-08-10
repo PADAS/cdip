@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.forms import ModelForm
 from simple_history.admin import SimpleHistoryAdmin
+from django.contrib import messages
 
 import deployments.models
 from .models import (
@@ -273,7 +274,17 @@ class IntegrationAdmin(admin.ModelAdmin):
         except Integration.dispatcher_by_integration.RelatedObjectDoesNotExist:
             pass  # No deployment to delete
         else:   # Delete deployment
-            deployment.delete()
+            if deployment.status not in [  # Check if it's in a safe state to delete
+                deployments.models.DispatcherDeployment.Status.COMPLETE,
+                deployments.models.DispatcherDeployment.Status.ERROR
+            ]:
+                msg = f"Warning: related dispatcher cannot be deleted in the current status. You can delete it later from the deployments page."
+                messages.add_message(request, messages.WARNING, message=msg)
+            elif Integration.objects.filter(additional__topic=deployment.topic_name).count() > 1:  # Check if the topic is being used by other integrations
+                msg = f"Warning: related dispatcher won't be deleted as it's being used by other integrations."
+                messages.add_message(request, messages.WARNING, message=msg)
+            else:  # It's safe to delete it
+                deployment.delete()
         # Delete the integration
         super().delete_model(request, obj)
 
