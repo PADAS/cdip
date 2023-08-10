@@ -275,6 +275,9 @@ CELERY_TASK_ROUTES = {
     "deployments.tasks.deploy_serverless_dispatcher": {
         "queue": "deployments", "routing_key": "deployments"
     },
+    "deployments.tasks.delete_serverless_dispatcher": {
+        "queue": "deployments", "routing_key": "deployments"
+    },
 }
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
