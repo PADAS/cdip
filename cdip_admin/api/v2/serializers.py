@@ -273,17 +273,18 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
         }
 
 
-class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
+class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField()
     action = serializers.PrimaryKeyRelatedField(queryset=IntegrationAction.objects.all())
 
     class Meta:
         model = IntegrationConfiguration
-        fields = ["action", "data"]
+        fields = ["id", "integration", "action", "data"]
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
-    configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
+    configurations = IntegrationConfigurationCreateUpdateSerializer(many=True, required=False)
     default_route = RoutingRuleSummarySerializer(read_only=True)
     create_default_route = serializers.BooleanField(default=True)
 
@@ -333,7 +334,18 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             ensure_default_route(integration=integration)
         return integration
 
-    # ToDo. Support updates with nested configurations too?
+    def update(self, instance, validated_data):
+        configurations = validated_data.pop("configurations", [])
+        # Update the integration
+        super().update(instance=instance, validated_data=validated_data)
+        # Update nested configurations if provided
+        if configurations:
+            config_objs = [IntegrationConfiguration(**config) for config in configurations]
+            try:
+                IntegrationConfiguration.objects.bulk_update(config_objs, ["data"])
+            except IntegrityError as e:
+                raise drf_exceptions.ValidationError(e)
+        return instance
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
