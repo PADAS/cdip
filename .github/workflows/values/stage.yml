@@ -30,7 +30,6 @@ admin_portal:
     GCP_PROJECT_ID: cdip-stage-78ca
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
     REDIS_HOST: "10.243.180.36"
-    KAFKA_BROKER: "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092"
     GS_BUCKET_NAME: "cdip-files-stage"
 kongplugin:
   cors:
