@@ -2,7 +2,9 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Integration, IntegrationAction, IntegrationType, get_user_integrations_qs
+    Integration,
+    IntegrationAction,
+    IntegrationConfiguration,
 )
 
 
@@ -943,3 +945,86 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
         },
         expected_integrations=[provider_lotek_panthera]
     )
+
+
+def _test_update_integration_config(
+        api_client, user, integration, configurations_data
+):
+    api_client.force_authenticate(user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": integration.id}),
+        data={
+          "configurations": configurations_data
+        },
+        format='json'
+    )
+    assert response.status_code == status.HTTP_200_OK
+    # Check that the configurations were updated in the database
+    integration.refresh_from_db()
+    assert len(configurations_data) == len(integration.configurations)
+    for config_data in configurations_data:
+        configuration = IntegrationConfiguration.objects.get(id=config_data["id"])
+        assert configuration.data == config_data["data"]
+        # Check that the config cannot be reassigned to other integration
+        assert configuration.integration == integration
+
+
+def test_update_integration_config_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions,
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    lotek_pull_positions_config = lotek_action_pull_positions.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user@lotek.com",
+                    "password": "NewP4sSW0rD"
+                }
+            },
+            {
+                "id": str(lotek_pull_positions_config.id),
+                "integration": str(provider_lotek_panthera.id),  # Optional, ignored
+                "action": str(lotek_action_pull_positions.id),  # Optional, ignored
+                "data": {
+                    "start_time": "2023-01-01T00:00:00Z"
+                }
+            }
+        ]
+    )
+
+
+def test_update_integration_config_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions,
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    lotek_pull_positions_config = lotek_action_pull_positions.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=superuser,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user@lotek.com",
+                    "password": "OtherP4sSW0rD"
+                }
+            },
+            {
+                "id": str(lotek_pull_positions_config.id),
+                "integration": str(provider_lotek_panthera.id),  # Optional, ignored
+                "action": str(lotek_action_pull_positions.id),  # Optional, ignored
+                "data": {
+                    "start_time": "2023-12-31T00:00:00Z"
+                }
+            }
+        ]
+    )
+
