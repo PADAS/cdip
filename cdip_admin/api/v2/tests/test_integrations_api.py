@@ -959,12 +959,29 @@ def _test_update_integration_config(
         format='json'
     )
     assert response.status_code == status.HTTP_200_OK
-    # Check that the configurations were updated in the database
     integration.refresh_from_db()
-    assert len(configurations_data) == len(integration.configurations)
-    for config_data in configurations_data:
-        configuration = IntegrationConfiguration.objects.get(id=config_data["id"])
-        assert configuration.data == config_data["data"]
+    # Check the API response
+    response_data = response.json()
+    assert "configurations" in response_data
+    for config_response in response_data["configurations"]:
+        assert "id" in config_response
+        assert "integration" in config_response
+        assert "action" in config_response
+        assert "data" in config_response
+    # Compare the response with request data
+    for config_request in configurations_data:
+        if "id" in config_request:  # Updated
+            config_response = next((c for c in response_data["configurations"] if c["id"] == config_request["id"]), None)
+            assert config_response
+            configuration = IntegrationConfiguration.objects.get(id=config_request["id"])
+        else:  # Created a new config
+            configuration = IntegrationConfiguration.objects.get(
+                integration=integration,
+                action_id=config_request["action"],
+                data=config_request["data"]
+            )
+        # Check that the new config was saved in the db
+        assert configuration.data == config_request["data"]
         # Check that the config cannot be reassigned to other integration
         assert configuration.integration == integration
 
@@ -1028,3 +1045,29 @@ def test_update_integration_config_as_superuser(
         ]
     )
 
+
+def test_update_or_create_integration_config_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions, lotek_action_list_devices
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {  # Config to be updated
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user2@lotek.com",
+                    "password": "OtherP4sSW0rD"
+                }
+            },
+            {  # New Config
+                "action": str(lotek_action_list_devices.id),  # Required for creation
+                "data": {
+                    "group_id": "1234"
+                }
+            }
+        ]
+    )
