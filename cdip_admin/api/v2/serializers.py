@@ -274,8 +274,9 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField()
-    action = serializers.PrimaryKeyRelatedField(queryset=IntegrationAction.objects.all())
+    id = serializers.UUIDField(required=False)
+    integration = serializers.PrimaryKeyRelatedField(required=False, queryset=Integration.objects.all())
+    action = serializers.PrimaryKeyRelatedField(required=False, queryset=IntegrationAction.objects.all())
 
     class Meta:
         model = IntegrationConfiguration
@@ -307,7 +308,12 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         Validate the configurations
         """
         for configuration in data.get("configurations", []):
-            action = configuration["action"]
+            if self.instance:  # Update
+                if "id" not in configuration:
+                    raise drf_exceptions.ValidationError(detail=f"Configuration id is required.")
+                action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
+            else:  # Create
+                action = configuration["action"]
             configuration_schema = action.schema
             if configuration_schema and not configuration:  # Blank or None
                 raise drf_exceptions.ValidationError("The configuration can't be null or empty")
