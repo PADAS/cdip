@@ -308,11 +308,11 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         Validate the configurations
         """
         for configuration in data.get("configurations", []):
-            if self.instance:  # Update
-                if "id" not in configuration:
-                    raise drf_exceptions.ValidationError(detail=f"Configuration id is required.")
+            if self.instance and "id" in configuration:  # Integration Update
                 action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
-            else:  # Create
+            else:  # Create a new integration or new config
+                if "action" not in configuration:
+                    raise drf_exceptions.ValidationError("The action id is required.")
                 action = configuration["action"]
             configuration_schema = action.schema
             if configuration_schema and not configuration:  # Blank or None
@@ -330,7 +330,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         # Create the integration
         integration = Integration.objects.create(**validated_data)
         # Create configurations if provided
-        for configuration in configurations:
+        for configuration in configurations:  # Usually less than 5-10 configs
             IntegrationConfiguration.objects.create(
                 integration=integration,
                 **configuration
@@ -344,13 +344,13 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         configurations = validated_data.pop("configurations", [])
         # Update the integration
         super().update(instance=instance, validated_data=validated_data)
-        # Update nested configurations if provided
-        if configurations:
-            config_objs = [IntegrationConfiguration(**config) for config in configurations]
-            try:
-                IntegrationConfiguration.objects.bulk_update(config_objs, ["data"])
-            except IntegrityError as e:
-                raise drf_exceptions.ValidationError(e)
+        # Update or Create nested configurations if provided
+        for config_data in configurations:  # Usually less than 5-10 configs
+            config_data["integration"] = self.instance
+            IntegrationConfiguration.objects.update_or_create(
+                id=config_data.get("id"),
+                defaults=config_data
+            )
         return instance
 
 
