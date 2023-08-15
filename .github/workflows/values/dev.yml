@@ -1,7 +1,7 @@
 serviceAccount: gundi-app-sa-b2b9960e@cdip-dev-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
-    - host: "admin.dev.gundiservice.org"
+    - host: "api.dev.gundiservice.org"
       paths:
         - path: /
           pathType: ImplementationSpecific
@@ -14,7 +14,7 @@ ingress:
   tls:
     - secretName: "admin-portal-tls"
       hosts:
-        - "admin.dev.gundiservice.org"
+        - "api.dev.gundiservice.org"
         - "sensors.api.dev.gundiservice.org"
 celery:
   worker:
@@ -35,7 +35,7 @@ admin_portal:
 kongplugin:
   cors:
     - https://dev.gundiservice.org
-    - https://admin.dev.gundiservice.org
+    - https://api.dev.gundiservice.org
 keycloak:
   KEYCLOAK_SERVER: "https://cdip-auth.pamdas.org"
   KEYCLOAK_REALM: "cdip-dev"
