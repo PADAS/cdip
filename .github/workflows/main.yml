@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - 'release-**'
+      - sik-2347-disable-gcp-on-ci
 
 jobs:
   vars:
