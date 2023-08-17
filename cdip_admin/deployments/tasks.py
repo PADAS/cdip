@@ -3,9 +3,17 @@ from google.cloud import pubsub_v1
 from google.cloud import functions_v2
 from google.api_core.exceptions import AlreadyExists
 from django.apps import apps
+from django.conf import settings
+from . import utils
 
-pubsub_client = pubsub_v1.PublisherClient()
-functions_client = functions_v2.FunctionServiceClient()
+
+if settings.GCP_ENVIRONMENT_ENABLED:
+    pubsub_client = pubsub_v1.PublisherClient()  # This raises  credentials error when running in th CI pipeline
+    functions_client = functions_v2.FunctionServiceClient()
+else:
+    pubsub_client = utils.PubSubDummyClient()
+    functions_client = utils.FunctionsDummyClient()
+
 
 
 @shared_task

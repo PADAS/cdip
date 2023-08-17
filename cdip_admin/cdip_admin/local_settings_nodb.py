@@ -7,3 +7,5 @@ DATABASES = {
         "NAME": "dummy-database",
     }
 }
+
+GCP_ENVIRONMENT_ENABLED = env.bool("GCP_ENVIRONMENT_ENABLED", default=False)
