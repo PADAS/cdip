@@ -31,7 +31,12 @@ def get_user_org(request, view) -> str:
     elif view.basename == "members":
         org_id = context.get("organization_pk")
     elif view.basename == "integrations":
-        org_id = request.data.get("owner")
+        if "owner" in request.data:  # New integration
+            org_id = request.data.get("owner")
+        elif integration_id := request.parser_context.get("kwargs", {}).get("pk"):  # Updating existent integration
+            org_id = str(Integration.objects.get(id=integration_id).owner.id)
+        else:
+            org_id = None
     elif view.basename == "connections":
         integration_id = request.data.get("pk")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
