@@ -14,6 +14,7 @@ import os
 import environ
 from pathlib import Path
 from django.utils.translation import ugettext_lazy as _
+from kombu import Exchange, Queue
 
 env = environ.Env()
 # reading .env file
@@ -92,6 +93,7 @@ INSTALLED_APPS = [
     "django_jsonform",
     "django_celery_beat",
     "storages",
+    "deployments",
 ]
 
 
@@ -263,6 +265,20 @@ CELERY_SEND_TASK_ERROR_EMAILS = False
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_DEFAULT_EXCHANGE = "default"
 CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
+
+CELERY_TASK_QUEUES = (
+    Queue("default", Exchange("default"), routing_key="default"),
+    Queue("deployments", Exchange("deployments"), routing_key="deployments"),
+)
+
+CELERY_TASK_ROUTES = {
+    "deployments.tasks.deploy_serverless_dispatcher": {
+        "queue": "deployments", "routing_key": "deployments"
+    },
+    "deployments.tasks.delete_serverless_dispatcher": {
+        "queue": "deployments", "routing_key": "deployments"
+    },
+}
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
 

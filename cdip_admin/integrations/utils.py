@@ -1,10 +1,9 @@
 import base64
 import logging
-
 import requests as requests
 from django.conf import settings
-from django.core.exceptions import PermissionDenied
 from rest_framework.utils import json
+
 
 KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
