@@ -2,11 +2,12 @@ import uuid
 from functools import cached_property
 import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Subquery
 from django.contrib.auth import get_user_model
 from integrations.utils import get_api_key
-
+from model_utils import FieldTracker
+# from integrations.utils import trigger_deployment_deletion
 
 User = get_user_model()
 
@@ -104,6 +105,8 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         verbose_name="Additional JSON Configuration"
     )
 
+    tracker = FieldTracker()
+
     class Meta:
         ordering = ("owner", "name", )
 
@@ -114,13 +117,25 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         pass
 
     def _post_save(self, *args, **kwargs):
+        # # Trigger the deployment deletion when the Integration is disabled
+        # if self.tracker.has_changed("enabled") and not self.enabled:
+        #     try:  # Is there a deployment?
+        #         deployment = self.dispatcher_by_integration
+        #         topic_name = self.additional.get("topic")
+        #     except Integration.dispatcher_by_integration.RelatedObjectDoesNotExist:
+        #         pass  # No deployment to delete
+        #     else:
+        #         trigger_deployment_deletion(
+        #             deployment_id=str(deployment.id),
+        #             topic_name=topic_name
+        #         )
         pass
 
     def save(self, *args, **kwargs):
-        self._pre_save(self, *args, **kwargs)
-        super().save(*args, **kwargs)
-        self._post_save(self, *args, **kwargs)
-
+        with self.tracker:
+            self._pre_save(self, *args, **kwargs)
+            super().save(*args, **kwargs)
+            self._post_save(self, *args, **kwargs)
 
     @property
     def configurations(self):
