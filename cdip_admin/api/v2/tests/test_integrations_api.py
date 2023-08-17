@@ -2,7 +2,9 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Integration, IntegrationAction, IntegrationType, get_user_integrations_qs
+    Integration,
+    IntegrationAction,
+    IntegrationConfiguration,
 )
 
 
@@ -942,4 +944,130 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
             "action_type": "pull",  # Provider
         },
         expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def _test_update_integration_config(
+        api_client, user, integration, configurations_data
+):
+    api_client.force_authenticate(user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": integration.id}),
+        data={
+          "configurations": configurations_data
+        },
+        format='json'
+    )
+    assert response.status_code == status.HTTP_200_OK
+    integration.refresh_from_db()
+    # Check the API response
+    response_data = response.json()
+    assert "configurations" in response_data
+    for config_response in response_data["configurations"]:
+        assert "id" in config_response
+        assert "integration" in config_response
+        assert "action" in config_response
+        assert "data" in config_response
+    # Compare the response with request data
+    for config_request in configurations_data:
+        if "id" in config_request:  # Updated
+            config_response = next((c for c in response_data["configurations"] if c["id"] == config_request["id"]), None)
+            assert config_response
+            configuration = IntegrationConfiguration.objects.get(id=config_request["id"])
+        else:  # Created a new config
+            configuration = IntegrationConfiguration.objects.get(
+                integration=integration,
+                action_id=config_request["action"],
+                data=config_request["data"]
+            )
+        # Check that the new config was saved in the db
+        assert configuration.data == config_request["data"]
+        # Check that the config cannot be reassigned to other integration
+        assert configuration.integration == integration
+
+
+def test_update_integration_config_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions,
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    lotek_pull_positions_config = lotek_action_pull_positions.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user@lotek.com",
+                    "password": "NewP4sSW0rD"
+                }
+            },
+            {
+                "id": str(lotek_pull_positions_config.id),
+                "integration": str(provider_lotek_panthera.id),  # Optional, ignored
+                "action": str(lotek_action_pull_positions.id),  # Optional, ignored
+                "data": {
+                    "start_time": "2023-01-01T00:00:00Z"
+                }
+            }
+        ]
+    )
+
+
+def test_update_integration_config_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions,
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    lotek_pull_positions_config = lotek_action_pull_positions.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=superuser,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user@lotek.com",
+                    "password": "OtherP4sSW0rD"
+                }
+            },
+            {
+                "id": str(lotek_pull_positions_config.id),
+                "integration": str(provider_lotek_panthera.id),  # Optional, ignored
+                "action": str(lotek_action_pull_positions.id),  # Optional, ignored
+                "data": {
+                    "start_time": "2023-12-31T00:00:00Z"
+                }
+            }
+        ]
+    )
+
+
+def test_update_or_create_integration_config_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions, lotek_action_list_devices
+):
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    _test_update_integration_config(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera,
+        configurations_data=[
+            {  # Config to be updated
+                "id": str(lotek_auth_config.id),
+                "data": {
+                    "username": "user2@lotek.com",
+                    "password": "OtherP4sSW0rD"
+                }
+            },
+            {  # New Config
+                "action": str(lotek_action_list_devices.id),  # Required for creation
+                "data": {
+                    "group_id": "1234"
+                }
+            }
+        ]
     )
