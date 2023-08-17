@@ -292,19 +292,42 @@ def lotek_action_pull_positions(integration_type_lotek):
         type=IntegrationAction.ActionTypes.PULL_DATA,
         name="Pull Positions",
         value="pull_positions",
-        description="Pull Tracking data from Move Bank API",
+        description="Pull Tracking data from Lotek API",
         schema={
             "type": "object",
             "required": [
                 "start_time"
             ],
             "properties": {
-                "max_records_per_individual": {
+                "start_time": {
                     "type": "string"
                 }
             }
         }
     )
+
+
+@pytest.fixture
+def lotek_action_list_devices(integration_type_lotek):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_lotek,
+        type=IntegrationAction.ActionTypes.GENERIC,
+        name="List Devices",
+        value="list_devices",
+        description="Pull devices list from Lotek API",
+        schema={
+            "type": "object",
+            "required": [
+                "group_id"
+            ],
+            "properties": {
+                "group_id": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
 
 
 @pytest.fixture

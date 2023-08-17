@@ -273,17 +273,19 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
         }
 
 
-class IntegrationConfigurationCreateSerializer(serializers.ModelSerializer):
-    action = serializers.PrimaryKeyRelatedField(queryset=IntegrationAction.objects.all())
+class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False)
+    integration = serializers.PrimaryKeyRelatedField(required=False, queryset=Integration.objects.all())
+    action = serializers.PrimaryKeyRelatedField(required=False, queryset=IntegrationAction.objects.all())
 
     class Meta:
         model = IntegrationConfiguration
-        fields = ["action", "data"]
+        fields = ["id", "integration", "action", "data"]
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
-    configurations = IntegrationConfigurationCreateSerializer(many=True, required=False)
+    configurations = IntegrationConfigurationCreateUpdateSerializer(many=True, required=False)
     default_route = RoutingRuleSummarySerializer(read_only=True)
     create_default_route = serializers.BooleanField(default=True)
 
@@ -306,7 +308,12 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         Validate the configurations
         """
         for configuration in data.get("configurations", []):
-            action = configuration["action"]
+            if self.instance and "id" in configuration:  # Integration Update
+                action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
+            else:  # Create a new integration or new config
+                if "action" not in configuration:
+                    raise drf_exceptions.ValidationError("The action id is required.")
+                action = configuration["action"]
             configuration_schema = action.schema
             if configuration_schema and not configuration:  # Blank or None
                 raise drf_exceptions.ValidationError("The configuration can't be null or empty")
@@ -323,7 +330,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         # Create the integration
         integration = Integration.objects.create(**validated_data)
         # Create configurations if provided
-        for configuration in configurations:
+        for configuration in configurations:  # Usually less than 5-10 configs
             IntegrationConfiguration.objects.create(
                 integration=integration,
                 **configuration
@@ -333,7 +340,18 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             ensure_default_route(integration=integration)
         return integration
 
-    # ToDo. Support updates with nested configurations too?
+    def update(self, instance, validated_data):
+        configurations = validated_data.pop("configurations", [])
+        # Update the integration
+        super().update(instance=instance, validated_data=validated_data)
+        # Update or Create nested configurations if provided
+        for config_data in configurations:  # Usually less than 5-10 configs
+            config_data["integration"] = self.instance
+            IntegrationConfiguration.objects.update_or_create(
+                id=config_data.get("id"),
+                defaults=config_data
+            )
+        return instance
 
 
 class IntegrationSummarySerializer(serializers.ModelSerializer):
