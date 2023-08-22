@@ -22,8 +22,7 @@ celery:
 eventsConsumer:
   replicaCount: 2
 database:
-  private_ip_enabled: True
-  connection_name: "cdip-prod1-78ca:us-central1:sintegrate-4bb07e9c"
+  connection_name: "cdip-78ca:us-central1:postgres-cdip-prod01"
 admin_portal:
   env:
     TRACE_ENVIRONMENT: "prod"
