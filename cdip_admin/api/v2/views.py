@@ -139,6 +139,8 @@ class IntegrationsView(viewsets.ModelViewSet):
             return v2_serializers.IntegrationURLSerializer
         if self.action == "owners":
             return v2_serializers.IntegrationOwnerSerializer
+        if self.action == "api_key":
+            return v2_serializers.IntegrationApiKeySerializer
         return v2_serializers.IntegrationRetrieveFullSerializer
 
     def get_queryset(self):
@@ -151,6 +153,10 @@ class IntegrationsView(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def urls(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path="api-key")
+    def api_key(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'])
     def owners(self, request, *args, **kwargs):
