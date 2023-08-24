@@ -679,12 +679,6 @@ class EventCreateSerializer(GundiTraceSerializer):
     class Meta:
         list_serializer_class = EventBulkCreateSerializer
 
-    def validate_integration(self, value):
-        # ToDo: How do we get the integration id injected based on the API Key being used
-        # ToDo: Check that the user is allowed to see that integration
-        # user = self.context["request"].user
-        return value
-
     def validate_location(self, value):
         # I must contain lat and lon and other extra fields are accepted
         if "lat" not in value or "lon" not in value:
@@ -769,12 +763,6 @@ class ObservationCreateSerializer(GundiTraceSerializer):
 
     class Meta:
         list_serializer_class = ObservationBulkCreateSerializer
-
-    def validate_integration(self, value):
-        # ToDo: How do we get the integration id injected based on the API Key being used
-        # ToDo: Check that the user is allowed to see that integration
-        # user = self.context["request"].user
-        return value
 
     def validate_location(self, value):
         # I must contain lat and lon and other extra fields are accepted
