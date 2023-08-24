@@ -1071,3 +1071,39 @@ def test_update_or_create_integration_config_as_org_admin(
             }
         ]
     )
+
+
+def _test_get_integration_api_key(
+        api_client, user, integration
+):
+    api_client.force_authenticate(user)
+    url = f'{reverse("integrations-detail", kwargs={"pk": integration.id})}api-key/'
+    response = api_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    # Check that a non-empty API Key is returned
+    response_data = response.json()
+    assert response_data.get("api_key")
+
+
+def test_get_integration_api_key_as_org_admin(
+        api_client, mocker, mock_get_api_key, org_admin_user, organization, provider_lotek_panthera
+):
+    mocker.patch("integrations.models.v2.Integration.api_key", mock_get_api_key)
+    _test_get_integration_api_key(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera
+    )
+    assert mock_get_api_key.called
+
+
+def test_get_integration_api_key_as_superuser(
+        api_client, mocker, mock_get_api_key, superuser, organization, provider_lotek_panthera
+):
+    mocker.patch("integrations.models.v2.Integration.api_key", mock_get_api_key)
+    _test_get_integration_api_key(
+        api_client=api_client,
+        user=superuser,
+        integration=provider_lotek_panthera
+    )
+    assert mock_get_api_key.called
