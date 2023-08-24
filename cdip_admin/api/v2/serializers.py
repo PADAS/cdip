@@ -382,6 +382,12 @@ class IntegrationOwnerSerializer(serializers.ModelSerializer):
         fields = ("id", "name", )
 
 
+class IntegrationApiKeySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Integration
+        fields = ("api_key", )
+
+
 class ConnectionRetrieveSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     provider = serializers.SerializerMethodField()
