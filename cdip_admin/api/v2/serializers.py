@@ -14,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError
 from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
-from .utils import send_events_to_routing, send_attachments_to_routing
+from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing
 
 User = get_user_model()
 
@@ -721,6 +721,93 @@ class EventCreateSerializer(GundiTraceSerializer):
         data = super().validate(data)
         # Validate that either location or geometry is provided
         if not ("location" in data or "geometry" in data):
+            raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=data["integration"],
+            external_id=data["source"]
+        )
+        data["source"] = source
+        return data
+
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement once we support updating events
+
+
+class ObservationBulkCreateSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of observations
+    """
+
+    def create(self, validated_data):
+        observations = [self.child.create(attrs) for attrs in validated_data]
+        try:
+            new_observations = GundiTrace.objects.bulk_create(observations)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        else:
+            # Publish messages to a topic to be processed by routing services
+            observation_ids = [str(event.object_id) for event in new_observations]
+            send_observations_to_routing(
+                observations=validated_data,
+                gundi_ids=observation_ids
+            )
+        return new_observations
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class ObservationCreateSerializer(GundiTraceSerializer):
+    object_type = serializers.HiddenField(default=StreamPrefixEnum.observation.value)
+    type = serializers.CharField(write_only=True, required=False)
+    subject_type = serializers.CharField(write_only=True, required=False)
+    recorded_at = serializers.DateTimeField(write_only=True)
+    location = serializers.JSONField(write_only=True, required=False)
+    additional = serializers.JSONField(write_only=True, required=False)
+    annotations = serializers.JSONField(write_only=True, required=False)
+
+    class Meta:
+        list_serializer_class = ObservationBulkCreateSerializer
+
+    def validate_integration(self, value):
+        # ToDo: How do we get the integration id injected based on the API Key being used
+        # ToDo: Check that the user is allowed to see that integration
+        # user = self.context["request"].user
+        return value
+
+    def validate_location(self, value):
+        # I must contain lat and lon and other extra fields are accepted
+        if "lat" not in value or "lon" not in value:
+            raise drf_exceptions.ValidationError(detail=f"'location' requires 'lat' and 'lon'.")
+        return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        # Store the user when possible. API Key authenticated requests are not related to a user
+        created_by = user if user and not user.is_anonymous else None
+        # Don't save to the DB if it's a bulk create
+        instance = GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data["integration"],
+            related_to=validated_data.get("related_to"),
+            object_type=validated_data["object_type"],
+            created_by=created_by
+            # Other fields are filled in later by the routing services
+        )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+            send_observations_to_routing(
+                observations=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
+        return instance
+
+    def validate(self, data):
+        data = super().validate(data)
+        # Validate that either location or geometry is provided
+        if "location" not in data:
             raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
