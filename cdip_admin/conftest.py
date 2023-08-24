@@ -1,4 +1,6 @@
 import base64
+from unittest.mock import PropertyMock
+
 import pytest
 import random
 from typing import NamedTuple, Any
@@ -970,6 +972,11 @@ def trap_tagger_observation_delivery_failed_event(mocker, trap_tagger_event_trac
     data_bytes = json.dumps(event_dict).encode('utf-8')
     message.data = data_bytes
     return message
+
+
+@pytest.fixture
+def mock_get_api_key():
+    return PropertyMock(return_value="TestAp1k3y1234")
 
 
 ########################################################################################################################
