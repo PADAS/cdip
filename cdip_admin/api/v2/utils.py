@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
-from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event
+from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation
 from core import tracing, cache
 from opentelemetry import trace
 
@@ -13,11 +13,8 @@ from opentelemetry import trace
 deduplication_db = cache.get_deduplication_db()
 
 
-# ToDo: Retry on failure?
-def is_duplicate_event(data: dict):
-
+def is_duplicate_data(data: dict, expiration_time):
     jsonified_data = json.dumps(data, default=str)
-
     # For a short time, check both the legacy, simple hash too.
     hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
     integration_id = str(data['integration'].id)
@@ -27,7 +24,7 @@ def is_duplicate_event(data: dict):
     # Discard duplicates
     is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
     deduplication_db.setex(
-        hash, settings.GEOEVENT_DUPLICATE_CHECK_SECONDS, 1
+        hash, expiration_time, 1
     )
     deduplication_db.delete(hash_v1)
     return is_duplicate
@@ -36,7 +33,7 @@ def is_duplicate_event(data: dict):
 def is_duplicate_attachment(data: dict):
     integration_id = str(data["integration"].id)
     source = data.get('source')
-    source_id = str(source.id if source else None)  # FixMe: Get source from event
+    source_id = str(source.id if source else None)
     related_to = str(data["related_to"])
     jsonified_data = json.dumps({
         "filename": data["file"].name,
@@ -70,7 +67,7 @@ def send_events_to_routing(events, gundi_ids):
             )
 
             # Check for duplicates
-            is_duplicate = is_duplicate_event(data=event)
+            is_duplicate = is_duplicate_data(data=event, expiration_time=settings.GEOEVENT_DUPLICATE_CHECK_SECONDS)
             if is_duplicate:
                 current_span.set_attribute("is_duplicate", True)
                 current_span.add_event(
@@ -95,7 +92,7 @@ def send_events_to_routing(events, gundi_ids):
                     location=Location(
                         lon=event.get("location", {}).get("lon"),  # Longitude
                         lat=event.get("location", {}).get("lat"),  # Latitude
-                        alt=event.get("location", {}).get("alt"),  # Altitude
+                        alt=event.get("location", {}).get("alt", 0.0),  # Altitude
                         hdop=event.get("location", {}).get("hdop"),
                         vdop=event.get("location", {}).get("vdop")
                     ),
@@ -180,6 +177,75 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
+                        "gundi_version": "v2",  # Add the version so routing knows how to handle it
+                        "gundi_id": str(gundi_id)
+                    },
+                )
+
+
+def send_observations_to_routing(observations, gundi_ids):
+    publisher = get_publisher()
+
+    for observation, gundi_id in zip(observations, gundi_ids):
+        # Trace observations with Open Telemetry
+        with tracing.tracer.start_as_current_span(
+                f"gundi_api.process_observation", kind=trace.SpanKind.PRODUCER
+        ) as current_span:
+            tracing.instrumentation.enrich_span_with_environment(
+                span=current_span
+            )
+
+            # Check for duplicates
+            is_duplicate = is_duplicate_data(
+                data=observation,
+                expiration_time=settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
+            )
+            if is_duplicate:
+                current_span.set_attribute("is_duplicate", True)
+                current_span.add_event(
+                    name=f"gundi_api.duplicate.observation_discarded"
+                )
+                continue
+
+            with tracing.tracer.start_as_current_span(
+                    f"gundi_api.send_observations_to_routing", kind=trace.SpanKind.PRODUCER
+            ) as current_span:
+                # Convert the event to the schema supported by routing
+                integration = observation.get("integration")
+                source = observation.get("source")
+                location = observation.get("location", {})
+                msg_for_routing = Observation(
+                    gundi_id=str(gundi_id),
+                    related_to=observation.get("related_to"),
+                    owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                    data_provider_id=str(integration.id),
+                    annotations=observation.get("annotations", {}),
+                    source_id=str(source.id),
+                    external_source_id=str(source.external_id),
+                    source_name=str(source.name),
+                    type=observation.get("type"),
+                    subject_type=observation.get("subject_type"),
+                    recorded_at=observation.get("recorded_at"),
+                    location=Location(
+                        lon=location.get("lon"),  # Longitude
+                        lat=location.get("lat"),  # Latitude
+                        alt=location.get("alt", 0.0),  # Altitude
+                        hdop=location.get("hdop"),
+                        vdop=location.get("vdop")
+                    ),
+                    additional=observation.get("additional", {}),
+                    observation_type=StreamPrefixEnum.observation.value
+                )
+                tracing.instrumentation.enrich_span_from_observation(
+                    span=current_span, observation=msg_for_routing, gundi_version="v2"
+                )
+                # Send message to routing services
+                # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
+                publisher.publish(
+                    topic=TopicEnum.observations_unprocessed.value,
+                    data=json.loads(msg_for_routing.json()),  # This is suboptimal. It's fixed in pydantic v2
+                    extra={
+                        "observation_type": StreamPrefixEnum.observation.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
                         "gundi_id": str(gundi_id)
                     },
