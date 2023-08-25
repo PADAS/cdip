@@ -310,8 +310,20 @@ class RoutesView(viewsets.ModelViewSet):
         return get_user_routes_qs(user=self.request.user)
 
 
+class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
+
+    def create(self, request, *args, **kwargs):
+        # We accept a single object or a list
+        many = isinstance(request.data, list)
+        serializer = self.get_serializer(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, headers=headers)
+
+
 class EventsView(
-    mixins.CreateModelMixin,
+    SingleOrBulkCreateModelMixin,
     viewsets.GenericViewSet
 ):
     """
@@ -322,14 +334,18 @@ class EventsView(
     serializer_class = v2_serializers.EventCreateSerializer
     queryset = GundiTrace.objects.all()
 
-    def create(self, request, *args, **kwargs):
-        # We accept a single event or a list
-        many = isinstance(request.data, list)
-        serializer = self.get_serializer(data=request.data, many=many)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, headers=headers)
+
+class ObservationsView(
+    SingleOrBulkCreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for sending Observations (a.k.a Positions).
+    """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
+    serializer_class = v2_serializers.ObservationCreateSerializer
+    queryset = GundiTrace.objects.all()
 
 
 class AttachmentViewSet(
