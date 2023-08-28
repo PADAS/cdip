@@ -2,6 +2,7 @@ import csv
 import logging
 import aiofiles
 import pydantic
+import os
 
 from asgiref.sync import async_to_sync
 from datetime import datetime, timezone
@@ -93,3 +94,6 @@ async def send_permissions_to_movebank(filename: str):
         )
 
     await client.close()  # Close the session used to send requests
+
+    # Permissions file upload was successful, removing CSV file...
+    os.remove(filename)
