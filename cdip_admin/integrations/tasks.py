@@ -1,29 +1,19 @@
 import csv
+import logging
 import aiofiles
+import pydantic
 
 from asgiref.sync import async_to_sync
 from datetime import datetime, timezone
 from celery import shared_task
-from google.cloud import pubsub_v1
-from google.cloud import functions_v2
 from django.apps import apps
-from django.conf import settings
-from utils import utils
 from movebank_client import MovebankClient, PermissionOperations
 
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions, MBPermissionsActionConfig, MBUserPermission
 
 
-if settings.GCP_ENVIRONMENT_ENABLED:
-    pubsub_client = pubsub_v1.PublisherClient()  # This raises  credentials error when running in th CI pipeline
-    functions_client = functions_v2.FunctionServiceClient()
-else:
-    pubsub_client = utils.PubSubDummyClient()
-    functions_client = utils.FunctionsDummyClient()
-
-
-logger = utils.logger
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -42,12 +32,17 @@ def recreate_and_send_movebank_permissions_csv_file():
     ).values('additional')
 
     for mb_config in movebank_configs_v1:
-        permissions = MBPermissionsActionConfig.parse_obj(mb_config["additional"]["permissions"])
-        if not permissions.permissions:  # if parsing went wrong
-            permissions.permissions = []
-        v1_configs += len(permissions.permissions)
-        for config in permissions.permissions:
-            configs.append(config)
+        try:
+            permissions = MBPermissionsActionConfig.parse_obj(mb_config["additional"]["permissions"])
+        except pydantic.ValidationError:
+            logger.exception('Error parsing MBPermissionsActionConfig model', extra={'needs_attention': True})
+            return
+        else:
+            if not permissions.permissions:  # if parsing went ok but no permissions
+                permissions.permissions = []
+            v1_configs += len(permissions.permissions)
+            for config in permissions.permissions:
+                configs.append(config)
 
     # V2 configs
     IntegrationConfiguration = apps.get_model("integrations", "IntegrationConfiguration")
@@ -57,12 +52,17 @@ def recreate_and_send_movebank_permissions_csv_file():
     ).values('data')
 
     for mb_config in movebank_configs_v2:
-        permissions = MBPermissionsActionConfig.parse_obj(mb_config["data"])
-        if not permissions.permissions:  # if parsing went wrong
-            permissions.permissions = []
-        v2_configs += len(permissions.permissions)
-        for config in permissions.permissions:
-            configs.append(config)
+        try:
+            permissions = MBPermissionsActionConfig.parse_obj(mb_config["data"])
+        except pydantic.ValidationError:
+            logger.exception('Error parsing MBPermissionsActionConfig model', extra={'needs_attention': True})
+            return
+        else:
+            if not permissions.permissions:  # if parsing went ok but no permissions
+                permissions.permissions = []
+            v2_configs += len(permissions.permissions)
+            for config in permissions.permissions:
+                configs.append(config)
 
     logger.info(f' -- Got {len(configs)} user/tag rows (v1: {v1_configs}, v2: {v2_configs}) --')
 
