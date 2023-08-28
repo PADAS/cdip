@@ -3,6 +3,8 @@ import logging
 import requests as requests
 from django.conf import settings
 from rest_framework.utils import json
+from gundi_core.schemas.v1 import DestinationTypes
+from gundi_core.schemas.v2 import MovebankActions
 
 
 KONG_PROXY_URL = settings.KONG_PROXY_URL
@@ -76,3 +78,28 @@ def get_api_key(integration):
             logger.exception("failed getting API key for consumer %s", integration)
 
     return create_api_key(integration)
+
+
+def does_movebank_permissions_config_changed(integration_config, gundi_version):
+    if gundi_version == "v2":
+        # is Movebank?
+        if integration_config.integration.type.value != DestinationTypes.Movebank.value:
+            return False
+        # is PERMISSIONS action?
+        if integration_config.action.value != MovebankActions.PERMISSIONS.value:
+            return False
+        # JSON config changed?
+        if not integration_config.tracker.has_changed("data"):
+            return False
+        return True
+    else:
+        # is Movebank?
+        if integration_config.type.slug != DestinationTypes.Movebank.value:
+            return False
+        # JSON config changed?
+        if not integration_config.tracker.has_changed("additional") \
+                or "permissions" not in integration_config.additional.keys():
+            return False
+        return True
+
+
