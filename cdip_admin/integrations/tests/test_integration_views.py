@@ -66,7 +66,7 @@ def test_get_inbound_integration_type_detail_global_admin(
 
     assert response.status_code == 200
 
-    response.context["module"].id == iit.id
+    assert response.context["module"].id == iit.id
 
 
 def test_get_inbound_integration_type_detail_organization_member(
@@ -83,7 +83,7 @@ def test_get_inbound_integration_type_detail_organization_member(
 
     assert response.status_code == 200
 
-    response.context["module"].id == iit.id
+    assert response.context["module"].id == iit.id
 
 
 def test_get_inbound_integration_configuration_list_global_admin(
@@ -331,7 +331,7 @@ def test_get_outbound_integration_type_detail_global_admin(
 
     assert response.status_code == 200
 
-    response.context["module"].id == oit.id
+    assert response.context["module"].id == oit.id
 
 
 def test_get_outbound_integration_type_detail_organization_member(
@@ -348,7 +348,7 @@ def test_get_outbound_integration_type_detail_organization_member(
 
     assert response.status_code == 200
 
-    response.context["module"].id == oit.id
+    assert response.context["module"].id == oit.id
 
 
 def test_get_outbound_integration_configuration_list_global_admin(
@@ -712,7 +712,7 @@ def test_get_device_detail_global_admin(client, global_admin_user, setup_data):
 
     assert response.status_code == 200
 
-    response.context["device"].id == d.id
+    assert response.context["device"].id == d.id
 
 
 def test_get_device_detail_organization_member(
@@ -729,7 +729,7 @@ def test_get_device_detail_organization_member(
 
     assert response.status_code == 200
 
-    response.context["device"].id == d.id
+    assert response.context["device"].id == d.id
 
 
 def test_device_list_global_admin(client, global_admin_user):

@@ -5,6 +5,7 @@ pytest-pythonpath==0.7.4
 pytest-mimesis==1.1.0
 pytest-cov==4.0.0
 pytest-xdist==3.2.1
+pytest_httpx
 xmlunittest==0.5.0
 pre-commit==3.2.0
 pytest-mock==3.10.0
