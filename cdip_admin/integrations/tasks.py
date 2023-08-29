@@ -14,11 +14,12 @@ from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions, MBPermissionsActionConfig, MBUserPermission
 
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 @shared_task
-def recreate_and_send_movebank_permissions_csv_file():
+def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     logger.info(' -- Recreating Movebank permissions CSV file... --')
 
     configs = []
@@ -79,27 +80,30 @@ def recreate_and_send_movebank_permissions_csv_file():
 
     logger.info(f' -- Got {len(configs)} user/tag rows (v1: {v1_configs}, v2: {v2_configs}) --')
 
-    with tempfile.NamedTemporaryFile(mode='w', delete=False) as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=MBUserPermission.schema().get("required"))
-        writer.writeheader()
-        for config in configs:
-            writer.writerow(config.dict(by_alias=True))
+    if configs:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=MBUserPermission.schema().get("required"))
+            writer.writeheader()
+            for config in configs:
+                writer.writerow(config.dict(by_alias=True))
 
-    logger.info(f' -- CSV temp file created successfully. --')
-    logger.info(f' -- Sending CSV file to Movebank... --')
+        logger.info(f' -- CSV temp file created successfully. --')
+        logger.info(f' -- Sending CSV file to Movebank... --')
 
-    send_permissions_to_movebank(csvfile.name)
+        send_permissions_to_movebank(csvfile.name, **kwargs)
 
-    logger.info(f' -- CSV file uploaded to Movebank successfully --')
+        logger.info(f' -- CSV file uploaded to Movebank successfully --')
 
-    # Permissions file upload was successful, removing CSV file...
-    csvfile.close()
-    os.unlink(csvfile.name)
+        # Permissions file upload was successful, removing CSV file...
+        csvfile.close()
+        os.unlink(csvfile.name)
+    else:
+        logger.info(' -- No configs available to send --')
 
 
 @async_to_sync
-async def send_permissions_to_movebank(filename: str):
-    client = MovebankClient()
+async def send_permissions_to_movebank(filename: str, **kwargs):
+    client = MovebankClient(**kwargs)
     # Send permissions CSV file to Movebank
     async with aiofiles.open(filename, mode='rb') as perm_file:
         await client.post_permissions(
