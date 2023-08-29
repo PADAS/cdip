@@ -2,10 +2,10 @@ import csv
 import logging
 import aiofiles
 import pydantic
+import tempfile
 import os
 
 from asgiref.sync import async_to_sync
-from datetime import datetime, timezone
 from celery import shared_task
 from django.apps import apps
 from movebank_client import MovebankClient, PermissionOperations
@@ -30,14 +30,20 @@ def recreate_and_send_movebank_permissions_csv_file():
     movebank_configs_v1 = OutboundIntegrationConfiguration.objects.filter(
         type__slug=DestinationTypes.Movebank.value,
         additional__has_key="permissions"
-    ).values('additional')
+    ).values('id', 'additional')
 
     for mb_config in movebank_configs_v1:
         try:
             permissions = MBPermissionsActionConfig.parse_obj(mb_config["additional"]["permissions"])
         except pydantic.ValidationError:
-            logger.exception('Error parsing MBPermissionsActionConfig model', extra={'needs_attention': True})
-            return
+            logger.exception(
+                'Error parsing MBPermissionsActionConfig model (v1)',
+                extra={
+                    'outbound_config_id': str(mb_config["id"]),
+                    'needs_attention': True
+                }
+            )
+            continue
         else:
             if not permissions.permissions:  # if parsing went ok but no permissions
                 permissions.permissions = []
@@ -50,14 +56,20 @@ def recreate_and_send_movebank_permissions_csv_file():
     movebank_configs_v2 = IntegrationConfiguration.objects.filter(
         integration__type__value=DestinationTypes.Movebank.value,
         action__value=MovebankActions.PERMISSIONS.value
-    ).values('data')
+    ).values('id', 'data')
 
     for mb_config in movebank_configs_v2:
         try:
             permissions = MBPermissionsActionConfig.parse_obj(mb_config["data"])
         except pydantic.ValidationError:
-            logger.exception('Error parsing MBPermissionsActionConfig model', extra={'needs_attention': True})
-            return
+            logger.exception(
+                'Error parsing MBPermissionsActionConfig model (v2)',
+                extra={
+                    'config_id': str(mb_config["id"]),
+                    'needs_attention': True
+                }
+            )
+            continue
         else:
             if not permissions.permissions:  # if parsing went ok but no permissions
                 permissions.permissions = []
@@ -67,19 +79,22 @@ def recreate_and_send_movebank_permissions_csv_file():
 
     logger.info(f' -- Got {len(configs)} user/tag rows (v1: {v1_configs}, v2: {v2_configs}) --')
 
-    filename = 'movebank_permissions_{}'.format(datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
-    with open(filename, 'w', newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=MBUserPermission.schema().get("required"))
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=MBUserPermission.schema().get("required"))
         writer.writeheader()
         for config in configs:
             writer.writerow(config.dict(by_alias=True))
 
-    logger.info(f' -- CSV file created successfully. filename: {filename} --')
+    logger.info(f' -- CSV temp file created successfully. --')
     logger.info(f' -- Sending CSV file to Movebank... --')
 
-    send_permissions_to_movebank(filename)
+    send_permissions_to_movebank(csvfile.name)
 
     logger.info(f' -- CSV file uploaded to Movebank successfully --')
+
+    # Permissions file upload was successful, removing CSV file...
+    csvfile.close()
+    os.unlink(csvfile.name)
 
 
 @async_to_sync
@@ -92,8 +107,4 @@ async def send_permissions_to_movebank(filename: str):
             csv_file=perm_file,
             operation=PermissionOperations.UPDATE_USER_PRIVILEGES
         )
-
     await client.close()  # Close the session used to send requests
-
-    # Permissions file upload was successful, removing CSV file...
-    os.remove(filename)
