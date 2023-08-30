@@ -40,8 +40,8 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v1)',
                 extra={
-                    'outbound_config_id': str(mb_config["id"]),
-                    'needs_attention': True
+                    'outbound_integration_id': str(mb_config["id"]),
+                    'attention_needed': True
                 }
             )
             continue
@@ -66,8 +66,8 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v2)',
                 extra={
-                    'config_id': str(mb_config["id"]),
-                    'needs_attention': True
+                    'gundi_id': str(mb_config["id"]),
+                    'attention_needed': True
                 }
             )
             continue
