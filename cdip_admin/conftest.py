@@ -1368,3 +1368,22 @@ def setup_account_profile_mapping(mapping):
         apo = AccountProfileOrganization.objects.create(
             accountprofile=ap, organization=org, role=role
         )
+
+@pytest.fixture
+def setup_movebank_test_data(db):
+    # v1
+    Organization.objects.create(name="Test Org")
+    OutboundIntegrationType.objects.create(name="Movebank", slug="movebank")
+
+    # v2
+    IntegrationType.objects.create(name="Movebank", value="movebank")
+    Integration.objects.create(
+        type=IntegrationType.objects.first(),
+        owner=Organization.objects.first(),
+    )
+    IntegrationAction.objects.create(
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Permissions",
+        value="permissions",
+        integration_type=IntegrationType.objects.first(),
+    )

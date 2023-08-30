@@ -5,8 +5,9 @@ from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models, transaction
 from django.db.models import Subquery
 from django.contrib.auth import get_user_model
-from integrations.utils import get_api_key
+from integrations.utils import get_api_key, does_movebank_permissions_config_changed
 from model_utils import FieldTracker
+from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 # from integrations.utils import trigger_deployment_deletion
 
 User = get_user_model()
@@ -172,11 +173,29 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
         verbose_name="JSON Configuration"
     )
 
+    tracker = FieldTracker()
+
     class Meta:
         ordering = ("id", )
 
     def __str__(self):
         return f"{self.data}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        if does_movebank_permissions_config_changed(self, "v2"):
+            # Movebank permissions file needs to be recreated
+            transaction.on_commit(
+                lambda: recreate_and_send_movebank_permissions_csv_file.delay()
+            )
+
+    def save(self, *args, **kwargs):
+        with self.tracker:
+            self._pre_save(self, *args, **kwargs)
+            super().save(*args, **kwargs)
+            self._post_save(self, *args, **kwargs)
 
 
 class IntegrationState(UUIDAbstractModel, TimestampedModel):
