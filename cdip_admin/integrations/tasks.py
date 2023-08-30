@@ -66,7 +66,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v2)',
                 extra={
-                    'gundi_id': str(mb_config["id"]),
+                    'integration_configuration_id': str(mb_config["id"]),
                     'attention_needed': True
                 }
             )
