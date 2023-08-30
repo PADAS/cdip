@@ -5,7 +5,7 @@ from organizations.models import Organization
 from ..models import (
     OutboundIntegrationType,
     OutboundIntegrationConfiguration,
-    IntegrationType, Integration,
+    Integration,
     IntegrationAction,
     IntegrationConfiguration
 )
@@ -13,8 +13,9 @@ from ..tasks import recreate_and_send_movebank_permissions_csv_file
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_no_configs(caplog):
+def test_movebank_permissions_file_upload_task_no_configs(caplog, httpx_mock: HTTPXMock):
     recreate_and_send_movebank_permissions_csv_file()
+    assert not httpx_mock.get_requests()  # No calls to Movebank
     log_to_test = ' -- No configs available to send --'
     assert log_to_test in [r.message for r in caplog.records]
 
@@ -67,6 +68,7 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, setup_moveba
     requests = httpx_mock.get_requests()
 
     assert requests
+    # Call to Movebank was made
     assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
 
     logs_to_test = [
@@ -161,11 +163,12 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, setup_mo
     requests = httpx_mock.get_requests()
 
     assert requests
+    # Call to Movebank was made
     assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
 
     logs_to_test = [
         'Error parsing MBPermissionsActionConfig model (v1)',  # exception message when bad config appears
-        'Error parsing MBPermissionsActionConfig model (v2)',
+        'Error parsing MBPermissionsActionConfig model (v2)',  # exception message when bad config appears
         ' -- Got 2 user/tag rows (v1: 1, v2: 1) --',
         ' -- CSV temp file created successfully. --',
         ' -- CSV file uploaded to Movebank successfully --'
