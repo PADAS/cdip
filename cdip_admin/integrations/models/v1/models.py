@@ -4,9 +4,12 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
+from integrations.utils import does_movebank_permissions_config_changed
+from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from cdip_admin import celery
 from core.models import TimestampedModel
 from organizations.models import Organization
+from model_utils import FieldTracker
 from simple_history.models import HistoricalRecords
 
 
@@ -189,11 +192,29 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     enabled = models.BooleanField(default=True)
     history = HistoricalRecords()
 
+    tracker = FieldTracker()
+
     class Meta:
         ordering = ("owner", "name")
 
     def __str__(self):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        if does_movebank_permissions_config_changed(self, "v1"):
+            # Movebank permissions file needs to be recreated
+            transaction.on_commit(
+                lambda: recreate_and_send_movebank_permissions_csv_file.delay()
+            )
+
+    def save(self, *args, **kwargs):
+        with self.tracker:
+            self._pre_save(self, *args, **kwargs)
+            super().save(*args, **kwargs)
+            self._post_save(self, *args, **kwargs)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
