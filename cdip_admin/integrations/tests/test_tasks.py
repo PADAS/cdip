@@ -20,7 +20,7 @@ def test_movebank_permissions_file_upload_task_no_configs(caplog):
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_with_configs(caplog, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_with_configs(caplog, setup_movebank_test_data, httpx_mock: HTTPXMock):
     movebank_client_params = {
         "base_url": "https://www.test-movebank.com",
         "password": "test_pwd",
@@ -28,53 +28,26 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, httpx_mock: 
     }
     httpx_mock.add_response(method="POST")
 
-    # Add values to DB
-    # v1
-    Organization.objects.create(name="Test Org")
-
-    OutboundIntegrationType.objects.create(name="Movebank", slug="movebank")
+    # v1 configs
     OutboundIntegrationConfiguration.objects.create(
         type=OutboundIntegrationType.objects.first(),
         owner=Organization.objects.first(),
         additional={
-          "broker": "gcp_pubsub",
-          "permissions": {
-            "permissions": [
-              {
-                "tag_id": "awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                "username": "test1"
-              },
-              {
-                "tag_id": "awt.test-device-ptyjhlnkfqgb.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                "username": "test1"
-              },
-              {
-                "tag_id": "awt.test-device-qjlvtwzrynfm.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                "username": "test1"
-              },
-              {
-                "tag_id": "awt.test-device-jqlvtwzrynfm.2b029798-a5a5-4799-a1bd-ac12b85f9279",
-                "username": "test1"
-              }
-            ],
-            "study": "gundi"
-          },
-          "topic": "destination-v2-gundi-load-testing-legacy"
+            "broker": "gcp_pubsub",
+            "topic": "destination-v2-gundi-load-testing-legacy",
+            "permissions": {
+                "permissions": [
+                    {
+                        "tag_id": "awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249",
+                        "username": "test1"
+                    }
+                ],
+                "study": "gundi"
+            }
         }
     )
 
-    # v2
-    IntegrationType.objects.create(name="Movebank", value="movebank")
-    Integration.objects.create(
-        type=IntegrationType.objects.first(),
-        owner=Organization.objects.first(),
-    )
-    IntegrationAction.objects.create(
-        type=IntegrationAction.ActionTypes.AUTHENTICATION,
-        name="Permissions",
-        value="permissions",
-        integration_type=IntegrationType.objects.first(),
-    )
+    # v2 configs
     IntegrationConfiguration.objects.create(
         integration=Integration.objects.first(),
         action=IntegrationAction.objects.first(),
@@ -84,18 +57,6 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, httpx_mock: 
                 {
                     "tag_id": "awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249",
                     "username": "test2"
-                },
-                {
-                    "tag_id": "awt.test-device-ptyjhlnkfqgb.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                    "username": "test2"
-                },
-                {
-                    "tag_id": "awt.test-device-qjlvtwzrynfm.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                    "username": "test2"
-                },
-                {
-                    "tag_id": "awt.test-device-jqlvtwzrynfm.2b029798-a5a5-4799-a1bd-ac12b85f9279",
-                    "username": "test2"
                 }
             ]
         }
@@ -103,8 +64,13 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, httpx_mock: 
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
 
+    requests = httpx_mock.get_requests()
+
+    assert requests
+    assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
+
     logs_to_test = [
-        ' -- Got 8 user/tag rows (v1: 4, v2: 4) --',
+        ' -- Got 2 user/tag rows (v1: 1, v2: 1) --',
         ' -- CSV temp file created successfully. --',
         ' -- CSV file uploaded to Movebank successfully --'
     ]
@@ -116,7 +82,7 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, httpx_mock: 
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, setup_movebank_test_data, httpx_mock: HTTPXMock):
     movebank_client_params = {
         "base_url": "https://www.test-movebank.com",
         "password": "test_pwd",
@@ -124,27 +90,23 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, httpx_mo
     }
     httpx_mock.add_response(method="POST")
 
-    # Add values to DB
     # v1
-    Organization.objects.create(name="Test Org")
-
-    OutboundIntegrationType.objects.create(name="Movebank", slug="movebank")
     OutboundIntegrationConfiguration.objects.create(
         type=OutboundIntegrationType.objects.first(),
         owner=Organization.objects.first(),
         name="Wrong config",
         additional={
-          "broker": "gcp_pubsub",
-          "permissions": {
-            "permissions": [
-              {
-                "tag": "awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249",
-                "user": "test1"
-              }
-            ],
-            "study": "gundi"
-          },
-          "topic": "destination-v2-gundi-load-testing-legacy"
+            "broker": "gcp_pubsub",
+            "topic": "destination-v2-gundi-load-testing-legacy",
+            "permissions": {
+                "permissions": [
+                    {
+                        "tag": "awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249",
+                        "user": "test1"
+                    }
+                ],
+                "study": "gundi"
+            }
         }
     )
     OutboundIntegrationConfiguration.objects.create(
@@ -153,6 +115,7 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, httpx_mo
         name="Good config",
         additional={
             "broker": "gcp_pubsub",
+            "topic": "destination-v2-gundi-load-testing-legacy",
             "permissions": {
                 "permissions": [
                     {
@@ -161,23 +124,11 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, httpx_mo
                     }
                 ],
                 "study": "gundi"
-            },
-            "topic": "destination-v2-gundi-load-testing-legacy"
+            }
         }
     )
 
     # v2
-    IntegrationType.objects.create(name="Movebank", value="movebank")
-    Integration.objects.create(
-        type=IntegrationType.objects.first(),
-        owner=Organization.objects.first(),
-    )
-    IntegrationAction.objects.create(
-        type=IntegrationAction.ActionTypes.AUTHENTICATION,
-        name="Permissions",
-        value="permissions",
-        integration_type=IntegrationType.objects.first(),
-    )
     IntegrationConfiguration.objects.create(
         integration=Integration.objects.first(),
         action=IntegrationAction.objects.first(),
@@ -206,6 +157,11 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, httpx_mo
     )
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
+
+    requests = httpx_mock.get_requests()
+
+    assert requests
+    assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
 
     logs_to_test = [
         'Error parsing MBPermissionsActionConfig model (v1)',  # exception message when bad config appears
