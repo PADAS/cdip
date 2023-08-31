@@ -1,4 +1,5 @@
 import uuid
+import pydantic
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -11,6 +12,7 @@ from core.models import TimestampedModel
 from organizations.models import Organization
 from model_utils import FieldTracker
 from simple_history.models import HistoricalRecords
+from gundi_core import schemas
 
 
 # This is where the general information for a configuration will be stored
@@ -206,8 +208,19 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def _post_save(self, *args, **kwargs):
         if does_movebank_permissions_config_changed(self, "v1"):
             # Movebank permissions file needs to be recreated
+            # Check if AUTH info is available
+            movebank_auth_data = {}
+            try:
+                movebank_auth_data = schemas.v2.MBAuthActionConfig.parse_obj(
+                    {
+                        "username": self.login or None,
+                        "password": self.password or None
+                    }
+                ).dict()
+            except pydantic.ValidationError:  # Bad config, ignore it
+                pass
             transaction.on_commit(
-                lambda: recreate_and_send_movebank_permissions_csv_file.delay()
+                lambda: recreate_and_send_movebank_permissions_csv_file.delay(**movebank_auth_data)
             )
 
     def save(self, *args, **kwargs):

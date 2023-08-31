@@ -1,6 +1,7 @@
 import uuid
 from functools import cached_property
 import jsonschema
+import pydantic
 from core.models import UUIDAbstractModel, TimestampedModel
 from django.db import models, transaction
 from django.db.models import Subquery
@@ -8,6 +9,7 @@ from django.contrib.auth import get_user_model
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed
 from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
+from gundi_core import schemas
 # from integrations.utils import trigger_deployment_deletion
 
 User = get_user_model()
@@ -187,8 +189,21 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         if does_movebank_permissions_config_changed(self, "v2"):
             # Movebank permissions file needs to be recreated
+            # Check if AUTH info is available
+            movebank_auth_data = {}
+            auth_config = IntegrationConfiguration.objects.get(
+                integration=self.integration,
+                action__type=IntegrationAction.ActionTypes.AUTHENTICATION,
+                action__value=schemas.v2.MovebankActions.AUTHENTICATE.value,
+                action__integration_type__value=schemas.DestinationTypes.Movebank.value
+            )
+            if auth_config:
+                try:
+                    movebank_auth_data = schemas.v2.MBAuthActionConfig.parse_obj(auth_config.data).dict()
+                except pydantic.ValidationError:  # Bad config, ignore it
+                    pass
             transaction.on_commit(
-                lambda: recreate_and_send_movebank_permissions_csv_file.delay()
+                lambda: recreate_and_send_movebank_permissions_csv_file.delay(**movebank_auth_data)
             )
 
     def save(self, *args, **kwargs):
