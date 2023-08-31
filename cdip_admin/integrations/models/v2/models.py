@@ -206,7 +206,7 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
                     logger.warning(
                         "Invalid AUTH action config.",
                         extra={
-                            "integration_config_id": self.id,
+                            "integration_config_id": auth_config.id,
                             'attention_needed': True
                         }
                     )
