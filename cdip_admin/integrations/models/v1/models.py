@@ -1,5 +1,6 @@
 import uuid
 import pydantic
+import logging
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -13,6 +14,9 @@ from organizations.models import Organization
 from model_utils import FieldTracker
 from simple_history.models import HistoricalRecords
 from gundi_core import schemas
+
+
+logger = logging.getLogger(__name__)
 
 
 # This is where the general information for a configuration will be stored
@@ -217,8 +221,14 @@ class OutboundIntegrationConfiguration(TimestampedModel):
                         "password": self.password or None
                     }
                 ).dict()
-            except pydantic.ValidationError:  # Bad config, ignore it
-                pass
+            except pydantic.ValidationError:  # Bad config, log a warning
+                logger.warning(
+                    "Invalid login/password or not present.",
+                    extra={
+                        "outbound_integration_config_id": self.id,
+                        'attention_needed': True
+                    }
+                )
             transaction.on_commit(
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay(**movebank_auth_data)
             )

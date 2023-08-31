@@ -1,4 +1,5 @@
 import uuid
+import logging
 from functools import cached_property
 import jsonschema
 import pydantic
@@ -13,6 +14,7 @@ from gundi_core import schemas
 # from integrations.utils import trigger_deployment_deletion
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
@@ -200,8 +202,14 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
             if auth_config:
                 try:
                     movebank_auth_data = schemas.v2.MBAuthActionConfig.parse_obj(auth_config.data).dict()
-                except pydantic.ValidationError:  # Bad config, ignore it
-                    pass
+                except pydantic.ValidationError:  # Bad config, log a warning
+                    logger.warning(
+                        "Invalid AUTH action config.",
+                        extra={
+                            "integration_config_id": self.id,
+                            'attention_needed': True
+                        }
+                    )
             transaction.on_commit(
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay(**movebank_auth_data)
             )
