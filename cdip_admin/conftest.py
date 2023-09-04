@@ -609,6 +609,49 @@ def provider_movebank_ewt(
 
 
 @pytest.fixture
+def mb_action_push_observations(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_movebank,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Observations",
+        value="push_observations",
+        description="Push Tracking data to Movebank API",
+        schema={
+            "type": "object",
+            "required": [
+                "feed"
+            ],
+            "properties": {
+                "feed": {
+                    "type": "string"
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
+def destination_movebank(
+        get_random_id, other_organization, integration_type_movebank, mb_action_push_observations
+):
+    destination, _ = Integration.objects.get_or_create(
+        type=integration_type_movebank,
+        name=f"Movebank Site {get_random_id()}",
+        owner=other_organization,
+        base_url=f"https://api.test.movebank.com"
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=destination,
+        action=mb_action_push_observations,
+        data={
+            "feed": "gundi/earthranger"
+        }
+    )
+    return destination
+
+
+@pytest.fixture
 def integrations_list(
         organization, other_organization, integration_type_er, get_random_id,
         er_action_auth, er_action_pull_positions, er_action_pull_events, er_action_push_positions, er_action_push_events
@@ -861,6 +904,18 @@ def trap_tagger_event_trace(provider_trap_tagger):
 
 
 @pytest.fixture
+def trap_tagger_to_movebank_observation_trace(provider_trap_tagger):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        object_type="obv",
+        # Other fields are filled in later by the routing services
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
 def event_delivered_trace(provider_trap_tagger, integrations_list):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
@@ -932,6 +987,28 @@ def trap_tagger_observation_delivered_event(mocker, trap_tagger_event_trace, int
     message.data = data_bytes
     return message
 
+
+@pytest.fixture
+def trap_tagger_to_movebank_observation_delivered_event(
+        mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(trap_tagger_to_movebank_observation_trace.object_id),
+            "related_to": None,
+            "external_id": None,
+            "data_provider_id": str(trap_tagger_to_movebank_observation_trace.data_provider.id),
+            "destination_id":  str(destination_movebank.id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace, integrations_list):

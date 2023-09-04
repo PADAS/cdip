@@ -55,3 +55,16 @@ def test_process_observation_delivery_failed_event(
     assert not trap_tagger_event_trace.destination
     assert not trap_tagger_event_trace.external_id
     assert not trap_tagger_event_trace.delivered_at
+
+
+def test_process_observation_delivered_event_without_external_id(
+        trap_tagger_to_movebank_observation_trace, trap_tagger_to_movebank_observation_delivered_event
+):
+    # Test the case when an observation is delivered to a single destination successfully
+    # But no external id is returned. (for example, Movebank)
+    process_event(trap_tagger_to_movebank_observation_delivered_event)
+    event_data = json.loads(trap_tagger_to_movebank_observation_delivered_event.data)["payload"]
+    trap_tagger_to_movebank_observation_trace.refresh_from_db()
+    assert str(trap_tagger_to_movebank_observation_trace.destination.id) == str(event_data["destination_id"])
+    assert not trap_tagger_to_movebank_observation_trace.external_id  # Movebank API doesn't return an ID
+    assert str(trap_tagger_to_movebank_observation_trace.delivered_at) == str(event_data["delivered_at"])
