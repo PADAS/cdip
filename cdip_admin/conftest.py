@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from unittest.mock import PropertyMock
 
@@ -34,6 +35,12 @@ from integrations.models import (
 from organizations.models import Organization
 from pathlib import Path
 from google.cloud import pubsub_v1
+
+
+def async_return(result):
+    f = asyncio.Future()
+    f.set_result(result)
+    return f
 
 
 @pytest.fixture
@@ -1445,6 +1452,32 @@ def setup_account_profile_mapping(mapping):
         apo = AccountProfileOrganization.objects.create(
             accountprofile=ap, organization=org, role=role
         )
+
+
+@pytest.fixture
+def mock_movebank_response():
+    # Movebank's API doesn't return any content, just 200 OK.
+    return ""
+
+
+@pytest.fixture
+def mock_movebank_client_class(
+        mocker,
+        mock_movebank_response
+):
+    mocked_movebank_client_class = mocker.MagicMock()
+    movebank_client_mock = mocker.MagicMock()
+    movebank_client_mock.post_permissions.return_value = async_return(
+        mock_movebank_response
+    )
+    movebank_client_mock.__aenter__.return_value = movebank_client_mock
+    movebank_client_mock.__aexit__.return_value = mock_movebank_response
+    movebank_client_mock.close.return_value = async_return(
+        mock_movebank_response
+    )
+    mocked_movebank_client_class.return_value = movebank_client_mock
+    return mocked_movebank_client_class
+
 
 @pytest.fixture
 def setup_movebank_test_data(db):
