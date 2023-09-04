@@ -413,7 +413,7 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
         blank=True
     )
     delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
-    external_id = models.CharField(max_length=250, db_index=True, blank=True)  # Object ID in the destination system
+    external_id = models.CharField(max_length=250, db_index=True, null=True, blank=True)  # Object ID in the destination system
 
     class Meta:
         indexes = [
