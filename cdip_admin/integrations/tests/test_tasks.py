@@ -1,5 +1,4 @@
 import pytest
-from pytest_httpx import HTTPXMock
 
 from organizations.models import Organization
 from ..models import (
@@ -13,21 +12,30 @@ from ..tasks import recreate_and_send_movebank_permissions_csv_file
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_no_configs(caplog, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_no_configs(mocker, caplog, mock_movebank_client_class):
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
     recreate_and_send_movebank_permissions_csv_file()
-    assert not httpx_mock.get_requests()  # No calls to Movebank
+    # Check that the tag data was NOT sent to Movebank
+    assert not mock_movebank_client_class.called
+    assert not mock_movebank_client_class.return_value.post_permissions.called
     log_to_test = ' -- No configs available to send --'
     assert log_to_test in [r.message for r in caplog.records]
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_with_configs(caplog, setup_movebank_test_data, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_with_configs(
+        mocker,
+        caplog,
+        setup_movebank_test_data,
+        mock_movebank_client_class
+):
     movebank_client_params = {
         "base_url": "https://www.test-movebank.com",
         "password": "test_pwd",
         "username": "test_user"
     }
-    httpx_mock.add_response(method="POST")
+
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
 
     # v1 configs
     OutboundIntegrationConfiguration.objects.create(
@@ -65,11 +73,9 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, setup_moveba
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
 
-    requests = httpx_mock.get_requests()
-
-    assert requests
-    # Call to Movebank was made
-    assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
+    # Check that the tag data was sent to Movebank
+    assert mock_movebank_client_class.called
+    assert mock_movebank_client_class.return_value.post_permissions.called
 
     logs_to_test = [
         ' -- Got 2 user/tag rows (v1: 1, v2: 1) --',
@@ -84,13 +90,19 @@ def test_movebank_permissions_file_upload_task_with_configs(caplog, setup_moveba
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, setup_movebank_test_data, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_with_bad_configs(
+        mocker,
+        caplog,
+        setup_movebank_test_data,
+        mock_movebank_client_class
+):
     movebank_client_params = {
         "base_url": "https://www.test-movebank.com",
         "password": "test_pwd",
         "username": "test_user"
     }
-    httpx_mock.add_response(method="POST")
+
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
 
     # v1
     OutboundIntegrationConfiguration.objects.create(
@@ -160,11 +172,9 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(caplog, setup_mo
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
 
-    requests = httpx_mock.get_requests()
-
-    assert requests
-    # Call to Movebank was made
-    assert movebank_client_params.get("base_url") + '/movebank/service/external-feed' == str(requests[0].url)
+    # Check that the tag data was sent to Movebank
+    assert mock_movebank_client_class.called
+    assert mock_movebank_client_class.return_value.post_permissions.called
 
     logs_to_test = [
         'Error parsing MBPermissionsActionConfig model (v1)',  # exception message when bad config appears
