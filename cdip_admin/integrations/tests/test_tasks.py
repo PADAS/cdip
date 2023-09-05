@@ -13,9 +13,12 @@ from ..tasks import recreate_and_send_movebank_permissions_csv_file
 
 
 @pytest.mark.django_db
-def test_movebank_permissions_file_upload_task_no_configs(caplog, httpx_mock: HTTPXMock):
+def test_movebank_permissions_file_upload_task_no_configs(mocker, caplog, mock_movebank_client_class):
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
     recreate_and_send_movebank_permissions_csv_file()
-    assert not httpx_mock.get_requests()  # No calls to Movebank
+    # Check that the tag data was NOT sent to Movebank
+    assert not mock_movebank_client_class.called
+    assert not mock_movebank_client_class.return_value.post_permissions.called
     log_to_test = ' -- No configs available to send --'
     assert log_to_test in [r.message for r in caplog.records]
 
@@ -71,7 +74,7 @@ def test_movebank_permissions_file_upload_task_with_configs(
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
 
-    # Check that the tag data was sent o Movebank
+    # Check that the tag data was sent to Movebank
     assert mock_movebank_client_class.called
     assert mock_movebank_client_class.return_value.post_permissions.called
 
@@ -170,7 +173,7 @@ def test_movebank_permissions_file_upload_task_with_bad_configs(
 
     recreate_and_send_movebank_permissions_csv_file(**movebank_client_params)
 
-    # Check that the tag data was sent o Movebank
+    # Check that the tag data was sent to Movebank
     assert mock_movebank_client_class.called
     assert mock_movebank_client_class.return_value.post_permissions.called
 

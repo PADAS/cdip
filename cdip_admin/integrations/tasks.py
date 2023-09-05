@@ -80,7 +80,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
 
     logger.info(f' -- Got {len(configs)} user/tag rows (v1: {v1_configs}, v2: {v2_configs}) --')
 
-    if configs:
+    if len(configs) >= 1:
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=MBUserPermission.schema().get("required"))
             writer.writeheader()
