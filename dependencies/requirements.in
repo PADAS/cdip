@@ -1,3 +1,5 @@
+aiofiles==23.2.1
+movebank-client==1.0.0
 celery==5.2.3
 celery-once==1.2.0
 Django==3.2.15
@@ -6,7 +8,7 @@ PyJWT==1.7.1
 beautifulsoup4==4.9.1
 cached-property==1.5.1
 certifi==2020.6.20
-cffi==1.14.0
+cffi==1.15.1
 chardet==3.0.4
 croniter==0.3.32
 cryptography==2.9.2
@@ -67,7 +69,7 @@ jsonschema==4.17.3
 django-celery-beat==2.5.0
 django-storages==1.13.2
 walrus==0.8.1
-gundi-core==1.2.5
+gundi-core==1.2.6
 gundi-client==1.0.1
 gundi-client-v2==2.0.1
 google-cloud-functions==1.13.1

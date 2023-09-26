@@ -18,9 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from website.views import welcome, date, about, index, login_view, logout_view
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-
+from api import v2 as api_v2
 
 urlpatterns = [
+    path(r'v2/', include(api_v2.urls)),  # API v2 (Gundi 2.0)
     path("admin/", admin.site.urls),
     path("", welcome, name="welcome"),
     path("date", date),
