@@ -75,7 +75,7 @@ gundi-client-v2==2.0.1
 google-cloud-functions==1.13.1
 django-model-utils==4.3.1
 https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
-https://github.com/PADAS/smartconnect-client/releases/download/v1.4.0/smartconnect_client-1.4.0-py3-none-any.whl
+https://github.com/PADAS/smartconnect-client/releases/download/v1.4.5/smartconnect_client-1.4.5-py3-none-any.whl
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.4.4-alpha/cdip_connector-1.4.4-py3-none-any.whl
 opentelemetry-api==1.14.0
 opentelemetry-sdk==1.14.0
