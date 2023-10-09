@@ -8,7 +8,7 @@ import os
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
-from movebank_client import MovebankClient, PermissionOperations
+from movebank_client import MovebankClient, MBClientError, PermissionOperations
 
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions, MBPermissionsActionConfig, MBUserPermission
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
 def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     logger.info(' -- Recreating Movebank permissions CSV file... --')
 
