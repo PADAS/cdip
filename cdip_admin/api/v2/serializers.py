@@ -756,6 +756,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
     object_type = serializers.HiddenField(default=StreamPrefixEnum.observation.value)
     type = serializers.CharField(write_only=True, required=False)
     subject_type = serializers.CharField(write_only=True, required=False)
+    source_name = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
     location = serializers.JSONField(write_only=True, required=False)
     additional = serializers.JSONField(write_only=True, required=False)
@@ -800,7 +801,10 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data["source"]
+            external_id=data["source"],
+            defaults={
+                "name": data["source_name"]
+            }
         )
         data["source"] = source
         return data
