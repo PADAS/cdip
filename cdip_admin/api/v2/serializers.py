@@ -803,7 +803,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
             integration=data["integration"],
             external_id=data["source"],
             defaults={
-                "name": data["source_name"]
+                "name": data.get("source_name", "")
             }
         )
         data["source"] = source
