@@ -6,6 +6,7 @@ import tempfile
 import os
 
 from asgiref.sync import async_to_sync
+from cdip_connector.core.publisher import get_publisher
 from celery import shared_task
 from django.apps import apps
 from movebank_client import MovebankClient, MBClientError, PermissionOperations
@@ -16,6 +17,35 @@ from gundi_core.schemas.v2 import MovebankActions, MBPermissionsActionConfig, MB
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={'max_retries': 3})
+def run_integration(**kwargs):
+    integration_id = kwargs.get("integration_id", None)
+    action_id = kwargs.get("action_id", None)
+    pubsub_topic = kwargs.get("pubsub_topic", None)
+
+    # Check if we have all the needed kwargs
+    if not integration_id or not action_id or not pubsub_topic:
+        logger.error(
+            'Action cannot be executed. Missing arguments',
+            extra={
+                'attention_needed': True
+            }
+        )
+        return
+
+    data = {
+        "integration_id": integration_id,
+        "action_id": action_id
+    }
+
+    # Send pubsub message to GCP
+    publisher = get_publisher()
+    publisher.publish(
+        topic=pubsub_topic,
+        data=data
+    )
 
 
 @shared_task(bind=True, autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
