@@ -1,7 +1,9 @@
+import json
 import uuid
 from functools import cached_property
 import jsonschema
 from core.models import UUIDAbstractModel, TimestampedModel
+from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
 from django.db.models import Subquery
 from django.contrib.auth import get_user_model
@@ -190,6 +192,25 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
             transaction.on_commit(
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()
             )
+
+        # Get or create interval and periodic task for this config
+        schedule, created = IntervalSchedule.objects.get_or_create(
+            every=10,
+            period=IntervalSchedule.MINUTES,
+        )
+
+        PeriodicTask.objects.get_or_create(
+            interval=schedule,
+            name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration.__str__()}')",
+            task="integrations.tasks.run_integration",
+            kwargs=json.dumps(
+                {
+                    "integration_id": str(self.integration_id),
+                    "action_id": self.action.value,
+                    "pubsub_topic": f"{self.integration.type.value}-actions-topic"
+                }
+            ),
+        )
 
     def save(self, *args, **kwargs):
         with self.tracker:
