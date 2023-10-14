@@ -2,6 +2,7 @@ import base64
 import logging
 import requests as requests
 from django.conf import settings
+from google.cloud import pubsub_v1
 from rest_framework.utils import json
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions
@@ -10,6 +11,9 @@ from gundi_core.schemas.v2 import MovebankActions
 KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
 KEYS_PATH = "/key-auth"
+
+# PubSubConfiguration
+PUBSUB_PROJECT_ID = 'cdip-stage-78ca'
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +107,8 @@ def does_movebank_permissions_config_changed(integration_config, gundi_version):
         return True
 
 
+def send_message_to_gcp_pubsub(message, topic):
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(PUBSUB_PROJECT_ID, topic)
+    future = publisher.publish(topic_path, message.encode('utf-8'))
+    logger.info(f"Published message ID: {future.result()}")
