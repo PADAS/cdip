@@ -2,6 +2,7 @@ import base64
 import logging
 import requests as requests
 from django.conf import settings
+from google.cloud import pubsub_v1
 from rest_framework.utils import json
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions
@@ -103,3 +104,15 @@ def does_movebank_permissions_config_changed(integration_config, gundi_version):
         return True
 
 
+def send_message_to_gcp_pubsub(message, topic):
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(settings.GCP_PROJECT_ID, topic)
+    logger.info(
+        f"Publish message to topic: {topic_path}, message: {message}",
+        extra={
+            "topic_path": topic_path,
+            "message": message
+        }
+    )
+    future = publisher.publish(topic_path, message.encode('utf-8'))
+    logger.info(f"Published message ID: {future.result()}")
