@@ -1,14 +1,15 @@
 import csv
 import logging
+import json
 import aiofiles
 import pydantic
 import tempfile
 import os
 
 from asgiref.sync import async_to_sync
-from cdip_connector.core.publisher import get_publisher
 from celery import shared_task
 from django.apps import apps
+from integrations.utils import send_message_to_gcp_pubsub
 from movebank_client import MovebankClient, MBClientError, PermissionOperations
 
 from gundi_core.schemas.v1 import DestinationTypes
@@ -30,6 +31,9 @@ def run_integration(**kwargs):
         logger.error(
             'Action cannot be executed. Missing arguments',
             extra={
+                "integration_id": integration_id,
+                "action_id": action_id,
+                "pubsub_topic": pubsub_topic,
                 'attention_needed': True
             }
         )
@@ -41,11 +45,7 @@ def run_integration(**kwargs):
     }
 
     # Send pubsub message to GCP
-    publisher = get_publisher()
-    publisher.publish(
-        topic=pubsub_topic,
-        data=data
-    )
+    send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic)
 
 
 @shared_task(bind=True, autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
