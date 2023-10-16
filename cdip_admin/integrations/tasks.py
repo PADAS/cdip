@@ -31,6 +31,9 @@ def run_integration(**kwargs):
         logger.error(
             'Action cannot be executed. Missing arguments',
             extra={
+                "integration_id": integration_id,
+                "action_id": action_id,
+                "pubsub_topic": pubsub_topic,
                 'attention_needed': True
             }
         )

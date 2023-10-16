@@ -107,5 +107,12 @@ def does_movebank_permissions_config_changed(integration_config, gundi_version):
 def send_message_to_gcp_pubsub(message, topic):
     publisher = pubsub_v1.PublisherClient()
     topic_path = publisher.topic_path(settings.GCP_PROJECT_ID, topic)
+    logger.info(
+        f"Publish message to topic: {topic_path}, message: {message}",
+        extra={
+            "topic_path": topic_path,
+            "message": message
+        }
+    )
     future = publisher.publish(topic_path, message.encode('utf-8'))
     logger.info(f"Published message ID: {future.result()}")
