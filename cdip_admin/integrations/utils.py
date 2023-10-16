@@ -111,7 +111,7 @@ def send_message_to_gcp_pubsub(message, topic):
         f"Publish message to topic: {topic_path}, message: {message}",
         extra={
             "topic_path": topic_path,
-            "message": message
+            "message_body": message
         }
     )
     future = publisher.publish(topic_path, message.encode('utf-8'))
