@@ -21,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={'max_retries': 3})
-def run_integration(self, **kwargs):
-    integration_id = kwargs.get("integration_id", None)
-    action_id = kwargs.get("action_id", None)
-    pubsub_topic = kwargs.get("pubsub_topic", None)
+def run_integration(self, integration_id=None, action_id=None, pubsub_topic=None):
 
     # Check if we have all the needed kwargs
     if not integration_id or not action_id or not pubsub_topic:
