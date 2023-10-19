@@ -17,36 +17,105 @@ def handle_observation_delivered_event(event_dict: dict):
     event = system_events.ObservationDelivered.parse_obj(event_dict)
     # Update the status and save the external id
     event_data = event.payload
+    logger.info(
+        f"Observation Delivery Succeeded for gundi_id: {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
     # Look for traces in the database
     traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
-    trace_count = traces.count()
-    if trace_count == 0:  # This shouldn't happen
+    logger.debug(
+        f"Observation Delivery Succeeded for gundi_id: {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
+    if not traces.exists():  # This shouldn't happen
         logger.warning(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
         return
-    if trace_count > 0:
-        # Update the db with the event data
+
+    trace_count = traces.count()
+    logger.debug(
+        f"Trace count for gundi_id: {event_data.gundi_id}: {trace_count}",
+        extra={"event": event_dict}
+    )
+    if trace_count > 1:  # Multiple destinations
+        trace = traces.filter(destination_id=event_data.destination_id).first()
+    else:
         trace = traces.first()
-        if not trace.destination:  # Single destination
-            trace.destination_id = event_data.destination_id
-            trace.delivered_at = event_data.delivered_at
-            trace.external_id = event_data.external_id
-            trace.save()
-        elif str(event_data.destination_id) != str(trace.destination.id):  # Multiple destinations
-            GundiTrace.objects.create(
-                object_id=trace.object_id,
-                object_type=trace.object_type,
-                related_to=event_data.related_to,
-                created_by=trace.created_by,
-                data_provider=trace.data_provider,
-                destination_id=event_data.destination_id,
-                delivered_at=event_data.delivered_at,
-                external_id=event_data.external_id
-            )
+
+    if not trace.destination or str(event_data.destination_id) == str(trace.destination.id):  # Update
+        logger.debug(
+            f"Updating trace as delivered for gundi_id {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+            extra={"event": event_dict}
+        )
+        trace.destination_id = event_data.destination_id
+        trace.delivered_at = event_data.delivered_at
+        trace.external_id = event_data.external_id
+        trace.has_error = False
+        trace.error = ""
+        trace.save()
+    else:
+        logger.debug(
+            f"Creating trace as delivered for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+            extra={"event": event_dict}
+        )
+        GundiTrace.objects.create(
+            object_id=trace.object_id,
+            object_type=trace.object_type,
+            related_to=event_data.related_to,
+            created_by=trace.created_by,
+            data_provider=trace.data_provider,
+            destination_id=event_data.destination_id,
+            delivered_at=event_data.delivered_at,
+            external_id=event_data.external_id,
+        )
 
 
 def handle_observation_delivery_failed_event(event_dict: dict):
     # ToDo: Revisit once we implement the monitoring & activity log
-    pass
+    event = system_events.ObservationDeliveryFailed.parse_obj(event_dict)
+    # Update the status and save the external id
+    event_data = event.payload
+    logger.warning(
+        f"Observation Delivery Failed. gundi_id: {event_data.gundi_id}",
+        extra={"event": event_dict}
+    )
+    # Look for traces in the database
+    traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
+    if not traces.exists():  # This shouldn't happen
+        logger.warning(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
+        return
+    # Update the db with the event data
+    trace = traces.first()
+    if not trace.destination:  # First destination
+        logger.debug(
+            f"Updating trace with error for gundi_id {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+            extra={"event": event_dict}
+        )
+        trace.destination_id = event_data.destination_id
+        trace.has_error = True
+        trace.error = "Delivery Failed at the Dispatcher."
+        trace.save()
+    elif str(event_data.destination_id) != str(trace.destination.id):  # Multiple destinations
+        logger.debug(
+            f"Creating trace with error for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+            extra={"event": event_dict}
+        )
+        GundiTrace.objects.create(
+            object_id=trace.object_id,
+            object_type=trace.object_type,
+            related_to=event_data.related_to,
+            created_by=trace.created_by,
+            data_provider=trace.data_provider,
+            destination_id=event_data.destination_id,
+            delivered_at=event_data.delivered_at,
+            external_id=event_data.external_id,
+            has_error=True,
+            error="Delivery Failed at the Dispatcher."
+        )
+    else:
+        logger.warning(
+            f"Trace was not updated due to possible duplicated event. gundi_id: {event_data.gundi_id}",
+            extra={"event": event_dict}
+        )
 
 
 event_handlers = {
