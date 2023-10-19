@@ -1,0 +1,64 @@
+import environ
+from .settings import *
+
+ALLOWED_HOSTS.append('127.0.0.1')
+ALLOWED_HOSTS.append('172.16.222.1')
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django_tables2',
+    'django_filters',
+    'crispy_forms',
+    'website',
+    'integrations',
+    'core',
+    'organizations',
+    'accounts',
+    'clients',
+    'phonenumber_field',
+    'rest_framework',
+    'rest_framework_swagger',
+    "bootstrap4",
+    "cdip_admin",
+    'simple_history',
+    #'session_security',
+    'django_jsonform'
+    # "sslserver"
+]
+
+env = environ.Env()
+# reading .env file
+environ.Env.read_env()
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME'),
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST'),
+        'PORT': env('DB_PORT'),
+    }
+}
+
+KONG_PROXY_URL = 'http://kong-proxy-172.16.222.1.nip.io'
+
+CELERY_BROKER_URL = 'redis://172.16.222.1:30091'
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+ALLOWED_HOSTS.append("portal-172.16.222.1.nip.io")
+ALLOWED_HOSTS.append("172.16.222.1")
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+STATIC_ROOT = "/home/dev/gundi-data/static"
