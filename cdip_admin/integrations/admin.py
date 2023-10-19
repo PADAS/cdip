@@ -404,5 +404,28 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination",
         "external_id",
         "delivered_at",
+        "has_error",
+        "error",
+        "created_at",
+        "updated_at",
         "created_by",
+    )
+    search_fields = (
+        "object_id",
+        "related_to",
+        "external_id",
+        "data_provider__name",
+        "data_provider__owner__name",
+        "data_provider__type__name",
+        "destination__name",
+        "destination__owner__name",
+        "destination__type__name",
+    )
+    list_filter = (
+        "has_error",
+        "object_type",
+        "data_provider__type",
+        "destination__type",
+        "data_provider",
+        "destination",
     )
