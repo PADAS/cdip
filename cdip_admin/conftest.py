@@ -1017,17 +1017,18 @@ def trap_tagger_to_movebank_observation_delivered_event(
     message.data = data_bytes
     return message
 
+
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace, integrations_list):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "505535df-1b9b-412b-9fd5-e29b09582910", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "615535df-1b9b-412b-9fd5-e29b09582977", "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDelivered",
         "payload": {
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
-            "external_id": "45983ced-1216-4d43-81da-01ee90ba9b81",
+            "external_id": "46983ced-1216-4d43-81da-01ee90ba9b81",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
             "destination_id":  str(integrations_list[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00"
@@ -1050,6 +1051,26 @@ def trap_tagger_observation_delivery_failed_event(mocker, trap_tagger_event_trac
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
             "destination_id":  str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode('utf-8')
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_delivery_failed_event_two(mocker, trap_tagger_event_trace, integrations_list):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "705535df-1b9b-412b-9fd5-e29b09582988", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDeliveryFailed",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id":  str(integrations_list[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00"
         }
     }
