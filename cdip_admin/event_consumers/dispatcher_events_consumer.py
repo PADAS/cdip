@@ -18,18 +18,30 @@ def handle_observation_delivered_event(event_dict: dict):
     # Update the status and save the external id
     event_data = event.payload
     logger.info(
-        f"Observation Delivery Succeeded. gundi_id: {event_data.gundi_id}",
+        f"Observation Delivery Succeeded for gundi_id: {event_data.gundi_id}, destination_id: {event_data.destination_id}",
         extra={"event": event_dict}
     )
     # Look for traces in the database
     traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
+    logger.debug(
+        f"Observation Delivery Succeeded for gundi_id: {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
     if not traces.exists():  # This shouldn't happen
         logger.warning(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
         return
 
-    # Update the db with the event data
-    trace = traces.first()
-    if not trace.destination or trace.has_error:  # Update existent trace
+    trace_count = traces.count()
+    logger.debug(
+        f"Trace count for gundi_id: {event_data.gundi_id}: {trace_count}",
+        extra={"event": event_dict}
+    )
+    if trace_count > 1:  # Multiple destinations
+        trace = traces.filter(destination_id=event_data.destination_id).first()
+    else:
+        trace = traces.first()
+
+    if not trace.destination or str(event_data.destination_id) == str(trace.destination.id):  # Update
         logger.warning(
             f"Updating trace as delivered for gundi_id {event_data.gundi_id}, destination_id: {event_data.destination_id}",
             extra={"event": event_dict}
@@ -40,7 +52,7 @@ def handle_observation_delivered_event(event_dict: dict):
         trace.has_error = False
         trace.error = ""
         trace.save()
-    elif str(event_data.destination_id) != str(trace.destination.id):  # Multiple destinations
+    else:
         logger.debug(
             f"Creating trace as delivered for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
             extra={"event": event_dict}
@@ -54,11 +66,6 @@ def handle_observation_delivered_event(event_dict: dict):
             destination_id=event_data.destination_id,
             delivered_at=event_data.delivered_at,
             external_id=event_data.external_id,
-        )
-    else:
-        logger.warning(
-            f"Trace was not updated due to possible duplicated event. gundi_id: {event_data.gundi_id}",
-            extra={"event": event_dict}
         )
 
 
