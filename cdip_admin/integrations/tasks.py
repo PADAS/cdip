@@ -20,8 +20,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={'max_retries': 3})
-def run_integration(self, integration_id=None, action_id=None, pubsub_topic=None):
+@shared_task(autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={'max_retries': 3})
+def run_integration(integration_id=None, action_id=None, pubsub_topic=None):
 
     # Check if we have all the needed kwargs
     if not integration_id or not action_id or not pubsub_topic:
@@ -45,7 +45,7 @@ def run_integration(self, integration_id=None, action_id=None, pubsub_topic=None
     send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic)
 
 
-@shared_task(bind=True, autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
+@shared_task(autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
 def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     logger.info(' -- Recreating Movebank permissions CSV file... --')
 
