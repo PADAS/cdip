@@ -106,7 +106,7 @@ def test_process_observation_delivered_event_after_retry_with_two_destinations(
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
     process_event(trap_tagger_observation_delivery_failed_event_two)
-    event_2_data = json.loads(trap_tagger_observation_delivered_event.data)["payload"]
+    event_2_data = json.loads(trap_tagger_observation_delivered_event_two.data)["payload"]
     trap_tagger_event_trace_2 = GundiTrace.objects.get(
         object_id=trap_tagger_event_trace.object_id,
         destination__id=str(event_2_data["destination_id"])
