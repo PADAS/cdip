@@ -42,7 +42,7 @@ def handle_observation_delivered_event(event_dict: dict):
         trace = traces.first()
 
     if not trace.destination or str(event_data.destination_id) == str(trace.destination.id):  # Update
-        logger.warning(
+        logger.debug(
             f"Updating trace as delivered for gundi_id {event_data.gundi_id}, destination_id: {event_data.destination_id}",
             extra={"event": event_dict}
         )
