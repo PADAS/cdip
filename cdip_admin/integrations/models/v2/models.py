@@ -437,6 +437,7 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     external_id = models.CharField(max_length=250, db_index=True, null=True, blank=True)  # Object ID in the destination system
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")
+    is_duplicate = models.BooleanField(default=False)
 
     class Meta:
         indexes = [

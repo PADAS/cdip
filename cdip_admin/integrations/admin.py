@@ -404,6 +404,7 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination",
         "external_id",
         "delivered_at",
+        "is_duplicate",
         "has_error",
         "error",
         "created_at",
@@ -423,6 +424,7 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
     )
     list_filter = (
         "has_error",
+        "is_duplicate",
         "object_type",
         "data_provider__type",
         "destination__type",

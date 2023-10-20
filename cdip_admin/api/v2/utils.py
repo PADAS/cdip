@@ -8,6 +8,7 @@ from cdip_connector.core.routing import TopicEnum
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation
 from core import tracing, cache
 from opentelemetry import trace
+from integrations.models import GundiTrace
 
 
 deduplication_db = cache.get_deduplication_db()
@@ -65,7 +66,7 @@ def send_events_to_routing(events, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
-
+            current_span.set_attribute("gundi_id", gundi_id)
             # Check for duplicates
             is_duplicate = is_duplicate_data(data=event, expiration_time=settings.GEOEVENT_DUPLICATE_CHECK_SECONDS)
             if is_duplicate:
@@ -73,6 +74,9 @@ def send_events_to_routing(events, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.event_discarded"
                 )
+                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
+                gundi_trace.is_duplicate = True
+                gundi_trace.save()
                 continue
 
             with tracing.tracer.start_as_current_span(
@@ -133,6 +137,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
+            current_span.set_attribute("gundi_id", gundi_id)
             # Check for duplicates
             is_duplicate = is_duplicate_attachment(data=attachment)
             if is_duplicate:
@@ -140,6 +145,9 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.attachment_discarded"
                 )
+                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
+                gundi_trace.is_duplicate = True
+                gundi_trace.save()
                 continue
             # Upload file to the cloud
             with tracing.tracer.start_as_current_span(
@@ -194,7 +202,7 @@ def send_observations_to_routing(observations, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
-
+            current_span.set_attribute("gundi_id", gundi_id)
             # Check for duplicates
             is_duplicate = is_duplicate_data(
                 data=observation,
@@ -205,6 +213,9 @@ def send_observations_to_routing(observations, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.observation_discarded"
                 )
+                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
+                gundi_trace.is_duplicate = True
+                gundi_trace.save()
                 continue
 
             with tracing.tracer.start_as_current_span(
