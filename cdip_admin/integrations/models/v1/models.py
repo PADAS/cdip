@@ -2,6 +2,7 @@ import uuid
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.conf import settings
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
 from integrations.utils import does_movebank_permissions_config_changed
@@ -11,6 +12,12 @@ from core.models import TimestampedModel
 from organizations.models import Organization
 from model_utils import FieldTracker
 from simple_history.models import HistoricalRecords
+from deployments.models import DispatcherDeployment
+from deployments.utils import (
+    get_dispatcher_defaults_from_gcp_secrets,
+    get_default_topic_name,
+    get_default_dispatcher_name,
+)
 
 
 # This is where the general information for a configuration will be stored
@@ -194,6 +201,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
 
     tracker = FieldTracker()
 
+    @property
+    def is_er_site(self):
+        return self.type.slug.lower().strip().replace("_", "") == "earthranger"
+
     class Meta:
         ordering = ("owner", "name")
 
@@ -201,9 +212,22 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        pass
+        # Use pubsub and serverless dispatcher for ER Sites
+        if self._state.adding and self.is_er_site:
+            if "topic" not in self.additional:
+                self.additional.update({"topic": get_default_topic_name(integration=self, gundi_version="v1")})
+            if "broker" not in self.additional:
+                self.additional.update({"broker": "gcp_pubsub"})
 
     def _post_save(self, *args, **kwargs):
+        created = kwargs.get("created", False)
+        # Deploy serverless dispatcher for ER Sites only
+        if created and self.is_er_site and settings.GCP_ENVIRONMENT_ENABLED:
+            DispatcherDeployment.objects.create(
+                name=get_default_dispatcher_name(integration=self, gundi_version="v1"),
+                legacy_integration=self,
+                configuration=get_dispatcher_defaults_from_gcp_secrets()
+            )
         if does_movebank_permissions_config_changed(self, "v1"):
             # Movebank permissions file needs to be recreated
             transaction.on_commit(
@@ -213,7 +237,9 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def save(self, *args, **kwargs):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
+            created = self._state.adding
             super().save(*args, **kwargs)
+            kwargs["created"] = created
             self._post_save(self, *args, **kwargs)
 
 
