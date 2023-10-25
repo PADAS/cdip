@@ -82,7 +82,7 @@ def get_dispatcher_defaults_from_gcp_secrets():
     # Load default settings for serverless dispatchers from GCP secrets
     client = secretmanager.SecretManagerServiceClient()
     project_id = settings.GCP_PROJECT_ID
-    secret_id = 'er-dispatcher-defaults'
+    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
     secret_version_id = 'latest'
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{secret_version_id}"
     response = client.access_secret_version(request={"name": name})
