@@ -6,11 +6,18 @@ from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
 from django.db.models import Subquery
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed
 from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
-# from integrations.utils import trigger_deployment_deletion
+from deployments.models import DispatcherDeployment
+from deployments.utils import (
+    get_dispatcher_defaults_from_gcp_secrets,
+    get_default_topic_name,
+    get_default_dispatcher_name,
+)
+
 
 User = get_user_model()
 
@@ -117,27 +124,29 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        pass
+        # Use pubsub and serverless dispatcher for ER Sites
+        if self._state.adding and self.is_er_site:
+            if "topic" not in self.additional:
+                self.additional.update({"topic": get_default_topic_name(integration=self)})
+            if "broker" not in self.additional:
+                self.additional.update({"broker": "gcp_pubsub"})
 
     def _post_save(self, *args, **kwargs):
-        # # Trigger the deployment deletion when the Integration is disabled
-        # if self.tracker.has_changed("enabled") and not self.enabled:
-        #     try:  # Is there a deployment?
-        #         deployment = self.dispatcher_by_integration
-        #         topic_name = self.additional.get("topic")
-        #     except Integration.dispatcher_by_integration.RelatedObjectDoesNotExist:
-        #         pass  # No deployment to delete
-        #     else:
-        #         trigger_deployment_deletion(
-        #             deployment_id=str(deployment.id),
-        #             topic_name=topic_name
-        #         )
-        pass
+        created = kwargs.get("created", False)
+        # Deploy serverless dispatcher for ER Sites only
+        if created and self.is_er_site and settings.GCP_ENVIRONMENT_ENABLED:
+            DispatcherDeployment.objects.create(
+                name=get_default_dispatcher_name(integration=self),
+                integration=self,
+                configuration=get_dispatcher_defaults_from_gcp_secrets()
+            )
 
     def save(self, *args, **kwargs):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
+            created = self._state.adding
             super().save(*args, **kwargs)
+            kwargs["created"] = created
             self._post_save(self, *args, **kwargs)
 
     @property
@@ -156,6 +165,10 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     @cached_property
     def api_key(self):
         return get_api_key(integration=self)
+
+    @property
+    def is_er_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "earthranger"
 
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
