@@ -1,8 +1,7 @@
 import logging
 import requests
-
+import time
 import rest_framework.request
-
 from cdip_admin import settings
 
 logger = logging.getLogger(__name__)
@@ -37,3 +36,21 @@ def add_base_url(request, url):
 
         url = request.build_absolute_uri(url)
     return url
+
+
+def generate_short_id_milliseconds():
+    """
+    Returns a short id as an alphanumeric string.
+    The typical length will be 7-8 characters
+    The id will be unique if the function is called in different milliseconds.
+    """
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    # Epoch since year 2000 in milliseconds
+    current_time_ms = int((time.time_ns() - time.mktime((2000, 1, 1, 0, 0, 0, 0, 0, 0)) * 1e9) // 1_000_000)
+    # Convert to base to get a short id
+    base = len(alphabet)
+    short_id = ""
+    while current_time_ms:
+        current_time_ms, index = divmod(current_time_ms, base)
+        short_id += alphabet[index]
+    return short_id
