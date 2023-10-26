@@ -195,9 +195,11 @@ gevent==21.12.0
     # via -r requirements.in
 google-api-core[grpc]==2.11.1
     # via
+    #   google-api-core
     #   google-cloud-core
     #   google-cloud-functions
     #   google-cloud-pubsub
+    #   google-cloud-secret-manager
     #   google-cloud-storage
     #   google-cloud-trace
 google-auth==2.21.0
@@ -211,6 +213,8 @@ google-cloud-functions==1.13.1
     # via -r requirements.in
 google-cloud-pubsub==2.17.1
     # via cdip-connector
+google-cloud-secret-manager==2.16.4
+    # via -r requirements.in
 google-cloud-storage==1.44.0
     # via cdip-connector
 google-cloud-trace==1.11.2
@@ -231,6 +235,7 @@ grpc-google-iam-v1==0.12.6
     # via
     #   google-cloud-functions
     #   google-cloud-pubsub
+    #   google-cloud-secret-manager
 grpcio==1.56.0
     # via
     #   google-api-core
@@ -371,12 +376,14 @@ proto-plus==1.22.3
     # via
     #   google-cloud-functions
     #   google-cloud-pubsub
+    #   google-cloud-secret-manager
     #   google-cloud-trace
 protobuf==4.23.4
     # via
     #   google-api-core
     #   google-cloud-functions
     #   google-cloud-pubsub
+    #   google-cloud-secret-manager
     #   google-cloud-storage
     #   google-cloud-trace
     #   googleapis-common-protos
