@@ -191,7 +191,7 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
     tracker = FieldTracker()
 
     class Meta:
-        ordering = ("id", )
+        ordering = ("-updated_at", )
 
     def __str__(self):
         return f"{self.data}"
