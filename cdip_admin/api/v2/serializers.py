@@ -623,7 +623,7 @@ class GundiTraceSerializer(serializers.Serializer):
     )
     source = serializers.CharField(
         write_only=True,
-        required=True,
+        default="default-source"
     )
 
     def validate(self, data):
