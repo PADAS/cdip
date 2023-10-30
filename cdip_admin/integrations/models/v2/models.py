@@ -70,6 +70,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         related_name="actions",
         verbose_name="Integration Type"
     )
+    is_periodic_action = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("name",)
@@ -206,24 +207,25 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()
             )
 
-        # Get or create interval and periodic task for this config
-        schedule, created = IntervalSchedule.objects.get_or_create(
-            every=10,
-            period=IntervalSchedule.MINUTES,
-        )
+        if self.action.is_periodic_action:
+            # Get or create interval and periodic task for this config
+            schedule, created = IntervalSchedule.objects.get_or_create(
+                every=10,
+                period=IntervalSchedule.MINUTES,
+            )
 
-        PeriodicTask.objects.get_or_create(
-            interval=schedule,
-            name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration.__str__()}')",
-            task="integrations.tasks.run_integration",
-            kwargs=json.dumps(
-                {
-                    "integration_id": str(self.integration_id),
-                    "action_id": self.action.value,
-                    "pubsub_topic": f"{self.integration.type.value}-actions-topic"
-                }
-            ),
-        )
+            PeriodicTask.objects.get_or_create(
+                interval=schedule,
+                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}')",
+                task="integrations.tasks.run_integration",
+                kwargs=json.dumps(
+                    {
+                        "integration_id": str(self.integration_id),
+                        "action_id": self.action.value,
+                        "pubsub_topic": f"{self.integration.type.value}-actions-topic"
+                    }
+                ),
+            )
 
     def save(self, *args, **kwargs):
         with self.tracker:
