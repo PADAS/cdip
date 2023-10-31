@@ -299,6 +299,7 @@ def lotek_action_pull_positions(integration_type_lotek):
     return IntegrationAction.objects.create(
         integration_type=integration_type_lotek,
         type=IntegrationAction.ActionTypes.PULL_DATA,
+        is_periodic_action=True,
         name="Pull Positions",
         value="pull_positions",
         description="Pull Tracking data from Lotek API",
