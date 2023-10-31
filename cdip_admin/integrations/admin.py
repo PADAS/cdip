@@ -422,6 +422,7 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination__owner__name",
         "destination__type__name",
     )
+    date_hierarchy = 'created_at'
     list_filter = (
         ("delivered_at", CustomDateFilter),
         "has_error",
