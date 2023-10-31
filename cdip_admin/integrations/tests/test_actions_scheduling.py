@@ -18,8 +18,8 @@ def test_periodic_task_is_created_for_periodic_actions(provider_lotek_panthera, 
         }
     )
     IntegrationConfiguration.objects.create(
-        integration=provider_lotek_panthera,  # Periodic action
-        action=lotek_action_pull_positions,
+        integration=provider_lotek_panthera,
+        action=lotek_action_pull_positions,  # Periodic action
         data={
             "start_time": "2023-10-31T00:00:00"
         }
