@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.forms import ModelForm
 from simple_history.admin import SimpleHistoryAdmin
 from django.contrib import messages
-
+from core.admin import CustomDateFilter
 import deployments.models
 from .models import (
     OutboundIntegrationType,
@@ -422,7 +422,9 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination__owner__name",
         "destination__type__name",
     )
+    date_hierarchy = 'created_at'
     list_filter = (
+        ("delivered_at", CustomDateFilter),
         "has_error",
         "is_duplicate",
         "object_type",
