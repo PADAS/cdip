@@ -250,6 +250,7 @@ class IntegrationActionAdmin(admin.ModelAdmin):
         "type",
         "name",
         "value",
+        "is_periodic_action",
         "description",
     )
     list_filter = (
