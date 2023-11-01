@@ -8,15 +8,11 @@ from django.db import models, transaction
 from django.db.models import Subquery
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from integrations.utils import get_api_key, does_movebank_permissions_config_changed
+from integrations.utils import get_api_key, does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
 from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
-from deployments.utils import (
-    get_dispatcher_defaults_from_gcp_secrets,
-    get_default_topic_name,
-    get_default_dispatcher_name,
-)
+from deployments.utils import get_dispatcher_defaults_from_gcp_secrets
 
 
 User = get_user_model()
@@ -125,10 +121,11 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub and serverless dispatcher for ER Sites
-        if self._state.adding and self.is_er_site:
+        # Use pubsub for ER and MoveBank Sites
+        # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
+        if self._state.adding and (self.is_er_site or self.is_mb_site):
             if "topic" not in self.additional:
-                self.additional.update({"topic": get_default_topic_name(integration=self)})
+                self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             if "broker" not in self.additional:
                 self.additional.update({"broker": "gcp_pubsub"})
 
@@ -170,6 +167,10 @@ class Integration(UUIDAbstractModel, TimestampedModel):
     @property
     def is_er_site(self):
         return self.type.value.lower().strip().replace("_", "") == "earthranger"
+
+    @property
+    def is_mb_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "movebank"
 
 
 class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):

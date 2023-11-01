@@ -15,7 +15,6 @@ from simple_history.models import HistoricalRecords
 from deployments.models import DispatcherDeployment
 from deployments.utils import (
     get_dispatcher_defaults_from_gcp_secrets,
-    get_default_topic_name,
     get_default_dispatcher_name,
 )
 
@@ -205,6 +204,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_er_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "earthranger"
 
+    @property
+    def is_mb_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "movebank"
+
     class Meta:
         ordering = ("owner", "name")
 
@@ -212,10 +215,11 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub and serverless dispatcher for ER Sites
-        if self._state.adding and self.is_er_site:
+        # Use pubsub for ER and MoveBank Sites
+        # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
+        if self._state.adding and (self.is_er_site or self.is_mb_site):
             if "topic" not in self.additional:
-                self.additional.update({"topic": get_default_topic_name(integration=self, gundi_version="v1")})
+                self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v1")})
             if "broker" not in self.additional:
                 self.additional.update({"broker": "gcp_pubsub"})
 
