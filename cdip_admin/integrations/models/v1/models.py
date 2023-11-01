@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from django.conf import settings
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
-from integrations.utils import does_movebank_permissions_config_changed
+from integrations.utils import does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from cdip_admin import celery
 from core.models import TimestampedModel
