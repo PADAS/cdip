@@ -206,7 +206,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
 
     @property
     def is_mb_site(self):
-        return self.type.value.lower().strip().replace("_", "") == "movebank"
+        return self.type.slug.lower().strip().replace("_", "") == "movebank"
 
     class Meta:
         ordering = ("owner", "name")
