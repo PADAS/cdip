@@ -6,6 +6,7 @@ from google.cloud import pubsub_v1
 from rest_framework.utils import json
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions
+from deployments.utils import get_default_topic_name_er
 
 
 KONG_PROXY_URL = settings.KONG_PROXY_URL
@@ -116,3 +117,12 @@ def send_message_to_gcp_pubsub(message, topic):
     )
     future = publisher.publish(topic_path, message.encode('utf-8'))
     logger.info(f"Published message ID: {future.result()}")
+
+
+def get_dispatcher_topic_default_name(integration, gundi_version="v2"):
+    if integration.is_er_site:
+        return get_default_topic_name_er(integration, gundi_version=gundi_version)
+    if integration.is_mb_site:
+        return settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
+    # Fallback to legacy kafka dispatchers topic
+    return f"sintegrate.observations.transformed"
