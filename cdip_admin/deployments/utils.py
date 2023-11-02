@@ -97,7 +97,7 @@ def get_default_dispatcher_name(integration, gundi_version="v2"):
     return f"{subdomain}-dispatcher-{integration_id}"
 
 
-def get_default_topic_name(integration, gundi_version="v2"):
+def get_default_topic_name_er(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]

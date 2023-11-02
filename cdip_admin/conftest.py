@@ -1519,3 +1519,12 @@ def setup_movebank_test_data(db):
         value="permissions",
         integration_type=IntegrationType.objects.first(),
     )
+
+
+@pytest.fixture
+def legacy_integration_type_movebank():
+    return OutboundIntegrationType.objects.create(
+        name="MoveBank Legacy",
+        slug="movebank",
+        description="Default integration type for Movebank",
+    )
