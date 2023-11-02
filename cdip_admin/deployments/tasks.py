@@ -45,7 +45,7 @@ def deploy_serverless_dispatcher(deployment_id):
     configuration = deployment.configuration
     env_vars = configuration.get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
-    topic = integration.additional.get("topic", utils.get_default_topic_name(integration=integration, gundi_version=gundi_version))
+    topic = integration.additional.get("topic", utils.get_default_topic_name_er(integration=integration, gundi_version=gundi_version))
     topic_path = f'projects/{project_id}/topics/{topic}'
     deployment.topic_name = topic  # Save the topic for retries or deletions
     deployment.save()
