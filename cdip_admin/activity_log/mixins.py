@@ -22,7 +22,7 @@ class ChangeLogMixin:
         changes = {}
         for field in self._meta.fields:
             field_name = field.attname
-            if field_name not in self.exclude_fields and getattr(self, field_name) != original_values.get(field_name):
+            if field_name not in self.exclude_fields and str(getattr(self, field_name)) != original_values.get(field_name):
                 changes[field_name] = str(getattr(self, field_name))
         return changes
 
