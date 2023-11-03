@@ -76,3 +76,7 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"[{self.created_at}] {self.title}"
+
+    def revert(self):
+        # ToDo. Revert action using revert_data
+        pass
