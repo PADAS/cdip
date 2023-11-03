@@ -75,10 +75,14 @@ class ChangeLogMixin:
 
     def get_integration(self):
         # ToDo: Solve how to get this in a generic way
+        # Some changes are related to more than one. i.e. Editing a Route.
+        # Not every change is related to an integration. Do we log only the ones that are?
         return None
 
     def get_user(self):
         # ToDo: Solve how to get this in a generic way
+        # Check django-crum
+        # https://github.com/ninemoreminutes/django-crum/
         return None
 
     def get_revert_data(self, action, fields):
