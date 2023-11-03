@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "storages",
     "deployments",
+    "activity_log",
 ]
 
 

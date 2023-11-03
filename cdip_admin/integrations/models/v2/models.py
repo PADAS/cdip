@@ -13,6 +13,7 @@ from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets
+from activity_log.mixins import ChangeLogMixin
 
 
 User = get_user_model()
@@ -79,7 +80,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         jsonschema.validate(instance=configuration, schema=self.schema)
 
 
-class Integration(UUIDAbstractModel, TimestampedModel):
+class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
         "integrations.IntegrationType",
         on_delete=models.CASCADE,
@@ -173,7 +174,7 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
 
-class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
+class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     integration = models.ForeignKey(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -235,7 +236,7 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
             self._post_save(self, *args, **kwargs)
 
 
-class IntegrationState(UUIDAbstractModel, TimestampedModel):
+class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     integration = models.OneToOneField(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -254,7 +255,7 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
         return f"{self.data}"
 
 
-class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
+class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -269,7 +270,7 @@ class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class Route(UUIDAbstractModel, TimestampedModel):
+class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
@@ -311,7 +312,7 @@ class Route(UUIDAbstractModel, TimestampedModel):
         return f"{self.owner}: {self.name}"
 
 
-class SourceFilter(UUIDAbstractModel, TimestampedModel):
+class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     class SourceFilterTypes(models.TextChoices):
         SOURCE_LIST = "list", "Select Sources By ID"  # Value, Display
@@ -347,7 +348,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
         return f"{self.name} {self.type}"
 
 
-class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
+class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -362,7 +363,7 @@ class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class Source(UUIDAbstractModel, TimestampedModel):
+class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
         max_length=200,
@@ -399,7 +400,7 @@ class Source(UUIDAbstractModel, TimestampedModel):
         ]
 
 
-class SourceState(UUIDAbstractModel, TimestampedModel):
+class SourceState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     source = models.OneToOneField(
         "integrations.Source",
         on_delete=models.CASCADE,
