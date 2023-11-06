@@ -10,20 +10,26 @@ class ChangeLogMixin:
         super().__init__(*args, **kwargs)
         self._original_values = self._get_original_values()
 
+    def _get_fields(self):
+        return self._meta.fields
+
     def _get_original_values(self):
         original_values = {}
-        for field in self._meta.fields:
+        for field in self._get_fields():
             field_name = field.attname
             if field_name not in self.exclude_fields:
-                original_values[field.attname] = str(getattr(self, field.attname))
+                value = str(getattr(self, field.attname))
+                original_values[field.attname] = value
         return original_values
 
     def get_changes(self, original_values):
         changes = {}
-        for field in self._meta.fields:
+        for field in self._get_fields():
             field_name = field.attname
-            if field_name not in self.exclude_fields and str(getattr(self, field_name)) != original_values.get(field_name):
-                changes[field_name] = str(getattr(self, field_name))
+            if field_name not in self.exclude_fields:
+                value = str(getattr(self, field.attname))
+                if value != original_values.get(field_name):
+                    changes[field_name] = value
         return changes
 
     def log_activity(self, integration, action, changes, is_reversible, revert_data=None, user=None):
@@ -53,14 +59,15 @@ class ChangeLogMixin:
         super().save(*args, **kwargs)
         action = "created" if created else "updated"
         changes = self.get_changes(original_values=self._original_values)
-        self.log_activity(
-            integration=self.get_integration(),
-            action=action,
-            changes=changes,
-            is_reversible=True,
-            revert_data=self.get_revert_data(action=action, fields=changes.keys()),
-            user=self.get_user()
-        )
+        if changes:
+            self.log_activity(
+                integration=self.get_integration(),
+                action=action,
+                changes=changes,
+                is_reversible=True,
+                revert_data=self.get_revert_data(action=action, fields=changes.keys()),
+                user=self.get_user()
+            )
 
     def delete(self, *args, **kwargs):
         action = "deleted"
@@ -102,3 +109,5 @@ class ChangeLogMixin:
             }
         else:
             return {}
+
+
