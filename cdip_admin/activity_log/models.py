@@ -9,10 +9,10 @@ User = get_user_model()
 class ActivityLog(UUIDAbstractModel, TimestampedModel):
 
     class LogLevels(models.IntegerChoices):
-        DEBUG = 0, "Debug"  # Value, Display
-        INFO = 1, "Info"
-        WARNING = 2, "Warning"
-        ERROR = 3, "Error"
+        DEBUG = 10, "Debug"  # Value, Display
+        INFO = 20, "Info"
+        WARNING = 30, "Warning"
+        ERROR = 40, "Error"
 
     class LogTypes(models.TextChoices):
         DATA_CHANGE = "cdc", "Data Change"
