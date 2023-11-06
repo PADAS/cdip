@@ -270,6 +270,16 @@ class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
+class RouteProvider(ChangeLogMixin, models.Model):
+    integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
+    route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
+
+
+class RouteDestination(ChangeLogMixin, models.Model):
+    integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
+    route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
+
+
 class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
@@ -282,13 +292,15 @@ class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         "integrations.Integration",
         related_name="routing_rules_by_provider",
         blank=True,
-        verbose_name="Data Providers"
+        verbose_name="Data Providers",
+        through="integrations.RouteProvider"
     )
     destinations = models.ManyToManyField(
         "integrations.Integration",
         related_name="routing_rules_by_destination",
         blank=True,
-        verbose_name="Destinations"
+        verbose_name="Destinations",
+        through="integrations.RouteDestination"
     )
     configuration = models.ForeignKey(
         "integrations.RouteConfiguration",
