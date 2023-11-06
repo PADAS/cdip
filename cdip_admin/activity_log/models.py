@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.apps import apps
 from core.models import UUIDAbstractModel, TimestampedModel
 
 
@@ -78,5 +79,18 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         return f"[{self.created_at}] {self.title}"
 
     def revert(self):
-        # ToDo. Revert action using revert_data
-        pass
+        if not self.is_reversible:
+            return
+        # ToDo: Error handling?
+        action = self.details.get("action")
+        model_name = self.revert_data.get("model_name")
+        Model = apps.get_model(app_label="integrations", model_name=model_name)
+        instance_pk = self.revert_data.get("instance_pk")
+        instance = Model.objects.get(pk=instance_pk)
+        if action == "created":
+            instance.delete()
+        elif action == "updated":
+            original_values = self.revert_data.get("original_values")
+            for field, value in original_values.items():
+                setattr(instance, field, value)
+            instance.save()
