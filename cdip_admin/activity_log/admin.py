@@ -2,20 +2,28 @@ from django.contrib import admin
 from .models import ActivityLog
 
 
+def revert_selected(modeladmin, request, queryset):
+    for log in queryset:
+        log.revert()
+
+
+revert_selected.short_description = "Revert selected"
+
+
 @admin.register(ActivityLog)
 class ActivityLogAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
-        "title",
-        "integration",
         "log_level",
-        "log_type",
-        "origin",
         "value",
-        "created_by",
+        "title",
+        "origin",
+        "log_type",
         "details",
         "is_reversible",
         "revert_data",
+        "integration",
+        "created_by",
     )
     search_fields = (
         "title",
@@ -30,4 +38,4 @@ class ActivityLogAdmin(admin.ModelAdmin):
         "is_reversible",
         "integration",
     )
-
+    actions = [revert_selected]
