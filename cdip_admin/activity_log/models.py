@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.apps import apps
 from core.models import UUIDAbstractModel, TimestampedModel
+from .core import ActivityActions
 
 
 User = get_user_model()
@@ -81,15 +82,14 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
     def revert(self):
         if not self.is_reversible:
             return
-        # ToDo: Error handling?
         action = self.details.get("action")
         model_name = self.revert_data.get("model_name")
         Model = apps.get_model(app_label="integrations", model_name=model_name)
         instance_pk = self.revert_data.get("instance_pk")
         instance = Model.objects.get(pk=instance_pk)
-        if action == "created":
+        if action == ActivityActions.CREATED.value:
             instance.delete()
-        elif action == "updated":
+        elif action == ActivityActions.UPDATE.value:
             original_values = self.revert_data.get("original_values")
             for field, value in original_values.items():
                 setattr(instance, field, value)
