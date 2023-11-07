@@ -1,4 +1,6 @@
 import logging
+from enum import Enum
+
 import requests
 import time
 import rest_framework.request
@@ -54,3 +56,9 @@ def generate_short_id_milliseconds():
         current_time_ms, index = divmod(current_time_ms, base)
         short_id += alphabet[index]
     return short_id
+
+
+class AutoNameEnum(Enum):
+    def _generate_next_value_(name, start, count, last_values):
+        return name
+
