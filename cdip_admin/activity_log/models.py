@@ -92,7 +92,7 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         instance = Model.objects.get(pk=instance_pk)
         if action == ActivityActions.CREATED.value:
             instance.delete()
-        elif action == ActivityActions.UPDATE.value:
+        elif action == ActivityActions.UPDATED.value:
             original_values = self.revert_data.get("original_values")
             for field, value in original_values.items():
                 setattr(instance, field, value)
