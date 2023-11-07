@@ -12,7 +12,7 @@ from integrations.utils import get_api_key, does_movebank_permissions_config_cha
 from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
-from deployments.utils import get_dispatcher_defaults_from_gcp_secrets
+from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 
 
 User = get_user_model()
