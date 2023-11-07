@@ -75,6 +75,9 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
 
     class Meta:
         ordering = ("-created_at", )
+        indexes = [
+            models.Index(fields=["-created_at"]),
+        ]
 
     def __str__(self):
         return f"[{self.created_at}] {self.title}"
