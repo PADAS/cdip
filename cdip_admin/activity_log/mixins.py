@@ -1,4 +1,4 @@
-from django.db import models
+from crum import get_current_user
 from .models import ActivityLog
 
 
@@ -87,10 +87,7 @@ class ChangeLogMixin:
         return None
 
     def get_user(self):
-        # ToDo: Solve how to get this in a generic way
-        # Check django-crum
-        # https://github.com/ninemoreminutes/django-crum/
-        return None
+        return get_current_user()
 
     def get_revert_data(self, action, fields):
         if action == 'created':
