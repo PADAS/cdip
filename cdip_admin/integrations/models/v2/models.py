@@ -262,6 +262,11 @@ class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Configuration"
     )
+    integration_field = "first_route_provider"
+
+    @property
+    def first_route_provider(self):
+        return self.routing_rules_by_configuration.first().data_providers.first()
 
     class Meta:
         ordering = ("name", )
@@ -316,6 +321,11 @@ class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="Additional JSON Configuration"
     )
+    integration_field = "first_provider"
+
+    @property
+    def first_provider(self):
+        return self.data_providers.first()
 
     class Meta:
         ordering = ("owner", "name", )
@@ -352,6 +362,7 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         related_name="source_filters",
         verbose_name="Routing Rule"
     )
+    integration_field = "routing_rule__first_provider"
 
     class Meta:
         ordering = ("routing_rule", "order_number",)
@@ -423,6 +434,7 @@ class SourceState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON State"
     )
+    integration_field = "source__integration"
 
     @property
     def owner(self):

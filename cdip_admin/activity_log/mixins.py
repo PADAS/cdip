@@ -2,6 +2,7 @@ from crum import get_current_user
 from .models import ActivityLog
 
 
+
 class ChangeLogMixin:
     reversible_actions = ["created", "updated"]
     exclude_fields = ["created_at", "updated_at"]
@@ -9,6 +10,7 @@ class ChangeLogMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._original_values = self._get_original_values()
+        self._original_integration = self._get_related_integration()
 
     def _get_fields(self):
         return self._meta.fields
@@ -61,7 +63,7 @@ class ChangeLogMixin:
         changes = self.get_changes(original_values=self._original_values)
         if changes:
             self.log_activity(
-                integration=self.get_integration(),
+                integration=self._original_integration,
                 action=action,
                 changes=changes,
                 is_reversible=True,
@@ -72,7 +74,7 @@ class ChangeLogMixin:
     def delete(self, *args, **kwargs):
         action = "deleted"
         self.log_activity(
-            integration=self.get_integration(),
+            integration=self._get_related_integration(),
             action=action,
             changes=self._original_values,
             is_reversible=False,
@@ -80,11 +82,31 @@ class ChangeLogMixin:
         )
         super().delete(*args, **kwargs)
 
-    def get_integration(self):
-        # ToDo: Solve how to get this in a generic way
-        # Some changes are related to more than one. i.e. Editing a Route.
-        # Not every change is related to an integration. Do we log only the ones that are?
-        return None
+    def _get_related_integration(self):
+        from integrations.models import Integration
+        integration = None
+        # Look for an attribute specifying the integration field
+        if hasattr(self, "integration_field"):
+            integration_field = self.integration_field
+        elif hasattr(self, "integration"):
+            integration_field = "integration"
+        else:
+            integration_field = ""
+        try:  # Try to get the related integration
+            fields = integration_field.lower().strip().split("__")
+            integration = self
+            while fields:  # Follow relationships
+                field = fields.pop(0)
+                integration = getattr(integration, field)
+        except Exception as e:
+            # ToDo: log error
+            print(f"ERROR getting integration for Activity Log {e}")
+            pass
+        # Safeguard in case the integration field isn't set properly
+        if not isinstance(integration, Integration):
+            print(f"Warning: integration retrieved for Activity Log isn't an instance of Integration")
+            integration = None
+        return integration
 
     def get_user(self):
         return get_current_user()
