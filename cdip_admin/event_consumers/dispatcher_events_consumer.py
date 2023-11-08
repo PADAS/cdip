@@ -83,7 +83,7 @@ def handle_observation_delivered_event(event_dict: dict):
         value="observation_delivery_succeeded",
         title=title,
         created_by=get_current_user(),
-        details=event_dict,
+        details=event_data,
         is_reversible=False
     )
 
@@ -148,7 +148,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         value="observation_delivery_failed",
         title=title,
         created_by=get_current_user(),
-        details=event_dict,
+        details=event_data,
         is_reversible=False
     )
 
