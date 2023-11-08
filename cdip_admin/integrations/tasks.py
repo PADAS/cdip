@@ -10,8 +10,9 @@ from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
 from integrations.utils import send_message_to_gcp_pubsub
-from movebank_client import MovebankClient, MBClientError, PermissionOperations
+from activity_log.models import ActivityLog
 
+from movebank_client import MovebankClient, MBClientError, PermissionOperations
 from gundi_core.schemas.v1 import DestinationTypes
 from gundi_core.schemas.v2 import MovebankActions, MBPermissionsActionConfig, MBUserPermission
 
@@ -40,9 +41,32 @@ def run_integration(integration_id=None, action_id=None, pubsub_topic=None):
         "integration_id": integration_id,
         "action_id": action_id
     }
-
     # Send pubsub message to GCP
     send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic)
+
+    try:  # Log the event
+        integration = apps.get_model("integrations", "Integration").objects.get(id=integration_id)
+        title = f"Action {action_id} triggered for Integration '{integration.name}'"
+        ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.DEBUG,
+            log_type=ActivityLog.LogTypes.EVENT,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration,
+            value="integration_action_triggered",
+            title=title,
+            details=data,
+            is_reversible=False
+        )
+    except Exception as e:
+        logger.error(
+            f"Error logging integration action triggered event: {e}",
+            extra={
+                "integration_id": integration_id,
+                "action": action_id,
+                "pubsub_topic": pubsub_topic,
+                'attention_needed': True
+            }
+        )
 
 
 @shared_task(autoretry_for=(MBClientError,), retry_backoff=15, retry_kwargs={'max_retries': 3})
