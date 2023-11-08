@@ -15,7 +15,9 @@ class ChangeLogMixin:
             self._original_values = self._get_original_values()
             self._original_integration = self._get_related_integration()
         except Exception as e:
-            logger.warning(f"Activity Log > Initialization Error in {self}: '{e}'.")
+            logger.warning(f"Activity Log > Initialization Error: '{e}'.")
+            self._original_values = {}
+            self._original_integration = None
 
     def _get_fields(self):
         return self._meta.fields
@@ -69,7 +71,7 @@ class ChangeLogMixin:
             changes = self.get_changes(original_values=self._original_values)
             if changes:
                 self.log_activity(
-                    integration=self._original_integration,
+                    integration=self._original_integration or self._get_related_integration(),
                     action=action,
                     changes=changes,
                     is_reversible=True,
@@ -97,13 +99,13 @@ class ChangeLogMixin:
         integration = None
         # Look for an attribute specifying the integration field
         if hasattr(self, "integration_field"):
-            integration_field = self.integration_field
+            integration_field = self.integration_field.lower().strip()
         elif hasattr(self, "integration"):
             integration_field = "integration"
         else:
             integration_field = ""
         try:  # Try to get the related integration
-            fields = integration_field.lower().strip().split("__")
+            fields = integration_field.split("__") if integration_field else []
             integration = self
             while fields:  # Follow relationships
                 field = fields.pop(0)
