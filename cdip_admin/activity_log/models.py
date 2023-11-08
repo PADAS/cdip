@@ -43,7 +43,7 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
     )
     integration = models.ForeignKey(
         "integrations.Integration",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="logs_by_integration",
         blank=True,
         null=True
