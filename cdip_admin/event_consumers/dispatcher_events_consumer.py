@@ -9,7 +9,6 @@ from django.conf import settings
 from gundi_core import events as system_events
 from integrations.models import GundiTrace, Integration
 from activity_log.models import ActivityLog
-from crum import get_current_user
 
 
 logger = logging.getLogger(__name__)
@@ -82,8 +81,7 @@ def handle_observation_delivered_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_delivery_succeeded",
         title=title,
-        created_by=get_current_user(),
-        details=event_data,
+        details=event_dict["payload"],
         is_reversible=False
     )
 
@@ -147,8 +145,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_delivery_failed",
         title=title,
-        created_by=get_current_user(),
-        details=event_data,
+        details=event_dict["payload"],
         is_reversible=False
     )
 
