@@ -1,9 +1,20 @@
+import json
 import logging
 from crum import get_current_user
+from django.db import models
 from .models import ActivityLog
 from .core import ActivityActions
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_field_value(field, value):
+    if value is None or type(value) in [int, bool, str, list, dict]:
+        encoded_value = value
+    else:  # Encode others like float or datetime as string
+        # ToDo: handle datetimes better? use ISO format?
+        encoded_value = str(value)
+    return encoded_value
 
 
 class ChangeLogMixin:
@@ -27,8 +38,11 @@ class ChangeLogMixin:
         for field in self._get_fields():
             field_name = field.attname
             if field_name not in self.activity_excluded_fields:
-                value = str(getattr(self, field.attname))
-                original_values[field.attname] = value
+                serialized_value = _serialize_field_value(
+                    field=field,
+                    value=getattr(self, field.attname)
+                )
+                original_values[field.attname] = serialized_value
         return original_values
 
     def get_changes(self, original_values):
@@ -36,9 +50,12 @@ class ChangeLogMixin:
         for field in self._get_fields():
             field_name = field.attname
             if field_name not in self.activity_excluded_fields:
-                value = str(getattr(self, field.attname))
-                if value != original_values.get(field_name):
-                    changes[field_name] = value
+                serialized_value = _serialize_field_value(
+                    field=field,
+                    value=getattr(self, field.attname)
+                )
+                if serialized_value != original_values.get(field_name):
+                    changes[field_name] = serialized_value
         return changes
 
     def log_activity(self, integration, action, changes, is_reversible, revert_data=None, user=None):
@@ -69,11 +86,11 @@ class ChangeLogMixin:
         try:  # Error logging activity shouldn't affect the operation
             action = ActivityActions.CREATED.value if created else ActivityActions.UPDATED.value
             changes = self.get_changes(original_values=self._original_values)
-            if changes:
+            if created or changes:
                 self.log_activity(
                     integration=self._original_integration or self._get_related_integration(),
                     action=action,
-                    changes=changes,
+                    changes=changes or self._original_values,  # FixMe: Some times on creation the changes are empty
                     is_reversible=True,
                     revert_data=self.get_revert_data(action=action, fields=changes.keys()),
                     user=self.get_user()
@@ -111,7 +128,6 @@ class ChangeLogMixin:
                 field = fields.pop(0)
                 integration = getattr(integration, field)
         except Exception as e:
-            # ToDo: log error
             logger.warning(f"Activity Log > ERROR resolving integration for {self}: {e}")
             pass
         # Safeguard in case the integration field isn't set properly
