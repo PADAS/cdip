@@ -61,6 +61,7 @@ class ChangeLogMixin:
     def log_activity(self, integration, action, changes, is_reversible, revert_data=None, user=None):
         model_name = self.__class__.__name__
         value = f"{model_name.lower()}_{action.lower()}"
+        user = user or "unknown user"
         title = f"{model_name} {action} by {user}"
         ActivityLog.objects.create(
             log_level=ActivityLog.LogLevels.INFO,
