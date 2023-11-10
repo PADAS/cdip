@@ -71,7 +71,7 @@ class ChangeLogMixin:
             integration=integration,
             value=value,
             title=title,
-            created_by=user if not user.is_anonymous else None,
+            created_by=user if user and not user.is_anonymous else None,
             details={
                 "model_name": model_name,
                 "instance_pk": str(self.pk),
