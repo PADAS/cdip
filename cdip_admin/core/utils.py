@@ -59,6 +59,7 @@ def generate_short_id_milliseconds():
 
 
 class AutoNameEnum(Enum):
+    @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name
 
