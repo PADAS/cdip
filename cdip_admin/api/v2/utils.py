@@ -85,6 +85,16 @@ def send_events_to_routing(events, gundi_ids):
                 # Convert the event to the schema supported by routing
                 integration = event.get("integration")
                 source = event.get("source")
+                if event_location := event.get("location"):
+                    location = Location(
+                        lon=event_location.get("lon"),  # Longitude
+                        lat=event_location.get("lat"),  # Latitude
+                        alt=event_location.get("alt", 0.0),  # Altitude
+                        hdop=event_location.get("hdop"),
+                        vdop=event_location.get("vdop")
+                    )
+                else:
+                    location = None
                 msg_for_routing = Event(
                     gundi_id=str(gundi_id),
                     related_to=event.get("related_to"),
@@ -93,13 +103,7 @@ def send_events_to_routing(events, gundi_ids):
                     external_source_id=str(source.external_id),
                     owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
                     recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
-                    location=Location(
-                        lon=event.get("location", {}).get("lon"),  # Longitude
-                        lat=event.get("location", {}).get("lat"),  # Latitude
-                        alt=event.get("location", {}).get("alt", 0.0),  # Altitude
-                        hdop=event.get("location", {}).get("hdop"),
-                        vdop=event.get("location", {}).get("vdop")
-                    ),
+                    location=location,
                     annotations=event.get("annotations", {}),
                     title=event.get("title"),
                     event_type=event.get("event_type"),
