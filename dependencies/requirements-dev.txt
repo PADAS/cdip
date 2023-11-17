@@ -121,6 +121,7 @@ django==3.2.15
     #   django-bootstrap4
     #   django-celery-beat
     #   django-cors-headers
+    #   django-crum
     #   django-extensions
     #   django-fernet-fields
     #   django-filter
@@ -144,6 +145,8 @@ django-celery-beat==2.5.0
 django-cors-headers==3.1.1
     # via -r requirements.in
 django-crispy-forms==1.9.1
+    # via -r requirements.in
+django-crum==0.7.9
     # via -r requirements.in
 django-environ==0.4.5
     # via -r requirements.in

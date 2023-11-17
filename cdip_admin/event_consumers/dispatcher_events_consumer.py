@@ -8,6 +8,7 @@ from google.cloud import pubsub_v1
 from django.conf import settings
 from gundi_core import events as system_events
 from integrations.models import GundiTrace, Integration
+from activity_log.models import ActivityLog
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ def handle_observation_delivered_event(event_dict: dict):
             f"Creating trace as delivered for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
             extra={"event": event_dict}
         )
-        GundiTrace.objects.create(
+        trace = GundiTrace.objects.create(
             object_id=trace.object_id,
             object_type=trace.object_type,
             related_to=event_data.related_to,
@@ -68,9 +69,24 @@ def handle_observation_delivered_event(event_dict: dict):
             external_id=event_data.external_id,
         )
 
+    logger.debug(
+        f"Recording delivery event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
+    title = f"Observation Delivered to '{trace.destination.base_url}'"
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.DEBUG,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=trace.data_provider,
+        value="observation_delivery_succeeded",
+        title=title,
+        details=event_dict["payload"],
+        is_reversible=False
+    )
+
 
 def handle_observation_delivery_failed_event(event_dict: dict):
-    # ToDo: Revisit once we implement the monitoring & activity log
     event = system_events.ObservationDeliveryFailed.parse_obj(event_dict)
     # Update the status and save the external id
     event_data = event.payload
@@ -116,6 +132,22 @@ def handle_observation_delivery_failed_event(event_dict: dict):
             f"Trace was not updated due to possible duplicated event. gundi_id: {event_data.gundi_id}",
             extra={"event": event_dict}
         )
+
+    logger.debug(
+        f"Recording delivery error event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
+    title = f"Error Delivering observation to '{trace.destination.base_url}'"
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=trace.data_provider,
+        value="observation_delivery_failed",
+        title=title,
+        details=event_dict["payload"],
+        is_reversible=False
+    )
 
 
 event_handlers = {
