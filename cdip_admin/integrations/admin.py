@@ -320,6 +320,14 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
     )
 
 
+class RouteProviderInline(admin.TabularInline):
+    model = Route.data_providers.through
+
+
+class RouteDestinationInline(admin.TabularInline):
+    model = Route.destinations.through
+
+
 @admin.register(Route)
 class RouteAdmin(admin.ModelAdmin):
     list_display = (
@@ -329,10 +337,14 @@ class RouteAdmin(admin.ModelAdmin):
     list_filter = (
         "owner",
     )
+    inlines = (
+        RouteProviderInline,
+        RouteDestinationInline,
+    )
 
 
 @admin.register(RouteConfiguration)
-class RouteAdmin(admin.ModelAdmin):
+class RouteConfigAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",

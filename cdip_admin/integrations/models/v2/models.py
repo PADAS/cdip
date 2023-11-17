@@ -13,6 +13,7 @@ from model_utils import FieldTracker
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
+from activity_log.mixins import ChangeLogMixin
 
 
 User = get_user_model()
@@ -79,7 +80,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         jsonschema.validate(instance=configuration, schema=self.schema)
 
 
-class Integration(UUIDAbstractModel, TimestampedModel):
+class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
         "integrations.IntegrationType",
         on_delete=models.CASCADE,
@@ -173,7 +174,7 @@ class Integration(UUIDAbstractModel, TimestampedModel):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
 
-class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
+class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     integration = models.ForeignKey(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -235,7 +236,7 @@ class IntegrationConfiguration(UUIDAbstractModel, TimestampedModel):
             self._post_save(self, *args, **kwargs)
 
 
-class IntegrationState(UUIDAbstractModel, TimestampedModel):
+class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     integration = models.OneToOneField(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -254,13 +255,18 @@ class IntegrationState(UUIDAbstractModel, TimestampedModel):
         return f"{self.data}"
 
 
-class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
+class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
         default=dict,
         verbose_name="JSON Configuration"
     )
+    integration_field = "first_route_provider"
+
+    @property
+    def first_route_provider(self):
+        return self.routing_rules_by_configuration.first().data_providers.first()
 
     class Meta:
         ordering = ("name", )
@@ -269,7 +275,17 @@ class RouteConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class Route(UUIDAbstractModel, TimestampedModel):
+class RouteProvider(ChangeLogMixin, models.Model):
+    integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
+    route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
+
+
+class RouteDestination(ChangeLogMixin, models.Model):
+    integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
+    route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
+
+
+class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
@@ -281,13 +297,15 @@ class Route(UUIDAbstractModel, TimestampedModel):
         "integrations.Integration",
         related_name="routing_rules_by_provider",
         blank=True,
-        verbose_name="Data Providers"
+        verbose_name="Data Providers",
+        through="integrations.RouteProvider"
     )
     destinations = models.ManyToManyField(
         "integrations.Integration",
         related_name="routing_rules_by_destination",
         blank=True,
-        verbose_name="Destinations"
+        verbose_name="Destinations",
+        through="integrations.RouteDestination"
     )
     configuration = models.ForeignKey(
         "integrations.RouteConfiguration",
@@ -303,6 +321,11 @@ class Route(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="Additional JSON Configuration"
     )
+    integration_field = "first_provider"
+
+    @property
+    def first_provider(self):
+        return self.data_providers.first()
 
     class Meta:
         ordering = ("owner", "name", )
@@ -311,7 +334,7 @@ class Route(UUIDAbstractModel, TimestampedModel):
         return f"{self.owner}: {self.name}"
 
 
-class SourceFilter(UUIDAbstractModel, TimestampedModel):
+class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     class SourceFilterTypes(models.TextChoices):
         SOURCE_LIST = "list", "Select Sources By ID"  # Value, Display
@@ -339,6 +362,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
         related_name="source_filters",
         verbose_name="Routing Rule"
     )
+    integration_field = "routing_rule__first_provider"
 
     class Meta:
         ordering = ("routing_rule", "order_number",)
@@ -347,7 +371,7 @@ class SourceFilter(UUIDAbstractModel, TimestampedModel):
         return f"{self.name} {self.type}"
 
 
-class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
+class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     data = models.JSONField(
         blank=True,
@@ -362,7 +386,7 @@ class SourceConfiguration(UUIDAbstractModel, TimestampedModel):
         return f"{self.name}"
 
 
-class Source(UUIDAbstractModel, TimestampedModel):
+class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)
     external_id = models.CharField(
         max_length=200,
@@ -399,7 +423,7 @@ class Source(UUIDAbstractModel, TimestampedModel):
         ]
 
 
-class SourceState(UUIDAbstractModel, TimestampedModel):
+class SourceState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     source = models.OneToOneField(
         "integrations.Source",
         on_delete=models.CASCADE,
@@ -410,6 +434,7 @@ class SourceState(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON State"
     )
+    integration_field = "source__integration"
 
     @property
     def owner(self):
