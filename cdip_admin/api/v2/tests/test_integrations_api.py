@@ -1,11 +1,15 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
+
+from activity_log.core import ActivityActions
+from activity_log.models import ActivityLog
 from integrations.models import (
     Integration,
     IntegrationAction,
     IntegrationConfiguration,
 )
+from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
 
 pytestmark = pytest.mark.django_db
@@ -92,11 +96,48 @@ def _test_create_integration(
     assert "id" in response_data
     # Check that the integration was created in the database
     integration = Integration.objects.get(id=response_data["id"])
+    # Check that the operations were recorded in the activity log
+    activity_log = ActivityLog.objects.filter(integration_id=integration.id, value="integration_created").first()
+    _test_activity_logs_on_instance_created(
+        activity_log=activity_log,
+        instance=integration,
+        user=user
+    )
+
     # Check that the related configurations where created too
-    assert integration.configurations.count() == len(configurations)
+    total_configurations = integration.configurations.count()
+    assert total_configurations == len(configurations)
+    activity_logs = ActivityLog.objects.filter(integration_id=integration.id, value="integrationconfiguration_created").all()
+    assert activity_logs.count() == total_configurations
+    sorted_configurations = integration.configurations.order_by("-created_at")
+    # Check activity logs for each configuration
+    for i, configuration in enumerate(sorted_configurations):
+        activity_log = activity_logs[i]
+        _test_activity_logs_on_instance_created(
+            activity_log=activity_log,
+            instance=configuration,
+            user=user
+        )
+
     # Check that a default routing rule is created
     if create_default_route:
         assert integration.default_route
+        activity_log = ActivityLog.objects.filter(integration_id=integration.id, value="integration_updated").first()
+        _test_activity_logs_on_instance_updated(
+            activity_log=activity_log,
+            instance=integration,
+            user=user,
+            expected_changes={
+                "default_route_id": str(integration.default_route.id),
+            },
+            expected_revert_data={
+                "instance_pk": str(integration.pk),
+                "model_name": "Integration",
+                "original_values": {
+                    "default_route_id": None
+                }
+            }
+        )
     else:
         assert integration.default_route is None
 
@@ -948,13 +989,13 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
 
 
 def _test_update_integration_config(
-        api_client, user, integration, configurations_data
+        api_client, user, integration, new_configurations_data, original_configurations_data=None
 ):
     api_client.force_authenticate(user)
     response = api_client.patch(
         reverse("integrations-detail", kwargs={"pk": integration.id}),
         data={
-          "configurations": configurations_data
+          "configurations": new_configurations_data
         },
         format='json'
     )
@@ -969,16 +1010,51 @@ def _test_update_integration_config(
         assert "action" in config_response
         assert "data" in config_response
     # Compare the response with request data
-    for config_request in configurations_data:
+    for config_request in new_configurations_data:
         if "id" in config_request:  # Updated
             config_response = next((c for c in response_data["configurations"] if c["id"] == config_request["id"]), None)
             assert config_response
             configuration = IntegrationConfiguration.objects.get(id=config_request["id"])
+            # Check activity logs
+            activity_log = ActivityLog.objects.filter(
+                integration=integration,
+                details__action=ActivityActions.UPDATED.value,
+                details__instance_pk=config_request["id"],
+                details__model_name="IntegrationConfiguration",
+            ).last()
+            expected_revert_data = {
+                "instance_pk": str(configuration.pk),
+                "model_name": "IntegrationConfiguration"
+            }
+            if original_configurations_data:
+                expected_revert_data["original_values"] = original_configurations_data[config_request["id"]]
+            _test_activity_logs_on_instance_updated(
+                activity_log=activity_log,
+                instance=configuration,
+                user=user,
+                expected_changes={
+                    "data": config_request["data"]
+                },
+                expected_revert_data=expected_revert_data
+            )
         else:  # Created a new config
             configuration = IntegrationConfiguration.objects.get(
                 integration=integration,
                 action_id=config_request["action"],
                 data=config_request["data"]
+            )
+            # Check activity logs
+            activity_log = ActivityLog.objects.filter(
+                integration=integration,
+                details__action=ActivityActions.CREATED.value,
+                details__instance_pk=str(configuration.id),
+                details__model_name="IntegrationConfiguration"
+            ).last()
+            assert activity_log
+            _test_activity_logs_on_instance_created(
+                activity_log=activity_log,
+                instance=configuration,
+                user=user
             )
         # Check that the new config was saved in the db
         assert configuration.data == config_request["data"]
@@ -996,7 +1072,7 @@ def test_update_integration_config_as_org_admin(
         api_client=api_client,
         user=org_admin_user,
         integration=provider_lotek_panthera,
-        configurations_data=[
+        new_configurations_data=[
             {
                 "id": str(lotek_auth_config.id),
                 "data": {
@@ -1009,10 +1085,18 @@ def test_update_integration_config_as_org_admin(
                 "integration": str(provider_lotek_panthera.id),  # Optional, ignored
                 "action": str(lotek_action_pull_positions.id),  # Optional, ignored
                 "data": {
-                    "start_time": "2023-01-01T00:00:00Z"
+                    "start_time": "2023-11-10T00:00:00Z"
                 }
             }
-        ]
+        ],
+        original_configurations_data={
+            str(lotek_auth_config.id): {
+                "data": lotek_auth_config.data
+            },
+            str(lotek_pull_positions_config.id): {
+                "data": lotek_pull_positions_config.data
+            }
+        }
     )
 
 
@@ -1026,7 +1110,7 @@ def test_update_integration_config_as_superuser(
         api_client=api_client,
         user=superuser,
         integration=provider_lotek_panthera,
-        configurations_data=[
+        new_configurations_data=[
             {
                 "id": str(lotek_auth_config.id),
                 "data": {
@@ -1055,7 +1139,7 @@ def test_update_or_create_integration_config_as_org_admin(
         api_client=api_client,
         user=org_admin_user,
         integration=provider_lotek_panthera,
-        configurations_data=[
+        new_configurations_data=[
             {  # Config to be updated
                 "id": str(lotek_auth_config.id),
                 "data": {
