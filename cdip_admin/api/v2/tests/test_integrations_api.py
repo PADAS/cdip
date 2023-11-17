@@ -1016,11 +1016,12 @@ def _test_update_integration_config(
             assert config_response
             configuration = IntegrationConfiguration.objects.get(id=config_request["id"])
             # Check activity logs
-            activity_log = ActivityLog.objects.get(
+            activity_log = ActivityLog.objects.filter(
                 integration=integration,
                 details__action=ActivityActions.UPDATED.value,
-                details__instance_pk=config_request["id"]
-            )
+                details__instance_pk=config_request["id"],
+                details__model_name="IntegrationConfiguration",
+            ).last()
             expected_revert_data = {
                 "instance_pk": str(configuration.pk),
                 "model_name": "IntegrationConfiguration"
@@ -1046,6 +1047,7 @@ def _test_update_integration_config(
             activity_log = ActivityLog.objects.filter(
                 integration=integration,
                 details__action=ActivityActions.CREATED.value,
+                details__instance_pk=str(configuration.id),
                 details__model_name="IntegrationConfiguration"
             ).last()
             assert activity_log
