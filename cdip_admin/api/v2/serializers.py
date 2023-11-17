@@ -713,9 +713,6 @@ class EventCreateSerializer(GundiTraceSerializer):
 
     def validate(self, data):
         data = super().validate(data)
-        # Validate that either location or geometry is provided
-        if not ("location" in data or "geometry" in data):
-            raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
@@ -758,7 +755,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
     subject_type = serializers.CharField(write_only=True, required=False)
     source_name = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
-    location = serializers.JSONField(write_only=True, required=False)
+    location = serializers.JSONField(write_only=True, required=True)
     additional = serializers.JSONField(write_only=True, required=False)
     annotations = serializers.JSONField(write_only=True, required=False)
 
@@ -795,9 +792,6 @@ class ObservationCreateSerializer(GundiTraceSerializer):
 
     def validate(self, data):
         data = super().validate(data)
-        # Validate that either location or geometry is provided
-        if "location" not in data:
-            raise drf_exceptions.ValidationError(detail=f"You must provide 'location' or 'geometry'")
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],

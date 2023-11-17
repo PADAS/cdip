@@ -220,3 +220,41 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_get_publi
     # Check that the source is set with a default value
     for call in publish_mock.call_args_list:
         assert call.kwargs["data"].get("external_source_id") == "default-source"
+
+
+def test_create_single_event_without_location(api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    _test_create_event(
+        api_client=api_client,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        data={  # Analizer events do not require location
+            'event_type': 'silence_source_provider_rep',
+            'title': '265de4c0-07b8-4e30-b136-5d5a75ff5912 integration disrupted',
+            'recorded_at': '2023-11-16T12:14:35.215393-06:00',
+            'event_details': {'report_time': '2023-11-16 18:14:34', 'silence_threshold': '00:00',
+                              'last_device_reported_at': '2023-10-26 21:24:02', 'updates': []},
+            'additional': {'id': '968f6307-3ff6-4810-aca5-bf4669d6ddd6', 'location': None,
+                           'time': '2023-11-16T12:14:35.213057-06:00', 'end_time': None, 'serial_number': 371,
+                           'message': '', 'provenance': '', 'priority': 0, 'priority_label': 'Gray', 'attributes': {},
+                           'comment': None, 'reported_by': None, 'state': 'new', 'is_contained_in': [],
+                           'sort_at': '2023-11-16T12:14:35.215163-06:00', 'patrol_segments': [], 'geometry': None,
+                           'updated_at': '2023-11-16T12:14:35.215163-06:00',
+                           'created_at': '2023-11-16T12:14:35.215393-06:00', 'icon_id': 'silence_source_provider_rep',
+                           'files': [], 'related_subjects': [], 'event_category': 'analyzer_event',
+                           'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/968f6307-3ff6-4810-aca5-bf4669d6ddd6',
+                           'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg', 'geojson': None,
+                           'is_collection': False, 'updates': [
+                    {'message': 'Created', 'time': '2023-11-16T18:14:35.220923+00:00',
+                     'user': {'first_name': '', 'last_name': '', 'username': ''}, 'type': 'add_event'}],
+                           'patrols': []}
+        }
+    )
+    # Check that a message was published in the right topic for routing
+    assert mock_get_publisher.return_value.publish.called
+    mock_get_publisher.return_value.publish.assert_called_with(
+        topic=TopicEnum.observations_unprocessed.value,
+        data=ANY,
+        extra=ANY
+    )
