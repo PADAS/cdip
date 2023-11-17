@@ -21,7 +21,7 @@ def enrich_span_from_event(span, event: Event, **kwargs):
     span.set_attribute("observation_type", event.observation_type)
     span.set_attribute("source_id", str(event.source_id))
     span.set_attribute("external_source_id", str(event.external_source_id))
-    span.set_attribute("location", str(event.location.dict()))
+    span.set_attribute("location", str(event.location.dict()) if event.location else "no-location")
     span.set_attribute("data", str(event.dict()))
     span.set_attribute("event_type", str(event.event_type))
     span.set_attribute("event_title", event.title)
