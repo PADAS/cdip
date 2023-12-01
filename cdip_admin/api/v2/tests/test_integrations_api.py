@@ -342,7 +342,56 @@ def test_cannot_create_integrations_with_invalid_url_as_org_admin(
             # Other actions in this example don't require extra settings
         ]
     )
-# ToDo: Add more tests for configuration schema validations
+
+
+def test_create_er_integration_with_auto_create_configurations_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            # Configurations for other actions are not provided
+        ],
+        create_configurations=True  # Create missing configurations
+    )
+
+
+def test_create_er_integration_without_all_configurations_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            # Configurations for other actions are not provided
+        ],
+        create_configurations=False  # Do not create missing configurations
+    )
 
 
 def _test_filter_integrations(api_client, user, filters, expected_integrations):
