@@ -107,6 +107,9 @@ def _test_create_integration(
 
     # Check that the related configurations where created too
     total_configurations = integration.configurations.count()
+    provided_configurations = [c["action"] for c in configurations]
+    missing_configurations = [str(action.id) for action in integration.type.actions.all() if
+                              str(action.id) not in provided_configurations]
     if create_configurations:
         assert total_configurations == len(integration.type.actions.all())
     else:
@@ -114,8 +117,13 @@ def _test_create_integration(
     activity_logs = ActivityLog.objects.filter(integration_id=integration.id, value="integrationconfiguration_created").all()
     assert activity_logs.count() == total_configurations
     sorted_configurations = integration.configurations.order_by("-created_at")
-    # Check activity logs for each configuration
+    # Check the configurations created
     for i, configuration in enumerate(sorted_configurations):
+        if str(configuration.action.id) in provided_configurations:
+            assert configuration.data == next(c for c in configurations if c["action"] == str(configuration.action.id))["data"]
+        elif str(configuration.action.id) in missing_configurations and create_configurations:
+            assert configuration.data == {}  # Configuration was created automatically
+        # Check activity logs for each configuration
         activity_log = activity_logs[i]
         _test_activity_logs_on_instance_created(
             activity_log=activity_log,
