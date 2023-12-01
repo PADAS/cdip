@@ -288,6 +288,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     configurations = IntegrationConfigurationCreateUpdateSerializer(many=True, required=False)
     default_route = RoutingRuleSummarySerializer(read_only=True)
     create_default_route = serializers.BooleanField(default=True)
+    create_configurations = serializers.BooleanField(default=True)
 
     class Meta:
         model = Integration
@@ -300,7 +301,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "owner",
             "configurations",
             "default_route",
-            "create_default_route"
+            "create_default_route",
+            "create_configurations"
         )
 
     def validate(self, data):
@@ -327,6 +329,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         configurations = validated_data.pop("configurations")
         create_default_route = validated_data.pop("create_default_route")
+        create_configurations = validated_data.pop("create_configurations")
         # Create the integration
         integration = Integration.objects.create(**validated_data)
         # Create configurations if provided
@@ -335,6 +338,9 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 integration=integration,
                 **configuration
             )
+        # Create other missing configurations
+        if create_configurations:
+            integration.create_missing_configurations()
         # Create a default route as needed
         if create_default_route:
             ensure_default_route(integration=integration)

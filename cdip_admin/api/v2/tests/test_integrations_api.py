@@ -75,7 +75,7 @@ def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organizati
 
 
 def _test_create_integration(
-        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True
+        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True, create_configurations=True
 ):
     request_data = {
       "name": name,
@@ -83,7 +83,8 @@ def _test_create_integration(
       "owner": str(owner.id),
       "base_url": base_url,
       "configurations": configurations,
-      "create_default_route": create_default_route
+      "create_default_route": create_default_route,
+      "create_configurations": create_configurations
     }
     api_client.force_authenticate(user)
     response = api_client.post(
@@ -106,7 +107,10 @@ def _test_create_integration(
 
     # Check that the related configurations where created too
     total_configurations = integration.configurations.count()
-    assert total_configurations == len(configurations)
+    if create_configurations:
+        assert total_configurations == len(integration.type.actions.all())
+    else:
+        assert total_configurations == len(configurations)
     activity_logs = ActivityLog.objects.filter(integration_id=integration.id, value="integrationconfiguration_created").all()
     assert activity_logs.count() == total_configurations
     sorted_configurations = integration.configurations.order_by("-created_at")
