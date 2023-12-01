@@ -75,7 +75,7 @@ def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organizati
 
 
 def _test_create_integration(
-        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True
+        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True, create_configurations=True
 ):
     request_data = {
       "name": name,
@@ -83,7 +83,8 @@ def _test_create_integration(
       "owner": str(owner.id),
       "base_url": base_url,
       "configurations": configurations,
-      "create_default_route": create_default_route
+      "create_default_route": create_default_route,
+      "create_configurations": create_configurations
     }
     api_client.force_authenticate(user)
     response = api_client.post(
@@ -106,12 +107,23 @@ def _test_create_integration(
 
     # Check that the related configurations where created too
     total_configurations = integration.configurations.count()
-    assert total_configurations == len(configurations)
+    provided_configurations = [c["action"] for c in configurations]
+    missing_configurations = [str(action.id) for action in integration.type.actions.all() if
+                              str(action.id) not in provided_configurations]
+    if create_configurations:
+        assert total_configurations == len(integration.type.actions.all())
+    else:
+        assert total_configurations == len(configurations)
     activity_logs = ActivityLog.objects.filter(integration_id=integration.id, value="integrationconfiguration_created").all()
     assert activity_logs.count() == total_configurations
     sorted_configurations = integration.configurations.order_by("-created_at")
-    # Check activity logs for each configuration
+    # Check the configurations created
     for i, configuration in enumerate(sorted_configurations):
+        if str(configuration.action.id) in provided_configurations:
+            assert configuration.data == next(c for c in configurations if c["action"] == str(configuration.action.id))["data"]
+        elif str(configuration.action.id) in missing_configurations and create_configurations:
+            assert configuration.data == {}  # Configuration was created automatically
+        # Check activity logs for each configuration
         activity_log = activity_logs[i]
         _test_activity_logs_on_instance_created(
             activity_log=activity_log,
@@ -338,7 +350,56 @@ def test_cannot_create_integrations_with_invalid_url_as_org_admin(
             # Other actions in this example don't require extra settings
         ]
     )
-# ToDo: Add more tests for configuration schema validations
+
+
+def test_create_er_integration_with_auto_create_configurations_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            # Configurations for other actions are not provided
+        ],
+        create_configurations=True  # Create missing configurations
+    )
+
+
+def test_create_er_integration_without_all_configurations_as_org_admin(
+        api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
+        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+):
+    _test_create_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        owner=organization,
+        integration_type=integration_type_er,
+        base_url="https://reservedest.pamdas.org",
+        name=f"Reserve Dest {get_random_id()}",
+        configurations=[
+            {
+                "action": str(er_action_auth.id),
+                "data": {
+                    "username": "reservedest@pamdas.org",
+                    "password": "P4sSW0rD"
+                }
+            },
+            # Configurations for other actions are not provided
+        ],
+        create_configurations=False  # Do not create missing configurations
+    )
 
 
 def _test_filter_integrations(api_client, user, filters, expected_integrations):

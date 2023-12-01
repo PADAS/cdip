@@ -173,6 +173,15 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def is_mb_site(self):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
+    def create_missing_configurations(self):
+        for action in self.type.actions.all():
+            if not self.configurations.filter(action=action).exists():
+                IntegrationConfiguration.objects.create(
+                    integration=self,
+                    action=action,
+                    data={}  # Empty configuration by default
+                )
+
 
 class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     integration = models.ForeignKey(
