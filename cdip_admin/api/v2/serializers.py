@@ -901,3 +901,20 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
     external_id = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+
+
+class ActivityLogRetrieveSerializer(serializers.Serializer):
+    created_at = serializers.DateTimeField(read_only=True)
+    log_level = serializers.IntegerField(read_only=True)
+    log_type = serializers.CharField(read_only=True)
+    origin = serializers.CharField(read_only=True)
+    integration = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+    )
+    value = serializers.CharField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    created_by = UserDetailsRetrieveSerializer(read_only=True)
+    details = serializers.JSONField(read_only=True)
+    is_reversible = serializers.BooleanField(read_only=True)
+    revert_data = serializers.JSONField(read_only=True)
+
