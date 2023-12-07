@@ -1,10 +1,12 @@
 import django_filters
 from django.db.models import Subquery
+
+from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
-    GundiTraceFilter
+    GundiTraceFilter, ActivityLogFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -403,3 +405,32 @@ class GundiTraceViewSet(
     ordering = ['-created_at']
     serializer_class = v2_serializers.GundiTraceRetrieveSerializer
     queryset = GundiTrace.objects.all()
+
+
+class ActivityLogsViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint retrieving activity logs.
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    serializer_class = v2_serializers.ActivityLogRetrieveSerializer
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        django_filters.rest_framework.DjangoFilterBackend,
+        #custom_filters.CustomizableSearchFilter
+    ]
+    filterset_class = ActivityLogFilter
+    # filterset_class = RouteFilter
+    ordering_fields = ["created_at", ]
+    ordering = ["-created_at"]
+    # search_fields = [  # Default search fields (used in the global search box)
+    #
+    # ]
+
+    def get_queryset(self):
+        # Returns a list with the logs that the user is allowed to see
+        user_integrations = get_user_integrations_qs(user=self.request.user)
+        return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values('id')))
+
