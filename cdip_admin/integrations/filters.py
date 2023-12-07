@@ -2,6 +2,8 @@ from django.db.models import Subquery
 from django.utils.translation import ugettext_lazy as _
 import django_filters
 from django_filters import rest_framework as django_filters_rest
+
+from activity_log.models import ActivityLog
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -543,3 +545,26 @@ class GundiTraceFilter(django_filters_rest.FilterSet):
             'destination': ['exact', ],
             'external_id': ['exact', ]
         }
+
+
+class ActivityLogFilter(django_filters_rest.FilterSet):
+    integration = django_filters_rest.CharFilter(
+        field_name="integration__id",
+        lookup_expr="exact",
+        distinct=True
+    )
+    integration__in = CharInFilter(
+        field_name="integration__id",
+        lookup_expr="in",
+        distinct=True
+    )
+    log_level = django_filters_rest.CharFilter(method='filter_by_log_level')
+
+    class Meta:
+        model = ActivityLog
+        fields = {
+            'integration': ['exact', ],
+        }
+
+    def filter_by_log_level(self, queryset, name, value):
+        return ActivityLog.objects.filter(log_level__gte=int(value))
