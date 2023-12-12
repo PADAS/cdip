@@ -548,6 +548,17 @@ class GundiTraceFilter(django_filters_rest.FilterSet):
 
 
 class ActivityLogFilter(django_filters_rest.FilterSet):
+    log_level = django_filters_rest.CharFilter(method='filter_by_log_level')
+    log_type = django_filters_rest.CharFilter(
+        field_name="log_type",
+        lookup_expr="exact",
+        distinct=True
+    )
+    origin = django_filters_rest.CharFilter(
+        field_name="origin",
+        lookup_expr="exact",
+        distinct=True
+    )
     integration = django_filters_rest.CharFilter(
         field_name="integration__id",
         lookup_expr="exact",
@@ -558,13 +569,18 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
         lookup_expr="in",
         distinct=True
     )
-    log_level = django_filters_rest.CharFilter(method='filter_by_log_level')
+    value = django_filters_rest.CharFilter(
+        field_name="value",
+        lookup_expr="exact",
+        distinct=True
+    )
+    from_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    to_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="lte")
+    is_reversible = django_filters_rest.BooleanFilter(field_name="is_reversible")
 
     class Meta:
         model = ActivityLog
-        fields = {
-            'integration': ['exact', ],
-        }
+        exclude = ["title", "details", "revert_data", ]
 
     def filter_by_log_level(self, queryset, name, value):
-        return ActivityLog.objects.filter(log_level__gte=int(value))
+        return queryset.filter(log_level__gte=int(value))
