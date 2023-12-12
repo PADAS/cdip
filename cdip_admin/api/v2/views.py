@@ -419,15 +419,15 @@ class ActivityLogsViewSet(
     filter_backends = [
         drf_filters.OrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
-        #custom_filters.CustomizableSearchFilter
+        custom_filters.CustomizableSearchFilter
     ]
     filterset_class = ActivityLogFilter
-    # filterset_class = RouteFilter
     ordering_fields = ["created_at", ]
     ordering = ["-created_at"]
-    # search_fields = [  # Default search fields (used in the global search box)
-    #
-    # ]
+    search_fields = [  # Default search fields (used in the global search box)
+        "title", "value", "created_by__username", "created_by__email",
+        "integration__name", "integration__base_url", "integration__type__name", "integration__type__value",
+    ]
 
     def get_queryset(self):
         # Returns a list with the logs that the user is allowed to see
