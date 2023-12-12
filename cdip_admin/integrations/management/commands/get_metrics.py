@@ -56,7 +56,7 @@ class Command(BaseCommand):
             created_at__lte=end,
             is_duplicate=False,
         )
-        self.stdout.write(f"Receive observations (skipping duplicates): {unique_traces_in_range.count()}")
+        self.stdout.write(f"Received observations (without duplicates): {unique_traces_in_range.count()}")
         dispatched_observations = unique_traces_in_range.filter(
             has_error=False,
             delivered_at__isnull=False
