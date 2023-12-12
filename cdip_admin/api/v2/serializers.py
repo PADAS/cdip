@@ -908,9 +908,7 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
     log_level = serializers.IntegerField(read_only=True)
     log_type = serializers.CharField(read_only=True)
     origin = serializers.CharField(read_only=True)
-    integration = serializers.PrimaryKeyRelatedField(
-        read_only=True,
-    )
+    integration = IntegrationSummarySerializer(read_only=True)
     value = serializers.CharField(read_only=True)
     title = serializers.CharField(read_only=True)
     created_by = UserDetailsRetrieveSerializer(read_only=True)
