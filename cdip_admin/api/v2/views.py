@@ -430,7 +430,10 @@ class ActivityLogsViewSet(
     ]
 
     def get_queryset(self):
-        # Returns a list with the logs that the user is allowed to see
+        # Superusers can see all
+        if self.request.user.is_superuser:
+            return ActivityLog.objects.all()
+        # Returns a list with the logs of integrations that the user is allowed to see
         user_integrations = get_user_integrations_qs(user=self.request.user)
         return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values('id')))
 
