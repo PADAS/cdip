@@ -409,10 +409,11 @@ class GundiTraceViewSet(
 
 class ActivityLogsViewSet(
     mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
     viewsets.GenericViewSet
 ):
     """
-    An endpoint retrieving activity logs.
+    An endpoint retrieving and revert activity logs.
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     serializer_class = v2_serializers.ActivityLogRetrieveSerializer
@@ -437,3 +438,10 @@ class ActivityLogsViewSet(
         user_integrations = get_user_integrations_qs(user=self.request.user)
         return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values('id')))
 
+    @action(detail=True, methods=['post', 'put'])
+    def revert(self, request, pk=None):
+        activity_log = self.get_object()
+        if not activity_log.is_reversible:
+            raise drf_exceptions.ValidationError("This activity log is not reversible.")
+        activity_log.revert()
+        return Response({'status': 'Activity reverted with success'})

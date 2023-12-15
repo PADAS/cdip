@@ -904,6 +904,7 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
 
 
 class ActivityLogRetrieveSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     log_level = serializers.IntegerField(read_only=True)
     log_type = serializers.CharField(read_only=True)
