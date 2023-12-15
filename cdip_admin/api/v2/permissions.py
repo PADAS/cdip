@@ -1,4 +1,6 @@
 from rest_framework import permissions
+
+from activity_log.models import ActivityLog
 from core.enums import RoleChoices
 from accounts.models import AccountProfileOrganization
 from integrations.models import Integration, Route
@@ -51,6 +53,10 @@ def get_user_org(request, view) -> str:
             org_id = request.data.get("owner")  # Create or Update
         else:
             org_id = None
+    elif view.basename == "logs":
+        log_id = context.get("pk")
+        log = ActivityLog.objects.get(id=log_id)
+        org_id = str(log.integration.owner.id) if log.integration else None
     else:  # Can't relate this user with an organization
         org_id = None
     return org_id
@@ -67,7 +73,8 @@ class IsOrgAdmin(permissions.BasePermission):
         "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
         "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
-        "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy"]
+        "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "logs": ["list", "retrieve", "revert"]
     }
 
     def has_permission(self, request, view):
