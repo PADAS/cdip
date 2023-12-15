@@ -9,6 +9,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
+from activity_log.models import ActivityLog
 from core.enums import DjangoGroups, RoleChoices
 from integrations.models import (
     InboundIntegrationType,
@@ -1527,4 +1528,90 @@ def legacy_integration_type_movebank():
         name="MoveBank Legacy",
         slug="movebank",
         description="Default integration type for Movebank",
+    )
+
+
+@pytest.fixture
+def observation_delivery_succeeded_event(provider_lotek_panthera, destination_movebank):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.DEBUG,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination_movebank,
+        value="observation_delivery_succeeded",
+        title="Observation Delivered to 'https://gundi-er.pamdas.org'",
+        details={
+            "gundi_id": "2f7387e3-fbad-42fb-9ca9-4fb8d001e95f",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-13 00:10:15.123456+00:00",
+            "destination_id": str(destination_movebank.id),
+            "data_provider_id": str(provider_lotek_panthera.id)
+        },
+        is_reversible=False
+    )
+
+
+@pytest.fixture
+def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list):
+    destination = integrations_list[0]
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.DEBUG,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination,
+        value="observation_delivery_succeeded",
+        title="Observation Delivered to 'https://test.movebank.mpg.de'",
+        details={
+            "gundi_id": "1f7387e3-fbad-42fb-9ca9-4fb8d001e95e",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination.id),
+            "data_provider_id": str(provider_movebank_ewt.id)
+        },
+        is_reversible=False
+    )
+
+
+@pytest.fixture
+def observation_delivery_failed_event(provider_lotek_panthera, destination_movebank):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination_movebank,
+        value="observation_delivery_failed",
+        title=f"Error Delivering observation to '{destination_movebank.base_url}'",
+        details={
+            "gundi_id": "3e7387e3-fbad-42fb-9ca9-4fb8d001e84c",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination_movebank.id),
+            "data_provider_id": str(provider_lotek_panthera.id)
+        },
+        is_reversible=False
+    )
+
+
+@pytest.fixture
+def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list):
+    destination = integrations_list[1]
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination,
+        value="observation_delivery_failed",
+        title=f"Error Delivering observation to '{destination.base_url}'",
+        details={
+            "gundi_id": "2f7387e3-fbad-42fb-9ca9-4fb8d001e85a",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination.id),
+            "data_provider_id": str(provider_lotek_panthera.id)
+        },
+        is_reversible=False
     )

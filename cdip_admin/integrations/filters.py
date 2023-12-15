@@ -2,6 +2,8 @@ from django.db.models import Subquery
 from django.utils.translation import ugettext_lazy as _
 import django_filters
 from django_filters import rest_framework as django_filters_rest
+
+from activity_log.models import ActivityLog
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
 from integrations.models import (
     DeviceState,
@@ -543,3 +545,42 @@ class GundiTraceFilter(django_filters_rest.FilterSet):
             'destination': ['exact', ],
             'external_id': ['exact', ]
         }
+
+
+class ActivityLogFilter(django_filters_rest.FilterSet):
+    log_level = django_filters_rest.CharFilter(method='filter_by_log_level')
+    log_type = django_filters_rest.CharFilter(
+        field_name="log_type",
+        lookup_expr="exact",
+        distinct=True
+    )
+    origin = django_filters_rest.CharFilter(
+        field_name="origin",
+        lookup_expr="exact",
+        distinct=True
+    )
+    integration = django_filters_rest.CharFilter(
+        field_name="integration__id",
+        lookup_expr="exact",
+        distinct=True
+    )
+    integration__in = CharInFilter(
+        field_name="integration__id",
+        lookup_expr="in",
+        distinct=True
+    )
+    value = django_filters_rest.CharFilter(
+        field_name="value",
+        lookup_expr="exact",
+        distinct=True
+    )
+    from_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    to_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="lte")
+    is_reversible = django_filters_rest.BooleanFilter(field_name="is_reversible")
+
+    class Meta:
+        model = ActivityLog
+        exclude = ["title", "details", "revert_data", ]
+
+    def filter_by_log_level(self, queryset, name, value):
+        return queryset.filter(log_level__gte=int(value))
