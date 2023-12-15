@@ -333,3 +333,126 @@ def test_search_logs_and_filter_as_superuser(
         },
         expected_logs=[observation_delivery_failed_event, observation_delivery_succeeded_event]
     )
+
+
+def _test_revert_activity_log(api_client, user, log):
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("logs-revert", kwargs={"pk": str(log.id)}),
+    )
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    assert response_data.get("status") == "Activity reverted with success"
+
+
+def test_revert_activity_as_superuser(
+        api_client, superuser, provider_lotek_panthera
+):
+    # Do a reversible change
+    original_name = provider_lotek_panthera.name
+    provider_lotek_panthera.name = "New Name"
+    provider_lotek_panthera.save()
+    log = ActivityLog.objects.filter(
+        integration=provider_lotek_panthera,
+        log_type=ActivityLog.LogTypes.DATA_CHANGE.value,
+    ).first()
+
+    _test_revert_activity_log(api_client=api_client, user=superuser, log=log)
+    provider_lotek_panthera.refresh_from_db()
+
+    assert provider_lotek_panthera.name == original_name
+
+
+def test_revert_activity_as_org_admin(
+        api_client, org_admin_user, provider_lotek_panthera
+):
+    # Do a reversible change
+    configuration = provider_lotek_panthera.configurations.get(action__value="auth")
+    original_config = configuration.data
+    configuration.data = {"username": "newuser", "password": "newpass"}
+    configuration.save()
+    # Get the activity log for this change
+    log = ActivityLog.objects.filter(
+        integration=provider_lotek_panthera,
+        log_type=ActivityLog.LogTypes.DATA_CHANGE.value,
+    ).first()
+
+    _test_revert_activity_log(api_client=api_client, user=org_admin_user, log=log)
+    configuration.refresh_from_db()
+
+    assert configuration.data == original_config
+
+
+def test_cannot_revert_activity_of_not_reversible_activity_as_superuser(
+        api_client, superuser, provider_lotek_panthera, destination_movebank,
+        observation_delivery_failed_event
+):
+    # Get the activity log for the event that is not reversible
+    log = ActivityLog.objects.filter(
+        integration=destination_movebank,
+        is_reversible=False,
+    ).first()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.post(
+        reverse("logs-revert", kwargs={"pk": str(log.id)}),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    response_data = response.json()
+    assert "This activity log is not reversible." in response_data
+
+
+def test_cannot_revert_activity_of_not_reversible_activity_as_org_admin(
+        api_client, org_admin_user_2, provider_lotek_panthera, destination_movebank,
+        observation_delivery_failed_event
+):
+    # Get the activity log for the event that is not reversible
+    log = ActivityLog.objects.filter(
+        integration=destination_movebank,
+        is_reversible=False,
+    ).first()
+
+    api_client.force_authenticate(org_admin_user_2)
+    response = api_client.post(
+        reverse("logs-revert", kwargs={"pk": str(log.id)}),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    response_data = response.json()
+    assert "This activity log is not reversible." in response_data
+
+
+def test_cannot_revert_activity_of_other_org_as_org_admin(
+        api_client, org_admin_user_2, provider_lotek_panthera, destination_movebank,
+        integrations_list, observation_delivery_failed_event_2
+):
+    # Get the activity log for a change that belongs to another org
+    log = ActivityLog.objects.filter(
+        integration=integrations_list[1],
+        is_reversible=True,
+    ).first()
+
+    api_client.force_authenticate(org_admin_user_2)
+    response = api_client.post(
+        reverse("logs-revert", kwargs={"pk": str(log.id)}),
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_cannot_revert_activity_log_as_org_viewer(
+        api_client, org_viewer_user, provider_lotek_panthera
+):
+    # Get and activity that is reversible
+    log = ActivityLog.objects.filter(
+        integration=provider_lotek_panthera,  # The viewer can see logs of this integration
+        is_reversible=True,
+    ).first()
+
+    api_client.force_authenticate(org_viewer_user)
+    response = api_client.post(
+        reverse("logs-revert", kwargs={"pk": str(log.id)}),
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
