@@ -436,12 +436,12 @@ class ActivityLogsViewSet(
             return ActivityLog.objects.all()
         # Returns a list with the logs of integrations that the user is allowed to see
         user_integrations = get_user_integrations_qs(user=self.request.user)
-        return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values('id')))
+        return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values("id")))
 
-    @action(detail=True, methods=['post', 'put'])
+    @action(detail=True, methods=["post", "put"])
     def revert(self, request, pk=None):
         activity_log = self.get_object()
         if not activity_log.is_reversible:
             raise drf_exceptions.ValidationError("This activity log is not reversible.")
         activity_log.revert()
-        return Response({'status': 'Activity reverted with success'})
+        return Response({"status": "Activity reverted with success"})
