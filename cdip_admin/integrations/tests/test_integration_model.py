@@ -28,3 +28,7 @@ def test_create_movebank_destination_v2_with_default_settings(other_organization
     )
     assert integration.additional.get("broker") == "gcp_pubsub"
     assert integration.additional.get("topic") == settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
+
+
+def test_delete_integration_with_default_route(provider_lotek_panthera):
+    provider_lotek_panthera.delete()
