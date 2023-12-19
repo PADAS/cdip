@@ -237,7 +237,7 @@ def send_observations_to_routing(observations, gundi_ids):
                     annotations=observation.get("annotations", {}),
                     source_id=str(source.id),
                     external_source_id=str(source.external_id),
-                    source_name=str(source.name),
+                    source_name=observation.get("source_name") or str(source.name),
                     type=observation.get("type"),
                     subject_type=observation.get("subject_type"),
                     recorded_at=observation.get("recorded_at"),

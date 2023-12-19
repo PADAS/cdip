@@ -873,6 +873,14 @@ def keyauth_headers_trap_tagger(provider_trap_tagger):
 
 
 @pytest.fixture
+def keyauth_headers_lotek(provider_lotek_panthera):
+    return {
+        "HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_lotek_panthera.id)}"
+    }
+
+
+
+@pytest.fixture
 def mock_get_publisher(mocker):
     return mocker.MagicMock()
 
