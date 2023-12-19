@@ -39,7 +39,11 @@ class OrganizationView(viewsets.ModelViewSet):
     An endpoint for managing organizations
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    filter_backends = [drf_filters.OrderingFilter]
+    filter_backends = [
+        drf_filters.OrderingFilter,
+        custom_filters.CustomizableSearchFilter
+    ]
+    search_fields = ["name", "description", ]
     ordering_fields = ['id', 'name']
     ordering = ['id']
 
