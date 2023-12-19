@@ -31,28 +31,32 @@ class ChangeLogMixin:
             self._original_integration = None
 
     def _get_fields(self):
-        return self._meta.fields
+        # Notice: Avoid calling self._meta.fields from __init__ as it may cause a recursion error
+        return [  # Get model fields by introspecting the instance
+            k for k, v in self.__dict__.items()
+            if not k.startswith("_") and not k.startswith("objects") and
+               not callable(v) and not isinstance(v, models.Manager) and not isinstance(v, models.QuerySet) and
+               not isinstance(v, property)
+        ]
 
     def _get_original_values(self):
         original_values = {}
-        for field in self._get_fields():
-            field_name = field.attname
+        for field_name in self._get_fields():
             if field_name not in self.activity_excluded_fields:
                 serialized_value = _serialize_field_value(
-                    field=field,
-                    value=getattr(self, field.attname)
+                    field=field_name,
+                    value=getattr(self, field_name)
                 )
-                original_values[field.attname] = serialized_value
+                original_values[field_name] = serialized_value
         return original_values
 
     def get_changes(self, original_values):
         changes = {}
-        for field in self._get_fields():
-            field_name = field.attname
+        for field_name in self._get_fields():
             if field_name not in self.activity_excluded_fields:
                 serialized_value = _serialize_field_value(
-                    field=field,
-                    value=getattr(self, field.attname)
+                    field=field_name,
+                    value=getattr(self, field_name)
                 )
                 if serialized_value != original_values.get(field_name):
                     changes[field_name] = serialized_value
