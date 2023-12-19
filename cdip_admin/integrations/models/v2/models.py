@@ -103,7 +103,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         "integrations.Route",
         blank=True,
         null=True,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name="integrations_by_rule",
         verbose_name="Default Routing Rule",
     )
