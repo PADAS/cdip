@@ -107,8 +107,6 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                         permissions.default_movebank_usernames,
                         "v1"
                     )
-                    mb_config.additional.get("permissions")["permissions"] = permissions.permissions
-                    mb_config.save()
             v1_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -143,8 +141,6 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                         permissions.default_movebank_usernames,
                         "v2"
                     )
-                    mb_config.data["permissions"] = permissions.permissions
-                    mb_config.save()
             v2_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -189,6 +185,8 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                         "username": username
                     }
                 )
+        config.additional.get("permissions")["permissions"] = permissions_dict
+        config.save()
     else:
         Route = apps.get_model("integrations", "Route")
         routes = Route.objects.filter(
@@ -206,6 +204,8 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                                 "username": username
                             }
                         )
+        config.data["permissions"] = permissions_dict
+        config.save()
 
     return permissions_dict
 
