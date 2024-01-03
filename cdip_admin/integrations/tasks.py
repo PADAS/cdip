@@ -174,7 +174,7 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
         Device = apps.get_model("integrations", "Device")
         devices = Device.objects.filter(
             devicegroup__destinations__id=config.id
-        ).all()
+        ).order_by("external_id").distinct("external_id")
         for username in usernames:
             for device in devices:
                 permissions_dict.append(
@@ -188,22 +188,21 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
         config.additional.get("permissions")["permissions"] = permissions_dict
         config.save()
     else:
-        Route = apps.get_model("integrations", "Route")
-        routes = Route.objects.filter(
-            destinations__id=config.integration.id
-        ).all()
+        Source = apps.get_model("integrations", "Source")
+        sources = Source.objects.filter(
+            integration__routing_rules_by_provider__destinations__id=config.integration.id
+        ).order_by("external_id").distinct("external_id")
+
         for username in usernames:
-            for route in routes:
-                for provider in route.data_providers.all():
-                    for source in provider.sources_by_integration.all():
-                        permissions_dict.append(
-                            {
-                                "tag_id": f"{source.integration.type.value}."
-                                          f"{source.external_id}."
-                                          f"{str(source.integration_id)}",
-                                "username": username
-                            }
-                        )
+            for source in sources:
+                permissions_dict.append(
+                    {
+                        "tag_id": f"{source.integration.type.value}."
+                                  f"{source.external_id}."
+                                  f"{str(source.integration_id)}",
+                        "username": username
+                    }
+                )
         config.data["permissions"] = permissions_dict
         config.save()
 
