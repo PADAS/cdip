@@ -82,7 +82,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     movebank_configs_v1 = OutboundIntegrationConfiguration.objects.filter(
         type__slug=DestinationTypes.Movebank.value,
         additional__has_key="permissions"
-    ).all()
+    )
 
     for mb_config in movebank_configs_v1:
         try:
@@ -116,7 +116,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     movebank_configs_v2 = IntegrationConfiguration.objects.filter(
         integration__type__value=DestinationTypes.Movebank.value,
         action__value=MovebankActions.PERMISSIONS.value
-    ).all()
+    )
 
     for mb_config in movebank_configs_v2:
         try:
