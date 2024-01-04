@@ -91,7 +91,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v1)',
                 extra={
-                    'outbound_integration_id': str(mb_config["id"]),
+                    'outbound_integration_id': str(mb_config.id),
                     'attention_needed': True
                 }
             )
@@ -125,7 +125,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v2)',
                 extra={
-                    'integration_configuration_id': str(mb_config["id"]),
+                    'integration_configuration_id': str(mb_config.id),
                     'attention_needed': True
                 }
             )
@@ -178,14 +178,16 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
         for username in usernames:
             for device in devices:
                 permissions_dict.append(
-                    {
-                        "tag_id": f"{device.inbound_configuration.type.slug}."
-                                  f"{device.external_id}."
-                                  f"{str(device.inbound_configuration.id)}",
-                        "username": username
-                    }
+                    MBUserPermission.parse_obj(
+                        {
+                            "tag_id": f"{device.inbound_configuration.type.slug}."
+                                      f"{device.external_id}."
+                                      f"{str(device.inbound_configuration.id)}",
+                            "username": username
+                        }
+                    )
                 )
-        config.additional.get("permissions")["permissions"] = permissions_dict
+        config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
         config.save()
     else:
         Source = apps.get_model("integrations", "Source")
@@ -196,14 +198,16 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
         for username in usernames:
             for source in sources:
                 permissions_dict.append(
-                    {
-                        "tag_id": f"{source.integration.type.value}."
-                                  f"{source.external_id}."
-                                  f"{str(source.integration_id)}",
-                        "username": username
-                    }
+                    MBUserPermission.parse_obj(
+                        {
+                            "tag_id": f"{source.integration.type.value}."
+                                      f"{source.external_id}."
+                                      f"{str(source.integration_id)}",
+                            "username": username
+                        }
+                    )
                 )
-        config.data["permissions"] = permissions_dict
+        config.data["permissions"] = [d.dict() for d in permissions_dict]
         config.save()
 
     return permissions_dict

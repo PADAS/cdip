@@ -2,6 +2,8 @@ import pytest
 
 from organizations.models import Organization
 from ..models import (
+    Device,
+    Source,
     OutboundIntegrationType,
     OutboundIntegrationConfiguration,
     Integration,
@@ -9,6 +11,61 @@ from ..models import (
     IntegrationConfiguration
 )
 from ..tasks import recreate_and_send_movebank_permissions_csv_file
+
+
+@pytest.mark.django_db
+def test_movebank_permissions_file_upload_task_creates_permissions_json(
+        mocker,
+        mock_movebank_client_class,
+        caplog,
+        setup_movebank_test_devices_sources
+):
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
+
+    # Get configs / devices
+    oi = OutboundIntegrationConfiguration.objects.get(
+        id=setup_movebank_test_devices_sources["v1"].get("config_id")
+    )
+    integration_config = IntegrationConfiguration.objects.get(
+        id=setup_movebank_test_devices_sources["v2"].get("config_id")
+    )
+
+    d1 = Device.objects.get(
+        id=setup_movebank_test_devices_sources["v1"].get("device_id")
+    )
+    d2 = Source.objects.get(
+        id=setup_movebank_test_devices_sources["v2"].get("device_id")
+    )
+
+    # No "permissions" dict set yet
+    assert "permissions" not in oi.additional.get("permissions").keys()
+    assert "permissions" not in integration_config.data.keys()
+
+    recreate_and_send_movebank_permissions_csv_file()
+
+    # Refresh from db to get updates made
+    oi.refresh_from_db()
+    integration_config.refresh_from_db()
+
+    # "permissions" dict set
+    assert "permissions" in oi.additional.get("permissions").keys()
+    assert "permissions" in integration_config.data.keys()
+
+    # Check devices in permissions dict
+    tag_id_1 = f"{d1.inbound_configuration.type.slug}."\
+               f"{d1.external_id}."\
+               f"{str(d1.inbound_configuration.id)}"
+
+    tag_id_2 = f"{d2.integration.type.value}." \
+               f"{d2.external_id}." \
+               f"{str(d2.integration_id)}"
+
+    assert oi.additional["permissions"]["permissions"][0].get("tag_id") == tag_id_1
+    assert integration_config.data["permissions"][0].get("tag_id") == tag_id_2
+
+    # Check that the tag data was sent to Movebank
+    assert mock_movebank_client_class.called
+    assert mock_movebank_client_class.return_value.post_permissions.called
 
 
 @pytest.mark.django_db
