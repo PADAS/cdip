@@ -1531,6 +1531,84 @@ def setup_movebank_test_data(db):
 
 
 @pytest.fixture
+def setup_movebank_test_devices_sources(provider_movebank_ewt, movebank_sources):
+    # v1
+    iit = InboundIntegrationType.objects.create(
+        name="Inbound Type 1",
+        slug="inbound-type-one",
+        description="Some integration type.",
+    )
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name="Inbound Configuration 1",
+        owner=Organization.objects.first()
+    )
+    oit = OutboundIntegrationType.objects.create(name="Movebank", slug="movebank")
+    oi = OutboundIntegrationConfiguration.objects.create(
+        type=oit,
+        owner=Organization.objects.first(),
+        additional={
+            "broker": "gcp_pubsub",
+            "topic": "destination-v2-gundi-load-testing-legacy",
+            "permissions": {
+                "default_movebank_usernames": [
+                    "victorg"
+                ],
+                "study": "gundi"
+            }
+        }
+    )
+
+    dg = DeviceGroup.objects.create(
+        name="device group 1",
+        owner=Organization.objects.first(),
+    )
+    dg.destinations.add(oi)
+
+    d = Device.objects.create(external_id="device-1", inbound_configuration=ii)
+    dg.devices.add(d)
+
+    # v2
+    integration = Integration.objects.create(
+        type=IntegrationType.objects.first(),
+        owner=Organization.objects.first(),
+    )
+    action = IntegrationAction.objects.create(
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Permissions",
+        value="permissions",
+        integration_type=IntegrationType.objects.first(),
+    )
+    integration_config = IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=action,
+        data={
+            "study": "gundi",
+            "default_movebank_usernames": [
+                "victorg"
+            ],
+        }
+    )
+    route, _ = Route.objects.get_or_create(
+        name=f"Device Set to single destination",
+        owner=Organization.objects.first(),
+    )
+    route.data_providers.add(provider_movebank_ewt)
+    route.destinations.add(integration)
+
+    return {
+        "v1": {
+            "config_id": oi.id,
+            "device_id": d.id
+        },
+        "v2": {
+            "config_id": integration_config.id,
+            "device_id": movebank_sources[0].id
+        }
+    }
+
+
+@pytest.fixture
 def legacy_integration_type_movebank():
     return OutboundIntegrationType.objects.create(
         name="MoveBank Legacy",
