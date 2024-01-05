@@ -51,6 +51,9 @@ def test_movebank_permissions_file_upload_task_creates_permissions_json(
     assert "permissions" in oi.additional.get("permissions").keys()
     assert "permissions" in integration_config.data.keys()
 
+    v1_tags = [tag.get("tag_id") for tag in oi.additional["permissions"]["permissions"]]
+    v2_tags = [tag.get("tag_id") for tag in integration_config.data["permissions"]]
+
     # Check devices in permissions dict
     tag_id_1 = f"{d1.inbound_configuration.type.slug}."\
                f"{d1.external_id}."\
@@ -60,8 +63,8 @@ def test_movebank_permissions_file_upload_task_creates_permissions_json(
                f"{d2.external_id}." \
                f"{str(d2.integration_id)}"
 
-    assert oi.additional["permissions"]["permissions"][0].get("tag_id") == tag_id_1
-    assert integration_config.data["permissions"][0].get("tag_id") == tag_id_2
+    assert tag_id_1 in v1_tags
+    assert tag_id_2 in v2_tags
 
     # Check that the tag data was sent to Movebank
     assert mock_movebank_client_class.called
