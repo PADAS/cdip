@@ -84,9 +84,7 @@ coreapi==2.3.3
 coreschema==0.0.4
     # via coreapi
 coverage[toml]==7.3.0
-    # via
-    #   coverage
-    #   pytest-cov
+    # via pytest-cov
 cron-descriptor==1.4.0
     # via django-celery-beat
 croniter==0.3.32
@@ -215,7 +213,6 @@ gevent==21.12.0
     # via -r requirements.in
 google-api-core[grpc]==2.11.1
     # via
-    #   google-api-core
     #   google-cloud-core
     #   google-cloud-functions
     #   google-cloud-pubsub
@@ -273,7 +270,7 @@ gundi-client==1.0.1
     #   cdip-connector
 gundi-client-v2==2.1.5
     # via -r requirements.in
-gundi-core==1.2.7
+gundi-core==1.2.8
     # via
     #   -r requirements.in
     #   cdip-connector
