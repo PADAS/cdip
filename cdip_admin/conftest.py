@@ -399,6 +399,16 @@ def mb_action_pull_positions(integration_type_movebank):
 
 
 @pytest.fixture
+def mb_action_permissions(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Permissions",
+        value="permissions",
+        integration_type=integration_type_movebank,
+    )
+
+
+@pytest.fixture
 def integration_type_er():
     # Create an integration type for Earth Ranger
     integration_type = IntegrationType.objects.create(
@@ -1528,6 +1538,79 @@ def setup_movebank_test_data(db):
         value="permissions",
         integration_type=IntegrationType.objects.first(),
     )
+
+
+@pytest.fixture
+def setup_movebank_test_devices_sources(
+        destination_movebank,
+        legacy_integration_type_movebank,
+        provider_lotek_panthera,
+        mb_action_permissions,
+        lotek_sources
+):
+    # v1
+    iit = InboundIntegrationType.objects.create(
+        name="Inbound Type 1",
+        slug="inbound-type-one",
+        description="Some integration type.",
+    )
+    ii = InboundIntegrationConfiguration.objects.create(
+        type=iit,
+        name="Inbound Configuration 1",
+        owner=Organization.objects.first()
+    )
+    oi = OutboundIntegrationConfiguration.objects.create(
+        type=legacy_integration_type_movebank,
+        owner=Organization.objects.first(),
+        additional={
+            "broker": "gcp_pubsub",
+            "topic": "destination-v2-gundi-load-testing-legacy",
+            "permissions": {
+                "default_movebank_usernames": [
+                    "victorg"
+                ],
+                "study": "gundi"
+            }
+        }
+    )
+
+    dg = DeviceGroup.objects.create(
+        name="device group 1",
+        owner=Organization.objects.first(),
+    )
+    dg.destinations.add(oi)
+
+    d = Device.objects.create(external_id="device-1", inbound_configuration=ii)
+    dg.devices.add(d)
+
+    # v2
+    integration_config = IntegrationConfiguration.objects.create(
+        integration=destination_movebank,
+        action=mb_action_permissions,
+        data={
+            "study": "gundi",
+            "default_movebank_usernames": [
+                "victorg"
+            ],
+        }
+    )
+    route, _ = Route.objects.get_or_create(
+        name=f"Device Set to single destination",
+        owner=Organization.objects.first(),
+    )
+    route.data_providers.add(provider_lotek_panthera)
+    route.destinations.add(destination_movebank)
+
+    return {
+        "v1": {
+            "config": oi,
+            "device": d  # 1 device only for test
+        },
+        "v2": {
+            "config": integration_config,
+            "device": lotek_sources[0]  # 1 device only for test
+        }
+    }
 
 
 @pytest.fixture

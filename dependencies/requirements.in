@@ -69,7 +69,7 @@ jsonschema==4.17.3
 django-celery-beat==2.5.0
 django-storages==1.13.2
 walrus==0.8.1
-gundi-core==1.2.7
+gundi-core==1.2.8
 gundi-client==1.0.1
 gundi-client-v2==2.1.5
 google-cloud-functions==1.13.1

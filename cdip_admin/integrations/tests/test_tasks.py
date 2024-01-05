@@ -12,6 +12,56 @@ from ..tasks import recreate_and_send_movebank_permissions_csv_file
 
 
 @pytest.mark.django_db
+def test_movebank_permissions_file_upload_task_creates_permissions_json(
+        mocker,
+        mock_movebank_client_class,
+        caplog,
+        setup_movebank_test_devices_sources
+):
+    mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
+
+    # Get test configs / devices
+    oi = setup_movebank_test_devices_sources["v1"].get("config")
+    integration_config = setup_movebank_test_devices_sources["v2"].get("config")
+
+    d1 = setup_movebank_test_devices_sources["v1"].get("device")
+    d2 = setup_movebank_test_devices_sources["v2"].get("device")
+
+    # No "permissions" dict set yet
+    assert "permissions" not in oi.additional.get("permissions").keys()
+    assert "permissions" not in integration_config.data.keys()
+
+    recreate_and_send_movebank_permissions_csv_file()
+
+    # Refresh from db to get updates made
+    oi.refresh_from_db()
+    integration_config.refresh_from_db()
+
+    # "permissions" dict set
+    assert "permissions" in oi.additional.get("permissions").keys()
+    assert "permissions" in integration_config.data.keys()
+
+    v1_tags = [tag.get("tag_id") for tag in oi.additional["permissions"]["permissions"]]
+    v2_tags = [tag.get("tag_id") for tag in integration_config.data["permissions"]]
+
+    # Check devices in permissions dict
+    tag_id_1 = f"{d1.inbound_configuration.type.slug}."\
+               f"{d1.external_id}."\
+               f"{str(d1.inbound_configuration.id)}"
+
+    tag_id_2 = f"{d2.integration.type.value}." \
+               f"{d2.external_id}." \
+               f"{str(d2.integration_id)}"
+
+    assert tag_id_1 in v1_tags
+    assert tag_id_2 in v2_tags
+
+    # Check that the tag data was sent to Movebank
+    assert mock_movebank_client_class.called
+    assert mock_movebank_client_class.return_value.post_permissions.called
+
+
+@pytest.mark.django_db
 def test_movebank_permissions_file_upload_task_no_configs(mocker, caplog, mock_movebank_client_class):
     mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
     recreate_and_send_movebank_permissions_csv_file()
