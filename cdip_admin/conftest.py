@@ -399,6 +399,16 @@ def mb_action_pull_positions(integration_type_movebank):
 
 
 @pytest.fixture
+def mb_action_permissions(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Permissions",
+        value="permissions",
+        integration_type=integration_type_movebank,
+    )
+
+
+@pytest.fixture
 def integration_type_er():
     # Create an integration type for Earth Ranger
     integration_type = IntegrationType.objects.create(
@@ -1531,7 +1541,13 @@ def setup_movebank_test_data(db):
 
 
 @pytest.fixture
-def setup_movebank_test_devices_sources(provider_movebank_ewt, movebank_sources):
+def setup_movebank_test_devices_sources(
+        destination_movebank,
+        legacy_integration_type_movebank,
+        provider_lotek_panthera,
+        mb_action_permissions,
+        lotek_sources
+):
     # v1
     iit = InboundIntegrationType.objects.create(
         name="Inbound Type 1",
@@ -1543,9 +1559,8 @@ def setup_movebank_test_devices_sources(provider_movebank_ewt, movebank_sources)
         name="Inbound Configuration 1",
         owner=Organization.objects.first()
     )
-    oit = OutboundIntegrationType.objects.create(name="Movebank", slug="movebank")
     oi = OutboundIntegrationConfiguration.objects.create(
-        type=oit,
+        type=legacy_integration_type_movebank,
         owner=Organization.objects.first(),
         additional={
             "broker": "gcp_pubsub",
@@ -1569,19 +1584,9 @@ def setup_movebank_test_devices_sources(provider_movebank_ewt, movebank_sources)
     dg.devices.add(d)
 
     # v2
-    integration = Integration.objects.create(
-        type=IntegrationType.objects.first(),
-        owner=Organization.objects.first(),
-    )
-    action = IntegrationAction.objects.create(
-        type=IntegrationAction.ActionTypes.AUTHENTICATION,
-        name="Permissions",
-        value="permissions",
-        integration_type=IntegrationType.objects.first(),
-    )
     integration_config = IntegrationConfiguration.objects.create(
-        integration=integration,
-        action=action,
+        integration=destination_movebank,
+        action=mb_action_permissions,
         data={
             "study": "gundi",
             "default_movebank_usernames": [
@@ -1593,17 +1598,17 @@ def setup_movebank_test_devices_sources(provider_movebank_ewt, movebank_sources)
         name=f"Device Set to single destination",
         owner=Organization.objects.first(),
     )
-    route.data_providers.add(provider_movebank_ewt)
-    route.destinations.add(integration)
+    route.data_providers.add(provider_lotek_panthera)
+    route.destinations.add(destination_movebank)
 
     return {
         "v1": {
             "config_id": oi.id,
-            "device_id": d.id
+            "device_id": d.id  # 1 device only for test
         },
         "v2": {
             "config_id": integration_config.id,
-            "device_id": movebank_sources[0].id
+            "device_id": lotek_sources[0].id  # 1 device only for test
         }
     }
 
