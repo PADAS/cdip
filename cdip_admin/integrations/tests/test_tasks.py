@@ -2,8 +2,6 @@ import pytest
 
 from organizations.models import Organization
 from ..models import (
-    Device,
-    Source,
     OutboundIntegrationType,
     OutboundIntegrationConfiguration,
     Integration,
@@ -22,20 +20,12 @@ def test_movebank_permissions_file_upload_task_creates_permissions_json(
 ):
     mocker.patch("integrations.tasks.MovebankClient", mock_movebank_client_class)
 
-    # Get configs / devices
-    oi = OutboundIntegrationConfiguration.objects.get(
-        id=setup_movebank_test_devices_sources["v1"].get("config_id")
-    )
-    integration_config = IntegrationConfiguration.objects.get(
-        id=setup_movebank_test_devices_sources["v2"].get("config_id")
-    )
+    # Get test configs / devices
+    oi = setup_movebank_test_devices_sources["v1"].get("config")
+    integration_config = setup_movebank_test_devices_sources["v2"].get("config")
 
-    d1 = Device.objects.get(
-        id=setup_movebank_test_devices_sources["v1"].get("device_id")
-    )
-    d2 = Source.objects.get(
-        id=setup_movebank_test_devices_sources["v2"].get("device_id")
-    )
+    d1 = setup_movebank_test_devices_sources["v1"].get("device")
+    d2 = setup_movebank_test_devices_sources["v2"].get("device")
 
     # No "permissions" dict set yet
     assert "permissions" not in oi.additional.get("permissions").keys()

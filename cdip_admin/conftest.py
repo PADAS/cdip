@@ -1603,12 +1603,12 @@ def setup_movebank_test_devices_sources(
 
     return {
         "v1": {
-            "config_id": oi.id,
-            "device_id": d.id  # 1 device only for test
+            "config": oi,
+            "device": d  # 1 device only for test
         },
         "v2": {
-            "config_id": integration_config.id,
-            "device_id": lotek_sources[0].id  # 1 device only for test
+            "config": integration_config,
+            "device": lotek_sources[0]  # 1 device only for test
         }
     }
 
