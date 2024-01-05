@@ -82,23 +82,31 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     movebank_configs_v1 = OutboundIntegrationConfiguration.objects.filter(
         type__slug=DestinationTypes.Movebank.value,
         additional__has_key="permissions"
-    ).values('id', 'additional')
+    )
 
     for mb_config in movebank_configs_v1:
         try:
-            permissions = MBPermissionsActionConfig.parse_obj(mb_config["additional"]["permissions"])
+            permissions = MBPermissionsActionConfig.parse_obj(mb_config.additional["permissions"])
         except pydantic.ValidationError:
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v1)',
                 extra={
-                    'outbound_integration_id': str(mb_config["id"]),
+                    'outbound_integration_id': str(mb_config.id),
                     'attention_needed': True
                 }
             )
             continue
         else:
             if not permissions.permissions:  # if parsing went ok but no permissions
-                permissions.permissions = []
+                if not permissions.default_movebank_usernames:  # config does not have usernames set
+                    permissions.permissions = []
+                else:
+                    # create and save preliminary permissions JSON into additional
+                    permissions.permissions = create_and_save_permissions_json(
+                        mb_config,
+                        permissions.default_movebank_usernames,
+                        "v1"
+                    )
             v1_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -108,23 +116,31 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     movebank_configs_v2 = IntegrationConfiguration.objects.filter(
         integration__type__value=DestinationTypes.Movebank.value,
         action__value=MovebankActions.PERMISSIONS.value
-    ).values('id', 'data')
+    )
 
     for mb_config in movebank_configs_v2:
         try:
-            permissions = MBPermissionsActionConfig.parse_obj(mb_config["data"])
+            permissions = MBPermissionsActionConfig.parse_obj(mb_config.data)
         except pydantic.ValidationError:
             logger.exception(
                 'Error parsing MBPermissionsActionConfig model (v2)',
                 extra={
-                    'integration_configuration_id': str(mb_config["id"]),
+                    'integration_configuration_id': str(mb_config.id),
                     'attention_needed': True
                 }
             )
             continue
         else:
             if not permissions.permissions:  # if parsing went ok but no permissions
-                permissions.permissions = []
+                if not permissions.default_movebank_usernames:  # config does not have usernames set
+                    permissions.permissions = []
+                else:
+                    # create and save preliminary permissions JSON into additional
+                    permissions.permissions = create_and_save_permissions_json(
+                        mb_config,
+                        permissions.default_movebank_usernames,
+                        "v2"
+                    )
             v2_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -150,6 +166,51 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
         os.unlink(csvfile.name)
     else:
         logger.info(' -- No configs available to send --')
+
+
+def create_and_save_permissions_json(config, usernames, gundi_version):
+    permissions_dict = []
+    if gundi_version == "v1":
+        Device = apps.get_model("integrations", "Device")
+        devices = Device.objects.filter(
+            devicegroup__destinations__id=config.id
+        ).order_by("external_id").distinct("external_id")
+        for username in usernames:
+            for device in devices:
+                permissions_dict.append(
+                    MBUserPermission.parse_obj(
+                        {
+                            "tag_id": f"{device.inbound_configuration.type.slug}."
+                                      f"{device.external_id}."
+                                      f"{str(device.inbound_configuration.id)}",
+                            "username": username
+                        }
+                    )
+                )
+        config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
+        config.save()
+    else:
+        Source = apps.get_model("integrations", "Source")
+        sources = Source.objects.filter(
+            integration__routing_rules_by_provider__destinations__id=config.integration.id
+        ).order_by("external_id").distinct("external_id")
+
+        for username in usernames:
+            for source in sources:
+                permissions_dict.append(
+                    MBUserPermission.parse_obj(
+                        {
+                            "tag_id": f"{source.integration.type.value}."
+                                      f"{source.external_id}."
+                                      f"{str(source.integration_id)}",
+                            "username": username
+                        }
+                    )
+                )
+        config.data["permissions"] = [d.dict() for d in permissions_dict]
+        config.save()
+
+    return permissions_dict
 
 
 @async_to_sync
