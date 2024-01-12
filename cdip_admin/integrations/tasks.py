@@ -199,7 +199,7 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
             logger.info(f' -- No permissions created for outbound ID {str(config.id)}... --')
         else:
             config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
-            config.save()
+            config.light_save()
             logger.info(f' -- Created {len(permissions_dict)} permissions for outbound ID {str(config.id)}... --')
     else:
         logger.info(f' -- Creating v2 permissions set for config ID {str(config.id)}... --')
@@ -225,7 +225,7 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
             logger.info(f' -- No permissions created for config ID {str(config.id)}... --')
         else:
             config.data["permissions"] = [d.dict() for d in permissions_dict]
-            config.save()
+            config.light_save()
             logger.info(f' -- Created {len(permissions_dict)} permissions for config ID {str(config.id)}... --')
 
     return permissions_dict
