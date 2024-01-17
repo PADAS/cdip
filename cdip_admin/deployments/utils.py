@@ -9,7 +9,7 @@ from core.utils import generate_short_id_milliseconds
 logger = logging.getLogger(__name__)
 
 
-class PubSubDummyClient():
+class PubSubDummyClient:
 
     def create_topic(
             self,
@@ -36,7 +36,7 @@ class PubSubDummyClient():
         return None
 
 
-class FunctionsDummyClient():
+class FunctionsDummyClient:
 
     def create_function(
             self,
@@ -78,11 +78,14 @@ class FunctionsDummyClient():
         return None
 
 
-def get_dispatcher_defaults_from_gcp_secrets():
+class CloudRunClient:
+    pass
+
+
+def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET)
     # Load default settings for serverless dispatchers from GCP secrets
     client = secretmanager.SecretManagerServiceClient()
     project_id = settings.GCP_PROJECT_ID
-    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
     secret_version_id = 'latest'
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{secret_version_id}"
     response = client.access_secret_version(request={"name": name})
@@ -94,7 +97,7 @@ def get_default_dispatcher_name(integration, gundi_version="v2"):
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]
     integration_id = str(integration.id)
-    return f"{subdomain}-dispatcher-{integration_id}"
+    return f"{subdomain}-{integration.type.value}-dispatcher-{integration_id}"
 
 
 def get_default_topic_name_er(integration, gundi_version="v2"):
@@ -102,4 +105,4 @@ def get_default_topic_name_er(integration, gundi_version="v2"):
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]
     unique_suffix = generate_short_id_milliseconds()
-    return f"{subdomain}-dispatcher-{unique_suffix}-topic"
+    return f"{subdomain}-{integration.type.value}-dispatcher-{unique_suffix}-topic"
