@@ -287,8 +287,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     configurations = IntegrationConfigurationCreateUpdateSerializer(many=True, required=False)
     default_route = RoutingRuleSummarySerializer(read_only=True)
-    create_default_route = serializers.BooleanField(default=True)
-    create_configurations = serializers.BooleanField(default=True)
+    create_default_route = serializers.BooleanField(write_only=True, default=True)
+    create_configurations = serializers.BooleanField(write_only=True, default=True)
 
     class Meta:
         model = Integration
