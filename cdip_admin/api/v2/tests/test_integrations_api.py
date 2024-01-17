@@ -95,6 +95,9 @@ def _test_create_integration(
     assert response.status_code == status.HTTP_201_CREATED
     response_data = response.json()
     assert "id" in response_data
+    # Create only flags shouldn't be returned as they are not part of the model
+    assert "create_default_route" not in response_data
+    assert "create_configurations" not in response_data
     # Check that the integration was created in the database
     integration = Integration.objects.get(id=response_data["id"])
     # Check that the operations were recorded in the activity log
