@@ -82,7 +82,7 @@ class CloudRunClient:
     pass
 
 
-def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET)
+def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET):
     # Load default settings for serverless dispatchers from GCP secrets
     client = secretmanager.SecretManagerServiceClient()
     project_id = settings.GCP_PROJECT_ID

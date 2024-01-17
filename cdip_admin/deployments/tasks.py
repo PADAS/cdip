@@ -237,7 +237,7 @@ def deploy_cloud_run_service(configuration, service_name, topic_path):
     region = deployment_settings.get("region", "us-central1")
     env_vars = configuration.get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
-    image_url = deployment_settings.get("image_url")
+    image_url = deployment_settings.get("docker_image_url")
     # Define the parent resource
     parent = f"projects/{project_id}/locations/{region}"
     # Define the service resource
