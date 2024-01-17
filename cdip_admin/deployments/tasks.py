@@ -1,6 +1,7 @@
+import google.auth
 from celery import shared_task
 from google.cloud import pubsub_v1
-from google.cloud import functions_v2
+from google.cloud import functions_v2, run_v2
 from google.api_core.exceptions import AlreadyExists
 from django.apps import apps
 from django.conf import settings
@@ -8,13 +9,22 @@ from . import utils
 
 
 if settings.GCP_ENVIRONMENT_ENABLED:
+    credentials, project_id = google.auth.default()
     pubsub_client = pubsub_v1.PublisherClient()  # This raises  credentials error when running in th CI pipeline
     functions_client = functions_v2.FunctionServiceClient()
-    DISPATCHER_DEFAULT_SETTINGS = utils.get_dispatcher_defaults_from_gcp_secrets()
+    cloudrun_client = run_v2.ServicesClient(credentials=credentials)
+    DISPATCHER_DEFAULT_SETTINGS_ER = utils.get_dispatcher_defaults_from_gcp_secrets(
+        secret_id=settings.DISPATCHER_DEFAULTS_SECRET
+    )
+    DISPATCHER_DEFAULT_SETTINGS_SMART = utils.get_dispatcher_defaults_from_gcp_secrets(
+        secret_id=settings.DISPATCHER_DEFAULTS_SECRET_SMART
+    )
 else:
     pubsub_client = utils.PubSubDummyClient()
     functions_client = utils.FunctionsDummyClient()
-    DISPATCHER_DEFAULT_SETTINGS = {}
+    cloudrun_client = utils.CloudRunClient()
+    DISPATCHER_DEFAULT_SETTINGS_ER = {}
+    DISPATCHER_DEFAULT_SETTINGS_SMART = {}
 
 
 @shared_task
@@ -41,7 +51,7 @@ def deploy_serverless_dispatcher(deployment_id):
         return
     function_name = deployment.name or utils.get_default_dispatcher_name(integration=integration, gundi_version=gundi_version)
     if not deployment.configuration:  # Use default settings
-        deployment.configuration = DISPATCHER_DEFAULT_SETTINGS
+        deployment.configuration = DISPATCHER_DEFAULT_SETTINGS_ER
     configuration = deployment.configuration
     env_vars = configuration.get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
@@ -51,14 +61,30 @@ def deploy_serverless_dispatcher(deployment_id):
     deployment.save()
 
     try:
-        function_request = get_function_request(
-            configuration=configuration,
-            function_name=function_name,
-            topic_path=topic_path
-        )
         create_topic(topic_path=topic_path)
-        response = create_or_update_function(function_request=function_request)
 
+        # Create the dispatcher
+        if integration.is_er_site:  # Deploy a Cloud function
+            function_request = get_function_request(
+                configuration=configuration,
+                function_name=function_name,
+                topic_path=topic_path
+            )
+            response = create_or_update_function(function_request=function_request)
+        elif integration.is_smart_site:  # Deploy a Cloud Run Service
+            # ToDo: Implement Cloud Run Service deployment
+            response = deploy_cloud_run_service(
+                configuration=configuration,
+                service_name=function_name,
+                topic_path=topic_path,
+            )
+        else:
+            error_msg = f"Integration type '{integration.type.value}' is not supported."
+            print(error_msg)
+            deployment.status = DispatcherDeployment.Status.ERROR
+            deployment.status_details = error_msg[:500]
+            deployment.save()
+            return
         print(f"Deploy complete.")
         print(response)
         deployment.status = DispatcherDeployment.Status.COMPLETE
@@ -205,3 +231,32 @@ def delete_topic(topic_name):
     )
     pubsub_client.delete_topic(request=request)
 
+
+def deploy_cloud_run_service(configuration, service_name, topic_path):
+    deployment_settings = configuration.get("deployment_settings", {})
+    region = deployment_settings.get("region", "us-central1")
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    image_url = deployment_settings.get("image_url")
+    # Define the parent resource
+    parent = f"projects/{project_id}/locations/{region}"
+    # Define the service resource
+    service = run_v2.types.Service(
+        name=f"{parent}/services/{service_name}",
+        template=run_v2.types.RevisionTemplate(
+            containers=[run_v2.types.Container(image=image_url)],
+            vpc_access=run_v2.types.VpcAccess(
+                connector=vpc_connector  # Todo: Finish this
+            ),
+            scaling=run_v2.types.RevisionScaling(
+                min_instance_count=0,
+                max_instance_count=2
+            )
+        )
+    )
+    # Deploy the service
+    operation = cloudrun_client.create_service(parent=parent, service=service)
+    response = operation.result()
+    # Todo: Add the eventarc trigger
+    print(f"Service {service_name} deployed to Cloud Run")
+    return response
