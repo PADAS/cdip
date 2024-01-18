@@ -2,6 +2,9 @@ import google.auth
 from celery import shared_task
 from google.cloud import pubsub_v1
 from google.cloud import functions_v2, run_v2
+from google.cloud import eventarc_v1
+from google.cloud.eventarc_v1 import CreateTriggerRequest
+from google.cloud.eventarc_v1.types import Trigger, Destination, CloudRun
 from google.api_core.exceptions import AlreadyExists
 from django.apps import apps
 from django.conf import settings
@@ -13,6 +16,7 @@ if settings.GCP_ENVIRONMENT_ENABLED:
     pubsub_client = pubsub_v1.PublisherClient()  # This raises  credentials error when running in th CI pipeline
     functions_client = functions_v2.FunctionServiceClient()
     cloudrun_client = run_v2.ServicesClient(credentials=credentials)
+    eventarc_client = eventarc_v1.EventarcClient(credentials=credentials)
     DISPATCHER_DEFAULT_SETTINGS_ER = utils.get_dispatcher_defaults_from_gcp_secrets(
         secret_id=settings.DISPATCHER_DEFAULTS_SECRET
     )
@@ -23,6 +27,7 @@ else:
     pubsub_client = utils.PubSubDummyClient()
     functions_client = utils.FunctionsDummyClient()
     cloudrun_client = utils.CloudRunClient()
+    #eventarc_client
     DISPATCHER_DEFAULT_SETTINGS_ER = {}
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
 
@@ -271,14 +276,40 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path):
     try:
         operation = cloudrun_client.create_service(request=request)
         response = operation.result()
+        # Trigger the service on new PubSub messages
+        print(f"Service {service_name} deployed to Cloud Run. Creating trigger..")
+        trigger_name = service_name.replace("dis", "tri")[:63]
+        trigger = Trigger(
+            name=f"{parent}/triggers/{trigger_name}",
+            event_filters=[
+                eventarc_v1.EventFilter(
+                    attribute="type",
+                    value="google.cloud.pubsub.topic.v1.messagePublished"
+                )
+            ],
+            destination=Destination(
+                cloud_run=CloudRun(
+                    service=service_name,
+                    region=region
+                )
+            ),
+            transport=eventarc_v1.Transport(
+                pubsub=eventarc_v1.Pubsub(
+                    topic=topic_path
+                )
+            )
+        )
+        create_trigger_request = CreateTriggerRequest(
+            parent=parent,
+            trigger=trigger,
+            trigger_id=trigger_name
+        )
+        operation = eventarc_client.create_trigger(request=create_trigger_request)
+        operation.result()
+        print(f"Trigger created for service {service_name}.")
     except AlreadyExists:
         print(f"Service {service_name} already exists.")
         print(f"Updating service {service_name}..")
-        # Define the CreateServiceRequest
-        # update_request = run_v2.types.UpdateServiceRequest(
-        #     service=service,
-        # )
-        # response = cloudrun_client.update_service(request=update_request)
         # Retrieve the current service configuration
         service_resource_name = f"projects/{project_id}/locations/{region}/services/{service_name}"
         current_service = cloudrun_client.get_service(name=service_resource_name)
@@ -291,10 +322,5 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path):
         # Update the service
         operation = cloudrun_client.update_service(service=current_service)
         response = operation.result()
-    except Exception as e:  # ToDo: Catch more specific errors like validation errors?
-        error_msg = f"Error deploying service: {e}"
-        print(error_msg)
-        raise e
-    # Todo: Add the eventarc trigger
-    print(f"Service {service_name} deployed to Cloud Run")
+    print(f"Deployment for service {service_name} Done.")
     return response
