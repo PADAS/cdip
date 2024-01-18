@@ -264,7 +264,8 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path):
                 min_instance_count=min_instances,
                 max_instance_count=max_instances
             )
-        )
+        ),
+        ingress=run_v2.types.IngressTraffic.INGRESS_TRAFFIC_INTERNAL_ONLY
     )
     # Define the CreateServiceRequest
     request = run_v2.types.CreateServiceRequest(
