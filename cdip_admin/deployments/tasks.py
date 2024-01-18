@@ -250,6 +250,7 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path):
     min_instances = deployment_settings.get("min_instances", 0)
     max_instances = deployment_settings.get("max_instances", 2)
     parent = f"projects/{project_id}/locations/{region}"
+    service_account = deployment_settings.get("service_account")
     # Define the service resource
     service = run_v2.types.Service(
         template=run_v2.types.RevisionTemplate(
@@ -298,7 +299,8 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path):
                 pubsub=eventarc_v1.Pubsub(
                     topic=topic_path
                 )
-            )
+            ),
+            service_account = service_account
         )
         create_trigger_request = CreateTriggerRequest(
             parent=parent,
