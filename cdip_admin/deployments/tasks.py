@@ -55,7 +55,7 @@ def deploy_serverless_dispatcher(deployment_id):
     configuration = deployment.configuration
     env_vars = configuration.get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
-    topic = integration.additional.get("topic", utils.get_default_topic_name_er(integration=integration, gundi_version=gundi_version))
+    topic = integration.additional.get("topic", utils.get_default_topic_name(integration=integration, gundi_version=gundi_version))
     topic_path = f'projects/{project_id}/topics/{topic}'
     deployment.topic_name = topic  # Save the topic for retries or deletions
     deployment.save()
@@ -73,7 +73,7 @@ def deploy_serverless_dispatcher(deployment_id):
             response = create_or_update_function(function_request=function_request)
         elif integration.is_smart_site:  # Deploy a Cloud Run Service
             # ToDo: Implement Cloud Run Service deployment
-            response = deploy_cloud_run_service(
+            response = create_or_update_cloud_run_service(
                 configuration=configuration,
                 service_name=function_name,
                 topic_path=topic_path,
@@ -232,31 +232,69 @@ def delete_topic(topic_name):
     pubsub_client.delete_topic(request=request)
 
 
-def deploy_cloud_run_service(configuration, service_name, topic_path):
+def create_or_update_cloud_run_service(configuration, service_name, topic_path):
+    print(f"Deploying Cloud Run service {service_name}...")
     deployment_settings = configuration.get("deployment_settings", {})
     region = deployment_settings.get("region", "us-central1")
     env_vars = configuration.get("env_vars", {})
+    env_var_objects = [run_v2.types.EnvVar(name=key, value=value) for key, value in env_vars.items()]
     project_id = env_vars.get("GCP_PROJECT_ID")
     image_url = deployment_settings.get("docker_image_url")
-    # Define the parent resource
+    vpc_connector_name = deployment_settings.get("vpc_connector")
+    vpc_connector_path = f"projects/{project_id}/locations/{region}/connectors/{vpc_connector_name}"
+    min_instances = deployment_settings.get("min_instances", 0)
+    max_instances = deployment_settings.get("max_instances", 2)
     parent = f"projects/{project_id}/locations/{region}"
     # Define the service resource
     service = run_v2.types.Service(
-        name=f"{parent}/services/{service_name}",
         template=run_v2.types.RevisionTemplate(
-            containers=[run_v2.types.Container(image=image_url)],
+            containers=[run_v2.types.Container(
+                image=image_url,
+                env=env_var_objects
+            )],
             vpc_access=run_v2.types.VpcAccess(
-                connector=vpc_connector  # Todo: Finish this
+                connector=vpc_connector_path
             ),
             scaling=run_v2.types.RevisionScaling(
-                min_instance_count=0,
-                max_instance_count=2
+                min_instance_count=min_instances,
+                max_instance_count=max_instances
             )
         )
     )
+    # Define the CreateServiceRequest
+    request = run_v2.types.CreateServiceRequest(
+        parent=parent,
+        service=service,
+        service_id=service_name
+    )
     # Deploy the service
-    operation = cloudrun_client.create_service(parent=parent, service=service)
-    response = operation.result()
+    try:
+        operation = cloudrun_client.create_service(request=request)
+        response = operation.result()
+    except AlreadyExists:
+        print(f"Service {service_name} already exists.")
+        print(f"Updating service {service_name}..")
+        # Define the CreateServiceRequest
+        # update_request = run_v2.types.UpdateServiceRequest(
+        #     service=service,
+        # )
+        # response = cloudrun_client.update_service(request=update_request)
+        # Retrieve the current service configuration
+        service_resource_name = f"projects/{project_id}/locations/{region}/services/{service_name}"
+        current_service = cloudrun_client.get_service(name=service_resource_name)
+        # Update the configuration
+        current_service.template.containers[0].image = image_url
+        current_service.template.containers[0].env = env_var_objects
+        current_service.template.vpc_access.connector = vpc_connector_path
+        current_service.template.scaling.min_instance_count = min_instances
+        current_service.template.scaling.max_instance_count = max_instances
+        # Update the service
+        operation = cloudrun_client.update_service(service=current_service)
+        response = operation.result()
+    except Exception as e:  # ToDo: Catch more specific errors like validation errors?
+        error_msg = f"Error deploying service: {e}"
+        print(error_msg)
+        raise e
     # Todo: Add the eventarc trigger
     print(f"Service {service_name} deployed to Cloud Run")
     return response
