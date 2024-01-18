@@ -77,7 +77,6 @@ def deploy_serverless_dispatcher(deployment_id):
             )
             response = create_or_update_function(function_request=function_request)
         elif integration.is_smart_site:  # Deploy a Cloud Run Service
-            # ToDo: Implement Cloud Run Service deployment
             response = create_or_update_cloud_run_service(
                 configuration=configuration,
                 service_name=function_name,
