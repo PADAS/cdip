@@ -78,8 +78,62 @@ class FunctionsDummyClient:
         return None
 
 
-class CloudRunClient:
-    pass
+class CloudRunDummyClient:
+
+    def create_service(
+            self,
+            request=None,
+            *,
+            parent=None,
+            service=None,
+            service_id=None,
+            retry=None,
+            timeout=None,
+            metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service creation ignored.")
+        return None
+
+    def get_service(
+            self,
+            request=None,
+            *,
+            name=None,
+            retry=None,
+            timeout=None,
+            metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service get ignored.")
+        return None
+
+    def update_service(
+        self,
+        request=None,
+        *,
+        service=None,
+        retry=None,
+        timeout=None,
+        metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service update ignored.")
+        return None
+
+
+class EventarcDummyClient:
+
+    def create_trigger(
+            self,
+            request=None,
+            *,
+            parent=None,
+            trigger=None,
+            trigger_id=None,
+            retry=None,
+            timeout=None,
+            metadata=(),
+    ) -> None:
+        logger.warning(f"Using EventarcDummyClient. Trigger creation ignored.")
+        return None
 
 
 def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET):
