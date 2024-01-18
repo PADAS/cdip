@@ -26,8 +26,8 @@ if settings.GCP_ENVIRONMENT_ENABLED:
 else:
     pubsub_client = utils.PubSubDummyClient()
     functions_client = utils.FunctionsDummyClient()
-    cloudrun_client = utils.CloudRunClient()
-    #eventarc_client
+    cloudrun_client = utils.CloudRunDummyClient()
+    eventarc_client = utils.EventarcDummyClient()
     DISPATCHER_DEFAULT_SETTINGS_ER = {}
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
 
