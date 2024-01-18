@@ -104,20 +104,22 @@ def deploy_serverless_dispatcher(deployment_id):
 
 @shared_task
 def delete_serverless_dispatcher(deployment_id, topic):
+    print(f"Deleting dispatcher deployment {deployment_id}...")
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
+    is_er_site = deployment.integration.is_er_site if deployment.integration else False
     deployment.integration = None  # Unlink from integrations as they might be being deleted
     deployment.legacy_integration = None
     deployment.status = DispatcherDeployment.Status.DELETING
     deployment.status_details = ""  # Clean previous errors
     deployment.save()
 
-    function_name = deployment.name
-
     try:
-        function_request = delete_function(function_name=function_name)
+        if is_er_site:
+            response = delete_function(function_name=deployment.name)
+        else:  # SMART or others will use Cloud Run
+            response = delete_cloudrun_service(service_name=deployment.name)
         delete_topic(topic_name=topic)
-        response = create_or_update_function(function_request=function_request)
         print(f"Delete complete.")
         print(response)
     except Exception as e:
@@ -223,6 +225,18 @@ def delete_function(function_name):
     )
     operation = functions_client.delete_function(
         request=function_request
+    )
+    response = operation.result()
+    return response
+
+
+def delete_cloudrun_service(service_name):
+    print(f"Deleting {service_name} service.")
+    delete_request = run_v2.types.DeleteServiceRequest(
+        name=service_name
+    )
+    operation = cloudrun_client.delete_service(
+        request=delete_request
     )
     response = operation.result()
     return response
