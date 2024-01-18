@@ -95,14 +95,16 @@ def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAU
 def get_default_dispatcher_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
-    subdomain = base_url.netloc.split(".")[0]
+    subdomain = base_url.netloc.split(".")[0][:8]
+    integration_type = integration.type.value.replace("_", "").lower().strip()[:5]
     integration_id = str(integration.id)
-    return f"{subdomain}-{integration.type.value}-dispatcher-{integration_id}"
+    return "-".join([subdomain, integration_type, "dis", integration_id])[:49]
 
 
-def get_default_topic_name_er(integration, gundi_version="v2"):
+def get_default_topic_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]
+    integration_type = integration.type.value.replace("_", "").lower().strip()[:8]
     unique_suffix = generate_short_id_milliseconds()
-    return f"{subdomain}-{integration.type.value}-dispatcher-{unique_suffix}-topic"
+    return "-".join([subdomain, integration_type, unique_suffix, "topic"])[:255]
