@@ -210,18 +210,20 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
 
 
 @shared_task
-def update_mb_permissions_for_group(instance, gundi_version):
+def update_mb_permissions_for_group(instance_pk, gundi_version):
     if gundi_version == "v1":
+        DeviceGroup = apps.get_model("integrations", "DeviceGroup")
+        device_group = DeviceGroup.objects.get(pk=instance_pk)
         Device = apps.get_model("integrations", "Device")
         devices = Device.objects.filter(
-            devicegroup=instance
+            devicegroup=device_group
         ).order_by("external_id").distinct("external_id")
 
         # Build tag_ids from fetched_devices
         devices_tag_id = [build_mb_tag_id(device, gundi_version) for device in devices]
 
         # configs for the device_group
-        configs = instance.destinations.filter(
+        configs = device_group.destinations.filter(
             type__slug=DestinationTypes.Movebank.value,
             additional__has_key="permissions"
         )
@@ -260,13 +262,15 @@ def update_mb_permissions_for_group(instance, gundi_version):
                 mb_config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions.permissions]
                 mb_config.save()
     else:
+        Source = apps.get_model("integrations", "Source")
+        source = Source.objects.get(pk=instance_pk)
         # Build tag_id from source
-        device_tag_id = build_mb_tag_id(instance, gundi_version)
+        device_tag_id = build_mb_tag_id(source, gundi_version)
 
         # configs with MB as destination
         IntegrationConfiguration = apps.get_model("integrations", "IntegrationConfiguration")
         configs = IntegrationConfiguration.objects.filter(
-            integration__in=instance.integration.destinations.filter(
+            integration__in=source.integration.destinations.filter(
                 type__value=DestinationTypes.Movebank.value
             ),
             action__value=MovebankActions.PERMISSIONS.value
