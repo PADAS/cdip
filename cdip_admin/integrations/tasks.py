@@ -214,13 +214,9 @@ def update_mb_permissions_for_group(instance_pk, gundi_version):
     if gundi_version == "v1":
         DeviceGroup = apps.get_model("integrations", "DeviceGroup")
         device_group = DeviceGroup.objects.get(pk=instance_pk)
-        Device = apps.get_model("integrations", "Device")
-        devices = Device.objects.filter(
-            devicegroup=device_group
-        ).order_by("external_id").distinct("external_id")
 
         # Build tag_ids from fetched_devices
-        devices_tag_id = [build_mb_tag_id(device, gundi_version) for device in devices]
+        devices_tag_id = [build_mb_tag_id(device, gundi_version) for device in device_group.devices.all()]
 
         # configs for the device_group
         configs = device_group.destinations.filter(
