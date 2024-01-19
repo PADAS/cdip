@@ -431,7 +431,7 @@ class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             # Handle devices for MB destinations
             transaction.on_commit(
                 lambda: update_mb_permissions_for_group.delay(
-                    instance=self,
+                    instance_pk=self.pk,
                     gundi_version="v2"
                 )
             )
