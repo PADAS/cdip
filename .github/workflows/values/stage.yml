@@ -33,6 +33,7 @@ admin_portal:
     GS_BUCKET_NAME: "cdip-files-stage"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "movebank-events-stage"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
 kongplugin:
   cors:
     - https://stage.gundiservice.org
