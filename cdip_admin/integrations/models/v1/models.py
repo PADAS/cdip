@@ -6,7 +6,7 @@ from django.conf import settings
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
 from integrations.utils import does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
-from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
+from integrations.tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group
 from cdip_admin import celery
 from core.models import TimestampedModel
 from organizations.models import Organization
@@ -494,6 +494,18 @@ class DeviceGroup(TimestampedModel):
 
     def __str__(self):
         return f"{self.name} - {self.owner.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Check if Movebank is within destinations
+        if any([a.is_mb_site for a in self.destinations.all()]):
+            # Handle devices for MB destinations
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance=self,
+                    gundi_version="v1"
+                )
+            )
 
 
 @receiver(post_save, sender=OutboundIntegrationConfiguration)
