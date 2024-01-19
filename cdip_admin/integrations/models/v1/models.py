@@ -238,13 +238,14 @@ class OutboundIntegrationConfiguration(TimestampedModel):
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()
             )
 
-    def save(self, *args, **kwargs):
+    def save(self, execute_post_save=True, *args, **kwargs):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
             created = self._state.adding
             super().save(*args, **kwargs)
             kwargs["created"] = created
-            self._post_save(self, *args, **kwargs)
+            if execute_post_save:
+                self._post_save(self, *args, **kwargs)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
