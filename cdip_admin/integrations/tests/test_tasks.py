@@ -6,9 +6,94 @@ from ..models import (
     OutboundIntegrationConfiguration,
     Integration,
     IntegrationAction,
-    IntegrationConfiguration
+    IntegrationConfiguration,
+    Device,
+    Source
 )
-from ..tasks import recreate_and_send_movebank_permissions_csv_file
+from ..tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group
+from ..utils import build_mb_tag_id
+
+
+@pytest.mark.django_db
+def test_movebank_permissions_set_is_updated_on_device_addition_v1(
+        setup_movebank_test_devices_sources
+):
+    # Get test configs / devices
+    ii = setup_movebank_test_devices_sources["v1"].get("inbound")
+    oi = setup_movebank_test_devices_sources["v1"].get("config")
+
+    # get test device
+    d1 = setup_movebank_test_devices_sources["v1"].get("device")
+
+    # Get device_group (for v1 test)
+    dg = setup_movebank_test_devices_sources["v1"].get("device_group")
+
+    # add "additional" blob to oi
+    oi.additional["permissions"]["permissions"] = [
+        {
+            "tag_id": build_mb_tag_id(d1, "v1"),
+            "username": "victorg"
+        }
+    ]
+    oi.save()
+    oi.refresh_from_db()
+
+    # Only 1 permissions dict registered
+    assert len(oi.additional["permissions"].get("permissions", [])) == 1
+
+    # Add new device to device_group
+    d = Device.objects.create(external_id="device-123", inbound_configuration=ii)
+    dg.devices.add(d)
+
+    update_mb_permissions_for_group(dg.pk, "v1")
+
+    # Refresh again for getting new devices
+    oi.refresh_from_db()
+
+    # Now we have 2
+    assert len(oi.additional["permissions"].get("permissions", [])) == 2
+    # The new permission set is related to newly added device
+    assert oi.additional["permissions"].get("permissions", [])[1].get("tag_id") == build_mb_tag_id(d, "v1")
+
+
+@pytest.mark.django_db
+def test_movebank_permissions_set_is_updated_on_device_addition_v2(
+        setup_movebank_test_devices_sources
+):
+    # Get test configs / devices
+    integration_config = setup_movebank_test_devices_sources["v2"].get("config")
+
+    # get test devices
+    d2 = setup_movebank_test_devices_sources["v2"].get("device")
+
+    # add "data" blob to integration_config
+    integration_config.data["permissions"] = [
+        {
+            "tag_id": build_mb_tag_id(d2, "v2"),
+            "username": "victorg"
+        }
+    ]
+    integration_config.save()
+    integration_config.refresh_from_db()
+
+    # Only 1 permissions dict registered
+    assert len(integration_config.data.get("permissions", [])) == 1
+
+    # Add new source
+    source = Source.objects.create(
+        external_id=f"device-456",
+        integration=d2.integration
+    )
+
+    update_mb_permissions_for_group(source.pk, "v2")
+
+    # Refresh again for getting new devices
+    integration_config.refresh_from_db()
+
+    # Now we have 2
+    assert len(integration_config.data.get("permissions", [])) == 2
+    # The new permission set is related to newly added source
+    assert integration_config.data.get("permissions", [])[1].get("tag_id") == build_mb_tag_id(source, "v2")
 
 
 @pytest.mark.django_db
