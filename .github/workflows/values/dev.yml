@@ -34,6 +34,7 @@ admin_portal:
     GS_BUCKET_NAME: "cdip-files-dev"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-dev"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "movebank-events-dev"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-dev"
 kongplugin:
   cors:
     - https://dev.gundiservice.org
