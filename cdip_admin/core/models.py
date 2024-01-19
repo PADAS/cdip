@@ -10,9 +10,6 @@ class TimestampedModel(models.Model):
     class Meta:
         abstract = True
 
-    def light_save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
 
 class Task(models.Model):
     class Meta:
