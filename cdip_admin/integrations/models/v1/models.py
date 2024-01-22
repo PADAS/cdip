@@ -208,6 +208,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_mb_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "movebank"
 
+    @property
+    def is_smart_site(self):
+        return self.type.slug.lower().strip().replace("_", "") == "smartconnect"
+
     class Meta:
         ordering = ("owner", "name")
 
