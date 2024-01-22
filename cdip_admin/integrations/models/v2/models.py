@@ -122,9 +122,9 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub for ER and MoveBank Sites
+        # Use pubsub for ER, SMART and MoveBank Sites
         # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_mb_site):
+        if self._state.adding and (self.is_er_site or self.is_smart_site or self.is_mb_site):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             if "broker" not in self.additional:
@@ -133,11 +133,12 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER Sites only
-        if created and self.is_er_site and settings.GCP_ENVIRONMENT_ENABLED:
+        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
+            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self),
                 integration=self,
-                configuration=get_dispatcher_defaults_from_gcp_secrets()
+                configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
             )
 
     def save(self, *args, **kwargs):
@@ -172,6 +173,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def is_mb_site(self):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
+
+    @property
+    def is_smart_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "smartconnect"
 
     def create_missing_configurations(self):
         for action in self.type.actions.all():
