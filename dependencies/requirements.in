@@ -73,6 +73,8 @@ gundi-core==1.2.8
 gundi-client==1.0.1
 gundi-client-v2==2.1.5
 google-cloud-functions==1.13.1
+google-cloud-run==0.10.1
+google-cloud-eventarc==1.10.0
 google-cloud-secret-manager==2.16.4
 django-model-utils==4.3.1
 django-crum==0.7.9
