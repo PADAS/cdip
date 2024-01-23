@@ -9,7 +9,7 @@ from core.utils import generate_short_id_milliseconds
 logger = logging.getLogger(__name__)
 
 
-class PubSubDummyClient():
+class PubSubDummyClient:
 
     def create_topic(
             self,
@@ -36,7 +36,7 @@ class PubSubDummyClient():
         return None
 
 
-class FunctionsDummyClient():
+class FunctionsDummyClient:
 
     def create_function(
             self,
@@ -78,11 +78,68 @@ class FunctionsDummyClient():
         return None
 
 
-def get_dispatcher_defaults_from_gcp_secrets():
+class CloudRunDummyClient:
+
+    def create_service(
+            self,
+            request=None,
+            *,
+            parent=None,
+            service=None,
+            service_id=None,
+            retry=None,
+            timeout=None,
+            metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service creation ignored.")
+        return None
+
+    def get_service(
+            self,
+            request=None,
+            *,
+            name=None,
+            retry=None,
+            timeout=None,
+            metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service get ignored.")
+        return None
+
+    def update_service(
+        self,
+        request=None,
+        *,
+        service=None,
+        retry=None,
+        timeout=None,
+        metadata=None,
+    ) -> None:
+        logger.warning(f"Using CloudRunDummyClient. Service update ignored.")
+        return None
+
+
+class EventarcDummyClient:
+
+    def create_trigger(
+            self,
+            request=None,
+            *,
+            parent=None,
+            trigger=None,
+            trigger_id=None,
+            retry=None,
+            timeout=None,
+            metadata=(),
+    ) -> None:
+        logger.warning(f"Using EventarcDummyClient. Trigger creation ignored.")
+        return None
+
+
+def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET):
     # Load default settings for serverless dispatchers from GCP secrets
     client = secretmanager.SecretManagerServiceClient()
     project_id = settings.GCP_PROJECT_ID
-    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
     secret_version_id = 'latest'
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{secret_version_id}"
     response = client.access_secret_version(request={"name": name})
@@ -92,14 +149,16 @@ def get_dispatcher_defaults_from_gcp_secrets():
 def get_default_dispatcher_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
-    subdomain = base_url.netloc.split(".")[0]
+    subdomain = base_url.netloc.split(".")[0][:8]
+    integration_type = integration.type.value.replace("_", "").lower().strip()[:5]
     integration_id = str(integration.id)
-    return f"{subdomain}-dispatcher-{integration_id}"
+    return "-".join([subdomain, integration_type, "dis", integration_id])[:49]
 
 
-def get_default_topic_name_er(integration, gundi_version="v2"):
+def get_default_topic_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]
+    integration_type = integration.type.value.replace("_", "").lower().strip()[:8]
     unique_suffix = generate_short_id_milliseconds()
-    return f"{subdomain}-dispatcher-{unique_suffix}-topic"
+    return "-".join([subdomain, integration_type, unique_suffix, "topic"])[:255]
