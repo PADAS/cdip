@@ -126,3 +126,16 @@ def get_dispatcher_topic_default_name(integration, gundi_version="v2"):
         return settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
     # Fallback to legacy kafka dispatchers topic
     return f"sintegrate.observations.transformed"
+
+
+def build_mb_tag_id(device, gundi_version):
+    if gundi_version == "v1":
+        tag_id = (f"{device.inbound_configuration.type.slug}."
+                  f"{device.external_id}."
+                  f"{str(device.inbound_configuration.id)}")
+    else:
+        tag_id = (f"{device.integration.type.value}."
+                  f"{device.external_id}."
+                  f"{str(device.integration_id)}")
+
+    return tag_id

@@ -1603,7 +1603,9 @@ def setup_movebank_test_devices_sources(
 
     return {
         "v1": {
+            "inbound": ii,
             "config": oi,
+            "device_group": dg,
             "device": d  # 1 device only for test
         },
         "v2": {
