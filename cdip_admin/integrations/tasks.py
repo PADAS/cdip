@@ -102,11 +102,14 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                     permissions.permissions = []
                 else:
                     # create and save preliminary permissions JSON into additional
+                    logger.info(' -- No "permissions" set in outbound "additional", creating... --')
+                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
                     permissions.permissions = create_and_save_permissions_json(
                         mb_config,
                         permissions.default_movebank_usernames,
                         "v1"
                     )
+                    continue
             v1_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -136,11 +139,14 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                     permissions.permissions = []
                 else:
                     # create and save preliminary permissions JSON into additional
+                    logger.info(' -- No "permissions" set in config "data", creating... --')
+                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
                     permissions.permissions = create_and_save_permissions_json(
                         mb_config,
                         permissions.default_movebank_usernames,
                         "v2"
                     )
+                    continue
             v2_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -171,6 +177,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
 def create_and_save_permissions_json(config, usernames, gundi_version):
     permissions_dict = []
     if gundi_version == "v1":
+        logger.info(f' -- Creating v1 permissions set for outbound ID {str(config.id)}... --')
         Device = apps.get_model("integrations", "Device")
         devices = Device.objects.filter(
             devicegroup__destinations__id=config.id
@@ -185,9 +192,15 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                         }
                     )
                 )
-        config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
-        config.save()
+
+        if not permissions_dict:
+            logger.info(f' -- No permissions created for outbound ID {str(config.id)}... --')
+        else:
+            config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
+            config.save(execute_post_save=False)
+            logger.info(f' -- Created {len(permissions_dict)} permissions for outbound ID {str(config.id)}... --')
     else:
+        logger.info(f' -- Creating v2 permissions set for config ID {str(config.id)}... --')
         Source = apps.get_model("integrations", "Source")
         sources = Source.objects.filter(
             integration__routing_rules_by_provider__destinations__id=config.integration.id
@@ -203,8 +216,13 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                         }
                     )
                 )
-        config.data["permissions"] = [d.dict() for d in permissions_dict]
-        config.save()
+
+        if not permissions_dict:
+            logger.info(f' -- No permissions created for config ID {str(config.id)}... --')
+        else:
+            config.data["permissions"] = [d.dict() for d in permissions_dict]
+            config.save(execute_post_save=False)
+            logger.info(f' -- Created {len(permissions_dict)} permissions for config ID {str(config.id)}... --')
 
     return permissions_dict
 

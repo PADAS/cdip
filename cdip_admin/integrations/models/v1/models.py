@@ -208,6 +208,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_mb_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "movebank"
 
+    @property
+    def is_smart_site(self):
+        return self.type.slug.lower().strip().replace("_", "") == "smartconnect"
+
     class Meta:
         ordering = ("owner", "name")
 
@@ -242,9 +246,11 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
             created = self._state.adding
+            execute_post_save = kwargs.pop("execute_post_save", True)
             super().save(*args, **kwargs)
             kwargs["created"] = created
-            self._post_save(self, *args, **kwargs)
+            if execute_post_save:
+                self._post_save(self, *args, **kwargs)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
