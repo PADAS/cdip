@@ -56,9 +56,8 @@ def test_movebank_permissions_file_upload_task_creates_permissions_json(
     assert tag_id_1 in v1_tags
     assert tag_id_2 in v2_tags
 
-    # Check that the tag data was sent to Movebank
-    assert mock_movebank_client_class.called
-    assert mock_movebank_client_class.return_value.post_permissions.called
+    # Check that the tag data was NOT sent to Movebank
+    assert not mock_movebank_client_class.called
 
 
 @pytest.mark.django_db
