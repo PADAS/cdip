@@ -255,8 +255,9 @@ def update_mb_permissions_for_group(instance_pk, gundi_version):
                                     }
                                 )
                             )
-                mb_config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions.permissions]
-                mb_config.save()
+
+                        mb_config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions.permissions]
+                        mb_config.save()
     else:
         Source = apps.get_model("integrations", "Source")
         source = Source.objects.get(pk=instance_pk)
@@ -302,8 +303,9 @@ def update_mb_permissions_for_group(instance_pk, gundi_version):
                                 }
                             )
                         )
-                mb_config.data["permissions"] = [d.dict() for d in permissions.permissions]
-                mb_config.save()
+
+                    mb_config.data["permissions"] = [d.dict() for d in permissions.permissions]
+                    mb_config.save()
 
 
 @async_to_sync

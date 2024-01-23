@@ -16,8 +16,15 @@ from ..utils import build_mb_tag_id
 
 @pytest.mark.django_db
 def test_movebank_permissions_set_is_updated_on_device_addition_v1(
+        mocker,
+        django_capture_on_commit_callbacks,
         setup_movebank_test_devices_sources
 ):
+    mocked_csv_task = mocker.MagicMock()
+    mocker.patch(
+        "integrations.models.v1.models.recreate_and_send_movebank_permissions_csv_file", mocked_csv_task
+    )
+
     # Get test configs / devices
     ii = setup_movebank_test_devices_sources["v1"].get("inbound")
     oi = setup_movebank_test_devices_sources["v1"].get("config")
@@ -45,7 +52,8 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v1(
     d = Device.objects.create(external_id="device-123", inbound_configuration=ii)
     dg.devices.add(d)
 
-    update_mb_permissions_for_group(dg.pk, "v1")
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        update_mb_permissions_for_group(dg.pk, "v1")
 
     # Refresh again for getting new devices
     oi.refresh_from_db()
@@ -55,11 +63,21 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v1(
     # The new permission set is related to newly added device
     assert oi.additional["permissions"].get("permissions", [])[1].get("tag_id") == build_mb_tag_id(d, "v1")
 
+    # Check that the task to send data to Movebank was called (after device adding)
+    assert mocked_csv_task.delay.called
+
 
 @pytest.mark.django_db
 def test_movebank_permissions_set_is_updated_on_device_addition_v2(
+        mocker,
+        django_capture_on_commit_callbacks,
         setup_movebank_test_devices_sources
 ):
+    mocked_csv_task = mocker.MagicMock()
+    mocker.patch(
+        "integrations.models.v2.models.recreate_and_send_movebank_permissions_csv_file", mocked_csv_task
+    )
+
     # Get test configs / devices
     integration_config = setup_movebank_test_devices_sources["v2"].get("config")
 
@@ -85,7 +103,8 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v2(
         integration=d2.integration
     )
 
-    update_mb_permissions_for_group(source.pk, "v2")
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        update_mb_permissions_for_group(source.pk, "v2")
 
     # Refresh again for getting new devices
     integration_config.refresh_from_db()
@@ -94,6 +113,9 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v2(
     assert len(integration_config.data.get("permissions", [])) == 2
     # The new permission set is related to newly added source
     assert integration_config.data.get("permissions", [])[1].get("tag_id") == build_mb_tag_id(source, "v2")
+
+    # Check that the task to send data to Movebank was called (after source adding)
+    assert mocked_csv_task.delay.called
 
 
 @pytest.mark.django_db
