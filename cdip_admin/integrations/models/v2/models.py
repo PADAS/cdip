@@ -238,9 +238,10 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                 ),
             )
 
-    def save(self, execute_post_save=True, *args, **kwargs):
+    def save(self, *args, **kwargs):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
+            execute_post_save = kwargs.pop("execute_post_save", True)
             super().save(*args, **kwargs)
             if execute_post_save:
                 self._post_save(self, *args, **kwargs)
