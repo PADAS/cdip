@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
 from model_utils import FieldTracker
-from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
+from integrations.tasks import update_mb_permissions_for_group, recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 from activity_log.mixins import ChangeLogMixin
@@ -430,6 +430,18 @@ class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.external_id} - {self.integration.type.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Check if Movebank is within destinations
+        if any([a.is_mb_site for a in self.integration.destinations.all()]):
+            # Handle devices for MB destinations
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance_pk=self.pk,
+                    gundi_version="v2"
+                )
+            )
 
     class Meta:
         ordering = ("integration", "external_id")
