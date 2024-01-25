@@ -280,14 +280,11 @@ CELERY_TASK_ROUTES = {
     "deployments.tasks.delete_serverless_dispatcher": {
         "queue": "deployments", "routing_key": "deployments"
     },
-    "integrations.tasks.run_integration": {
-        "queue": "tasks", "routing_key": "tasks"
-    },
     "integrations.tasks.recreate_and_send_movebank_permissions_csv_file": {
-        "queue": "tasks", "routing_key": "tasks"
+        "queue": "tasks", "routing_key": "mb_permissions"
     },
     "integrations.tasks.update_mb_permissions_for_group": {
-        "queue": "tasks", "routing_key": "tasks"
+        "queue": "tasks", "routing_key": "mb_permissions"
     },
 }
 
