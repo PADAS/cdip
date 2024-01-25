@@ -270,6 +270,7 @@ CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 CELERY_TASK_QUEUES = (
     Queue("default", Exchange("default"), routing_key="default"),
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
+    Queue("tasks", Exchange("tasks"), routing_key="tasks"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -278,6 +279,15 @@ CELERY_TASK_ROUTES = {
     },
     "deployments.tasks.delete_serverless_dispatcher": {
         "queue": "deployments", "routing_key": "deployments"
+    },
+    "integrations.tasks.run_integration": {
+        "queue": "tasks", "routing_key": "tasks"
+    },
+    "integrations.tasks.recreate_and_send_movebank_permissions_csv_file": {
+        "queue": "tasks", "routing_key": "tasks"
+    },
+    "integrations.tasks.update_mb_permissions_for_group": {
+        "queue": "tasks", "routing_key": "tasks"
     },
 }
 
