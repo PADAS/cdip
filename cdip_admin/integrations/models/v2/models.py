@@ -234,6 +234,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                 interval=schedule,
                 name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}')",
                 task="integrations.tasks.run_integration",
+                queue="tasks",
                 kwargs=json.dumps(
                     {
                         "integration_id": str(self.integration_id),
