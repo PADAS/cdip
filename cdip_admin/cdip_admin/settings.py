@@ -270,7 +270,7 @@ CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 CELERY_TASK_QUEUES = (
     Queue("default", Exchange("default"), routing_key="default"),
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
-    Queue("tasks", Exchange("tasks"), routing_key="tasks"),
+    Queue("tasks", Exchange("tasks"), routing_key="mb_permissions"),
 )
 
 CELERY_TASK_ROUTES = {
