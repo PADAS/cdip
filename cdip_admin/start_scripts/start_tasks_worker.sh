@@ -4,4 +4,4 @@
 
 WORKERS=5
 
-celery -A cdip_admin worker -l info -c $WORKERS -Q tasks 2>&1
+celery -A cdip_admin worker -l info -c $WORKERS -Q mb_permissions 2>&1
