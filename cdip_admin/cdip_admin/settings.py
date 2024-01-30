@@ -270,7 +270,7 @@ CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 CELERY_TASK_QUEUES = (
     Queue("default", Exchange("default"), routing_key="default"),
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
-    Queue("tasks", Exchange("tasks"), routing_key="mb_permissions"),
+    Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -281,10 +281,10 @@ CELERY_TASK_ROUTES = {
         "queue": "deployments", "routing_key": "deployments"
     },
     "integrations.tasks.recreate_and_send_movebank_permissions_csv_file": {
-        "queue": "tasks", "routing_key": "mb_permissions"
+        "queue": "mb_permissions", "routing_key": "mb_permissions"
     },
     "integrations.tasks.update_mb_permissions_for_group": {
-        "queue": "tasks", "routing_key": "mb_permissions"
+        "queue": "mb_permissions", "routing_key": "mb_permissions"
     },
 }
 
