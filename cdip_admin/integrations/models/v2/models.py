@@ -204,6 +204,13 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
         default=dict,
         verbose_name="JSON Configuration"
     )
+    periodic_task = models.OneToOneField(
+        "django_celery_beat.PeriodicTask",
+        on_delete=models.SET_NULL,
+        related_name="configurations_by_periodic_task",
+        blank=True,
+        null=True
+    )
 
     tracker = FieldTracker()
 
@@ -223,16 +230,16 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()
             )
 
-        if self.action.is_periodic_action:
+        if self.action.is_periodic_action and not self.periodic_task:
             # Get or create interval and periodic task for this config
             schedule, created = IntervalSchedule.objects.get_or_create(
                 every=10,
                 period=IntervalSchedule.MINUTES,
             )
 
-            PeriodicTask.objects.get_or_create(
+            self.periodic_task = PeriodicTask.objects.create(
                 interval=schedule,
-                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}')",
+                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}', Configuration {self.pk})",
                 task="integrations.tasks.run_integration",
                 kwargs=json.dumps(
                     {
@@ -242,11 +249,12 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                     }
                 ),
             )
+            self.save(update_fields=["periodic_task"], execute_post_save=False)
 
     def save(self, *args, **kwargs):
         with self.tracker:
-            self._pre_save(self, *args, **kwargs)
             execute_post_save = kwargs.pop("execute_post_save", True)
+            self._pre_save(self, *args, **kwargs)
             super().save(*args, **kwargs)
             if execute_post_save:
                 self._post_save(self, *args, **kwargs)
