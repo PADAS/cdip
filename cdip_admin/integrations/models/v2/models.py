@@ -239,7 +239,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
             self.periodic_task = PeriodicTask.objects.create(
                 interval=schedule,
-                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}')",
+                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}', Configuration {self.pk})",
                 task="integrations.tasks.run_integration",
                 kwargs=json.dumps(
                     {

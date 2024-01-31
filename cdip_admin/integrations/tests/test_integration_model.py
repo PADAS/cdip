@@ -1,5 +1,7 @@
 import pytest
 from django.conf import settings
+from django_celery_beat.models import PeriodicTask
+
 from ..models import Integration, OutboundIntegrationConfiguration
 
 
@@ -32,3 +34,14 @@ def test_create_movebank_destination_v2_with_default_settings(other_organization
 
 def test_delete_integration_with_default_route(provider_lotek_panthera):
     provider_lotek_panthera.delete()
+
+
+def test_delete_periodic_tasks_on_integration_delete(provider_lotek_panthera):
+    task_ids = [c.periodic_task.id for c in provider_lotek_panthera.configurations if c.action.is_periodic_action]
+
+    provider_lotek_panthera.delete()
+
+    # Configurations are be deleted on cascade, and associated tasks should be deleted as well
+    for task_id in task_ids:
+        with pytest.raises(PeriodicTask.DoesNotExist):
+            PeriodicTask.objects.get(id=task_id)
