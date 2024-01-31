@@ -41,7 +41,7 @@ def test_delete_periodic_tasks_on_integration_delete(provider_lotek_panthera):
 
     provider_lotek_panthera.delete()
 
-    # Configurations are be deleted on cascade, and associated tasks should be deleted as well
+    # Configurations are deleted on cascade, and associated tasks should be deleted as well
     for task_id in task_ids:
         with pytest.raises(PeriodicTask.DoesNotExist):
             PeriodicTask.objects.get(id=task_id)
