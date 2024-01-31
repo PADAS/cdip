@@ -1114,7 +1114,7 @@ def _test_update_integration_config(
                 details__action=ActivityActions.CREATED.value,
                 details__instance_pk=str(configuration.id),
                 details__model_name="IntegrationConfiguration"
-            ).exclude(details__changes__has_key="periodic_task").last()
+            ).last()
             assert activity_log
             _test_activity_logs_on_instance_created(
                 activity_log=activity_log,
