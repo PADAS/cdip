@@ -1,5 +1,6 @@
 import pytest
 from django.urls import reverse
+from django_celery_beat.models import PeriodicTask
 from rest_framework import status
 
 from activity_log.core import ActivityActions
@@ -1085,7 +1086,7 @@ def _test_update_integration_config(
                 details__action=ActivityActions.UPDATED.value,
                 details__instance_pk=config_request["id"],
                 details__model_name="IntegrationConfiguration",
-            ).last()
+            ).exclude(details__changes__has_key="periodic_task_id").last()
             expected_revert_data = {
                 "instance_pk": str(configuration.pk),
                 "model_name": "IntegrationConfiguration"
@@ -1113,7 +1114,7 @@ def _test_update_integration_config(
                 details__action=ActivityActions.CREATED.value,
                 details__instance_pk=str(configuration.id),
                 details__model_name="IntegrationConfiguration"
-            ).last()
+            ).exclude(details__changes__has_key="periodic_task").last()
             assert activity_log
             _test_activity_logs_on_instance_created(
                 activity_log=activity_log,
@@ -1255,3 +1256,49 @@ def test_get_integration_api_key_as_superuser(
         integration=provider_lotek_panthera
     )
     assert mock_get_api_key.called
+
+
+def _test_delete_integration(
+        api_client, user, integration
+):
+    api_client.force_authenticate(user)
+    url = reverse("integrations-detail", kwargs={"pk": integration.id})
+    # Save the ids of related configurations and periodic tasks
+    config_ids = [c.id for c in integration.configurations]
+    task_ids = [c.periodic_task.id for c in integration.configurations if c.action.is_periodic_action]
+
+    response = api_client.delete(url)
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    # Check that the integration was deleted
+    with pytest.raises(Integration.DoesNotExist):
+        integration.refresh_from_db()
+    # Check that related configurations were deleted
+    for config_id in config_ids:
+        with pytest.raises(IntegrationConfiguration.DoesNotExist):
+            IntegrationConfiguration.objects.get(id=config_id)
+    # Check that related periodic tasks were deleted
+    for task_id in task_ids:
+        with pytest.raises(PeriodicTask.DoesNotExist):
+            PeriodicTask.objects.get(id=task_id)
+
+
+def test_delete_integration_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera
+):
+    _test_delete_integration(
+        api_client=api_client,
+        user=superuser,
+        integration=provider_lotek_panthera
+    )
+
+
+def test_delete_integration_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera
+):
+    _test_delete_integration(
+        api_client=api_client,
+        user=org_admin_user,
+        integration=provider_lotek_panthera
+    )
+
