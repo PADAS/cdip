@@ -20,7 +20,7 @@ class IsSuperuser(permissions.BasePermission):
     Superusers can see everything and edit or delete anything.
     """
     def has_permission(self, request, view):
-        return request.user.is_superuser
+        return request.user.is_superuser if request.user else False
 
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)
