@@ -174,7 +174,7 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
             return
         event_handler(event_dict=event_dict)
     except Exception as e:
-        logger.error(f"Error Processing Dispatcher Event: {e}", extra={"event": json.loads(message.data)})
+        logger.exception(f"Error Processing Dispatcher Event: {e}", extra={"event": json.loads(message.data)})
     else:
         logger.info(f"Dispatcher Event Processed successfully.")
     finally:
@@ -182,26 +182,31 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
 
 
 def main():
-    subscriber = pubsub_v1.SubscriberClient()
-    subscription_path = subscriber.subscription_path(
-        settings.GCP_PROJECT_ID,
-        settings.DISPATCHER_EVENTS_SUB_ID
-    )
-    streaming_pull_future = subscriber.subscribe(
-        subscription_path,
-        callback=process_event
-    )
-    logger.info(f"Dispatcher Events Consumer > Listening for messages on {subscription_path}..\n")
-
-    # Wrap subscriber in a 'with' block to automatically call close() when done.
-    with subscriber:
+    while True:  # Keep the consumer running. Reset the connection if it fails.
         try:
-            streaming_pull_future.result()
-        except Exception as e:
-            logger.error(f"Internal Error {e}. Shutting down..\n")
-            streaming_pull_future.cancel()  # Trigger the shutdown.
-            streaming_pull_future.result()  # Block until the shutdown is complete.
+            subscriber = pubsub_v1.SubscriberClient()
+            subscription_path = subscriber.subscription_path(
+                settings.GCP_PROJECT_ID,
+                settings.DISPATCHER_EVENTS_SUB_ID
+            )
+            streaming_pull_future = subscriber.subscribe(
+                subscription_path,
+                callback=process_event
+            )
+            logger.info(f"Dispatcher Events Consumer > Listening for messages on {subscription_path}..\n")
 
+            # Wrap subscriber in a 'with' block to automatically call close() when done.
+            with subscriber:
+                try:
+                    streaming_pull_future.result()
+                except Exception as e:
+                    logger.exception(f"Internal Error {e}. Shutting down..\n")
+                    streaming_pull_future.cancel()  # Trigger the shutdown.
+                    streaming_pull_future.result()  # Block until the shutdown is complete.
+                    raise e
+        except Exception as e:
+            logger.exception(f"Internal Error {e}. Restarting..")
+            continue
 
 if __name__ == '__main__':
     main()

@@ -338,7 +338,8 @@ TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 
 # Subscriptions to read system events from pub/sub topics
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
-DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-dev")
+DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-prod")
+INTEGRATION_EVENTS_SUB_ID = env.str("INTEGRATION_EVENTS_SUB_ID", "cdip-integration-events-sub-prod")
 GCP_ENVIRONMENT_ENABLED = env.bool("GCP_ENVIRONMENT_ENABLED", default=True)
 DISPATCHER_DEFAULTS_SECRET = env.str("DISPATCHER_DEFAULTS_SECRET", "er-dispatcher-defaults-prod")
 DISPATCHER_DEFAULTS_SECRET_SMART = env.str("DISPATCHER_DEFAULTS_SECRET_SMART", "sm-dispatcher-defaults-prod")
