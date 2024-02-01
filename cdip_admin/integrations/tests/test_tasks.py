@@ -17,13 +17,15 @@ from ..utils import build_mb_tag_id
 @pytest.mark.django_db
 def test_movebank_permissions_set_is_updated_on_device_addition_v1(
         mocker,
-        django_capture_on_commit_callbacks,
         setup_movebank_test_devices_sources
 ):
     mocked_csv_task = mocker.MagicMock()
     mocker.patch(
         "integrations.models.v1.models.recreate_and_send_movebank_permissions_csv_file", mocked_csv_task
     )
+    # Patch on_commit to execute the function immediately
+    mocker.patch('integrations.models.v1.models.transaction.on_commit', lambda fn: fn())
+
 
     # Get test configs / devices
     ii = setup_movebank_test_devices_sources["v1"].get("inbound")
@@ -45,23 +47,23 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v1(
     oi.save()
     oi.refresh_from_db()
 
+    # Add Movebank destination in the default group
+    ii.default_devicegroup.destinations.add(oi)
+
     # Only 1 permissions dict registered
     assert len(oi.additional["permissions"].get("permissions", [])) == 1
 
     # Add new device to device_group
-    d = Device.objects.create(external_id="device-123", inbound_configuration=ii)
-    dg.devices.add(d)
-
-    with django_capture_on_commit_callbacks(execute=True) as callbacks:
-        update_mb_permissions_for_group(dg.pk, "v1")
+    new_device = Device.objects.create(external_id="device-123", inbound_configuration=ii)
 
     # Refresh again for getting new devices
     oi.refresh_from_db()
 
     # Now we have 2
+    assert new_device
     assert len(oi.additional["permissions"].get("permissions", [])) == 2
     # The new permission set is related to newly added device
-    assert oi.additional["permissions"].get("permissions", [])[1].get("tag_id") == build_mb_tag_id(d, "v1")
+    assert oi.additional["permissions"].get("permissions", [])[1].get("tag_id") == build_mb_tag_id(new_device, "v1")
 
     # Check that the task to send data to Movebank was called (after device adding)
     assert mocked_csv_task.delay.called
@@ -70,13 +72,14 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v1(
 @pytest.mark.django_db
 def test_movebank_permissions_set_is_updated_on_device_addition_v2(
         mocker,
-        django_capture_on_commit_callbacks,
         setup_movebank_test_devices_sources
 ):
     mocked_csv_task = mocker.MagicMock()
     mocker.patch(
         "integrations.models.v2.models.recreate_and_send_movebank_permissions_csv_file", mocked_csv_task
     )
+    # Patch on_commit to execute the function immediately
+    mocker.patch('integrations.models.v1.models.transaction.on_commit', lambda fn: fn())
 
     # Get test configs / devices
     integration_config = setup_movebank_test_devices_sources["v2"].get("config")
@@ -102,9 +105,6 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v2(
         external_id=f"device-456",
         integration=d2.integration
     )
-
-    with django_capture_on_commit_callbacks(execute=True) as callbacks:
-        update_mb_permissions_for_group(source.pk, "v2")
 
     # Refresh again for getting new devices
     integration_config.refresh_from_db()
