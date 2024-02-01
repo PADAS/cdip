@@ -435,6 +435,15 @@ class Device(TimestampedModel):
     def _post_save(self, *args, **kwargs):
         # Ensure the device is added to the default group after creation
         self.default_group.devices.add(self)
+        # Check if the device is connected to Movebank destination
+        if any([d.is_mb_site for d in self.default_group.destinations.all()]):
+            # Update Movebank permissions to include this device
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance_pk=self.default_group.pk,
+                    gundi_version="v1"
+                )
+            )
 
     def save(self, *args, **kwargs):
         self._pre_save(self, *args, **kwargs)
