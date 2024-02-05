@@ -20,7 +20,7 @@ def handle_integration_action_started_event(event_dict: dict):
     action_id = event_data.action_id
     integration_id = event_data.integration_id
     integration = Integration.objects.get(id=integration_id)
-    message = f"Action '{action_id}' started for integration {integration_id}."
+    message = f"Action '{action_id}' started for integration {integration.name}."
     logger.info(
         message,
         extra={"event": event_dict}
@@ -43,7 +43,7 @@ def handle_integration_action_complete_event(event_dict: dict):
     action_id = event_data.action_id
     integration_id = event_data.integration_id
     integration = Integration.objects.get(id=integration_id)
-    message = f"Action '{action_id}' completed for integration {integration_id}."
+    message = f"Action '{action_id}' completed."
     logger.info(
         message,
         extra={"event": event_dict}
@@ -66,7 +66,8 @@ def handle_integration_action_failed_event(event_dict: dict):
     action_id = event_data.action_id
     integration_id = event_data.integration_id
     integration = Integration.objects.get(id=integration_id)
-    message = f"Error running action '{action_id}' for integration {integration_id}."
+    error = event_dict["payload"].get("error", "No details.")
+    message = f"Error running action '{action_id}': {error}"
     logger.info(
         message,
         extra={"event": event_dict}
@@ -88,7 +89,7 @@ def handle_integration_action_custom_log_event(event_dict: dict):
     custom_log = event.payload
     integration_id = custom_log.integration_id
     integration = Integration.objects.get(id=integration_id)
-    message = f"Integration Log: {custom_log.title}."
+    message = f"Custom Log: {custom_log.title}."
     logger.info(
         message,
         extra={"event": event_dict}
@@ -99,7 +100,7 @@ def handle_integration_action_custom_log_event(event_dict: dict):
         origin=ActivityLog.Origin.INTEGRATION,
         integration=integration,
         value="integration_custom_log",
-        title=message,
+        title=custom_log.title,
         details=event_dict["payload"],
         is_reversible=False
     )
