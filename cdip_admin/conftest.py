@@ -31,7 +31,10 @@ from integrations.models import (
     ListFilter,
     Source,
     SourceState,
-    SourceConfiguration, ensure_default_route, RouteConfiguration, GundiTrace
+    SourceConfiguration,
+    ensure_default_route,
+    RouteConfiguration,
+    GundiTrace,
 )
 from organizations.models import Organization
 from pathlib import Path
@@ -62,7 +65,7 @@ def superuser():
         email=email,
         first_name="John",
         last_name="Doe",
-        is_superuser=True
+        is_superuser=True,
     )
     return user
 
@@ -71,10 +74,7 @@ def superuser():
 def org_admin_user(organization, org_members_group):
     email = "orgadmin@gundiservice.org"
     user, _ = User.objects.get_or_create(
-        username=email,
-        email=email,
-        first_name="Caroline",
-        last_name="West"
+        username=email, email=email, first_name="Caroline", last_name="West"
     )
     user.groups.add(org_members_group.id)
     account_profile, _ = AccountProfile.objects.get_or_create(
@@ -83,7 +83,7 @@ def org_admin_user(organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=organization.id,
-        role=RoleChoices.ADMIN.value
+        role=RoleChoices.ADMIN.value,
     )
     return user
 
@@ -92,10 +92,7 @@ def org_admin_user(organization, org_members_group):
 def org_admin_user_2(other_organization, org_members_group):
     email = "orgadmin2@gundiservice.org"
     user, _ = User.objects.get_or_create(
-        username=email,
-        email=email,
-        first_name="Jack",
-        last_name="Pearson"
+        username=email, email=email, first_name="Jack", last_name="Pearson"
     )
     user.groups.add(org_members_group.id)
     account_profile, _ = AccountProfile.objects.get_or_create(
@@ -104,7 +101,7 @@ def org_admin_user_2(other_organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=other_organization.id,
-        role=RoleChoices.ADMIN.value
+        role=RoleChoices.ADMIN.value,
     )
     return user
 
@@ -113,10 +110,7 @@ def org_admin_user_2(other_organization, org_members_group):
 def org_viewer_user(organization, org_members_group):
     email = "orgviewer@gundiservice.org"
     user, _ = User.objects.get_or_create(
-        username=email,
-        email=email,
-        first_name="Colin",
-        last_name="Gray"
+        username=email, email=email, first_name="Colin", last_name="Gray"
     )
     user.groups.add(org_members_group.id)
     account_profile, _ = AccountProfile.objects.get_or_create(
@@ -125,7 +119,7 @@ def org_viewer_user(organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=organization.id,
-        role=RoleChoices.VIEWER.value
+        role=RoleChoices.VIEWER.value,
     )
     return user
 
@@ -134,10 +128,7 @@ def org_viewer_user(organization, org_members_group):
 def org_viewer_user_2(other_organization, org_members_group):
     email = "orgaviewer2@gundiservice.org"
     user, _ = User.objects.get_or_create(
-        username=email,
-        email=email,
-        first_name="Phill",
-        last_name="Wane"
+        username=email, email=email, first_name="Phill", last_name="Wane"
     )
     user.groups.add(org_members_group.id)
     account_profile, _ = AccountProfile.objects.get_or_create(
@@ -146,7 +137,7 @@ def org_viewer_user_2(other_organization, org_members_group):
     AccountProfileOrganization.objects.get_or_create(
         accountprofile_id=account_profile.id,
         organization_id=other_organization.id,
-        role=RoleChoices.VIEWER.value
+        role=RoleChoices.VIEWER.value,
     )
     return user
 
@@ -155,10 +146,7 @@ def org_viewer_user_2(other_organization, org_members_group):
 def new_random_user(new_user_email, org_members_group):
     def _make_random_user():
         email = new_user_email()
-        user = User.objects.create(
-            username=email,
-            email=email
-        )
+        user = User.objects.create(username=email, email=email)
         user.groups.add(org_members_group.id)
         AccountProfile.objects.create(
             user_id=user.id,
@@ -188,7 +176,7 @@ def new_user_email(get_random_id):
 def organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
         name=f"Test Organization Lewa {get_random_id()}",
-        description="A reserve in Africa"
+        description="A reserve in Africa",
     )
     return org
 
@@ -197,7 +185,7 @@ def organization(get_random_id):
 def other_organization(get_random_id):
     org, _ = Organization.objects.get_or_create(
         name=f"Test Organization EWT {get_random_id()}",
-        description="A different reserve in Africa"
+        description="A different reserve in Africa",
     )
     return org
 
@@ -210,7 +198,7 @@ def members_apo_list(organization, new_random_user):
         apo = AccountProfileOrganization.objects.create(
             accountprofile_id=user.accountprofile.id,
             organization_id=organization.id,
-            role=RoleChoices.VIEWER.value
+            role=RoleChoices.VIEWER.value,
         )
         members_apo_list.append(apo)
     return members_apo_list
@@ -222,7 +210,7 @@ def organizations_list(get_random_id, organization):
     for i in range(10):
         org, _ = Organization.objects.get_or_create(
             name=f"Test Organization {get_random_id()}",
-            description="A reserve in Africa"
+            description="A reserve in Africa",
         )
         orgs.append(org)
     return orgs
@@ -230,9 +218,7 @@ def organizations_list(get_random_id, organization):
 
 @pytest.fixture
 def org_members_group():
-    group, _ = Group.objects.get_or_create(
-        name=DjangoGroups.ORGANIZATION_MEMBER.value
-    )
+    group, _ = Group.objects.get_or_create(name=DjangoGroups.ORGANIZATION_MEMBER.value)
     return group
 
 
@@ -265,7 +251,7 @@ def integration_type_lotek():
     return IntegrationType.objects.create(
         name="Lotek",
         value="lotek",
-        description="Standard inbound integration type for pulling data from Lotek API."
+        description="Standard inbound integration type for pulling data from Lotek API.",
     )
 
 
@@ -279,19 +265,12 @@ def lotek_action_auth(integration_type_lotek):
         description="Use credentials to authenticate against Lotek API",
         schema={
             "type": "object",
-            "required": [
-                "username",
-                "password"
-            ],
+            "required": ["username", "password"],
             "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        }
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
     )
 
 
@@ -306,15 +285,9 @@ def lotek_action_pull_positions(integration_type_lotek):
         description="Pull Tracking data from Lotek API",
         schema={
             "type": "object",
-            "required": [
-                "start_time"
-            ],
-            "properties": {
-                "start_time": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["start_time"],
+            "properties": {"start_time": {"type": "string"}},
+        },
     )
 
 
@@ -328,17 +301,10 @@ def lotek_action_list_devices(integration_type_lotek):
         description="Pull devices list from Lotek API",
         schema={
             "type": "object",
-            "required": [
-                "group_id"
-            ],
-            "properties": {
-                "group_id": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["group_id"],
+            "properties": {"group_id": {"type": "string"}},
+        },
     )
-
 
 
 @pytest.fixture
@@ -346,7 +312,7 @@ def integration_type_movebank():
     return IntegrationType.objects.create(
         name="Move Bank",
         value="movebank",
-        description="Standard Integration type for Move Bank API."
+        description="Standard Integration type for Move Bank API.",
     )
 
 
@@ -360,19 +326,9 @@ def mb_action_auth(integration_type_movebank):
         description="Use credentials to authenticate against Move Bank API",
         schema={
             "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["email", "password"],
+            "properties": {"password": {"type": "string"}, "email": {"type": "string"}},
+        },
     )
 
 
@@ -386,15 +342,9 @@ def mb_action_pull_positions(integration_type_movebank):
         description="Pull Tracking data from Move Bank API",
         schema={
             "type": "object",
-            "required": [
-                "max_records_per_individual"
-            ],
-            "properties": {
-                "max_records_per_individual": {
-                    "type": "integer"
-                }
-            }
-        }
+            "required": ["max_records_per_individual"],
+            "properties": {"max_records_per_individual": {"type": "integer"}},
+        },
     )
 
 
@@ -414,7 +364,7 @@ def integration_type_er():
     integration_type = IntegrationType.objects.create(
         name="EarthRanger",
         value="earth_ranger",
-        description="Standard type for distributing data to EarthRanger sites."
+        description="Standard type for distributing data to EarthRanger sites.",
     )
     return integration_type
 
@@ -429,19 +379,12 @@ def er_action_auth(integration_type_er):
         description="Use credentials to authenticate against Earth Ranger API",
         schema={
             "type": "object",
-            "required": [
-                "username",
-                "password"
-            ],
+            "required": ["username", "password"],
             "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        }
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
     )
 
 
@@ -455,15 +398,9 @@ def er_action_push_positions(integration_type_er):
         description="Push Tracking data to Earth Ranger API",
         schema={
             "type": "object",
-            "required": [
-                "sensor_type"
-            ],
-            "properties": {
-                "sensor_type": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["sensor_type"],
+            "properties": {"sensor_type": {"type": "string"}},
+        },
     )
 
 
@@ -474,7 +411,7 @@ def er_action_push_events(integration_type_er):
         type=IntegrationAction.ActionTypes.PUSH_DATA,
         name="Push Events",
         value="push_events",
-        description="Push Event data to Earth Ranger API"
+        description="Push Event data to Earth Ranger API",
     )
 
 
@@ -485,7 +422,7 @@ def er_action_pull_positions(integration_type_er):
         type=IntegrationAction.ActionTypes.PULL_DATA,
         name="Pull Positions",
         value="pull_positions",
-        description="Pull Tracking data from Earth Ranger API"
+        description="Pull Tracking data from Earth Ranger API",
     )
 
 
@@ -496,7 +433,7 @@ def er_action_pull_events(integration_type_er):
         type=IntegrationAction.ActionTypes.PULL_DATA,
         name="Pull Events",
         value="pull_events",
-        description="Pull Event data from Earth Ranger API"
+        description="Pull Event data from Earth Ranger API",
     )
 
 
@@ -505,7 +442,7 @@ def integration_type_smart():
     return IntegrationType.objects.create(
         name="SMART",
         value="smart",
-        description="Standard integration type for pushing data to SMART Cloud."
+        description="Standard integration type for pushing data to SMART Cloud.",
     )
 
 
@@ -516,7 +453,7 @@ def smart_action_push_events(integration_type_smart):
         type=IntegrationAction.ActionTypes.PUSH_DATA,
         name="Push Events",
         value="push_events",
-        description="Push Event data to SMART Cloud API"
+        description="Push Event data to SMART Cloud API",
     )
 
 
@@ -530,22 +467,20 @@ def smart_action_auth(integration_type_smart):
         description="API Key to authenticate against SMART API",
         schema={
             "type": "object",
-            "required": [
-                "api_key"
-            ],
-            "properties": {
-                "api_key": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["api_key"],
+            "properties": {"api_key": {"type": "string"}},
+        },
     )
 
 
 @pytest.fixture
 def smart_integration(
-        organization, other_organization, integration_type_smart, get_random_id,
-        smart_action_auth, smart_action_push_events
+    organization,
+    other_organization,
+    integration_type_smart,
+    get_random_id,
+    smart_action_auth,
+    smart_action_push_events,
 ):
     # Create the integration
     site_url = f"{get_random_id()}.smart.wps.org"
@@ -553,7 +488,7 @@ def smart_integration(
         type=integration_type_smart,
         name=f"SMART Site {get_random_id()}",
         owner=other_organization,
-        base_url=site_url
+        base_url=site_url,
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
@@ -561,7 +496,7 @@ def smart_integration(
         action=smart_action_auth,
         data={
             "api_key": f"SMART-{get_random_id()}-KEY",
-        }
+        },
     )
     ensure_default_route(integration=integration)
     return integration
@@ -569,13 +504,17 @@ def smart_integration(
 
 @pytest.fixture
 def provider_lotek_panthera(
-        get_random_id, organization, integration_type_lotek, lotek_action_auth, lotek_action_pull_positions
+    get_random_id,
+    organization,
+    integration_type_lotek,
+    lotek_action_auth,
+    lotek_action_pull_positions,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_lotek,
         name=f"Lotek Provider For Panthera {get_random_id()}",
         owner=organization,
-        base_url=f"api.test.lotek.com"
+        base_url=f"api.test.lotek.com",
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
@@ -583,15 +522,13 @@ def provider_lotek_panthera(
         action=lotek_action_auth,
         data={
             "username": f"user-{get_random_id()}@lotek.com",
-            "password": f"passwd-{get_random_id()}"
-        }
+            "password": f"passwd-{get_random_id()}",
+        },
     )
     IntegrationConfiguration.objects.create(
         integration=provider,
         action=lotek_action_pull_positions,
-        data={
-            "start_time": "2023-01-01T00:00:00Z"
-        }
+        data={"start_time": "2023-01-01T00:00:00Z"},
     )
     ensure_default_route(integration=provider)
     return provider
@@ -599,13 +536,17 @@ def provider_lotek_panthera(
 
 @pytest.fixture
 def provider_movebank_ewt(
-        get_random_id, other_organization, integration_type_movebank, mb_action_auth, mb_action_pull_positions
+    get_random_id,
+    other_organization,
+    integration_type_movebank,
+    mb_action_auth,
+    mb_action_pull_positions,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_movebank,
         name=f"Movebank Provider For EWT {get_random_id()}",
         owner=other_organization,
-        base_url=f"https://api.test.movebank.com"
+        base_url=f"https://api.test.movebank.com",
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
@@ -613,15 +554,13 @@ def provider_movebank_ewt(
         action=mb_action_auth,
         data={
             "email": f"user-{get_random_id()}@movebank.com",
-            "password": f"passwd-{get_random_id()}"
-        }
+            "password": f"passwd-{get_random_id()}",
+        },
     )
     IntegrationConfiguration.objects.create(
         integration=provider,
         action=mb_action_pull_positions,
-        data={
-            "max_records_per_individual": 20000
-        }
+        data={"max_records_per_individual": 20000},
     )
     ensure_default_route(integration=provider)
     return provider
@@ -637,43 +576,45 @@ def mb_action_push_observations(integration_type_movebank):
         description="Push Tracking data to Movebank API",
         schema={
             "type": "object",
-            "required": [
-                "feed"
-            ],
-            "properties": {
-                "feed": {
-                    "type": "string"
-                }
-            }
-        }
+            "required": ["feed"],
+            "properties": {"feed": {"type": "string"}},
+        },
     )
 
 
 @pytest.fixture
 def destination_movebank(
-        get_random_id, other_organization, integration_type_movebank, mb_action_push_observations
+    get_random_id,
+    other_organization,
+    integration_type_movebank,
+    mb_action_push_observations,
 ):
     destination, _ = Integration.objects.get_or_create(
         type=integration_type_movebank,
         name=f"Movebank Site {get_random_id()}",
         owner=other_organization,
-        base_url=f"https://api.test.movebank.com"
+        base_url=f"https://api.test.movebank.com",
     )
     # Configure actions
     IntegrationConfiguration.objects.create(
         integration=destination,
         action=mb_action_push_observations,
-        data={
-            "feed": "gundi/earthranger"
-        }
+        data={"feed": "gundi/earthranger"},
     )
     return destination
 
 
 @pytest.fixture
 def integrations_list(
-        organization, other_organization, integration_type_er, get_random_id,
-        er_action_auth, er_action_pull_positions, er_action_pull_events, er_action_push_positions, er_action_push_events
+    organization,
+    other_organization,
+    integration_type_er,
+    get_random_id,
+    er_action_auth,
+    er_action_pull_positions,
+    er_action_pull_events,
+    er_action_push_positions,
+    er_action_push_events,
 ):
     integrations = []
     for i in range(10):
@@ -683,7 +624,7 @@ def integrations_list(
             type=integration_type_er,
             name=f"ER Site {get_random_id()}",
             owner=organization if i < 5 else other_organization,
-            base_url=site_url
+            base_url=site_url,
         )
         # Configure actions
         IntegrationConfiguration.objects.create(
@@ -691,27 +632,22 @@ def integrations_list(
             action=er_action_auth,
             data={
                 "username": f"eruser-{get_random_id()}",
-                "password": f"passwd-{get_random_id()}"
-            }
+                "password": f"passwd-{get_random_id()}",
+            },
         )
         IntegrationConfiguration.objects.create(
             integration=integration,
             action=er_action_push_positions,
-            data={
-                "sensor_type": "collar"
-            }
+            data={"sensor_type": "collar"},
         )
         IntegrationConfiguration.objects.create(
-            integration=integration,
-            action=er_action_pull_positions
+            integration=integration, action=er_action_pull_positions
         )
         IntegrationConfiguration.objects.create(
-            integration=integration,
-            action=er_action_push_events
+            integration=integration, action=er_action_push_events
         )
         IntegrationConfiguration.objects.create(
-            integration=integration,
-            action=er_action_pull_events
+            integration=integration, action=er_action_pull_events
         )
         integrations.append(integration)
         ensure_default_route(integration=integration)
@@ -723,15 +659,11 @@ def make_random_sources(get_random_id):
     def _make_devices(provider, qty):
         sources = []
         configuration = SourceConfiguration.objects.create(
-            name="Report every 10 minutes",
-            data={
-                "report_every": "10min"
-            }
+            name="Report every 10 minutes", data={"report_every": "10min"}
         )
         for i in range(qty):
             source, _ = Source.objects.get_or_create(
-                external_id=f"device-{get_random_id()}",
-                integration=provider
+                external_id=f"device-{get_random_id()}", integration=provider
             )
             # Add a device state and a device configuration in some of them
             if i % 2:
@@ -739,10 +671,7 @@ def make_random_sources(get_random_id):
                 source.save()
             else:
                 SourceState.objects.create(
-                    source=source,
-                    data={
-                        "last_data_received": "2023-05-17T09:52:13"
-                    }
+                    source=source, data={"last_data_received": "2023-05-17T09:52:13"}
                 )
             sources.append(source)
         return sources
@@ -751,17 +680,27 @@ def make_random_sources(get_random_id):
 
 
 @pytest.fixture
-def lotek_sources(get_random_id, organization, provider_lotek_panthera, make_random_sources):
+def lotek_sources(
+    get_random_id, organization, provider_lotek_panthera, make_random_sources
+):
     return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
-def movebank_sources(get_random_id, organization, provider_movebank_ewt, make_random_sources):
+def movebank_sources(
+    get_random_id, organization, provider_movebank_ewt, make_random_sources
+):
     return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
-def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera, integrations_list):
+def route_1(
+    get_random_id,
+    organization,
+    lotek_sources,
+    provider_lotek_panthera,
+    integrations_list,
+):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
@@ -774,10 +713,8 @@ def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera,
         name="Panthera Male Pumas",
         description="Select collars on male pumas in panthera reserve",
         order_number=1,
-        selector=ListFilter(
-            ids=[d.external_id for d in lotek_sources]
-        ).dict(),
-        routing_rule=rule
+        selector=ListFilter(ids=[d.external_id for d in lotek_sources]).dict(),
+        routing_rule=rule,
     )
     return rule
 
@@ -785,10 +722,7 @@ def route_1(get_random_id, organization, lotek_sources, provider_lotek_panthera,
 @pytest.fixture
 def er_route_configuration_elephants():
     route_config = RouteConfiguration.objects.create(
-        name="Set Elephant Subject Type",
-        data={
-            "subject_type": "elephant"
-        }
+        name="Set Elephant Subject Type", data={"subject_type": "elephant"}
     )
     return route_config
 
@@ -796,10 +730,7 @@ def er_route_configuration_elephants():
 @pytest.fixture
 def er_route_configuration_rangers():
     route_config = RouteConfiguration.objects.create(
-        name="Set Ranger Subject Type",
-        data={
-            "subject_type": "ranger"
-        }
+        name="Set Ranger Subject Type", data={"subject_type": "ranger"}
     )
     return route_config
 
@@ -809,23 +740,22 @@ def smart_route_configuration():
     route_config = RouteConfiguration.objects.create(
         name="Set Ranger Subject Type",
         data={
-            "ca_uuids": [
-                "8f7fbe1b-121a-4ef4-bda8-14f5581e44cf"
-            ],
-            "transformation_rules": {
-                "attribute_map": [],
-                "category_map": []
-            },
-            "version": "7.5.6"
-        }
+            "ca_uuids": ["8f7fbe1b-121a-4ef4-bda8-14f5581e44cf"],
+            "transformation_rules": {"attribute_map": [], "category_map": []},
+            "version": "7.5.6",
+        },
     )
     return route_config
 
 
 @pytest.fixture
 def route_2(
-        get_random_id, other_organization, movebank_sources, provider_movebank_ewt,
-        integrations_list, er_route_configuration_elephants
+    get_random_id,
+    other_organization,
+    movebank_sources,
+    provider_movebank_ewt,
+    integrations_list,
+    er_route_configuration_elephants,
 ):
     route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
@@ -839,10 +769,8 @@ def route_2(
         name="EWT Baby Elephants",
         description="Select collars on baby elephants in EWT reserve",
         order_number=1,
-        selector=ListFilter(
-            ids=[d.external_id for d in movebank_sources]
-        ).dict(),
-        routing_rule=route
+        selector=ListFilter(ids=[d.external_id for d in movebank_sources]).dict(),
+        routing_rule=route,
     )
     # Add a custom configuration
     route.configuration = er_route_configuration_elephants
@@ -856,20 +784,22 @@ def integration_type_trap_tagger():
     integration_type = IntegrationType.objects.create(
         name="TrapTagger(Push)",
         value="trap_tagger",
-        description="Standard type Trap Tagger Integration"
+        description="Standard type Trap Tagger Integration",
     )
     return integration_type
 
 
 @pytest.fixture
 def provider_trap_tagger(
-        get_random_id, other_organization, integration_type_trap_tagger,
+    get_random_id,
+    other_organization,
+    integration_type_trap_tagger,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_trap_tagger,
         name=f"Trap Tagger Provider {get_random_id()}",
         owner=other_organization,
-        base_url=f"https://api.test.traptagger.com"
+        base_url=f"https://api.test.traptagger.com",
     )
     ensure_default_route(integration=provider)
     return provider
@@ -877,9 +807,7 @@ def provider_trap_tagger(
 
 @pytest.fixture
 def keyauth_headers_trap_tagger(provider_trap_tagger):
-    return {
-        "HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_trap_tagger.id)}"
-    }
+    return {"HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_trap_tagger.id)}"}
 
 
 @pytest.fixture
@@ -887,7 +815,6 @@ def keyauth_headers_lotek(provider_lotek_panthera):
     return {
         "HTTP_X_CONSUMER_USERNAME": f"integration:{str(provider_lotek_panthera.id)}"
     }
-
 
 
 @pytest.fixture
@@ -904,16 +831,20 @@ def mock_deduplication(mocker):
 
 @pytest.fixture
 def leopard_image_file():
-    file_path = Path(__file__).resolve().parent.joinpath(
-        "api/v2/tests/images/2023-07-05-1358_leopard.jpg"
+    file_path = (
+        Path(__file__)
+        .resolve()
+        .parent.joinpath("api/v2/tests/images/2023-07-05-1358_leopard.jpg")
     )
     return open(file_path, "rb")
 
 
 @pytest.fixture
 def wilddog_image_file():
-    file_path = Path(__file__).resolve().parent.joinpath(
-        "api/v2/tests/images/2023-07-05-1358_wilddog.jpg"
+    file_path = (
+        Path(__file__)
+        .resolve()
+        .parent.joinpath("api/v2/tests/images/2023-07-05-1358_wilddog.jpg")
     )
     return open(file_path, "rb")
 
@@ -951,7 +882,7 @@ def event_delivered_trace(provider_trap_tagger, integrations_list):
         object_type="ev",
         destination=integrations_list[0],
         delivered_at="2023-07-10T19:35:34.425974Z",
-        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
     trace.save()
     return trace
@@ -966,14 +897,16 @@ def event_delivered_trace2(provider_trap_tagger, integrations_list):
         object_type="ev",
         destination=integrations_list[1],
         delivered_at="2023-07-10T19:36:15.425974Z",
-        external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f"
+        external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f",
     )
     trace.save()
     return trace
 
 
 @pytest.fixture
-def attachment_delivered_trace(provider_trap_tagger, event_delivered_trace, integrations_list):
+def attachment_delivered_trace(
+    provider_trap_tagger, event_delivered_trace, integrations_list
+):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
@@ -981,7 +914,7 @@ def attachment_delivered_trace(provider_trap_tagger, event_delivered_trace, inte
         object_type="ev",
         destination=integrations_list[0],
         delivered_at="2023-07-10T19:37:48.425974Z",
-        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2"
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
     trace.save()
     return trace
@@ -995,10 +928,13 @@ def mock_cloud_storage(mocker):
 
 
 @pytest.fixture
-def trap_tagger_observation_delivered_event(mocker, trap_tagger_event_trace, integrations_list):
+def trap_tagger_observation_delivered_event(
+    mocker, trap_tagger_event_trace, integrations_list
+):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDelivered",
         "payload": {
@@ -1006,43 +942,49 @@ def trap_tagger_observation_delivered_event(mocker, trap_tagger_event_trace, int
             "related_to": None,
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id":  str(integrations_list[0].id),
-            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
-        }
+            "destination_id": str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
     }
-    data_bytes = json.dumps(event_dict).encode('utf-8')
+    data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
 
 
 @pytest.fixture
 def trap_tagger_to_movebank_observation_delivered_event(
-        mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
+    mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
 ):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDelivered",
         "payload": {
             "gundi_id": str(trap_tagger_to_movebank_observation_trace.object_id),
             "related_to": None,
             "external_id": None,
-            "data_provider_id": str(trap_tagger_to_movebank_observation_trace.data_provider.id),
-            "destination_id":  str(destination_movebank.id),
-            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
-        }
+            "data_provider_id": str(
+                trap_tagger_to_movebank_observation_trace.data_provider.id
+            ),
+            "destination_id": str(destination_movebank.id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
     }
-    data_bytes = json.dumps(event_dict).encode('utf-8')
+    data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
 
 
 @pytest.fixture
-def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace, integrations_list):
+def trap_tagger_observation_delivered_event_two(
+    mocker, trap_tagger_event_trace, integrations_list
+):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "615535df-1b9b-412b-9fd5-e29b09582977", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "615535df-1b9b-412b-9fd5-e29b09582977",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDelivered",
         "payload": {
@@ -1050,51 +992,57 @@ def trap_tagger_observation_delivered_event_two(mocker, trap_tagger_event_trace,
             "related_to": None,
             "external_id": "46983ced-1216-4d43-81da-01ee90ba9b81",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id":  str(integrations_list[1].id),
-            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
-        }
+            "destination_id": str(integrations_list[1].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
     }
-    data_bytes = json.dumps(event_dict).encode('utf-8')
+    data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
 
 
 @pytest.fixture
-def trap_tagger_observation_delivery_failed_event(mocker, trap_tagger_event_trace, integrations_list):
+def trap_tagger_observation_delivery_failed_event(
+    mocker, trap_tagger_event_trace, integrations_list
+):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDeliveryFailed",
         "payload": {
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id":  str(integrations_list[0].id),
-            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
-        }
+            "destination_id": str(integrations_list[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
     }
-    data_bytes = json.dumps(event_dict).encode('utf-8')
+    data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
 
 
 @pytest.fixture
-def trap_tagger_observation_delivery_failed_event_two(mocker, trap_tagger_event_trace, integrations_list):
+def trap_tagger_observation_delivery_failed_event_two(
+    mocker, trap_tagger_event_trace, integrations_list
+):
     message = mocker.MagicMock()
     event_dict = {
-        "event_id": "705535df-1b9b-412b-9fd5-e29b09582988", "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "event_id": "705535df-1b9b-412b-9fd5-e29b09582988",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
         "schema_version": "v1",
         "event_type": "ObservationDeliveryFailed",
         "payload": {
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id":  str(integrations_list[1].id),
-            "delivered_at": "2023-07-11 18:19:19.215015+00:00"
-        }
+            "destination_id": str(integrations_list[1].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
     }
-    data_bytes = json.dumps(event_dict).encode('utf-8')
+    data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
 
@@ -1224,14 +1172,7 @@ def setup_data(db, django_user_model):
         name="Inbound Type 3",
         slug="inbound-type-three",
         description="Some integration type.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "test": {
-                    "type": "string"
-                }
-            }
-        }
+        configuration_schema={"type": "object", "keys": {"test": {"type": "string"}}},
     )
 
     iit4 = InboundIntegrationType.objects.create(
@@ -1241,19 +1182,11 @@ def setup_data(db, django_user_model):
         configuration_schema={
             "type": "object",
             "keys": {
-                "site_name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+                "site_name": {"type": "string"},
+                "email": {"type": "string", "format": "email"},
+                "password": {"type": "string", "format": "password"},
+            },
+        },
     )
 
     oit1 = OutboundIntegrationType.objects.create(
@@ -1272,14 +1205,7 @@ def setup_data(db, django_user_model):
         name="Outbound Type 3",
         slug="outbound-type-three",
         description="Some integration type.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "test": {
-                    "type": "string"
-                }
-            }
-        }
+        configuration_schema={"type": "object", "keys": {"test": {"type": "string"}}},
     )
 
     oit4 = OutboundIntegrationType.objects.create(
@@ -1289,24 +1215,16 @@ def setup_data(db, django_user_model):
         configuration_schema={
             "type": "object",
             "keys": {
-                "site_name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+                "site_name": {"type": "string"},
+                "email": {"type": "string", "format": "email"},
+                "password": {"type": "string", "format": "password"},
+            },
+        },
     )
 
     oit_smart_connect = OutboundIntegrationType.objects.create(
         name="Smart Connect",
-        slug='smart_connect',
+        slug="smart_connect",
     )
 
     bit1 = BridgeIntegrationType.objects.create(
@@ -1319,14 +1237,7 @@ def setup_data(db, django_user_model):
         name="Bridge Type 2",
         slug="bridge-type-two",
         description="Bridge integration type 2.",
-        configuration_schema={
-            "type": "object",
-            "keys": {
-                "test": {
-                    "type": "string"
-                }
-            }
-        }
+        configuration_schema={"type": "object", "keys": {"test": {"type": "string"}}},
     )
 
     bit3 = BridgeIntegrationType.objects.create(
@@ -1336,19 +1247,11 @@ def setup_data(db, django_user_model):
         configuration_schema={
             "type": "object",
             "keys": {
-                "site_name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "password": {
-                    "type": "string",
-                    "format": "password"
-                }
-            }
-        }
+                "site_name": {"type": "string"},
+                "email": {"type": "string", "format": "email"},
+                "password": {"type": "string", "format": "password"},
+            },
+        },
     )
 
     ii1 = InboundIntegrationConfiguration.objects.create(
@@ -1368,8 +1271,7 @@ def setup_data(db, django_user_model):
     )
 
     ii5 = InboundIntegrationConfiguration.objects.create(
-        type=iit3, name="Inbound Configuration 4", owner=org2, enabled=False,
-        state={}
+        type=iit3, name="Inbound Configuration 4", owner=org2, enabled=False, state={}
     )
 
     oi1 = OutboundIntegrationConfiguration.objects.create(
@@ -1389,8 +1291,7 @@ def setup_data(db, django_user_model):
     )
 
     oi5 = OutboundIntegrationConfiguration.objects.create(
-        type=oit4, name="Outbound Configuration 4", owner=org2, enabled=False,
-        state={}
+        type=oit4, name="Outbound Configuration 4", owner=org2, enabled=False, state={}
     )
 
     bi1 = BridgeIntegration.objects.create(
@@ -1410,8 +1311,11 @@ def setup_data(db, django_user_model):
     )
 
     bi5 = BridgeIntegration.objects.create(
-        type=bit3, name="Bridge Integration 5", owner=org2, enabled=False,
-        additional={"site_name": "foo"}
+        type=bit3,
+        name="Bridge Integration 5",
+        owner=org2,
+        enabled=False,
+        additional={"site_name": "foo"},
     )
 
     dg1 = DeviceGroup.objects.create(
@@ -1502,10 +1406,7 @@ def mock_movebank_response():
 
 
 @pytest.fixture
-def mock_movebank_client_class(
-        mocker,
-        mock_movebank_response
-):
+def mock_movebank_client_class(mocker, mock_movebank_response):
     mocked_movebank_client_class = mocker.MagicMock()
     movebank_client_mock = mocker.MagicMock()
     movebank_client_mock.post_permissions.return_value = async_return(
@@ -1513,9 +1414,7 @@ def mock_movebank_client_class(
     )
     movebank_client_mock.__aenter__.return_value = movebank_client_mock
     movebank_client_mock.__aexit__.return_value = mock_movebank_response
-    movebank_client_mock.close.return_value = async_return(
-        mock_movebank_response
-    )
+    movebank_client_mock.close.return_value = async_return(mock_movebank_response)
     mocked_movebank_client_class.return_value = movebank_client_mock
     return mocked_movebank_client_class
 
@@ -1542,11 +1441,11 @@ def setup_movebank_test_data(db):
 
 @pytest.fixture
 def setup_movebank_test_devices_sources(
-        destination_movebank,
-        legacy_integration_type_movebank,
-        provider_lotek_panthera,
-        mb_action_permissions,
-        lotek_sources
+    destination_movebank,
+    legacy_integration_type_movebank,
+    provider_lotek_panthera,
+    mb_action_permissions,
+    lotek_sources,
 ):
     # v1
     iit = InboundIntegrationType.objects.create(
@@ -1555,9 +1454,7 @@ def setup_movebank_test_devices_sources(
         description="Some integration type.",
     )
     ii = InboundIntegrationConfiguration.objects.create(
-        type=iit,
-        name="Inbound Configuration 1",
-        owner=Organization.objects.first()
+        type=iit, name="Inbound Configuration 1", owner=Organization.objects.first()
     )
     oi = OutboundIntegrationConfiguration.objects.create(
         type=legacy_integration_type_movebank,
@@ -1566,12 +1463,10 @@ def setup_movebank_test_devices_sources(
             "broker": "gcp_pubsub",
             "topic": "destination-v2-gundi-load-testing-legacy",
             "permissions": {
-                "default_movebank_usernames": [
-                    "victorg"
-                ],
-                "study": "gundi"
-            }
-        }
+                "default_movebank_usernames": ["victorg"],
+                "study": "gundi",
+            },
+        },
     )
 
     dg = DeviceGroup.objects.create(
@@ -1589,10 +1484,8 @@ def setup_movebank_test_devices_sources(
         action=mb_action_permissions,
         data={
             "study": "gundi",
-            "default_movebank_usernames": [
-                "victorg"
-            ],
-        }
+            "default_movebank_usernames": ["victorg"],
+        },
     )
     route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
@@ -1603,13 +1496,15 @@ def setup_movebank_test_devices_sources(
 
     return {
         "v1": {
+            "inbound": ii,
             "config": oi,
-            "device": d  # 1 device only for test
+            "device_group": dg,
+            "device": d,  # 1 device only for test
         },
         "v2": {
             "config": integration_config,
-            "device": lotek_sources[0]  # 1 device only for test
-        }
+            "device": lotek_sources[0],  # 1 device only for test
+        },
     }
 
 
@@ -1637,9 +1532,9 @@ def observation_delivery_succeeded_event(provider_lotek_panthera, destination_mo
             "external_id": None,
             "delivered_at": "2023-12-13 00:10:15.123456+00:00",
             "destination_id": str(destination_movebank.id),
-            "data_provider_id": str(provider_lotek_panthera.id)
+            "data_provider_id": str(provider_lotek_panthera.id),
         },
-        is_reversible=False
+        is_reversible=False,
     )
 
 
@@ -1659,9 +1554,9 @@ def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_l
             "external_id": None,
             "delivered_at": "2023-12-14 00:16:51.949252+00:00",
             "destination_id": str(destination.id),
-            "data_provider_id": str(provider_movebank_ewt.id)
+            "data_provider_id": str(provider_movebank_ewt.id),
         },
-        is_reversible=False
+        is_reversible=False,
     )
 
 
@@ -1680,9 +1575,9 @@ def observation_delivery_failed_event(provider_lotek_panthera, destination_moveb
             "external_id": None,
             "delivered_at": "2023-12-14 00:16:51.949252+00:00",
             "destination_id": str(destination_movebank.id),
-            "data_provider_id": str(provider_lotek_panthera.id)
+            "data_provider_id": str(provider_lotek_panthera.id),
         },
-        is_reversible=False
+        is_reversible=False,
     )
 
 
@@ -1702,7 +1597,88 @@ def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_li
             "external_id": None,
             "delivered_at": "2023-12-14 00:16:51.949252+00:00",
             "destination_id": str(destination.id),
-            "data_provider_id": str(provider_lotek_panthera.id)
+            "data_provider_id": str(provider_lotek_panthera.id),
         },
-        is_reversible=False
+        is_reversible=False,
     )
+
+
+@pytest.fixture
+def pull_observations_action_started_event(mocker, provider_lotek_panthera):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "cedd4805-7595-487a-9221-02286ed3048f",
+        "timestamp": "2024-02-05 14:46:28.065161+00:00",
+        "schema_version": "v1",
+        "payload": {
+            "integration_id": str(provider_lotek_panthera.id),
+            "action_id": "pull_observations",
+            "config_data": {"start_date": "2024-02-05"},
+        },
+        "event_type": "IntegrationActionStarted",
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def pull_observations_action_complete_event(mocker, provider_lotek_panthera):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "d71b99ad-d047-42b9-b5bc-49d2cfb1259a",
+        "timestamp": "2024-02-05 14:46:29.041589+00:00",
+        "schema_version": "v1",
+        "payload": {
+            "integration_id": str(provider_lotek_panthera.id),
+            "action_id": "pull_observations",
+            "config_data": {"start_date": "2024-02-05"},
+            "result": {"observations_extracted": 10},
+        },
+        "event_type": "IntegrationActionComplete",
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def pull_observations_action_failed_event(mocker, provider_lotek_panthera):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "3c8a0759-c34c-4ad3-960a-398a17a50d31",
+        "timestamp": "2024-02-05 15:11:02.139794+00:00",
+        "schema_version": "v1",
+        "payload": {
+            "integration_id": str(provider_lotek_panthera.id),
+            "action_id": "pull_observations",
+            "config_data": {"start_date": "2024-02-05"},
+            "error": "Error connecting to provider.",
+        },
+        "event_type": "IntegrationActionFailed",
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "649aa769-5c65-45ff-ae80-40f0f2fedeb3",
+        "timestamp": "2024-02-05 14:46:28.478350+00:00",
+        "schema_version": "v1",
+        "payload": {
+            "integration_id": str(provider_lotek_panthera.id),
+            "action_id": "pull_observations",
+            "config_data": {"start_date": "2024-02-05"},
+            "title": "Extracting observations with filter {'start_date': '2024-02-05'}",
+            "level": 20,
+            "data": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
+        },
+        "event_type": "IntegrationActionCustomLog",
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
