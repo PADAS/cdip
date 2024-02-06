@@ -6,7 +6,7 @@ from django.conf import settings
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
 from integrations.utils import does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
-from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
+from integrations.tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group
 from cdip_admin import celery
 from core.models import TimestampedModel
 from organizations.models import Organization
@@ -208,6 +208,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_mb_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "movebank"
 
+    @property
+    def is_smart_site(self):
+        return self.type.slug.lower().strip().replace("_", "") == "smartconnect"
+
     class Meta:
         ordering = ("owner", "name")
 
@@ -242,9 +246,11 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         with self.tracker:
             self._pre_save(self, *args, **kwargs)
             created = self._state.adding
+            execute_post_save = kwargs.pop("execute_post_save", True)
             super().save(*args, **kwargs)
             kwargs["created"] = created
-            self._post_save(self, *args, **kwargs)
+            if execute_post_save:
+                self._post_save(self, *args, **kwargs)
 
 
 # This is the information for a given configuration this will include a specific organizations account information
@@ -429,6 +435,15 @@ class Device(TimestampedModel):
     def _post_save(self, *args, **kwargs):
         # Ensure the device is added to the default group after creation
         self.default_group.devices.add(self)
+        # Check if the device is connected to Movebank destination
+        if any([d.is_mb_site for d in self.default_group.destinations.all()]):
+            # Update Movebank permissions to include this device
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance_pk=self.default_group.pk,
+                    gundi_version="v1"
+                )
+            )
 
     def save(self, *args, **kwargs):
         self._pre_save(self, *args, **kwargs)
@@ -494,6 +509,18 @@ class DeviceGroup(TimestampedModel):
 
     def __str__(self):
         return f"{self.name} - {self.owner.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Check if Movebank is within destinations
+        if any([a.is_mb_site for a in self.destinations.all()]):
+            # Handle devices for MB destinations
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance_pk=self.pk,
+                    gundi_version="v1"
+                )
+            )
 
 
 @receiver(post_save, sender=OutboundIntegrationConfiguration)

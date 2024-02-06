@@ -9,7 +9,7 @@ import os
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
-from integrations.utils import send_message_to_gcp_pubsub
+from integrations.utils import build_mb_tag_id, send_message_to_gcp_pubsub
 from activity_log.models import ActivityLog
 
 from movebank_client import MovebankClient, MBClientError, PermissionOperations
@@ -102,11 +102,14 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                     permissions.permissions = []
                 else:
                     # create and save preliminary permissions JSON into additional
+                    logger.info(' -- No "permissions" set in outbound "additional", creating... --')
+                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
                     permissions.permissions = create_and_save_permissions_json(
                         mb_config,
                         permissions.default_movebank_usernames,
                         "v1"
                     )
+                    continue
             v1_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -136,11 +139,14 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
                     permissions.permissions = []
                 else:
                     # create and save preliminary permissions JSON into additional
+                    logger.info(' -- No "permissions" set in config "data", creating... --')
+                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
                     permissions.permissions = create_and_save_permissions_json(
                         mb_config,
                         permissions.default_movebank_usernames,
                         "v2"
                     )
+                    continue
             v2_configs += len(permissions.permissions)
             for config in permissions.permissions:
                 configs.append(config)
@@ -171,6 +177,7 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
 def create_and_save_permissions_json(config, usernames, gundi_version):
     permissions_dict = []
     if gundi_version == "v1":
+        logger.info(f' -- Creating v1 permissions set for outbound ID {str(config.id)}... --')
         Device = apps.get_model("integrations", "Device")
         devices = Device.objects.filter(
             devicegroup__destinations__id=config.id
@@ -180,16 +187,20 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                 permissions_dict.append(
                     MBUserPermission.parse_obj(
                         {
-                            "tag_id": f"{device.inbound_configuration.type.slug}."
-                                      f"{device.external_id}."
-                                      f"{str(device.inbound_configuration.id)}",
+                            "tag_id": build_mb_tag_id(device, gundi_version),
                             "username": username
                         }
                     )
                 )
-        config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
-        config.save()
+
+        if not permissions_dict:
+            logger.info(f' -- No permissions created for outbound ID {str(config.id)}... --')
+        else:
+            config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
+            config.save(execute_post_save=False)
+            logger.info(f' -- Created {len(permissions_dict)} permissions for outbound ID {str(config.id)}... --')
     else:
+        logger.info(f' -- Creating v2 permissions set for config ID {str(config.id)}... --')
         Source = apps.get_model("integrations", "Source")
         sources = Source.objects.filter(
             integration__routing_rules_by_provider__destinations__id=config.integration.id
@@ -200,17 +211,119 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                 permissions_dict.append(
                     MBUserPermission.parse_obj(
                         {
-                            "tag_id": f"{source.integration.type.value}."
-                                      f"{source.external_id}."
-                                      f"{str(source.integration_id)}",
+                            "tag_id": build_mb_tag_id(source, gundi_version),
                             "username": username
                         }
                     )
                 )
-        config.data["permissions"] = [d.dict() for d in permissions_dict]
-        config.save()
+
+        if not permissions_dict:
+            logger.info(f' -- No permissions created for config ID {str(config.id)}... --')
+        else:
+            config.data["permissions"] = [d.dict() for d in permissions_dict]
+            config.save(execute_post_save=False)
+            logger.info(f' -- Created {len(permissions_dict)} permissions for config ID {str(config.id)}... --')
 
     return permissions_dict
+
+
+@shared_task
+def update_mb_permissions_for_group(instance_pk, gundi_version):
+    if gundi_version == "v1":
+        DeviceGroup = apps.get_model("integrations", "DeviceGroup")
+        device_group = DeviceGroup.objects.get(pk=instance_pk)
+
+        # Build tag_ids from fetched_devices
+        devices_tag_id = [build_mb_tag_id(device, gundi_version) for device in device_group.devices.all()]
+
+        # configs for the device_group
+        configs = device_group.destinations.filter(
+            type__slug=DestinationTypes.Movebank.value,
+            additional__has_key="permissions"
+        )
+
+        for mb_config in configs:
+            try:
+                permissions = MBPermissionsActionConfig.parse_obj(mb_config.additional["permissions"])
+            except pydantic.ValidationError:
+                logger.exception(
+                    'Error parsing MBPermissionsActionConfig model (v1)',
+                    extra={
+                        'outbound_integration_id': str(mb_config.id),
+                        'attention_needed': True
+                    }
+                )
+                continue
+            else:
+                if not permissions.permissions:  # if parsing went ok but no permissions
+                    permissions.permissions = []
+
+                if not permissions.default_movebank_usernames:  # if parsing went ok but no usernames
+                    permissions.default_movebank_usernames = []
+
+                for tag_id in devices_tag_id:
+                    if tag_id not in [perm.tag_id for perm in permissions.permissions]:
+                        # device not in permissions, adding...
+                        for username in permissions.default_movebank_usernames:
+                            permissions.permissions.append(
+                                MBUserPermission.parse_obj(
+                                    {
+                                        "tag_id": tag_id,
+                                        "username": username
+                                    }
+                                )
+                            )
+
+                        mb_config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions.permissions]
+                mb_config.save()
+    else:
+        Source = apps.get_model("integrations", "Source")
+        source = Source.objects.get(pk=instance_pk)
+        # Build tag_id from source
+        device_tag_id = build_mb_tag_id(source, gundi_version)
+
+        # configs with MB as destination
+        IntegrationConfiguration = apps.get_model("integrations", "IntegrationConfiguration")
+        configs = IntegrationConfiguration.objects.filter(
+            integration__in=source.integration.destinations.filter(
+                type__value=DestinationTypes.Movebank.value
+            ),
+            action__value=MovebankActions.PERMISSIONS.value
+        )
+
+        for mb_config in configs:
+            try:
+                permissions = MBPermissionsActionConfig.parse_obj(mb_config.data)
+            except pydantic.ValidationError:
+                logger.exception(
+                    'Error parsing MBPermissionsActionConfig model (v2)',
+                    extra={
+                        'integration_configuration_id': str(mb_config.id),
+                        'attention_needed': True
+                    }
+                )
+                continue
+            else:
+                if not permissions.permissions:  # if parsing went ok but no permissions
+                    permissions.permissions = []
+
+                if not permissions.default_movebank_usernames:  # if parsing went ok but no usernames
+                    permissions.default_movebank_usernames = []
+
+                if device_tag_id not in [perm.tag_id for perm in permissions.permissions]:
+                    # device not in permissions, adding...
+                    for username in permissions.default_movebank_usernames:
+                        permissions.permissions.append(
+                            MBUserPermission.parse_obj(
+                                {
+                                    "tag_id": device_tag_id,
+                                    "username": username
+                                }
+                            )
+                        )
+
+                    mb_config.data["permissions"] = [d.dict() for d in permissions.permissions]
+                    mb_config.save()
 
 
 @async_to_sync
