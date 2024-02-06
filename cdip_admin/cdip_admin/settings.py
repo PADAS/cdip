@@ -270,6 +270,7 @@ CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 CELERY_TASK_QUEUES = (
     Queue("default", Exchange("default"), routing_key="default"),
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
+    Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -278,6 +279,12 @@ CELERY_TASK_ROUTES = {
     },
     "deployments.tasks.delete_serverless_dispatcher": {
         "queue": "deployments", "routing_key": "deployments"
+    },
+    "integrations.tasks.recreate_and_send_movebank_permissions_csv_file": {
+        "queue": "mb_permissions", "routing_key": "mb_permissions"
+    },
+    "integrations.tasks.update_mb_permissions_for_group": {
+        "queue": "mb_permissions", "routing_key": "mb_permissions"
     },
 }
 
@@ -331,7 +338,9 @@ TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 
 # Subscriptions to read system events from pub/sub topics
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
-DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-dev")
+DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-prod")
+INTEGRATION_EVENTS_SUB_ID = env.str("INTEGRATION_EVENTS_SUB_ID", "cdip-integration-events-sub-prod")
 GCP_ENVIRONMENT_ENABLED = env.bool("GCP_ENVIRONMENT_ENABLED", default=True)
 DISPATCHER_DEFAULTS_SECRET = env.str("DISPATCHER_DEFAULTS_SECRET", "er-dispatcher-defaults-prod")
+DISPATCHER_DEFAULTS_SECRET_SMART = env.str("DISPATCHER_DEFAULTS_SECRET_SMART", "sm-dispatcher-defaults-prod")
 MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC", "movebank-dispatcher-topic-prod")

@@ -32,7 +32,8 @@ admin_portal:
     REDIS_HOST: "10.243.180.36"
     GS_BUCKET_NAME: "cdip-files-stage"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"
-    MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "movebank-events-stage"
+    MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
 kongplugin:
   cors:
     - https://stage.gundiservice.org

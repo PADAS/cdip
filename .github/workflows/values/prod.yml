@@ -32,7 +32,8 @@ admin_portal:
     REDIS_HOST: "10.208.106.172"
     GS_BUCKET_NAME: "cdip-files-prod"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-prod"
-    MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "movebank-events-prod"
+    MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-prod"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-prod"
 kongplugin:
   cors:
     - https://gundiservice.org

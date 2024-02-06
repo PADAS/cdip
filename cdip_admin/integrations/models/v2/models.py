@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
 from model_utils import FieldTracker
-from integrations.tasks import recreate_and_send_movebank_permissions_csv_file
+from integrations.tasks import update_mb_permissions_for_group, recreate_and_send_movebank_permissions_csv_file
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 from activity_log.mixins import ChangeLogMixin
@@ -122,9 +122,9 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub for ER and MoveBank Sites
+        # Use pubsub for ER, SMART and MoveBank Sites
         # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_mb_site):
+        if self._state.adding and (self.is_er_site or self.is_smart_site or self.is_mb_site):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             if "broker" not in self.additional:
@@ -133,11 +133,12 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER Sites only
-        if created and self.is_er_site and settings.GCP_ENVIRONMENT_ENABLED:
+        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
+            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self),
                 integration=self,
-                configuration=get_dispatcher_defaults_from_gcp_secrets()
+                configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
             )
 
     def save(self, *args, **kwargs):
@@ -173,6 +174,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def is_mb_site(self):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
+    @property
+    def is_smart_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "smartconnect"
+
     def create_missing_configurations(self):
         for action in self.type.actions.all():
             if not self.configurations.filter(action=action).exists():
@@ -199,6 +204,13 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
         default=dict,
         verbose_name="JSON Configuration"
     )
+    periodic_task = models.OneToOneField(
+        "django_celery_beat.PeriodicTask",
+        on_delete=models.SET_NULL,
+        related_name="configurations_by_periodic_task",
+        blank=True,
+        null=True
+    )
 
     tracker = FieldTracker()
 
@@ -218,16 +230,16 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()
             )
 
-        if self.action.is_periodic_action:
+        if self.action.is_periodic_action and not self.periodic_task:
             # Get or create interval and periodic task for this config
             schedule, created = IntervalSchedule.objects.get_or_create(
                 every=10,
                 period=IntervalSchedule.MINUTES,
             )
 
-            PeriodicTask.objects.get_or_create(
+            self.periodic_task = PeriodicTask.objects.create(
                 interval=schedule,
-                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}')",
+                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}', Configuration {self.pk})",
                 task="integrations.tasks.run_integration",
                 kwargs=json.dumps(
                     {
@@ -237,12 +249,15 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
                     }
                 ),
             )
+            self.save(update_fields=["periodic_task"], execute_post_save=False)
 
     def save(self, *args, **kwargs):
         with self.tracker:
+            execute_post_save = kwargs.pop("execute_post_save", True)
             self._pre_save(self, *args, **kwargs)
             super().save(*args, **kwargs)
-            self._post_save(self, *args, **kwargs)
+            if execute_post_save:
+                self._post_save(self, *args, **kwargs)
 
 
 class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
@@ -423,6 +438,18 @@ class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.external_id} - {self.integration.type.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Check if Movebank is within destinations
+        if any([a.is_mb_site for a in self.integration.destinations.all()]):
+            # Handle devices for MB destinations
+            transaction.on_commit(
+                lambda: update_mb_permissions_for_group.delay(
+                    instance_pk=self.pk,
+                    gundi_version="v2"
+                )
+            )
 
     class Meta:
         ordering = ("integration", "external_id")
