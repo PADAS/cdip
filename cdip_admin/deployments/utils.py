@@ -150,7 +150,8 @@ def get_default_dispatcher_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0][:8]
-    integration_type = integration.type.value.replace("_", "").lower().strip()[:5]
+    integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
+    integration_type = integration_type_id.replace("_", "").lower().strip()[:5]
     integration_id = str(integration.id)
     return "-".join([subdomain, integration_type, "dis", integration_id])[:49]
 
@@ -159,6 +160,7 @@ def get_default_topic_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     base_url = urlparse(str(integration_url).lower())
     subdomain = base_url.netloc.split(".")[0]
-    integration_type = integration.type.value.replace("_", "").lower().strip()[:8]
+    integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
+    integration_type = integration_type_id.replace("_", "").lower().strip()[:8]
     unique_suffix = generate_short_id_milliseconds()
     return "-".join([subdomain, integration_type, unique_suffix, "topic"])[:255]
