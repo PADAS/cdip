@@ -1518,6 +1518,69 @@ def legacy_integration_type_movebank():
 
 
 @pytest.fixture
+def legacy_integration_type_earthranger():
+    return OutboundIntegrationType.objects.create(
+        name="EarthRanger",
+        slug="earth_ranger",
+        description="Default integration type for Earth Ranger",
+    )
+
+
+@pytest.fixture
+def legacy_integration_type_smart():
+    return OutboundIntegrationType.objects.create(
+        name="SMART",
+        slug="smart_connect",
+        description="Default integration type for SMART",
+    )
+
+
+@pytest.fixture
+def outbound_integration_er_with_kafka_dispatcher(
+    legacy_integration_type_earthranger, organization,
+):
+    return OutboundIntegrationConfiguration.objects.create(
+        name="EarthRanger Integration v1 with Kafka",
+        type=legacy_integration_type_earthranger,
+        endpoint="https://test0.fakepamdas.org",
+        owner=organization,
+        additional={
+            "broker": "kafka",
+        },
+    )
+
+
+@pytest.fixture
+def outbound_integration_er_no_broker(
+    legacy_integration_type_earthranger, organization,
+):
+    integration = OutboundIntegrationConfiguration.objects.create(
+        name="EarthRanger Integration v1 no broker specified",
+        endpoint="https://test1.fakepamdas.org",
+        type=legacy_integration_type_earthranger,
+        owner=organization
+    )
+    integration.additional = {}
+    integration.save()
+    return integration
+
+
+@pytest.fixture
+def outbound_integration_smart_with_kafka_dispatcher(
+    legacy_integration_type_smart, organization,
+):
+    return OutboundIntegrationConfiguration.objects.create(
+        name="EarthRanger Integration v1 with Kafka",
+        endpoint="https://test2.fakesmartconnect.com",
+        type=legacy_integration_type_smart,
+        owner=organization,
+        additional={
+            "broker": "kafka",
+        },
+    )
+
+
+@pytest.fixture
 def observation_delivery_succeeded_event(provider_lotek_panthera, destination_movebank):
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
