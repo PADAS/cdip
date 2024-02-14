@@ -69,7 +69,7 @@ class Command(BaseCommand):
         elif options["list_missing"]:
             self.list_integrations_using_kafka_dispatchers(options=options)
         elif integration_id := options["deploy"]:
-            if not options.get("--v1" ) and not options.get("--v2"):
+            if not options.get("v1") and not options.get("v2"):
                 self.stdout.write("Please specify a Gundi version (v1 or v2)")
                 return
             integration = None
