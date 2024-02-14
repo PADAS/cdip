@@ -100,3 +100,35 @@ def test_call_dispatchers_command_deploy_missing_for_smart(
 
     # Check that the deploy task was called for the smart integration using legacy dispatchers
     assert mock_deploy_serverless_dispatcher.delay.call_count == 1
+
+
+def test_call_dispatchers_command_deploy_with_integration_id(
+    mocker,
+    capsys,
+    organization,
+    outbound_integration_er_no_broker,
+    outbound_integration_er_with_kafka_dispatcher,
+    outbound_integration_smart_with_kafka_dispatcher,
+):
+    # Mock the celery task doing the actual deployment
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mock_deploy_serverless_dispatcher = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher,
+    )
+    integration = outbound_integration_er_no_broker
+
+    call_command("dispatchers", "--v1", "--deploy", str(integration.id))
+    captured = capsys.readouterr()
+
+    # Check that configuration was updated to use pubsub
+    integration.refresh_from_db()
+    assert integration.additional.get("broker") == "gcp_pubsub"
+    assert integration.additional.get("topic")  # Topic name must be set
+    # Check the command output
+    assert f"Deploying dispatcher for {integration.name}..." in captured.out
+    assert f"Deployment triggered for {integration.name} (v1)" in captured.out
+
+    # Check that the deploy task was called for the selected ER integration
+    assert mock_deploy_serverless_dispatcher.delay.called
