@@ -221,7 +221,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def _pre_save(self, *args, **kwargs):
         # Use pubsub for ER and MoveBank Sites
         # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_mb_site):
+        if self._state.adding and (self.is_er_site or self.is_mb_site or self.is_smart_site):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v1")})
             if "broker" not in self.additional:
@@ -229,12 +229,13 @@ class OutboundIntegrationConfiguration(TimestampedModel):
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
-        # Deploy serverless dispatcher for ER Sites only
-        if created and self.is_er_site and settings.GCP_ENVIRONMENT_ENABLED:
+        # Deploy serverless dispatcher for ER or SMART sites only
+        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
+            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self, gundi_version="v1"),
                 legacy_integration=self,
-                configuration=get_dispatcher_defaults_from_gcp_secrets()
+                configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
             )
         if does_movebank_permissions_config_changed(self, "v1"):
             # Movebank permissions file needs to be recreated
