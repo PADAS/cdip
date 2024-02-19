@@ -335,6 +335,7 @@ OBSERVATION_DUPLICATE_CHECK_SECONDS = env.int("OBSERVATION_DUPLICATE_CHECK_SECON
 
 # Used in OTel traces/spans to set the 'environment' attribute, used on metrics calculation
 TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
+TRACING_ENABLED = env.bool("TRACING_ENABLED", True)
 
 # Subscriptions to read system events from pub/sub topics
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
