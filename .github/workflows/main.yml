@@ -27,7 +27,7 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@main
     if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
@@ -36,6 +36,7 @@ jobs:
       chart_version: '0.8.2'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+    secrets: inherit
 
   deploy_stage:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
