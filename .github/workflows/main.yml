@@ -48,6 +48,7 @@ jobs:
       chart_version: '0.8.2'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+    secrets: inherit
 
   deploy_prod:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
@@ -59,3 +60,4 @@ jobs:
       chart_version: '0.8.2'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+    secrets: inherit
