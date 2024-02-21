@@ -19,7 +19,7 @@ jobs:
           echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
-    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@main
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v2
     needs: vars
     with:
       environment: stage
@@ -27,7 +27,7 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@main
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
     if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
@@ -39,7 +39,7 @@ jobs:
     secrets: inherit
 
   deploy_stage:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
     if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build]
     with:
@@ -50,7 +50,7 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_prod:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
     if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build, deploy_stage]
     with:
