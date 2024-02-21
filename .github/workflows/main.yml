@@ -12,14 +12,14 @@ jobs:
       tag: ${{ steps.vars.outputs.tag }}
       repository: ${{ steps.vars.outputs.repository }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - id: vars
         run: |
           echo "tag=${{ github.head_ref || github.ref_name }}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
-    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v1-stable
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@main
     needs: vars
     with:
       environment: stage
