@@ -818,7 +818,7 @@ def keyauth_headers_lotek(provider_lotek_panthera):
 
 
 @pytest.fixture
-def mock_get_publisher(mocker):
+def mock_publisher(mocker):
     return mocker.MagicMock()
 
 
