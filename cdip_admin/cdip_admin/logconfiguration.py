@@ -1,7 +1,11 @@
 import logging
 import logging.config
 import sys
+import environ
 
+env = environ.Env()
+
+LOGGING_LEVEL = env.str("LOGGING_LEVEL", "INFO")
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -14,7 +18,7 @@ LOGGING_CONFIG = {
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
+            "level": LOGGING_LEVEL,
             "class": "logging.StreamHandler",
             "stream": sys.stdout,
             "formatter": "json",
