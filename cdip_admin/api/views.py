@@ -1,7 +1,5 @@
 import logging
-
 import rest_framework
-from datadog import statsd
 from django.core.exceptions import PermissionDenied
 from django.db.models import F
 from django.http import JsonResponse, Http404
@@ -25,7 +23,6 @@ logger = logging.getLogger(__name__)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public(request):
-    statsd.increment("portal.healthcheck")
     return JsonResponse(
         {
             "message": "Hello from a public endpoint! You don't need to be authenticated to see this."
