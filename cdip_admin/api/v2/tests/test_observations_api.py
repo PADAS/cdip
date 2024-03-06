@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import ANY
 from django.urls import reverse
+from django.conf import settings
 from rest_framework import status
-from cdip_connector.core.routing import TopicEnum
 from activity_log.models import ActivityLog
 from integrations.models import Source
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
@@ -42,10 +42,10 @@ def _test_create_observation(api_client, integration, keyauth_headers, data, ass
 
 
 def test_create_single_observation(
-        api_client, mocker, mock_get_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
+        api_client, mocker, mock_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
 ):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_observation(
         api_client=api_client,
@@ -69,19 +69,19 @@ def test_create_single_observation(
         }
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
 def test_create_observations_in_bulk(
-        api_client, mocker, mock_get_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
+        api_client, mocker, mock_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
 ):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_observation(
         api_client=api_client,
@@ -123,20 +123,20 @@ def test_create_observations_in_bulk(
         ]
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    assert mock_get_publisher.return_value.publish.call_count == 2
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    assert mock_publisher.publish.call_count == 2
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
 def test_override_observation_source_name_with_new_source(
-        api_client, mocker, mock_get_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
+        api_client, mocker, mock_publisher, mock_deduplication, provider_trap_tagger, keyauth_headers_trap_tagger
 ):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     observation_data = {
         "source": "STVIC",
@@ -158,8 +158,8 @@ def test_override_observation_source_name_with_new_source(
         data=observation_data
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    final_message = mock_get_publisher.return_value.publish.call_args.kwargs.get("data")
+    assert mock_publisher.publish.called
+    final_message = mock_publisher.publish.call_args.kwargs.get("data")
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]
@@ -170,11 +170,11 @@ def test_override_observation_source_name_with_new_source(
 
 
 def test_override_observation_source_name_with_existent_source(
-        api_client, mocker, mock_get_publisher, mock_deduplication,
+        api_client, mocker, mock_publisher, mock_deduplication,
         provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
 ):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     source = lotek_sources[0]
     observation_data = {
@@ -198,8 +198,8 @@ def test_override_observation_source_name_with_existent_source(
         assert_source_created=False
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    final_message = mock_get_publisher.return_value.publish.call_args.kwargs.get("data")
+    assert mock_publisher.publish.called
+    final_message = mock_publisher.publish.call_args.kwargs.get("data")
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]

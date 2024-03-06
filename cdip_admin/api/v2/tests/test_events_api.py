@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import ANY
 from django.urls import reverse
+from django.conf import settings
 from rest_framework import status
-from cdip_connector.core.routing import TopicEnum
 
 
 pytestmark = pytest.mark.django_db
@@ -25,9 +25,9 @@ def _test_create_event(api_client, keyauth_headers, data):
         assert "created_at" in obj
 
 
-def test_create_single_event(api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+def test_create_single_event(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
@@ -53,17 +53,17 @@ def test_create_single_event(api_client, mocker, mock_get_publisher, mock_dedupl
         }
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
-def test_create_events_in_bulk(api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+def test_create_events_in_bulk(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
@@ -110,20 +110,20 @@ def test_create_events_in_bulk(api_client, mocker, mock_get_publisher, mock_dedu
         ]
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    assert mock_get_publisher.return_value.publish.call_count == 2
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    assert mock_publisher.publish.call_count == 2
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
 def test_create_single_event_without_source(
-        api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger
 ):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
@@ -149,10 +149,10 @@ def test_create_single_event_without_source(
         }
     )
     # Check that a message was published in the right topic for routing
-    publish_mock = mock_get_publisher.return_value.publish
+    publish_mock = mock_publisher.publish
     assert publish_mock.called
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
@@ -160,9 +160,9 @@ def test_create_single_event_without_source(
     assert publish_mock.call_args.kwargs["data"].get("external_source_id") == "default-source"
 
 
-def test_create_events_in_bulk_without_source(api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
@@ -209,11 +209,11 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_get_publi
         ]
     )
     # Check that a message was published in the right topic for routing
-    publish_mock = mock_get_publisher.return_value.publish
+    publish_mock = mock_publisher.publish
     assert publish_mock.called
     assert publish_mock.call_count == 2
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
@@ -222,9 +222,9 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_get_publi
         assert call.kwargs["data"].get("external_source_id") == "default-source"
 
 
-def test_create_single_event_without_location(api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+def test_create_single_event_without_location(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
@@ -252,9 +252,9 @@ def test_create_single_event_without_location(api_client, mocker, mock_get_publi
         }
     )
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
