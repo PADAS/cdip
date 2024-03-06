@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import ANY
 from django.urls import reverse
+from django.conf import settings
 from rest_framework import status
-from cdip_connector.core.routing import TopicEnum
 
 
 pytestmark = pytest.mark.django_db
@@ -26,12 +26,12 @@ def _test_create_attachment(api_client, keyauth_headers, event_id, files):
 
 
 def test_create_single_attachment(
-        api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger,
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger,
         trap_tagger_event_trace, leopard_image_file, mock_cloud_storage
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.default_storage", mock_cloud_storage)
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_attachment", mock_deduplication)
     _test_create_attachment(
         api_client=api_client,
@@ -44,21 +44,21 @@ def test_create_single_attachment(
     # Check that the file was saved
     assert mock_cloud_storage.save.called
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
 def test_create_attachments_multiple_files(
-        api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger,
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger,
         trap_tagger_event_trace, leopard_image_file, wilddog_image_file, mock_cloud_storage
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.default_storage", mock_cloud_storage)
-    mocker.patch("api.v2.utils.get_publisher", mock_get_publisher)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_attachment", mock_deduplication)
     _test_create_attachment(
         api_client=api_client,
@@ -73,17 +73,17 @@ def test_create_attachments_multiple_files(
     assert mock_cloud_storage.save.called
     assert mock_cloud_storage.save.call_count == 2
     # Check that a message was published in the right topic for routing
-    assert mock_get_publisher.return_value.publish.called
-    assert mock_get_publisher.return_value.publish.call_count == 2
-    mock_get_publisher.return_value.publish.assert_called_with(
-        topic=TopicEnum.observations_unprocessed.value,
+    assert mock_publisher.publish.called
+    assert mock_publisher.publish.call_count == 2
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
         data=ANY,
         extra=ANY
     )
 
 
 def test_create_attachments_no_files(
-        api_client, mocker, mock_get_publisher, mock_deduplication, keyauth_headers_trap_tagger,
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger,
         trap_tagger_event_trace
 ):
     # Try sending no files

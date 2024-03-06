@@ -345,3 +345,6 @@ GCP_ENVIRONMENT_ENABLED = env.bool("GCP_ENVIRONMENT_ENABLED", default=True)
 DISPATCHER_DEFAULTS_SECRET = env.str("DISPATCHER_DEFAULTS_SECRET", "er-dispatcher-defaults-prod")
 DISPATCHER_DEFAULTS_SECRET_SMART = env.str("DISPATCHER_DEFAULTS_SECRET_SMART", "sm-dispatcher-defaults-prod")
 MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC", "movebank-dispatcher-topic-prod")
+
+# Sensors API to Routing
+RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-dev")

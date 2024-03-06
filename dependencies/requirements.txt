@@ -90,14 +90,10 @@ cryptography==2.9.2
     #   social-auth-core
 dasclient @ https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
     # via -r requirements.in
-datadog==0.39.0
-    # via -r requirements.in
 dateparser==1.1.8
     # via
     #   dasclient
     #   smartconnect-client
-decorator==5.1.1
-    # via datadog
 defusedxml==0.7.1
     # via
     #   python3-openid
@@ -487,7 +483,6 @@ requests==2.31.0
     #   cdip-connector
     #   coreapi
     #   dasclient
-    #   datadog
     #   google-api-core
     #   google-cloud-storage
     #   opentelemetry-exporter-otlp-proto-http
