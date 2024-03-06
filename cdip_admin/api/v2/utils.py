@@ -1,10 +1,14 @@
 import json
 from hashlib import md5
+
+import backoff
+from google.api_core.exceptions import GoogleAPICallError
+from google.cloud import pubsub_v1
+from cdip_connector.core import cdip_settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
-from cdip_connector.core.publisher import get_publisher
-from cdip_connector.core.routing import TopicEnum
+from cdip_connector.core.publisher import NullPublisher, Publisher
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation
 from core import tracing, cache
 from opentelemetry import trace
@@ -55,9 +59,38 @@ def is_duplicate_attachment(data: dict):
     return is_duplicate
 
 
-def send_events_to_routing(events, gundi_ids):
-    publisher = get_publisher()
+class GooglePublisher(Publisher):
 
+    def __init__(self):
+        self.pubsub_client = pubsub_v1.PublisherClient()
+
+    @backoff.on_exception(
+        backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
+    )
+    def publish(self, topic: str, data: dict, extra: dict = None):
+        extra = extra or {}
+        # Specify the topic path
+        topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
+        publish_future = self.pubsub_client.publish(
+            topic=topic_path,
+            data=json.dumps(data, default=str).encode("utf-8"),
+            **extra
+        )
+        result = publish_future.result()
+        return result
+
+
+def get_publisher():
+    if cdip_settings.PUBSUB_ENABLED:
+        return GooglePublisher()
+    else:
+        return NullPublisher()
+
+
+publisher = get_publisher()
+
+
+def send_events_to_routing(events, gundi_ids):
     for event, gundi_id in zip(events, gundi_ids):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
@@ -118,7 +151,7 @@ def send_events_to_routing(events, gundi_ids):
                 # Send message to routing services
                 # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
-                    topic=TopicEnum.observations_unprocessed.value,
+                    topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
@@ -129,11 +162,7 @@ def send_events_to_routing(events, gundi_ids):
 
 
 def send_attachments_to_routing(attachments_data, gundi_ids):
-
-    publisher = get_publisher()
-
     for attachment, gundi_id in zip(attachments_data, gundi_ids):
-        # ToDo: Manage tracing and deduplication
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
                 f"gundi_api.process_attachment", kind=trace.SpanKind.PRODUCER
@@ -183,9 +212,8 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     gundi_version="v2", gundi_id=str(gundi_id), related_to=str(attachment.get("related_to"))
                 )
                 # Send message to routing services
-                # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
-                    topic=TopicEnum.observations_unprocessed.value,
+                    topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
@@ -196,8 +224,6 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
 
 
 def send_observations_to_routing(observations, gundi_ids):
-    publisher = get_publisher()
-
     for observation, gundi_id in zip(observations, gundi_ids):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
@@ -257,7 +283,7 @@ def send_observations_to_routing(observations, gundi_ids):
                 # Send message to routing services
                 # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
-                    topic=TopicEnum.observations_unprocessed.value,
+                    topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal. It's fixed in pydantic v2
                     extra={
                         "observation_type": StreamPrefixEnum.observation.value,
