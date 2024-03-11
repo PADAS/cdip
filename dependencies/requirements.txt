@@ -105,7 +105,7 @@ defusedxml==0.7.1
     #   untangle
 deprecated==1.2.14
     # via opentelemetry-api
-django==3.2.15
+django==3.2.25
     # via
     #   -r requirements.in
     #   django-bootstrap4
