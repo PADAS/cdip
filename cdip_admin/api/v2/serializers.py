@@ -219,7 +219,8 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "schema"
+            "schema",
+            "is_periodic_action"
         )
 
 
