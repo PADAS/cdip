@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - 'release-**'
+      - 'gundi-2831-integrations-registration'
 
 jobs:
   vars:
