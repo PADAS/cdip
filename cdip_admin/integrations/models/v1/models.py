@@ -212,6 +212,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_smart_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "smartconnect"
 
+    @property
+    def is_wpswatch_site(self):
+        return self.type.slug.lower().strip().replace("_", "") == "wpswatch"
+
     class Meta:
         ordering = ("owner", "name")
 
@@ -230,8 +234,13 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER or SMART sites only
-        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
-            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
+        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site or self.is_wpswatch_site):
+            if self.is_smart_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+            elif self.is_wpswatch_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+            else:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self, gundi_version="v1"),
                 legacy_integration=self,

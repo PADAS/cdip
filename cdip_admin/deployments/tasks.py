@@ -23,6 +23,9 @@ if settings.GCP_ENVIRONMENT_ENABLED:
     DISPATCHER_DEFAULT_SETTINGS_SMART = utils.get_dispatcher_defaults_from_gcp_secrets(
         secret_id=settings.DISPATCHER_DEFAULTS_SECRET_SMART
     )
+    DISPATCHER_DEFAULT_SETTINGS_WPSWATCH = utils.get_dispatcher_defaults_from_gcp_secrets(
+        secret_id=settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+    )
 else:
     pubsub_client = utils.PubSubDummyClient()
     functions_client = utils.FunctionsDummyClient()
@@ -76,7 +79,7 @@ def deploy_serverless_dispatcher(deployment_id):
                 topic_path=topic_path
             )
             response = create_or_update_function(function_request=function_request)
-        elif integration.is_smart_site:  # Deploy a Cloud Run Service
+        elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
             response = create_or_update_cloud_run_service(
                 configuration=configuration,
                 service_name=function_name,
