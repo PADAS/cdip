@@ -45,4 +45,4 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 4
+replicaCount: 2
