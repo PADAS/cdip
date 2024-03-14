@@ -16,11 +16,6 @@ ingress:
       hosts:
         - "api.dev.gundiservice.org"
         - "sensors.api.dev.gundiservice.org"
-celery:
-  worker:
-    replicaCount: 1
-eventsConsumer:
-  replicaCount: 1
 database:
   private_ip_enabled: True
   connection_name: "cdip-dev-78ca:us-central1:sintegrate-b2b9960e"
@@ -46,4 +41,3 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 1
