@@ -45,4 +45,14 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-prod"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
-replicaCount: 4
+
+portal:
+  replicaCount: 4
+worker:
+  replicaCount: 2
+dispatcherEvents:
+  replicaCount: 2
+integrationEvents:
+  replicaCount: 2
+deploymentsWorker:
+  replicaCount: 2
