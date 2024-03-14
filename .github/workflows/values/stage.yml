@@ -16,11 +16,6 @@ ingress:
       hosts:
         - "api.stage.gundiservice.org"
         - "sensors.api.stage.gundiservice.org"
-celery:
-  worker:
-    replicaCount: 2
-eventsConsumer:
-  replicaCount: 1
 database:
   connection_name: "cdip-78ca:us-central1:postgres-cdip-dev"
 admin_portal:
@@ -45,4 +40,8 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 2
+
+portal:
+  replicaCount: 2
+worker:
+  replicaCount: 2
