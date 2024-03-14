@@ -2,7 +2,7 @@ aiofiles==23.2.1
 movebank-client==1.0.0
 celery==5.2.3
 celery-once==1.2.0
-Django==3.2.15
+Django==3.2.25
 PyJWT==1.7.1
 #asgiref==3.2.10
 beautifulsoup4==4.9.1
