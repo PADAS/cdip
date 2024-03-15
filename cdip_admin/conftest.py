@@ -441,7 +441,7 @@ def er_action_pull_events(integration_type_er):
 def integration_type_smart():
     return IntegrationType.objects.create(
         name="SMART",
-        value="smart",
+        value="smart_connect",
         description="Standard integration type for pushing data to SMART Cloud.",
     )
 
@@ -500,6 +500,17 @@ def smart_integration(
     )
     ensure_default_route(integration=integration)
     return integration
+
+
+@pytest.fixture
+def integration_type_wpswatch():
+    # Create an integration type for Earth Ranger
+    integration_type = IntegrationType.objects.create(
+        name="WPS Watch",
+        value="wps_watch",
+        description="Standard type for distributing data to WPS Watch sites.",
+    )
+    return integration_type
 
 
 @pytest.fixture
@@ -1536,6 +1547,15 @@ def legacy_integration_type_smart():
 
 
 @pytest.fixture
+def legacy_integration_type_wpswatch():
+    return OutboundIntegrationType.objects.create(
+        name="WPS Watch",
+        slug="wps_watch",
+        description="Default integration type for WPS Watch",
+    )
+
+
+@pytest.fixture
 def outbound_integration_er_with_kafka_dispatcher(
     legacy_integration_type_earthranger, organization,
 ):
@@ -1745,3 +1765,15 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
     data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
+
+
+@pytest.fixture
+def mock_dispatcher_secrets():
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO', 'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test', 'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev', 'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300', 'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test', 'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google', 'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id', 'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org', 'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc', 'MAX_EVENT_AGE_SECONDS': '86400', 'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123', 'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'}, 'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev', 'concurrency': 4, 'max_instances': 2, 'min_instances': 0, 'vpc_connector': 'cdip-cloudrun-connector', 'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com', 'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets
+    return mock
