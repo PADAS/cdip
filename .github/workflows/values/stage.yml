@@ -16,11 +16,6 @@ ingress:
       hosts:
         - "api.stage.gundiservice.org"
         - "sensors.api.stage.gundiservice.org"
-celery:
-  worker:
-    replicaCount: 2
-eventsConsumer:
-  replicaCount: 1
 database:
   connection_name: "cdip-78ca:us-central1:postgres-cdip-dev"
 admin_portal:
@@ -35,6 +30,7 @@ admin_portal:
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-stage
+    RAW_OBSERVATIONS_TOPIC: raw-observations-stage
 kongplugin:
   cors:
     - https://stage.gundiservice.org
@@ -45,4 +41,8 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "***REMOVED***"
   KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
-replicaCount: 2
+
+portal:
+  replicaCount: 2
+worker:
+  replicaCount: 2
