@@ -30,6 +30,7 @@ admin_portal:
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-stage
+    RAW_OBSERVATIONS_TOPIC: raw-observations-stage
 kongplugin:
   cors:
     - https://stage.gundiservice.org

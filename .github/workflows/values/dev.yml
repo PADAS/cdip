@@ -31,6 +31,7 @@ admin_portal:
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-dev"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-dev"
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-dev
+    RAW_OBSERVATIONS_TOPIC: raw-observations-dev
 kongplugin:
   cors:
     - https://dev.gundiservice.org
