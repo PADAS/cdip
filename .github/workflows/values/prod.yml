@@ -35,6 +35,7 @@ admin_portal:
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-prod"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-prod"
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-prod
+    RAW_OBSERVATIONS_TOPIC: raw-observations-prod
 kongplugin:
   cors:
     - https://gundiservice.org
@@ -45,4 +46,14 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-prod"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
-replicaCount: 4
+
+portal:
+  replicaCount: 4
+worker:
+  replicaCount: 2
+dispatcherEvents:
+  replicaCount: 2
+integrationEvents:
+  replicaCount: 2
+deploymentsWorker:
+  replicaCount: 2
