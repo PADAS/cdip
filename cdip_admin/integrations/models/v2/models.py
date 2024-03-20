@@ -178,6 +178,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def is_smart_site(self):
         return self.type.value.lower().strip().replace("_", "") == "smartconnect"
 
+    @property
+    def is_wpswatch_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "wpswatch"
+
     def create_missing_configurations(self):
         for action in self.type.actions.all():
             if not self.configurations.filter(action=action).exists():
