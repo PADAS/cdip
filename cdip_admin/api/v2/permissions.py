@@ -48,15 +48,15 @@ def get_user_org(request, view) -> str:
     elif view.basename == "routes":
         if view.action in ["retrieve", "update", "partial_update", "destroy"]:
             route_id = context.get("pk")
-            org_id = str(Route.objects.get(id=route_id).owner.id)
+            org_id = str(Route.objects.get(id=route_id).owner.id) if route_id else None
         elif request.data.get("owner"):
             org_id = request.data.get("owner")  # Create or Update
         else:
             org_id = None
-    elif view.basename == "logs":
-        log_id = context.get("pk")
-        log = ActivityLog.objects.get(id=log_id)
-        org_id = str(log.integration.owner.id) if log.integration else None
+    elif view.basename == "logs" and (log_id := context.get("pk")):
+        # log_id = context.get("pk")
+        log = ActivityLog.objects.get(id=log_id) if log_id else None
+        org_id = str(log.integration.owner.id) if log and log.integration else None
     else:  # Can't relate this user with an organization
         org_id = None
     return org_id
