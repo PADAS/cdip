@@ -33,7 +33,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
 
         sclient = SmartClient(api='https://tempuri.org/', username='', password='', use_language_code='fr')
-        dm = sclient.load_datamodel(filename='/Users/***REMOVED***o/Downloads/Modele de données SMART.xml')
+        dm = sclient.load_datamodel(filename='/Users/chrisdo/Downloads/Modele de données SMART.xml')
 
         print(dm)
 

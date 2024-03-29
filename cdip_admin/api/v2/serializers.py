@@ -211,8 +211,21 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
         )
 
 
+class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationAction
+        fields = (
+            "type",
+            "name",
+            "value",
+            "description",
+            "schema",
+            "is_periodic_action"
+        )
+
+
 class IntegrationTypeFullSerializer(serializers.ModelSerializer):
-    actions = IntegrationActionFullSerializer(many=True)
+    actions = IntegrationActionFullSerializer(many=True, read_only=True)
 
     class Meta:
         model = IntegrationType
@@ -223,6 +236,54 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
             "description",
             "actions"
         )
+
+
+class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
+    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+    value = serializers.CharField(required=True)
+
+    class Meta:
+        model = IntegrationType
+        fields = (
+            "name",
+            "value",
+            "description",
+            "actions"
+        )
+
+    def validate_value(self, value):
+        # Skip uniqueness validation for idempotent creation
+        return value
+
+    def validate(self, data):
+        """
+        Validate the actions
+        """
+        for action_data in data.get("actions", []):
+            # ToDo: validate action data?
+            if self.instance and "value" in action:  # Update
+                action = IntegrationAction.objects.get(value=action["value"]).action
+                serializer = IntegrationActionCreateUpdateSerializer(instance=action, data=action_data)
+            else:  # Create
+                # Validate the action data
+                serializer = IntegrationActionCreateUpdateSerializer(data=action_data)
+            serializer.is_valid(raise_exception=True)
+        return data
+
+    def create(self, validated_data):
+        actions = validated_data.pop("actions")
+        # Create the integration type idempotently
+        type_slug = validated_data.pop("value")
+        integration_type, created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
+        # Create or update actions if provided
+        for action_params in actions:  # Usually less than 5 actions
+            action_slug = action_params.pop("value")
+            action, created = IntegrationAction.objects.update_or_create(
+                integration_type=integration_type,
+                value=action_slug,
+                defaults=action_params
+            )
+        return integration_type
 
 
 class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):

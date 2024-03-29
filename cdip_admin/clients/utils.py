@@ -184,7 +184,7 @@ def build_authorization_settings(type_id):
                 scopes.append(scope)
             resource_scope.append(scope)
         resource["scopes"] = resource_scope
-        resource["type"] = "urn:***REMOVED***:resources:default"
+        resource["type"] = "urn:cdip-admin-portal:resources:default"
         resources.append(resource)
 
     authorizationSettings["resources"] = resources
