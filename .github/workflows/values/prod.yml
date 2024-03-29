@@ -44,8 +44,8 @@ keycloak:
   KEYCLOAK_SERVER: "https://cdip-auth.pamdas.org"
   KEYCLOAK_REALM: "cdip-prod"
   KEYCLOAK_ADMIN_REALM: "cdip-prod"
-  KEYCLOAK_CLIENT_ID: "***REMOVED***"
-  KEYCLOAK_ADMIN_CLIENT_ID: ***REMOVED***
+  KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
+  KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
 
 portal:
   replicaCount: 4
