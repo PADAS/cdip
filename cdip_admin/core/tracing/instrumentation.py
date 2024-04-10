@@ -1,5 +1,6 @@
 from django.conf import settings
 from gundi_core.schemas.v2 import Event, Observation
+from opentelemetry import propagate
 
 
 def _enrich_span_from_kwargs(span, **kwargs):
@@ -52,3 +53,10 @@ def enrich_span_from_attachment(span, attachment, **kwargs):
     span.set_attribute("integration_id", str(attachment.data_provider_id))
     span.set_attribute("observation_type", str(attachment.observation_type))
     _enrich_span_from_kwargs(span, **kwargs)
+
+
+def build_context_headers():
+    headers = {}
+    propagate.inject(headers)
+    print(f"[tracing.build_context_headers]> headers: {headers}")
+    return headers
