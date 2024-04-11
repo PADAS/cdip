@@ -347,10 +347,10 @@ class ER_SMART_Synchronizer:
                                 "tracing_context": tracing_context  # Propagate OTel context in message attributes
                             },
                         )
-                        subspan.set.event("gundi_er_smart_sync.event_sent_to_routing")
+                        subspan.add_event("gundi_er_smart_sync.event_sent_to_routing")
                 else:
                     current_span.set_attribute("is_patrol_event", True)
-                    current_span.set_event("gundi_er_smart_sync.skipped_event_associated_to_patrol")
+                    current_span.add_event("gundi_er_smart_sync.skipped_event_associated_to_patrol")
                     logger.info(
                         f"Skipping event {event.serial_number} because it is associated to a patrol"
                     )
@@ -473,7 +473,7 @@ class ER_SMART_Synchronizer:
                             "skipping processing, patrol contains no start location",
                             extra=extra_dict,
                         )
-                        current_span.set_event("gundi_er_smart_sync.skipped_patrol_no_start_location")
+                        current_span.add_event("gundi_er_smart_sync.skipped_patrol_no_start_location")
                         publish_observation = False
                         continue
 
@@ -552,7 +552,7 @@ class ER_SMART_Synchronizer:
                         "skipping processing, patrol doesn't have updates since last poll",
                         extra=extra_dict,
                     )
-                    current_span.set_event("gundi_er_smart_sync.skipped_patrol_no_updates")
+                    current_span.add_event("gundi_er_smart_sync.skipped_patrol_no_updates")
                     continue
 
                 # TODO: Will need to revisit this if we support processing of multiple segments in the future
@@ -574,7 +574,7 @@ class ER_SMART_Synchronizer:
                                 "tracing_context": tracing_context  # Propagate OTel context in message attributes
                             },
                         )
-                        subspan.set_event("gundi_er_smart_sync.patrol_sent_to_routing")
+                        subspan.add_event("gundi_er_smart_sync.patrol_sent_to_routing")
 
     def get_er_patrols(self, *args, config: InboundIntegrationConfiguration):
 
