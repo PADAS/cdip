@@ -292,7 +292,7 @@ class ER_SMART_Synchronizer:
             with tracing.tracer.start_as_current_span(
                     f"gundi_er_smart_sync.process_event", kind=trace.SpanKind.PRODUCER
             ) as current_span:
-                tracing.instrumentation.enrich_span_from_event(
+                tracing.instrumentation.enrich_span_from_er_event(
                     span=current_span, event=event, gundi_version="v1",
                 )
                 # Exclude events associated to patrols when pushing independent incidents to SMART
