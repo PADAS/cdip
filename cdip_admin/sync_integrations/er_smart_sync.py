@@ -9,10 +9,10 @@ from datetime import timezone, datetime, timedelta
 from typing import List, Optional, Dict
 from urllib.parse import urlparse
 from cdip_connector.core.cloudstorage import get_cloud_storage
-from cdip_connector.core.publisher import get_publisher
 from cdip_connector.core.routing import TopicEnum
 from gundi_core.schemas import ERPatrol, EREvent, ERSubject, ERObservation
 from dasclient.dasclient import DasClient
+from gundi_core.schemas.v1 import StreamPrefixEnum
 from pydantic import parse_obj_as
 from smartconnect import SmartClient
 from smartconnect.er_sync_utils import (
@@ -26,10 +26,13 @@ from smartconnect.er_sync_utils import (
 )
 from packaging import version
 from cdip_admin import settings
+from core import tracing
+from opentelemetry import trace
 from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
+from api.v2.utils import get_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -286,44 +289,71 @@ class ER_SMART_Synchronizer:
         logger.info(f"Pulled {len(events)} events from ER")
         event: EREvent
         for event in events:
-            # Exclude events associated to patrols when pushing independent incidents to SMART
-            if not event.patrols:
-                event.integration_id = config.id
-                event.device_id = event.id
-                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
-                    # stop gap for supporting SMART observation updates
-                    try:
-                        self.update_event_with_smart_data(event=event)
-                    except:
-                        logger.error(
-                            "Error patching event %s (%s) with smart_observation_uuid, event not processed",
-                            event.serial_number, event.id,
-                            extra=dict(event_id=event.id, event_title=event.title,
-                                       event_serial_number=event.serial_number),
+            with tracing.tracer.start_as_current_span(
+                    f"gundi_er_smart_sync.process_event", kind=trace.SpanKind.PRODUCER
+            ) as current_span:
+                tracing.instrumentation.enrich_span_from_event(
+                    span=current_span, event=event, gundi_version="v1",
+                )
+                # Exclude events associated to patrols when pushing independent incidents to SMART
+                if not event.patrols:
+                    event.integration_id = config.id
+                    event.device_id = event.id
+                    if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                        # stop gap for supporting SMART observation updates
+                        try:
+                            self.update_event_with_smart_data(event=event)
+                        except Exception as e:
+                            error_msg = f"Error patching event {event.serial_number} ({event.id}) with smart_observation_uuid, event not processed: {e}"
+                            current_span.set_attribute("error", error_msg)
+                            current_span.set_event("gundi_er_smart_sync.error_updating_event")
+                            logger.exception(
+                                error_msg,
+                                extra=dict(event_id=event.id, event_title=event.title,
+                                           event_serial_number=event.serial_number),
+                            )
+                    for file in event.files:
+                        try:
+                            self.process_file(file=file)
+                        except Exception as e:
+                            error_msg = f"Failed to download event file: {e}"
+                            current_span.set_attribute("error", error_msg)
+                            current_span.set_event("gundi_er_smart_sync.error_downloading_event_file")
+                            logger.exception(
+                                error_msg,
+                                extra=dict(
+                                    event_serial_number=event.serial_number,
+                                    file_name=file.get("filename"),
+                                    error=e,
+                                ),
+                            )
+                    logger.info(
+                        f"Publishing observation for event {event.serial_number}",
+                        extra=dict(event_id=event.id, event_title=event.title, event_serial_number=event.serial_number)
+                    )
+                    with tracing.tracer.start_as_current_span(
+                            f"gundi_api.send_event_to_routing", kind=trace.SpanKind.PRODUCER
+                    ) as subspan:
+                        tracing_context = json.dumps(
+                            tracing.instrumentation.build_context_headers(),
+                            default=str,
                         )
-                for file in event.files:
-                    try:
-                        self.process_file(file=file)
-                    except Exception as e:
-                        logger.error(
-                            "Failed to download event file",
-                            extra=dict(
-                                event_serial_number=event.serial_number,
-                                file_name=file.get("filename"),
-                                error=e,
-                            ),
+                        self.publisher.publish(
+                            topic=settings.RAW_OBSERVATIONS_TOPIC,
+                            data=json.loads(event.json()),  # This is suboptimal but it's fixed in pydantic 2
+                            extra={
+                                "observation_type": StreamPrefixEnum.earthranger_event.value,
+                                "gundi_version": "v1",  # Add the version so routing knows how to handle it
+                                "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                            },
                         )
-                logger.info(
-                    f"Publishing observation for event {event.serial_number}",
-                    extra=dict(event_id=event.id, event_title=event.title, event_serial_number=event.serial_number)
-                )
-                self.publisher.publish(
-                    TopicEnum.observations_unprocessed.value, event.dict()
-                )
-            else:
-                logger.info(
-                    f"Skipping event {event.serial_number} because it is associated to a patrol"
-                )
+                        subspan.set.event("gundi_er_smart_sync.event_sent_to_routing")
+                else:
+                    current_span.set_attribute("is_patrol_event", True)
+                    current_span.set_event("gundi_er_smart_sync.skipped_event_associated_to_patrol")
+                    logger.info(
+                        f"Skipping event {event.serial_number} because it is associated to a patrol"
+                    )
         i_state.event_last_poll_at = current_time
         set_earthranger_last_poll(integration_id=config.id, state=i_state)
 
@@ -403,129 +433,148 @@ class ER_SMART_Synchronizer:
         assert not args, 'This method does not accept positional arguments'
         patrol: ERPatrol
         for patrol in patrols:
-            logger.info(
-                f"Beginning processing of ER patrol",
-                extra=dict(
+            with tracing.tracer.start_as_current_span(
+                    f"gundi_er_smart_sync.process_patrol", kind=trace.SpanKind.PRODUCER
+            ) as current_span:
+                logger.info(
+                    f"Beginning processing of ER patrol",
+                    extra=dict(
+                        patrol_id=patrol.id,
+                        patrol_serial_num=patrol.serial_number,
+                        patrol_title=patrol.title,
+                    ),
+                )
+                patrol.integration_id = integration_id
+                patrol.device_id = patrol.id
+
+                events_updated_at = []
+
+                publish_observation = True
+                extra_dict = dict(
                     patrol_id=patrol.id,
                     patrol_serial_num=patrol.serial_number,
                     patrol_title=patrol.title,
-                ),
-            )
-            patrol.integration_id = integration_id
-            patrol.device_id = patrol.id
+                )
 
-            events_updated_at = []
+                # active patrols always returned so determine if patrol has any new updates
+                updates = patrol.updates
+                for seg in patrol.patrol_segments:
+                    for update in seg.updates:
+                        updates.append(update)
+                    for event in seg.events:
+                        events_updated_at.append(event.updated_at)
+                max_update = max(events_updated_at + [u.time for u in updates])
 
-            publish_observation = True
-            extra_dict = dict(
-                patrol_id=patrol.id,
-                patrol_serial_num=patrol.serial_number,
-                patrol_title=patrol.title,
-            )
+                # collect events and track points associated to patrol
+                for segment in patrol.patrol_segments:
+                    if not segment.start_location:
+                        # Need start location to pass in coordinates and determine location timezone
+                        logger.info(
+                            "skipping processing, patrol contains no start location",
+                            extra=extra_dict,
+                        )
+                        current_span.set_event("gundi_er_smart_sync.skipped_patrol_no_start_location")
+                        publish_observation = False
+                        continue
 
-            # active patrols always returned so determine if patrol has any new updates
-            updates = patrol.updates
-            for seg in patrol.patrol_segments:
-                for update in seg.updates:
-                    updates.append(update)
-                for event in seg.events:
-                    events_updated_at.append(event.updated_at)
-            max_update = max(events_updated_at + [u.time for u in updates])
+                    if not segment.leader:
+                        # SMART requires at least one member on patrol leg
+                        logger.info(
+                            "skipping processing, patrol contains no segment leader",
+                            extra=extra_dict,
+                        )
+                        publish_observation = False
+                        continue
 
-            # collect events and track points associated to patrol
-            for segment in patrol.patrol_segments:
-                if not segment.start_location:
-                    # Need start location to pass in coordinates and determine location timezone
-                    logger.info(
-                        "skipping processing, patrol contains no start location",
-                        extra=extra_dict,
-                    )
-                    publish_observation = False
-                    continue
-
-                if not segment.leader:
-                    # SMART requires at least one member on patrol leg
-                    logger.info(
-                        "skipping processing, patrol contains no segment leader",
-                        extra=extra_dict,
-                    )
-                    publish_observation = False
-                    continue
-
-                # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
-                for segment_event in segment.events:
-                    # Need to get event details for each event since they are not provided in patrol get
-                    event_details = parse_obj_as(
-                        List[EREvent],
-                        self.das_client.get_events(event_ids=segment_event.id),
-                    )
-
-                    # process event files
-                    for event in event_details:
-                        for file in event.files:
-                            try:
-                                self.process_file(file=file)
-                            except Exception as e:
-                                logger.error(
-                                    "Failed to download event file",
-                                    extra=dict(
-                                        event_serial_number=event.serial_number,
-                                        file_name=file.get("filename"),
-                                        error=e,
-                                    ),
-                                )
-                    segment.event_details.extend(event_details)
-                    # process event files
-
-                if version.parse(self.smart_client.version) < version.parse("7.5.3"):
-                    # stop gap for supporting SMART observation updates
-                    for event in segment.event_details:
-                        try:
-                            self.update_event_with_smart_data(event=event)
-                        except:
-                            logger.error(
-                                "Error patching event_type with smart_observation_uuid, event not processed",
-                                extra=dict(event_id=event.id, event_title=event.title),
-                            )
-
-                # process patrol files
-                for file in patrol.files:
-                    try:
-                        self.process_file(file=file)
-                    except Exception as e:
-                        logger.error(
-                            "Failed to download patrol file",
-                            extra=dict(
-                                event_serial_number=patrol.serial_number,
-                                file_name=file.get("filename"),
-                                error=e,
-                            ),
+                    # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
+                    for segment_event in segment.events:
+                        # Need to get event details for each event since they are not provided in patrol get
+                        event_details = parse_obj_as(
+                            List[EREvent],
+                            self.das_client.get_events(event_ids=segment_event.id),
                         )
 
-                # Get track points from subject during time range of patrol
-                start = patrol_last_poll_at
-                end = upper
-                segment.track_points = parse_obj_as(
-                    List[ERObservation],
-                    self.das_client.get_subject_observations(
-                        subject_id=segment.leader.id, start=start, end=end
-                    ),
-                )
+                        # process event files
+                        for event in event_details:
+                            for file in event.files:
+                                try:
+                                    self.process_file(file=file)
+                                except Exception as e:
+                                    logger.error(
+                                        "Failed to download event file",
+                                        extra=dict(
+                                            event_serial_number=event.serial_number,
+                                            file_name=file.get("filename"),
+                                            error=e,
+                                        ),
+                                    )
+                        segment.event_details.extend(event_details)
+                        # process event files
 
-            if max_update < patrol_last_poll_at and \
-                    not any(len(seg.track_points) > 0 for seg in patrol.patrol_segments):
-                logger.info(
-                    "skipping processing, patrol doesn't have updates since last poll",
-                    extra=extra_dict,
-                )
-                continue
+                    if version.parse(self.smart_client.version) < version.parse("7.5.3"):
+                        # stop gap for supporting SMART observation updates
+                        for event in segment.event_details:
+                            try:
+                                self.update_event_with_smart_data(event=event)
+                            except:
+                                logger.error(
+                                    "Error patching event_type with smart_observation_uuid, event not processed",
+                                    extra=dict(event_id=event.id, event_title=event.title),
+                                )
 
-            # TODO: Will need to revisit this if we support processing of multiple segments in the future
-            if publish_observation:
-                logger.info(f"Publishing observation for ER Patrol", extra=extra_dict)
-                self.publisher.publish(
-                    TopicEnum.observations_unprocessed.value, patrol.dict()
-                )
+                    # process patrol files
+                    for file in patrol.files:
+                        try:
+                            self.process_file(file=file)
+                        except Exception as e:
+                            logger.error(
+                                "Failed to download patrol file",
+                                extra=dict(
+                                    event_serial_number=patrol.serial_number,
+                                    file_name=file.get("filename"),
+                                    error=e,
+                                ),
+                            )
+
+                    # Get track points from subject during time range of patrol
+                    start = patrol_last_poll_at
+                    end = upper
+                    segment.track_points = parse_obj_as(
+                        List[ERObservation],
+                        self.das_client.get_subject_observations(
+                            subject_id=segment.leader.id, start=start, end=end
+                        ),
+                    )
+
+                if max_update < patrol_last_poll_at and \
+                        not any(len(seg.track_points) > 0 for seg in patrol.patrol_segments):
+                    logger.info(
+                        "skipping processing, patrol doesn't have updates since last poll",
+                        extra=extra_dict,
+                    )
+                    current_span.set_event("gundi_er_smart_sync.skipped_patrol_no_updates")
+                    continue
+
+                # TODO: Will need to revisit this if we support processing of multiple segments in the future
+                if publish_observation:
+                    logger.info(f"Publishing observation for ER Patrol", extra=extra_dict)
+                    with tracing.tracer.start_as_current_span(
+                            f"gundi_api.send_patrol_to_routing", kind=trace.SpanKind.PRODUCER
+                    ) as subspan:
+                        tracing_context = json.dumps(
+                            tracing.instrumentation.build_context_headers(),
+                            default=str,
+                        )
+                        self.publisher.publish(
+                            topic=settings.RAW_OBSERVATIONS_TOPIC,
+                            data=json.loads(patrol.json()),  # This is suboptimal but it's fixed in pydantic 2
+                            extra={
+                                "observation_type": StreamPrefixEnum.earthranger_patrol.value,
+                                "gundi_version": "v1",  # Add the version so routing knows how to handle it
+                                "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                            },
+                        )
+                        subspan.set_event("gundi_er_smart_sync.patrol_sent_to_routing")
 
     def get_er_patrols(self, *args, config: InboundIntegrationConfiguration):
 
