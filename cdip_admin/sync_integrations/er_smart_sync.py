@@ -306,7 +306,7 @@ class ER_SMART_Synchronizer:
                         except Exception as e:
                             error_msg = f"Error patching event {event.serial_number} ({event.id}) with smart_observation_uuid, event not processed: {e}"
                             current_span.set_attribute("error", error_msg)
-                            current_span.set_event("gundi_er_smart_sync.error_updating_event")
+                            current_span.add_event("gundi_er_smart_sync.error_updating_event")
                             logger.exception(
                                 error_msg,
                                 extra=dict(event_id=event.id, event_title=event.title,
@@ -318,7 +318,7 @@ class ER_SMART_Synchronizer:
                         except Exception as e:
                             error_msg = f"Failed to download event file: {e}"
                             current_span.set_attribute("error", error_msg)
-                            current_span.set_event("gundi_er_smart_sync.error_downloading_event_file")
+                            current_span.add_event("gundi_er_smart_sync.error_downloading_event_file")
                             logger.exception(
                                 error_msg,
                                 extra=dict(
