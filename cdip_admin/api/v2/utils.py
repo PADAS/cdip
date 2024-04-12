@@ -148,6 +148,10 @@ def send_events_to_routing(events, gundi_ids):
                     span=current_span, event=msg_for_routing, gundi_version="v2",
                     gundi_id=str(gundi_id), related_to=str(event.get("related_to"))
                 )
+                tracing_context = json.dumps(
+                    tracing.instrumentation.build_context_headers(),
+                    default=str,
+                )
                 # Send message to routing services
                 # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
@@ -156,7 +160,8 @@ def send_events_to_routing(events, gundi_ids):
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
-                        "gundi_id": str(gundi_id)
+                        "gundi_id": str(gundi_id),
+                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
                     },
                 )
 
@@ -211,6 +216,10 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     span=current_span, attachment=msg_for_routing, file_path=file_path,
                     gundi_version="v2", gundi_id=str(gundi_id), related_to=str(attachment.get("related_to"))
                 )
+                tracing_context = json.dumps(
+                    tracing.instrumentation.build_context_headers(),
+                    default=str,
+                )
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
@@ -218,7 +227,8 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
-                        "gundi_id": str(gundi_id)
+                        "gundi_id": str(gundi_id),
+                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
                     },
                 )
 
@@ -280,6 +290,10 @@ def send_observations_to_routing(observations, gundi_ids):
                 tracing.instrumentation.enrich_span_from_observation(
                     span=current_span, observation=msg_for_routing, gundi_version="v2"
                 )
+                tracing_context = json.dumps(
+                    tracing.instrumentation.build_context_headers(),
+                    default=str,
+                )
                 # Send message to routing services
                 # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
@@ -288,6 +302,7 @@ def send_observations_to_routing(observations, gundi_ids):
                     extra={
                         "observation_type": StreamPrefixEnum.observation.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
-                        "gundi_id": str(gundi_id)
+                        "gundi_id": str(gundi_id),
+                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
                     },
                 )
