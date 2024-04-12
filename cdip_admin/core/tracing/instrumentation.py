@@ -1,6 +1,10 @@
+import logging
 from django.conf import settings
 from gundi_core.schemas.v2 import Event, Observation
 from opentelemetry import propagate
+
+
+logger = logging.getLogger(__name__)
 
 
 def _enrich_span_from_kwargs(span, **kwargs):
@@ -58,5 +62,5 @@ def enrich_span_from_attachment(span, attachment, **kwargs):
 def build_context_headers():
     headers = {}
     propagate.inject(headers)
-    print(f"[tracing.build_context_headers]> headers: {headers}")
+    logger.debug(f"[tracing.build_context_headers]> headers: {headers}")
     return headers
