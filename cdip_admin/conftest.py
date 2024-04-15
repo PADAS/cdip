@@ -475,12 +475,12 @@ def smart_action_auth(integration_type_smart):
 
 @pytest.fixture
 def smart_integration(
-    organization,
-    other_organization,
-    integration_type_smart,
-    get_random_id,
-    smart_action_auth,
-    smart_action_push_events,
+        organization,
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
 ):
     # Create the integration
     site_url = f"{get_random_id()}.smart.wps.org"
@@ -515,11 +515,11 @@ def integration_type_wpswatch():
 
 @pytest.fixture
 def provider_lotek_panthera(
-    get_random_id,
-    organization,
-    integration_type_lotek,
-    lotek_action_auth,
-    lotek_action_pull_positions,
+        get_random_id,
+        organization,
+        integration_type_lotek,
+        lotek_action_auth,
+        lotek_action_pull_positions,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_lotek,
@@ -547,11 +547,11 @@ def provider_lotek_panthera(
 
 @pytest.fixture
 def provider_movebank_ewt(
-    get_random_id,
-    other_organization,
-    integration_type_movebank,
-    mb_action_auth,
-    mb_action_pull_positions,
+        get_random_id,
+        other_organization,
+        integration_type_movebank,
+        mb_action_auth,
+        mb_action_pull_positions,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_movebank,
@@ -595,10 +595,10 @@ def mb_action_push_observations(integration_type_movebank):
 
 @pytest.fixture
 def destination_movebank(
-    get_random_id,
-    other_organization,
-    integration_type_movebank,
-    mb_action_push_observations,
+        get_random_id,
+        other_organization,
+        integration_type_movebank,
+        mb_action_push_observations,
 ):
     destination, _ = Integration.objects.get_or_create(
         type=integration_type_movebank,
@@ -617,15 +617,15 @@ def destination_movebank(
 
 @pytest.fixture
 def integrations_list(
-    organization,
-    other_organization,
-    integration_type_er,
-    get_random_id,
-    er_action_auth,
-    er_action_pull_positions,
-    er_action_pull_events,
-    er_action_push_positions,
-    er_action_push_events,
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_pull_positions,
+        er_action_pull_events,
+        er_action_push_positions,
+        er_action_push_events,
 ):
     integrations = []
     for i in range(10):
@@ -692,25 +692,25 @@ def make_random_sources(get_random_id):
 
 @pytest.fixture
 def lotek_sources(
-    get_random_id, organization, provider_lotek_panthera, make_random_sources
+        get_random_id, organization, provider_lotek_panthera, make_random_sources
 ):
     return make_random_sources(provider=provider_lotek_panthera, qty=5)
 
 
 @pytest.fixture
 def movebank_sources(
-    get_random_id, organization, provider_movebank_ewt, make_random_sources
+        get_random_id, organization, provider_movebank_ewt, make_random_sources
 ):
     return make_random_sources(provider=provider_movebank_ewt, qty=3)
 
 
 @pytest.fixture
 def route_1(
-    get_random_id,
-    organization,
-    lotek_sources,
-    provider_lotek_panthera,
-    integrations_list,
+        get_random_id,
+        organization,
+        lotek_sources,
+        provider_lotek_panthera,
+        integrations_list,
 ):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
@@ -761,12 +761,12 @@ def smart_route_configuration():
 
 @pytest.fixture
 def route_2(
-    get_random_id,
-    other_organization,
-    movebank_sources,
-    provider_movebank_ewt,
-    integrations_list,
-    er_route_configuration_elephants,
+        get_random_id,
+        other_organization,
+        movebank_sources,
+        provider_movebank_ewt,
+        integrations_list,
+        er_route_configuration_elephants,
 ):
     route, _ = Route.objects.get_or_create(
         name=f"Device Set to single destination",
@@ -802,9 +802,9 @@ def integration_type_trap_tagger():
 
 @pytest.fixture
 def provider_trap_tagger(
-    get_random_id,
-    other_organization,
-    integration_type_trap_tagger,
+        get_random_id,
+        other_organization,
+        integration_type_trap_tagger,
 ):
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_trap_tagger,
@@ -916,7 +916,7 @@ def event_delivered_trace2(provider_trap_tagger, integrations_list):
 
 @pytest.fixture
 def attachment_delivered_trace(
-    provider_trap_tagger, event_delivered_trace, integrations_list
+        provider_trap_tagger, event_delivered_trace, integrations_list
 ):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
@@ -940,7 +940,7 @@ def mock_cloud_storage(mocker):
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event(
-    mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -964,7 +964,7 @@ def trap_tagger_observation_delivered_event(
 
 @pytest.fixture
 def trap_tagger_to_movebank_observation_delivered_event(
-    mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
+        mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -990,7 +990,7 @@ def trap_tagger_to_movebank_observation_delivered_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(
-    mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1014,7 +1014,7 @@ def trap_tagger_observation_delivered_event_two(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event(
-    mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1037,7 +1037,7 @@ def trap_tagger_observation_delivery_failed_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event_two(
-    mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1452,11 +1452,11 @@ def setup_movebank_test_data(db):
 
 @pytest.fixture
 def setup_movebank_test_devices_sources(
-    destination_movebank,
-    legacy_integration_type_movebank,
-    provider_lotek_panthera,
-    mb_action_permissions,
-    lotek_sources,
+        destination_movebank,
+        legacy_integration_type_movebank,
+        provider_lotek_panthera,
+        mb_action_permissions,
+        lotek_sources,
 ):
     # v1
     iit = InboundIntegrationType.objects.create(
@@ -1538,6 +1538,15 @@ def legacy_integration_type_earthranger():
 
 
 @pytest.fixture
+def legacy_inbound_integration_type_earthranger():
+    return InboundIntegrationType.objects.create(
+        name="EarthRanger",
+        slug="earth_ranger",
+        description="Default integration type for Earth Ranger as inbound",
+    )
+
+
+@pytest.fixture
 def legacy_integration_type_smart():
     return OutboundIntegrationType.objects.create(
         name="SMART",
@@ -1556,8 +1565,17 @@ def legacy_integration_type_wpswatch():
 
 
 @pytest.fixture
+def inbound_integration_er(legacy_inbound_integration_type_earthranger, organization):
+    return InboundIntegrationConfiguration.objects.create(
+        name="EarthRanger Integration v1",
+        type=legacy_inbound_integration_type_earthranger,
+        owner=organization
+    )
+
+
+@pytest.fixture
 def outbound_integration_er_with_kafka_dispatcher(
-    legacy_integration_type_earthranger, organization,
+        legacy_integration_type_earthranger, organization,
 ):
     return OutboundIntegrationConfiguration.objects.create(
         name="EarthRanger Integration v1 with Kafka",
@@ -1572,7 +1590,7 @@ def outbound_integration_er_with_kafka_dispatcher(
 
 @pytest.fixture
 def outbound_integration_er_no_broker(
-    legacy_integration_type_earthranger, organization,
+        legacy_integration_type_earthranger, organization,
 ):
     integration = OutboundIntegrationConfiguration.objects.create(
         name="EarthRanger Integration v1 no broker specified",
@@ -1587,16 +1605,28 @@ def outbound_integration_er_no_broker(
 
 @pytest.fixture
 def outbound_integration_smart_with_kafka_dispatcher(
-    legacy_integration_type_smart, organization,
+        legacy_integration_type_smart, organization,
 ):
     return OutboundIntegrationConfiguration.objects.create(
-        name="EarthRanger Integration v1 with Kafka",
+        name="SMART Integration v1 with Kafka",
         endpoint="https://test2.fakesmartconnect.com",
         type=legacy_integration_type_smart,
         owner=organization,
         additional={
             "broker": "kafka",
         },
+    )
+
+
+@pytest.fixture
+def outbound_integration_smart(
+        legacy_integration_type_smart, organization,
+):
+    return OutboundIntegrationConfiguration.objects.create(
+        name="SMART Integration v1 with PubSub",
+        endpoint="https://test2.fakesmartconnect.com",
+        type=legacy_integration_type_smart,
+        owner=organization
     )
 
 
@@ -1769,7 +1799,23 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
 
 @pytest.fixture
 def mock_dispatcher_secrets():
-    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO', 'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test', 'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev', 'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300', 'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test', 'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google', 'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id', 'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org', 'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc', 'MAX_EVENT_AGE_SECONDS': '86400', 'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123', 'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'}, 'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev', 'concurrency': 4, 'max_instances': 2, 'min_instances': 0, 'vpc_connector': 'cdip-cloudrun-connector', 'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com', 'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
 
 
 @pytest.fixture
@@ -1777,3 +1823,426 @@ def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secret
     mock = mocker.MagicMock()
     mock.return_value = mock_dispatcher_secrets
     return mock
+
+
+@pytest.fixture
+def das_client_events_response():
+    return [
+        {'id': '537466c0-f4a8-400a-91ae-b7da981ecfd5', 'location': {'latitude': -41.145026, 'longitude': -71.261822},
+         'time': '2024-04-12T07:37:59-06:00', 'end_time': None, 'serial_number': 49575, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp', 'priority': 0,
+         'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
+         'sort_at': '2024-04-12T07:38:04.287767-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-12T07:38:04.287767-06:00', 'created_at': '2024-04-12T07:38:00.730106-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp',
+         'event_details': {'updates': []}, 'files': [{'id': '84ed5275-7c9f-451c-a726-c559fc90e808', 'comment': '',
+                                                      'created_at': '2024-04-12T07:38:04.250161-06:00',
+                                                      'updated_at': '2024-04-12T07:38:04.250249-06:00', 'updates': [
+                {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                 'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+                 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                          'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+                 'type': 'add_eventfile'}],
+                                                      'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/',
+                                                      'images': {
+                                                          'original': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/original/2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                          'icon': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/icon/2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                          'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/thumbnail/2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                          'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/large/2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                          'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/xlarge/2024-04-12_10-37-55_shelter_camp_observ....jpg'},
+                                                      'filename': '2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                      'file_type': 'image',
+                                                      'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/icon/2024-04-12_10-37-55_shelter_camp_observ....jpg'}],
+         'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261822, -41.145026]},
+                     'properties': {'message': '', 'datetime': '2024-04-12T13:37:59+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Changed State: new → active', 'time': '2024-04-12T13:38:04.303464+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
+            {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
+             'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T13:38:00.816986+00:00',
+                                        'user': {'username': 'marianom', 'first_name': 'Mariano',
+                                                 'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
+                                                 'content_type': 'accounts.user'}, 'type': 'add_event'}],
+         'patrols': []},
+        {'id': 'ecaf94dc-1a75-4163-9795-784db8cbf29e', 'location': {'latitude': -41.145139, 'longitude': -71.262131},
+         'time': '2024-04-12T06:58:32-06:00', 'end_time': None, 'serial_number': 49574, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_animals', 'priority': 0, 'priority_label': 'Gray',
+         'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
+         'sort_at': '2024-04-12T06:58:35.476603-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-12T06:58:35.476603-06:00', 'created_at': '2024-04-12T06:58:33.372986-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_animals', 'event_details': {'updates': []}, 'files': [
+            {'id': '73be60b8-19fb-4e3c-ab66-bada9fcae6c6', 'comment': '',
+             'created_at': '2024-04-12T06:58:35.432821-06:00', 'updated_at': '2024-04-12T06:58:35.432852-06:00',
+             'updates': [
+                 {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+                  'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+                  'type': 'add_eventfile'}],
+             'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/',
+             'images': {
+                 'original': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/original/2024-04-12_09-58-23_wildlife.jpg',
+                 'icon': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/icon/2024-04-12_09-58-23_wildlife.jpg',
+                 'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/thumbnail/2024-04-12_09-58-23_wildlife.jpg',
+                 'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/large/2024-04-12_09-58-23_wildlife.jpg',
+                 'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/xlarge/2024-04-12_09-58-23_wildlife.jpg'},
+             'filename': '2024-04-12_09-58-23_wildlife.jpg', 'file_type': 'image',
+             'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/icon/2024-04-12_09-58-23_wildlife.jpg'}],
+         'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.262131, -41.145139]},
+                     'properties': {'message': '', 'datetime': '2024-04-12T12:58:32+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:58:35.495824+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
+            {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+             'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                                  'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:58:33.432933+00:00',
+                                        'user': {'username': 'marianom', 'first_name': 'Mariano',
+                                                 'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
+                                                 'content_type': 'accounts.user'}, 'type': 'add_event'}],
+         'patrols': []},
+        {'id': 'e74fd6de-bfa9-44a8-b878-9689afd53079', 'location': {'latitude': -41.145106, 'longitude': -71.26202},
+         'time': '2024-04-12T06:30:19-06:00', 'end_time': None, 'serial_number': 49573, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment', 'priority': 0,
+         'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
+         'sort_at': '2024-04-12T06:30:22.850273-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-12T06:30:22.850273-06:00', 'created_at': '2024-04-12T06:30:20.768199-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment',
+         'event_details': {'numberofweaponorgear': 1, 'actiontakenweaponorgar': 'confiscated',
+                           'typeofevidentmaterials': 'other', 'updates': []}, 'files': [
+            {'id': 'cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f', 'comment': '',
+             'created_at': '2024-04-12T06:30:22.811731-06:00', 'updated_at': '2024-04-12T06:30:22.811771-06:00',
+             'updates': [{'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+                          'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+                          'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                                   'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+                          'type': 'add_eventfile'}],
+             'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/',
+             'images': {
+                 'original': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/original/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+                 'icon': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/icon/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+                 'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/thumbnail/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+                 'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/large/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+                 'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/xlarge/2024-04-12_09-29-39_weapons_and_gear_se....jpg'},
+             'filename': '2024-04-12_09-29-39_weapons_and_gear_se....jpg', 'file_type': 'image',
+             'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/icon/2024-04-12_09-29-39_weapons_and_gear_se....jpg'}],
+         'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.26202, -41.145106]},
+                     'properties': {'message': '', 'datetime': '2024-04-12T12:30:19+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:30:22.871420+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
+            {'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
+             'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:30:20.821637+00:00',
+                                        'user': {'username': 'marianom', 'first_name': 'Mariano',
+                                                 'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
+                                                 'content_type': 'accounts.user'}, 'type': 'add_event'}],
+         'patrols': []},
+        {'id': 'ede43c88-f282-46eb-ae63-227da082c2b4', 'location': {'latitude': -41.145032, 'longitude': -71.261906},
+         'time': '2024-04-12T06:22:11-06:00', 'end_time': None, 'serial_number': 49572, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching', 'priority': 0,
+         'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
+         'sort_at': '2024-04-12T06:22:12.044902-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-12T06:22:12.044902-06:00', 'created_at': '2024-04-12T06:22:12.046247-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching',
+         'event_details': {'animalpoached': 'carcass', 'targetspecies': 'birds.greategret', 'numberofanimalpoached': 1,
+                           'updates': []}, 'files': [], 'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ede43c88-f282-46eb-ae63-227da082c2b4',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261906, -41.145032]},
+                     'properties': {'message': '', 'datetime': '2024-04-12T12:22:11+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Created', 'time': '2024-04-12T12:22:12.123550+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_event'}], 'patrols': []},
+        {'id': '5becfebb-1d4d-4096-89f1-737521e23f92', 'location': {'latitude': -41.145088, 'longitude': -71.261973},
+         'time': '2024-04-11T16:04:50-06:00', 'end_time': None, 'serial_number': 49571, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_transportation', 'priority': 0,
+         'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
+         'sort_at': '2024-04-11T16:04:50.943795-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-11T16:04:50.943795-06:00', 'created_at': '2024-04-11T16:04:50.944835-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_transportation',
+         'event_details': {'updates': []}, 'files': [], 'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/5becfebb-1d4d-4096-89f1-737521e23f92',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261973, -41.145088]},
+                     'properties': {'message': '', 'datetime': '2024-04-11T22:04:50+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Created', 'time': '2024-04-11T22:04:50.985980+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_event'}], 'patrols': []},
+        {'id': 'f7401f43-d10e-4979-8bd9-60c32a4b1c23', 'location': {'latitude': -41.145088, 'longitude': -71.261973},
+         'time': '2024-04-11T15:42:22-06:00', 'end_time': None, 'serial_number': 49570, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_features_waterhole', 'priority': 0,
+         'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
+         'sort_at': '2024-04-11T15:42:22.950275-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-11T15:42:22.950275-06:00', 'created_at': '2024-04-11T15:42:22.951102-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_features_waterhole', 'event_details': {'updates': []},
+         'files': [], 'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/f7401f43-d10e-4979-8bd9-60c32a4b1c23',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261973, -41.145088]},
+                     'properties': {'message': '', 'datetime': '2024-04-11T21:42:22+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Created', 'time': '2024-04-11T21:42:22.961648+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_event'}], 'patrols': []},
+        {'id': 'bad79581-12d1-48b6-bd26-5f8a0ad97427', 'location': {'latitude': -41.145001, 'longitude': -71.26194},
+         'time': '2024-04-11T15:38:00-06:00', 'end_time': None, 'serial_number': 49569, 'message': '', 'provenance': '',
+         'event_type': '169361d0-62b8-411d-a8e6-019823805016_animals', 'priority': 0, 'priority_label': 'Gray',
+         'attributes': {}, 'comment': None, 'title': None,
+         'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
+                         'name': 'Mariano Martinez', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                         'common_name': None, 'additional': {}, 'created_at': '2024-03-13T11:07:40.684181-06:00',
+                         'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
+                         'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
+                         'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
+         'sort_at': '2024-04-11T15:38:00.530146-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': '2024-04-11T15:38:00.530146-06:00', 'created_at': '2024-04-11T15:38:00.531426-06:00',
+         'icon_id': '169361d0-62b8-411d-a8e6-019823805016_animals', 'event_details': {'updates': []}, 'files': [],
+         'related_subjects': [], 'event_category': 'smart',
+         'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/bad79581-12d1-48b6-bd26-5f8a0ad97427',
+         'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+         'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.26194, -41.145001]},
+                     'properties': {'message': '', 'datetime': '2024-04-11T21:38:00+00:00',
+                                    'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                    'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
+                                             'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
+                                             'className': 'dot'}}}, 'is_collection': False, 'updates': [
+            {'message': 'Created', 'time': '2024-04-11T21:38:00.617275+00:00',
+             'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
+                      'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
+             'type': 'add_event'}], 'patrols': []}
+    ]
+
+
+@pytest.fixture
+def das_client_patrols_response():
+    return [
+        {'id': 'd0e3542d-6346-4f5d-9d47-805add57f8be', 'priority': 0, 'state': 'open', 'objective': None,
+         'serial_number': 24, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
+            {'id': '159ac2d7-2b49-4435-b18d-1233017c80b7', 'patrol_type': 'routine_patrol',
+             'leader': {'content_type': 'observations.subject', 'id': '73624ad7-7337-47bd-9a31-8d6d03eb133e',
+                        'name': 'Admin One (SMART)', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                        'common_name': None, 'additional': {'ca_uuid': '169361d0-62b8-411d-a8e6-019823805016',
+                                                            'smart_member_id': '088da485de3c4175b6eaf645d0ac4796'},
+                        'created_at': '2024-03-07T14:59:26.608485-06:00',
+                        'updated_at': '2024-03-07T14:59:26.608510-06:00', 'is_active': True, 'user': None,
+                        'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
+             'scheduled_start': '2024-04-12T12:09:02.760000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': '2024-04-12T12:09:13.182000-06:00', 'end_time': None},
+             'start_location': {'latitude': 25.46380455676075, 'longitude': -106.17172113020978}, 'end_location': None,
+             'events': [], 'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
+             'icon_id': 'routine-patrol-icon', 'updates': [
+                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:13.339878+00:00',
+                 'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                          'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+                 'type': 'update_segment'}]}], 'updates': [
+            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:11.808969+00:00',
+             'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                      'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+             'type': 'add_patrol'}]},
+        {'id': 'e541b97f-7936-476f-bbdf-8cbc413af658', 'priority': 0, 'state': 'open', 'objective': None,
+         'serial_number': 23, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
+            {'id': '142eca77-79c2-4cc7-acab-728c2ad82989', 'patrol_type': 'routine_patrol',
+             'leader': {'content_type': 'observations.subject', 'id': '33458b5b-10df-494a-9d2d-bb808d602de0',
+                        'name': 'Antony Lynam (SMART)', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                        'common_name': None, 'additional': {'ca_uuid': '169361d0-62b8-411d-a8e6-019823805016',
+                                                            'smart_member_id': '9f9cbc580fce4db1ae6a080c8816dcb1'},
+                        'created_at': '2024-03-07T14:59:33.833433-06:00',
+                        'updated_at': '2024-03-07T14:59:33.833460-06:00', 'is_active': True, 'user': None,
+                        'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
+             'scheduled_start': '2024-04-12T11:45:16.796000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': '2024-04-12T11:47:29.077000-06:00', 'end_time': None},
+             'start_location': {'latitude': 25.35092637406109, 'longitude': -106.04704163232911},
+             'end_location': None, 'events': [],
+             'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
+             'icon_id': 'routine-patrol-icon', 'updates': [
+                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T17:47:29.571873+00:00',
+                 'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                          'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+                 'type': 'update_segment'}]}], 'updates': [
+            {'message': 'Patrol Added', 'time': '2024-04-12T17:45:33.457184+00:00',
+             'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                      'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+             'type': 'add_patrol'}]},
+        {'id': 'c3c54188-aae5-414f-bf95-ec0500078d2d', 'priority': 0, 'state': 'open', 'objective': None,
+         'serial_number': 25, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
+            {'id': 'e36587a7-2fc6-4d75-9a7f-504169e9d926', 'patrol_type': 'routine_patrol',
+             'leader': {'content_type': 'observations.subject', 'id': '97ca29f0-f3c0-4693-b1c8-b0d00cc068f1',
+                        'name': 'Bos Pin បោះ ពិន (SMART)', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                        'common_name': None, 'additional': {'ca_uuid': '169361d0-62b8-411d-a8e6-019823805016',
+                                                            'smart_member_id': '788207bc93974cb0a1a445ab232140eb'},
+                        'created_at': '2024-03-07T14:59:25.786875-06:00',
+                        'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
+                        'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
+             'scheduled_start': '2024-04-12T12:09:17.655000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': '2024-04-12T12:09:30.147000-06:00', 'end_time': None},
+             'start_location': {'latitude': 28.01653928410248, 'longitude': -107.91184126931785},
+             'end_location': None, 'events': [],
+             'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
+             'icon_id': 'routine-patrol-icon', 'updates': [
+                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:30.309659+00:00',
+                 'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                          'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+                 'type': 'update_segment'}]}], 'updates': [
+            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:28.626462+00:00',
+             'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                      'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+             'type': 'add_patrol'}]},
+        {'id': 'c423ed79-eaa3-4aad-8ecc-11a5f1fb820c', 'priority': 0, 'state': 'open', 'objective': None,
+         'serial_number': 26, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
+            {'id': '527ec2c1-a0f2-40e2-a887-362bcba2e704', 'patrol_type': 'routine_patrol',
+             'leader': {'content_type': 'observations.subject', 'id': '97ca29f0-f3c0-4693-b1c8-b0d00cc068f1',
+                        'name': 'Bos Pin បោះ ពិន (SMART)', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                        'common_name': None, 'additional': {'ca_uuid': '169361d0-62b8-411d-a8e6-019823805016',
+                                                            'smart_member_id': '788207bc93974cb0a1a445ab232140eb'},
+                        'created_at': '2024-03-07T14:59:25.786875-06:00',
+                        'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
+                        'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
+             'scheduled_start': '2024-04-12T12:22:37.505000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': '2024-04-12T12:22:48.829000-06:00', 'end_time': None},
+             'start_location': {'latitude': 24.901369994330622, 'longitude': -104.92882719106991},
+             'end_location': None, 'events': [],
+             'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
+             'icon_id': 'routine-patrol-icon', 'updates': [
+                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:22:49.164268+00:00',
+                 'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                          'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+                 'type': 'update_segment'}]}], 'updates': [
+            {'message': 'Patrol Added', 'time': '2024-04-12T18:22:46.466459+00:00',
+             'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                      'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+             'type': 'add_patrol'}]},
+        {'id': 'dbead27b-0039-4349-9099-ad3c448a1d88', 'priority': 0, 'state': 'open', 'objective': None,
+         'serial_number': 27, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
+            {'id': '7b359f9f-8433-42e5-8393-5e1993c98428', 'patrol_type': 'routine_patrol',
+             'leader': {'content_type': 'observations.subject', 'id': '90bb173d-9a7b-444a-82ac-41d3e88b931c',
+                        'name': 'Drew Cronin (SMART)', 'subject_type': 'person', 'subject_subtype': 'ranger',
+                        'common_name': None, 'additional': {'ca_uuid': '169361d0-62b8-411d-a8e6-019823805016',
+                                                            'smart_member_id': '6ac37ce1098140c690af85b20dffc791'},
+                        'created_at': '2024-03-07T14:59:26.347917-06:00',
+                        'updated_at': '2024-03-07T14:59:26.347941-06:00', 'is_active': True, 'user': None,
+                        'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
+             'scheduled_start': '2024-04-12T12:26:17.671000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': '2024-04-12T12:26:32.961000-06:00', 'end_time': None},
+             'start_location': {'latitude': 23.31206200043364, 'longitude': -104.43094585906033},
+             'end_location': None, 'events': [],
+             'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
+             'icon_id': 'routine-patrol-icon', 'updates': [
+                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:26:33.304716+00:00',
+                 'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                          'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+                 'type': 'update_segment'}]}], 'updates': [
+            {'message': 'Patrol Added', 'time': '2024-04-12T18:26:31.304513+00:00',
+             'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
+                      'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
+             'type': 'add_patrol'}]}
+    ]
+
+
+@pytest.fixture
+def das_client_observations_response():
+    return []
+
+
+@pytest.fixture
+def mock_das_client(mocker, das_client_events_response, das_client_patrols_response, das_client_observations_response):
+    mock_client = mocker.MagicMock()
+    mock_client.get_events.return_value = das_client_events_response
+    mock_client.get_patrols.return_value = das_client_patrols_response
+    mock_client.get_subject_observations.return_value = das_client_observations_response
+    return mock_client
+
+
+@pytest.fixture
+def mock_smart_client(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.version = '7.5.7'
+    return mock_client
+
+
+@pytest.fixture
+def mock_pubsub_publisher(mocker):
+    mock_client = mocker.MagicMock()
+    return mock_client
+
+
+@pytest.fixture
+def mock_last_poll(mocker):
+    mock_last_poll = mocker.MagicMock()
+    mock_last_poll.return_value.patrol_last_poll_at = None
+    return mock_last_poll
