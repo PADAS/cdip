@@ -51,7 +51,7 @@ def enrich_span_from_er_event(span, event: EREvent, **kwargs):
     span.set_attribute("event_title", str(event.title))
     span.set_attribute("event_details", str(event.event_details))
     span.set_attribute("patrols", str(event.patrols))
-    span.set_attribute("patrols", str(event.files))
+    span.set_attribute("files", str(event.files))
     _enrich_span_from_kwargs(span, **kwargs)
 
 
