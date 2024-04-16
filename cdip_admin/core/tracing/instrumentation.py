@@ -1,5 +1,11 @@
+import logging
 from django.conf import settings
 from gundi_core.schemas.v2 import Event, Observation
+from gundi_core.schemas.v1 import EREvent
+from opentelemetry import propagate
+
+
+logger = logging.getLogger(__name__)
 
 
 def _enrich_span_from_kwargs(span, **kwargs):
@@ -29,6 +35,26 @@ def enrich_span_from_event(span, event: Event, **kwargs):
     _enrich_span_from_kwargs(span, **kwargs)
 
 
+def enrich_span_from_er_event(span, event: EREvent, **kwargs):
+    """
+    This helper function adds attributes to a span extracting relevant data from an Earth Ranger Event.
+    It also supports passing extra key/value pairs as attributes.
+    """
+    span.set_attribute("er_uuid", str(event.er_uuid))
+    span.set_attribute("serial_number", str(event.serial_number))
+    span.set_attribute("integration_id", str(event.integration_id))
+    span.set_attribute("observation_type", str(event.observation_type))
+    span.set_attribute("device_id", str(event.device_id))
+    span.set_attribute("location", str(event.location.dict()) if event.location else "no-location")
+    span.set_attribute("data", str(event.dict()))
+    span.set_attribute("event_type", str(event.event_type))
+    span.set_attribute("event_title", str(event.title))
+    span.set_attribute("event_details", str(event.event_details))
+    span.set_attribute("patrols", str(event.patrols))
+    span.set_attribute("files", str(event.files))
+    _enrich_span_from_kwargs(span, **kwargs)
+
+
 def enrich_span_from_observation(span, observation: Observation, **kwargs):
     """
     This helper function adds attributes to a span extracting relevant data from an observation.
@@ -52,3 +78,10 @@ def enrich_span_from_attachment(span, attachment, **kwargs):
     span.set_attribute("integration_id", str(attachment.data_provider_id))
     span.set_attribute("observation_type", str(attachment.observation_type))
     _enrich_span_from_kwargs(span, **kwargs)
+
+
+def build_context_headers():
+    headers = {}
+    propagate.inject(headers)
+    logger.debug(f"[tracing.build_context_headers]> headers: {headers}")
+    return headers
