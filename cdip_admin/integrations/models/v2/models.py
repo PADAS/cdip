@@ -2,6 +2,8 @@ import json
 import uuid
 from functools import cached_property
 import jsonschema
+import requests
+
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
@@ -27,6 +29,7 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
         verbose_name="Value (Identifier)"
     )
     description = models.TextField(blank=True)
+    actions_endpoint = models.URLField(blank=True, null=True, default="")
 
     class Meta:
         ordering = ("name",)
@@ -78,6 +81,22 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
     def validate_configuration(self, configuration: dict):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
+
+    def execute(self, integration, config_overrides=None, run_in_background=False):
+        config_overrides = config_overrides or {}
+        action_runner_endpoint = integration.type.actions_endpoint
+        if not action_runner_endpoint:
+            raise ValueError(f"Integration Type '{integration.type}' does not have an actions endpoint configured")
+        response = requests.post(
+            url=action_runner_endpoint,
+            json={
+                "integration_id": str(integration.id),
+                "action_id": self.value,
+                "run_in_background": run_in_background,
+                "config_overrides": config_overrides,
+            }
+        )
+        response.raise_for_status()
 
 
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
