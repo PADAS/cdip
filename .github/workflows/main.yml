@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - 'release-**'
+      - 'gundi-2991-trigger-actions'
 
 jobs:
   vars:
