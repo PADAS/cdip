@@ -71,7 +71,7 @@ class IsOrgAdmin(permissions.BasePermission):
     org_admin_allowed_actions = {
         "organizations": ["list", "retrieve", "update", "partial_update"],
         "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
-        "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy", "execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "logs": ["list", "retrieve", "revert"]

@@ -978,3 +978,7 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
     is_reversible = serializers.BooleanField(read_only=True)
     revert_data = serializers.JSONField(read_only=True)
 
+
+class ActionTriggerSerializer(serializers.Serializer):
+    run_in_background = serializers.BooleanField(required=False, default=False)
+    config_overrides = serializers.JSONField(required=False, write_only=True)
