@@ -239,6 +239,7 @@ class IntegrationTypeAdmin(admin.ModelAdmin):
         "name",
         "value",
         "description",
+        "actions_endpoint"
     )
 
 
