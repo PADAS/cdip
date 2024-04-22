@@ -3,14 +3,14 @@ from django.db.models import Subquery
 
 from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
-    get_user_routes_qs, GundiTrace
+    get_user_routes_qs, GundiTrace, IntegrationAction
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
 from accounts.models import AccountProfileOrganization
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
-from rest_framework import viewsets, status, mixins
+from rest_framework import viewsets, status, mixins, generics
 from rest_framework import filters as drf_filters
 from rest_framework import exceptions as drf_exceptions
 from rest_framework.decorators import action
@@ -452,3 +452,27 @@ class ActivityLogsViewSet(
             raise drf_exceptions.ValidationError("This activity log is not reversible.")
         activity_log.revert()
         return Response({"status": "Activity reverted with success"})
+
+
+class ActionTriggerView(
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for triggering actions
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    lookup_field = "value"
+
+    @action(detail=True, methods=["post", "put"], lookup_field="value")
+    def execute(self, request, integration_pk, value=None):
+        serializer = v2_serializers.ActionTriggerSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        integration = Integration.objects.get(id=integration_pk)
+        action = IntegrationAction.objects.get(integration_type=integration.type, value=value)
+        action.execute(
+            integration=integration,
+            run_in_background=serializer.data.get("run_in_background", False),
+            config_overrides=serializer.data.get("config_overrides")
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
