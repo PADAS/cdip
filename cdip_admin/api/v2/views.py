@@ -462,10 +462,11 @@ class ActionTriggerView(
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     lookup_field = "value"
+    serializer_class = v2_serializers.ActionTriggerSerializer
 
     @action(detail=True, methods=["post", "put"], lookup_field="value")
     def execute(self, request, integration_pk, value=None):
-        serializer = v2_serializers.ActionTriggerSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         integration = Integration.objects.get(id=integration_pk)
