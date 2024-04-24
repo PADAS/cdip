@@ -3,7 +3,8 @@ import uuid
 from functools import cached_property
 import jsonschema
 import requests
-
+from urllib.parse import urljoin
+import google.oauth2.id_token
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
@@ -29,7 +30,7 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
         verbose_name="Value (Identifier)"
     )
     description = models.TextField(blank=True)
-    actions_endpoint = models.URLField(blank=True, null=True, default="")
+    service_url = models.URLField(blank=True, null=True, default="")
 
     class Meta:
         ordering = ("name",)
@@ -84,11 +85,21 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
 
     def execute(self, integration, config_overrides=None, run_in_background=False):
         config_overrides = config_overrides or {}
-        action_runner_endpoint = integration.type.actions_endpoint
-        if not action_runner_endpoint:
-            raise ValueError(f"Integration Type '{integration.type}' does not have an actions endpoint configured")
+        service_url = integration.type.service_url
+        if not service_url:
+            raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
+
+        # Build the URL for the action runner endpoint
+        actions_execute_path = "v1/actions/execute"
+        actions_execute_url = urljoin(service_url, actions_execute_path)
+
+        # Make an authorized request to the action runner endpoint using google.oauth2.id_token
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+        auth_headers = {"Authorization": f"Bearer {id_token}"}
         response = requests.post(
-            url=action_runner_endpoint,
+            url=actions_execute_url,
+            headers=auth_headers,
             json={
                 "integration_id": str(integration.id),
                 "action_id": self.value,
@@ -97,6 +108,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
             }
         )
         response.raise_for_status()
+        return response.json()
 
 
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):

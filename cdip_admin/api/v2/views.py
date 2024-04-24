@@ -470,10 +470,10 @@ class ActionTriggerView(
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         integration = Integration.objects.get(id=integration_pk)
-        action = IntegrationAction.objects.get(integration_type=integration.type, value=value)
-        action.execute(
+        integration_action = IntegrationAction.objects.get(integration_type=integration.type, value=value)
+        response_data = integration_action.execute(
             integration=integration,
             run_in_background=serializer.data.get("run_in_background", False),
             config_overrides=serializer.data.get("config_overrides")
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
