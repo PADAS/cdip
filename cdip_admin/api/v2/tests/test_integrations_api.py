@@ -8,7 +8,7 @@ from activity_log.models import ActivityLog
 from integrations.models import (
     Integration,
     IntegrationAction,
-    IntegrationConfiguration,
+    IntegrationConfiguration, IntegrationType,
 )
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
@@ -605,6 +605,105 @@ def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer
             ).distinct()
         )
     )
+
+
+def test_register_integration_type_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology X",
+        "value": "tech_x",
+        "description": f"Default type for integrations with Technology X",
+        "service_url": "https://techx-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": IntegrationAction.ActionTypes.AUTHENTICATION.value,
+                "name": "Authenticate",
+                "value": "auth",
+                "description": "Technology X Authenticate action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string"
+                        },
+                        "password": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["username", "password"]
+                },
+                "is_periodic_action": False
+            },
+            {
+                "type": IntegrationAction.ActionTypes.PULL_DATA.value,
+                "name": "Fetch Data Sample",
+                "value": "fetch_samples",
+                "description": "Technology X Fetch Data Sample action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "sensor_type": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["sensor_type"]
+                },
+                "is_periodic_action": False
+            },
+            {
+                "type": IntegrationAction.ActionTypes.PULL_DATA.value,
+                "name": "Pull Observations",
+                "value": "pull_observations",
+                "description": "Technology X pull observations action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["start_date"]
+                },
+                "is_periodic_action": True
+            }
+        ]
+    }
+    response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    integration_type = IntegrationType.objects.get(value=request_data["value"])
+    assert integration_type.name == request_data["name"]
+    assert integration_type.description == request_data["description"]
+    assert integration_type.service_url == request_data["service_url"]
+    for action in request_data["actions"]:
+        action_in_db = IntegrationAction.objects.get(integration_type=integration_type, value=action["value"])
+        assert action_in_db.type == action["type"]
+        assert action_in_db.name == action["name"]
+        assert action_in_db.description == action["description"]
+        assert action_in_db.schema == action["schema"]
+        assert action_in_db.is_periodic_action == action["is_periodic_action"]
+
+
+def test_update_service_url_in_integration_type_as_superuser(api_client, superuser, integration_type_lotek):
+    api_client.force_authenticate(superuser)
+    lotek_integration_url = "https://lotek-actions-runner-fakeurl123-uc.a.run.app"
+    request_data = {
+        "service_url": lotek_integration_url
+    }
+
+    response = api_client.patch(
+        reverse("integration-types-detail", kwargs={"value": integration_type_lotek.value}),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    integration_type_lotek.refresh_from_db()
+    assert integration_type_lotek.service_url == lotek_integration_url
 
 
 def _test_filter_integration_types(api_client, user, filters, expected_integration_types):
