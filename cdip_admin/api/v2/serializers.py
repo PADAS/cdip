@@ -287,6 +287,33 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
         return integration_type
 
 
+class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer):
+    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = IntegrationType
+        fields = (
+            "name",
+            "value",
+            "description",
+            "actions",
+            "service_url",
+        )
+
+    def update(self, instance, validated_data):
+        actions = validated_data.pop("actions", [])
+        # Update the integration type
+        super().update(instance=instance, validated_data=validated_data)
+        # Update or Create nested actions if provided
+        for action_data in actions:  # Usually less than 5 actions
+            action_data["integration_type"] = self.instance
+            IntegrationAction.objects.update_or_create(
+                value=action_data.get("value"),
+                defaults=action_data
+            )
+        return instance
+
+
 class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
     action = IntegrationActionSummarySerializer()
 
