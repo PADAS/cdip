@@ -84,9 +84,7 @@ coreapi==2.3.3
 coreschema==0.0.4
     # via coreapi
 coverage[toml]==7.3.0
-    # via
-    #   coverage
-    #   pytest-cov
+    # via pytest-cov
 cron-descriptor==1.4.0
     # via django-celery-beat
 croniter==0.3.32
@@ -211,7 +209,6 @@ gevent==21.12.0
     # via -r requirements.in
 google-api-core[grpc]==2.11.1
     # via
-    #   google-api-core
     #   google-cloud-core
     #   google-cloud-eventarc
     #   google-cloud-functions
@@ -545,9 +542,12 @@ requests==2.31.0
     #   google-cloud-storage
     #   opentelemetry-exporter-otlp-proto-http
     #   python-keycloak-client
+    #   requests-mock
     #   requests-oauthlib
     #   smartconnect-client
     #   social-auth-core
+requests-mock==1.12.1
+    # via -r requirements-dev.in
 requests-oauthlib==1.3.0
     # via
     #   -r requirements.in
