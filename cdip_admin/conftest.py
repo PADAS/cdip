@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from datetime import datetime
 from unittest.mock import PropertyMock
 
 import pytest
@@ -613,6 +614,130 @@ def destination_movebank(
         data={"feed": "gundi/earthranger"},
     )
     return destination
+
+
+@pytest.fixture
+def integration_type_cellstop():
+    return IntegrationType.objects.create(
+        name="Cellstop",
+        value="cellstop",
+        description="Standard integration type for Cellstop",
+        service_url="https://cellstop-actions-runner-fakeurl123-uc.a.run.app"
+    )
+
+
+@pytest.fixture
+def cellstop_action_fetch_samples(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Fetch Samples",
+        value="fetch_samples",
+        description="Extract a data sample from cellstop",
+    )
+
+@pytest.fixture
+def cellstop_fetch_samples_response():
+    return {
+        "observations_extracted": 2,
+        "observations": [
+            {
+                "deviceId": 1234,
+                "vehicleId": 5678,
+                "x": 12.123456789,
+                "y": -21.123456789,
+                "name": "device-name-1",
+                "regNo": "A12345B ",
+                "iconURL": None,
+                "address": "fake street 123, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+132456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            },
+            {
+                "deviceId": 2345,
+                "vehicleId": 6789,
+                "x": 11.123456789,
+                "y": -22.123456789,
+                "name": "device-name-2",
+                "regNo": "B45678C",
+                "iconURL": None,
+                "address": "fake street 456, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+123456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def cellstop_action_auth(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="API Key to authenticate against Cellstop API",
+        schema={
+            "type": "object",
+            "required": ["username", "password"],
+            "properties": {
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
+    )
+
+
+@pytest.fixture
+def cellstop_action_auth_response():
+    return {
+        "valid_credentials": True
+    }
+
+
+@pytest.fixture
+def cellstop_integration(
+        organization,
+        other_organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstopnm.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Cellstop Site {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    return integration
 
 
 @pytest.fixture
@@ -1827,9 +1952,10 @@ def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secret
 
 @pytest.fixture
 def das_client_events_response():
+    today = datetime.now().strftime('%Y-%m-%d')
     return [
         {'id': '537466c0-f4a8-400a-91ae-b7da981ecfd5', 'location': {'latitude': -41.145026, 'longitude': -71.261822},
-         'time': '2024-04-12T07:37:59-06:00', 'end_time': None, 'serial_number': 49575, 'message': '', 'provenance': '',
+         'time': f'{today}T07:37:59-06:00', 'end_time': None, 'serial_number': 49575, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1838,14 +1964,14 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T07:38:04.287767-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T07:38:04.287767-06:00', 'created_at': '2024-04-12T07:38:00.730106-06:00',
+         'sort_at': f'{today}T07:38:04.287767-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T07:38:04.287767-06:00', 'created_at': f'{today}T07:38:00.730106-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp',
          'event_details': {'updates': []}, 'files': [{'id': '84ed5275-7c9f-451c-a726-c559fc90e808', 'comment': '',
-                                                      'created_at': '2024-04-12T07:38:04.250161-06:00',
-                                                      'updated_at': '2024-04-12T07:38:04.250249-06:00', 'updates': [
+                                                      'created_at': f'{today}T07:38:04.250161-06:00',
+                                                      'updated_at': f'{today}T07:38:04.250249-06:00', 'updates': [
                 {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
-                 'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+                 'time': f'{today}T13:38:04.270018+00:00', 'text': '',
                  'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                           'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                  'type': 'add_eventfile'}],
@@ -1856,32 +1982,32 @@ def das_client_events_response():
                                                           'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/thumbnail/2024-04-12_10-37-55_shelter_camp_observ....jpg',
                                                           'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/large/2024-04-12_10-37-55_shelter_camp_observ....jpg',
                                                           'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/xlarge/2024-04-12_10-37-55_shelter_camp_observ....jpg'},
-                                                      'filename': '2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                      'filename': f'{today}_10-37-55_shelter_camp_observ....jpg',
                                                       'file_type': 'image',
                                                       'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/icon/2024-04-12_10-37-55_shelter_camp_observ....jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261822, -41.145026]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T13:37:59+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T13:37:59+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T13:38:04.303464+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T13:38:04.303464+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
             {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
-             'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+             'time': f'{today}T13:38:04.270018+00:00', 'text': '',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T13:38:00.816986+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T13:38:00.816986+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'ecaf94dc-1a75-4163-9795-784db8cbf29e', 'location': {'latitude': -41.145139, 'longitude': -71.262131},
-         'time': '2024-04-12T06:58:32-06:00', 'end_time': None, 'serial_number': 49574, 'message': '', 'provenance': '',
+         'time': f'{today}T06:58:32-06:00', 'end_time': None, 'serial_number': 49574, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_animals', 'priority': 0, 'priority_label': 'Gray',
          'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1890,13 +2016,13 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:58:35.476603-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:58:35.476603-06:00', 'created_at': '2024-04-12T06:58:33.372986-06:00',
+         'sort_at': f'{today}T06:58:35.476603-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:58:35.476603-06:00', 'created_at': f'{today}T06:58:33.372986-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_animals', 'event_details': {'updates': []}, 'files': [
             {'id': '73be60b8-19fb-4e3c-ab66-bada9fcae6c6', 'comment': '',
-             'created_at': '2024-04-12T06:58:35.432821-06:00', 'updated_at': '2024-04-12T06:58:35.432852-06:00',
+             'created_at': f'{today}T06:58:35.432821-06:00', 'updated_at': f'{today}T06:58:35.432852-06:00',
              'updates': [
-                 {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+                 {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': f'{today}T12:58:35.457115+00:00',
                   'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                        'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                   'type': 'add_eventfile'}],
@@ -1907,30 +2033,30 @@ def das_client_events_response():
                  'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/thumbnail/2024-04-12_09-58-23_wildlife.jpg',
                  'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/large/2024-04-12_09-58-23_wildlife.jpg',
                  'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/xlarge/2024-04-12_09-58-23_wildlife.jpg'},
-             'filename': '2024-04-12_09-58-23_wildlife.jpg', 'file_type': 'image',
+             'filename': f'{today}_09-58-23_wildlife.jpg', 'file_type': 'image',
              'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/icon/2024-04-12_09-58-23_wildlife.jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.262131, -41.145139]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:58:32+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:58:32+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:58:35.495824+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T12:58:35.495824+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
-            {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+            {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': f'{today}T12:58:35.457115+00:00',
              'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                   'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:58:33.432933+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T12:58:33.432933+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'e74fd6de-bfa9-44a8-b878-9689afd53079', 'location': {'latitude': -41.145106, 'longitude': -71.26202},
-         'time': '2024-04-12T06:30:19-06:00', 'end_time': None, 'serial_number': 49573, 'message': '', 'provenance': '',
+         'time': f'{today}T06:30:19-06:00', 'end_time': None, 'serial_number': 49573, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1939,15 +2065,15 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:30:22.850273-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:30:22.850273-06:00', 'created_at': '2024-04-12T06:30:20.768199-06:00',
+         'sort_at': f'{today}T06:30:22.850273-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:30:22.850273-06:00', 'created_at': f'{today}T06:30:20.768199-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment',
          'event_details': {'numberofweaponorgear': 1, 'actiontakenweaponorgar': 'confiscated',
                            'typeofevidentmaterials': 'other', 'updates': []}, 'files': [
             {'id': 'cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f', 'comment': '',
-             'created_at': '2024-04-12T06:30:22.811731-06:00', 'updated_at': '2024-04-12T06:30:22.811771-06:00',
+             'created_at': f'{today}T06:30:22.811731-06:00', 'updated_at': f'{today}T06:30:22.811771-06:00',
              'updates': [{'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
-                          'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+                          'time': f'{today}T12:30:22.832590+00:00', 'text': '',
                           'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                    'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                           'type': 'add_eventfile'}],
@@ -1958,31 +2084,31 @@ def das_client_events_response():
                  'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/thumbnail/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
                  'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/large/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
                  'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/xlarge/2024-04-12_09-29-39_weapons_and_gear_se....jpg'},
-             'filename': '2024-04-12_09-29-39_weapons_and_gear_se....jpg', 'file_type': 'image',
+             'filename': f'{today}_09-29-39_weapons_and_gear_se....jpg', 'file_type': 'image',
              'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/icon/2024-04-12_09-29-39_weapons_and_gear_se....jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.26202, -41.145106]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:30:19+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:30:19+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:30:22.871420+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T12:30:22.871420+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
             {'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
-             'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+             'time': f'{today}T12:30:22.832590+00:00', 'text': '',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:30:20.821637+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T12:30:20.821637+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'ede43c88-f282-46eb-ae63-227da082c2b4', 'location': {'latitude': -41.145032, 'longitude': -71.261906},
-         'time': '2024-04-12T06:22:11-06:00', 'end_time': None, 'serial_number': 49572, 'message': '', 'provenance': '',
+         'time': f'{today}T06:22:11-06:00', 'end_time': None, 'serial_number': 49572, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1991,20 +2117,20 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:22:12.044902-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:22:12.044902-06:00', 'created_at': '2024-04-12T06:22:12.046247-06:00',
+         'sort_at': f'{today}T06:22:12.044902-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:22:12.044902-06:00', 'created_at': f'{today}T06:22:12.046247-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching',
          'event_details': {'animalpoached': 'carcass', 'targetspecies': 'birds.greategret', 'numberofanimalpoached': 1,
                            'updates': []}, 'files': [], 'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ede43c88-f282-46eb-ae63-227da082c2b4',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261906, -41.145032]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:22:11+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:22:11+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Created', 'time': '2024-04-12T12:22:12.123550+00:00',
+            {'message': 'Created', 'time': f'{today}T12:22:12.123550+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
              'type': 'add_event'}], 'patrols': []},
@@ -2091,6 +2217,7 @@ def das_client_events_response():
 
 @pytest.fixture
 def das_client_patrols_response():
+    today = datetime.now().strftime('%Y-%m-%d')
     return [
         {'id': 'd0e3542d-6346-4f5d-9d47-805add57f8be', 'priority': 0, 'state': 'open', 'objective': None,
          'serial_number': 24, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
@@ -2102,16 +2229,16 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:26.608485-06:00',
                         'updated_at': '2024-03-07T14:59:26.608510-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:09:02.760000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:09:13.182000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:09:02.760000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:09:13.182000-06:00', 'end_time': None},
              'start_location': {'latitude': 25.46380455676075, 'longitude': -106.17172113020978}, 'end_location': None,
              'events': [], 'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:13.339878+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:09:13.339878+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:11.808969+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:09:11.808969+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2125,17 +2252,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:33.833433-06:00',
                         'updated_at': '2024-03-07T14:59:33.833460-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T11:45:16.796000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T11:47:29.077000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T11:45:16.796000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T11:47:29.077000-06:00', 'end_time': None},
              'start_location': {'latitude': 25.35092637406109, 'longitude': -106.04704163232911},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T17:47:29.571873+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T17:47:29.571873+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T17:45:33.457184+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T17:45:33.457184+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2149,17 +2276,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:25.786875-06:00',
                         'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:09:17.655000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:09:30.147000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:09:17.655000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:09:30.147000-06:00', 'end_time': None},
              'start_location': {'latitude': 28.01653928410248, 'longitude': -107.91184126931785},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:30.309659+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:09:30.309659+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:28.626462+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:09:28.626462+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2173,17 +2300,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:25.786875-06:00',
                         'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:22:37.505000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:22:48.829000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:22:37.505000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:22:48.829000-06:00', 'end_time': None},
              'start_location': {'latitude': 24.901369994330622, 'longitude': -104.92882719106991},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:22:49.164268+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:22:49.164268+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:22:46.466459+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:22:46.466459+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2197,17 +2324,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:26.347917-06:00',
                         'updated_at': '2024-03-07T14:59:26.347941-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:26:17.671000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:26:32.961000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:26:17.671000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:26:32.961000-06:00', 'end_time': None},
              'start_location': {'latitude': 23.31206200043364, 'longitude': -104.43094585906033},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:26:33.304716+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:26:33.304716+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:26:31.304513+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:26:31.304513+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]}

@@ -248,7 +248,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "actions"
+            "actions",
+            "service_url",
         )
 
     def validate_value(self, value):
@@ -284,6 +285,33 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
                 defaults=action_params
             )
         return integration_type
+
+
+class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer):
+    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = IntegrationType
+        fields = (
+            "name",
+            "value",
+            "description",
+            "actions",
+            "service_url",
+        )
+
+    def update(self, instance, validated_data):
+        actions = validated_data.pop("actions", [])
+        # Update the integration type
+        super().update(instance=instance, validated_data=validated_data)
+        # Update or Create nested actions if provided
+        for action_data in actions:  # Usually less than 5 actions
+            action_data["integration_type"] = self.instance
+            IntegrationAction.objects.update_or_create(
+                value=action_data.get("value"),
+                defaults=action_data
+            )
+        return instance
 
 
 class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
@@ -978,3 +1006,7 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
     is_reversible = serializers.BooleanField(read_only=True)
     revert_data = serializers.JSONField(read_only=True)
 
+
+class ActionTriggerSerializer(serializers.Serializer):
+    run_in_background = serializers.BooleanField(required=False, default=False)
+    config_overrides = serializers.JSONField(required=False, write_only=True)
