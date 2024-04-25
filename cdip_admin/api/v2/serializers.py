@@ -248,7 +248,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "actions"
+            "actions",
+            "service_url",
         )
 
     def validate_value(self, value):
