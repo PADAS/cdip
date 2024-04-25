@@ -180,15 +180,12 @@ class IntegrationsView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class IntegrationTypeView(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    viewsets.GenericViewSet
-):
+class IntegrationTypeView(viewsets.ModelViewSet):
     """
     An endpoint for listing integration types.
     """
     queryset = IntegrationType.objects.all()
+    lookup_field = "value"
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
         drf_filters.OrderingFilter,
@@ -201,8 +198,10 @@ class IntegrationTypeView(
     search_fields = ["value", "name", "description"]
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
+        if self.action == "create":
             return v2_serializers.IntegrationTypeIdempotentCreateSerializer
+        elif self.action in ["update", "partial_update"]:
+            return v2_serializers.IntegrationTypeUpdateSerializer
         return v2_serializers.IntegrationTypeFullSerializer
 
 
