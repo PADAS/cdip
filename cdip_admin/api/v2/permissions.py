@@ -35,7 +35,12 @@ def get_user_org(request, view) -> str:
     elif view.basename == "integrations":
         if "owner" in request.data:  # New integration
             org_id = request.data.get("owner")
-        elif integration_id := request.parser_context.get("kwargs", {}).get("pk"):  # Updating existent integration
+        elif integration_id := context.get("pk"):  # Updating existent integration
+            org_id = str(Integration.objects.get(id=integration_id).owner.id)
+        else:
+            org_id = None
+    elif view.basename == "actions":
+        if integration_id := context.get("integration_pk"):
             org_id = str(Integration.objects.get(id=integration_id).owner.id)
         else:
             org_id = None
@@ -71,7 +76,8 @@ class IsOrgAdmin(permissions.BasePermission):
     org_admin_allowed_actions = {
         "organizations": ["list", "retrieve", "update", "partial_update"],
         "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
-        "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy", "execute"],
+        "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "actions": ["execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "logs": ["list", "retrieve", "revert"]
