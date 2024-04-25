@@ -616,6 +616,130 @@ def destination_movebank(
 
 
 @pytest.fixture
+def integration_type_cellstop():
+    return IntegrationType.objects.create(
+        name="Cellstop",
+        value="cellstop",
+        description="Standard integration type for Cellstop",
+        service_url="https://cellstop-actions-runner-fakeurl123-uc.a.run.app"
+    )
+
+
+@pytest.fixture
+def cellstop_action_fetch_samples(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Fetch Samples",
+        value="fetch_samples",
+        description="Extract a data sample from cellstop",
+    )
+
+@pytest.fixture
+def cellstop_fetch_samples_response():
+    return {
+        "observations_extracted": 2,
+        "observations": [
+            {
+                "deviceId": 1234,
+                "vehicleId": 5678,
+                "x": 12.123456789,
+                "y": -21.123456789,
+                "name": "device-name-1",
+                "regNo": "A12345B ",
+                "iconURL": None,
+                "address": "fake street 123, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+132456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            },
+            {
+                "deviceId": 2345,
+                "vehicleId": 6789,
+                "x": 11.123456789,
+                "y": -22.123456789,
+                "name": "device-name-2",
+                "regNo": "B45678C",
+                "iconURL": None,
+                "address": "fake street 456, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+123456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def cellstop_action_auth(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="API Key to authenticate against Cellstop API",
+        schema={
+            "type": "object",
+            "required": ["username", "password"],
+            "properties": {
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
+    )
+
+
+@pytest.fixture
+def cellstop_action_auth_response():
+    return {
+        "valid_credentials": True
+    }
+
+
+@pytest.fixture
+def cellstop_integration(
+        organization,
+        other_organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstopnm.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Cellstop Site {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    return integration
+
+
+@pytest.fixture
 def integrations_list(
         organization,
         other_organization,

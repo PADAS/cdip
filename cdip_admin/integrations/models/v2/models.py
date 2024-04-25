@@ -84,7 +84,6 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         jsonschema.validate(instance=configuration, schema=self.schema)
 
     def execute(self, integration, config_overrides=None, run_in_background=False):
-        config_overrides = config_overrides or {}
         service_url = integration.type.service_url
         if not service_url:
             raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
