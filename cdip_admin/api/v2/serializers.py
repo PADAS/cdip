@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
-from accounts.models import AccountProfileOrganization, AccountProfile
+from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
     GundiTrace
@@ -21,6 +21,7 @@ User = get_user_model()
 
 class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    accepted_eula = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -29,11 +30,20 @@ class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "full_name",
-            "is_superuser"
+            "is_superuser",
+            "accepted_eula",
         )
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip().capitalize()
+
+    def get_accepted_eula(self, obj):
+        try:
+            agreement = UserAgreement.objects.get(user=obj, eula=EULA.objects.get_active_eula())
+        except UserAgreement.DoesNotExist as e:
+            return False
+        else:
+            return agreement.accept
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
