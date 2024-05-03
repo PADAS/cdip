@@ -1,5 +1,5 @@
 from django.contrib import admin
-from accounts.models import AccountProfile
+from accounts.models import AccountProfile, EULA, UserAgreement
 
 
 class OrganzationMemberInline(admin.TabularInline):
@@ -25,3 +25,13 @@ class AccountProfile(admin.ModelAdmin):
     )
 
     fieldsets = ((None, {"classes": ("wide",), "fields": (("user",))}),)
+
+
+@admin.register(EULA)
+class EULAAdmin(admin.ModelAdmin):
+    list_display = ("version", "active", "eula_url", "created_at", )
+
+
+@admin.register(UserAgreement)
+class UserAgreementAdmin(admin.ModelAdmin):
+    list_display = ("user", "eula", "accept", "date_accepted", )
