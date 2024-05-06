@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from smartconnect import SmartClient
 
 from integrations.models import OutboundIntegrationConfiguration
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -57,3 +58,33 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
     config.state['download_data_models'] = False
     config.state['data_models_downloaded_at'] = datetime.now(tz=timezone.utc).isoformat()
     config.save()
+
+def unicode_to_ascii(input_string, replacement=''):
+    """
+    Convert a Unicode string to an ASCII string, using a specified replacement string
+    for those that cannot be converted directly.
+
+    Args:
+    input_string (str): The Unicode string to convert.
+    replacement (str): The string to use for replacing non-ASCII characters.
+
+    Returns:
+    str: The ASCII version of the input string.
+    """
+    # Normalize the Unicode string to decompose characters into base characters and modifiers
+    normalized_string = unicodedata.normalize('NFKD', input_string)
+
+    # Encode to ASCII bytes, using the 'ignore' strategy to skip non-ASCII characters,
+    # then decode back to string, this loses the characters which can't be directly converted
+    ascii_string = normalized_string.encode('ASCII', 'ignore').decode('ASCII')
+
+    # For any character that is not ASCII in the original normalized string, replace it
+    result = []
+    for char in normalized_string:
+        if char in ascii_string:
+            result.append(char)
+        else:
+            result.append(replacement)
+
+    return ''.join(result)
+
