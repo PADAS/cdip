@@ -1020,3 +1020,52 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
 class ActionTriggerSerializer(serializers.Serializer):
     run_in_background = serializers.BooleanField(required=False, default=False)
     config_overrides = serializers.JSONField(required=False, write_only=True)
+
+
+class UserAgreementSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    eula = serializers.HiddenField(default=EULA.objects.get_active_eula())
+    accept = serializers.BooleanField(read_only=True)
+    date_accepted = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = UserAgreement
+        fields = (
+            "user",
+            "eula",
+            "accept",
+            "date_accepted",
+        )
+
+    def get_unique_together_validators(self):
+        # Overriden to disable unique together check as it's handled in the create method
+        return []
+
+    def create(self, validated_data):
+        # Creates the user agreement in a idempotent way
+        agreement, created = UserAgreement.objects.get_or_create(
+            user=validated_data["user"],
+            eula=validated_data["eula"]
+        )
+        return agreement
+
+
+class EULARetrieveSerializer(serializers.ModelSerializer):
+    accepted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EULA
+        fields = (
+            "version",
+            "eula_url",
+            "accepted"
+        )
+
+    def get_accepted(self, obj):
+        try:
+            user = self.context["request"].user
+            agreement = UserAgreement.objects.get(user=user, eula=EULA.objects.get_active_eula())
+        except UserAgreement.DoesNotExist as e:
+            return False
+        else:
+            return agreement.accept
