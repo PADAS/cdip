@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('date_accepted', models.DateTimeField(auto_now_add=True, verbose_name='Date Accepted')),
-                ('accept', models.BooleanField(default=False)),
+                ('accept', models.BooleanField(default=True)),
                 ('eula', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='userterms', to='accounts.eula')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='userterms', to=settings.AUTH_USER_MODEL)),
             ],

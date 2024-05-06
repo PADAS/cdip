@@ -34,14 +34,10 @@ class UserAgreement(UUIDAbstractModel, TimestampedModel):
     user = models.ForeignKey(get_user_model(), related_name="userterms", on_delete=models.CASCADE)
     eula = models.ForeignKey("EULA", related_name="userterms", on_delete=models.CASCADE)
     date_accepted = models.DateTimeField(auto_now_add=True, verbose_name=_("Date Accepted"))
-    accept = models.BooleanField(default=False)
+    accept = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ("user", "eula")
-
-    def save(self, *args, **kwargs):
-        self.accept = True
-        return super(UserAgreement, self).save(*args, **kwargs)
 
 
 class EULAManager(models.Manager):
@@ -75,6 +71,7 @@ class EULA(UUIDAbstractModel, TimestampedModel):
                 fields=['active'], name='unique_active_eula'
             )
         ]
+        ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
         # Check if a new EULA was Created
