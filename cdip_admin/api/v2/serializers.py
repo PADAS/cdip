@@ -1024,7 +1024,7 @@ class ActionTriggerSerializer(serializers.Serializer):
 
 class UserAgreementSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    eula = serializers.HiddenField(default=EULA.objects.get_active_eula())
+    eula = serializers.HiddenField(default=EULA.objects.get_active_eula)
     accept = serializers.BooleanField(read_only=True)
     date_accepted = serializers.DateTimeField(read_only=True)
 
@@ -1043,9 +1043,10 @@ class UserAgreementSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         # Creates the user agreement in a idempotent way
-        agreement, created = UserAgreement.objects.get_or_create(
+        agreement, created = UserAgreement.objects.update_or_create(
             user=validated_data["user"],
-            eula=validated_data["eula"]
+            eula=validated_data["eula"],
+            defaults={"accept": True}
         )
         return agreement
 
