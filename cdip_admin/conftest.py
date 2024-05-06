@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
 from activity_log.models import ActivityLog
 from core.enums import DjangoGroups, RoleChoices
+from accounts.models import EULA, UserAgreement
 from integrations.models import (
     InboundIntegrationType,
     OutboundIntegrationType,
@@ -2373,3 +2374,17 @@ def mock_last_poll(mocker):
     mock_last_poll = mocker.MagicMock()
     mock_last_poll.return_value.patrol_last_poll_at = None
     return mock_last_poll
+
+@pytest.fixture
+def eula_v1():
+    return EULA.objects.create(
+        version="Gundi_EULA_2024-05-03",
+        eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
+    )
+
+@pytest.fixture
+def eula_v2():
+    return EULA.objects.create(
+        version="Gundi_EULA_2024-05-05",
+        eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
+    )

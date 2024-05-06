@@ -1,5 +1,6 @@
 import django_filters
 from django.db.models import Subquery
+from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
@@ -7,7 +8,7 @@ from integrations.models import Route, get_user_integrations_qs, get_integration
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
-from accounts.models import AccountProfileOrganization
+from accounts.models import AccountProfileOrganization, EULA
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
 from rest_framework import viewsets, status, mixins, generics
@@ -32,6 +33,40 @@ class UsersView(
 
     def get_object(self):
         return self.request.user
+
+
+class EULAView(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for retrieving and accepting EULA
+    """
+    # Authenticated users only
+    permission_classes = [IsAuthenticated]
+    queryset = EULA.objects.all()
+
+    def get_serializer_class(self):
+        if self.action == "accept":
+            return v2_serializers.UserAgreementSerializer
+        return v2_serializers.EULARetrieveSerializer
+
+    def get_object(self):
+        return EULA.objects.get_active_eula()
+
+    # Overriden to return a single object (the active eula)
+    def list(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post", "put"])
+    def accept(self, request):
+        # Create a UserAgreement
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class OrganizationView(viewsets.ModelViewSet):
