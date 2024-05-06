@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0016_accountprofile_accepted_eula'),
+        ('accounts', '0015_eula_unique_active_eula'),
     ]
 
     operations = [

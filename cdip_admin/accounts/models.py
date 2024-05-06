@@ -24,7 +24,6 @@ class AccountProfile(models.Model):
     organizations = models.ManyToManyField(
         Organization, through=AccountProfileOrganization
     )
-    accepted_eula = models.BooleanField(default=False)
 
     def __str__(self):
         return self.user.username
