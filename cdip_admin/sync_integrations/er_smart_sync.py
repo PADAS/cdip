@@ -4,7 +4,7 @@ import pathlib
 import uuid
 import re
 import pydantic
-import unidecode
+
 from datetime import timezone, datetime, timedelta
 from typing import List, Optional, Dict
 from urllib.parse import urlparse
@@ -33,6 +33,7 @@ from integrations.models import (
     InboundIntegrationConfiguration,
 )
 from api.v2.utils import get_publisher
+from .utils import unicode_to_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ class ER_SMART_Synchronizer:
         }
 
         calcuated_value = ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
-        return unidecode.unidecode(calcuated_value)
+        return unicode_to_ascii(calcuated_value)
 
     @staticmethod
     def get_identifier_from_ca_label(ca_label: str = ""):
