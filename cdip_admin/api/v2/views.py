@@ -56,7 +56,10 @@ class EULAView(
 
     # Overriden to return a single object (the active eula)
     def list(self, request, *args, **kwargs):
-        instance = self.get_object()
+        try:
+            instance = self.get_object()
+        except EULA.DoesNotExist:  # No active EULA
+            return Response(status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
