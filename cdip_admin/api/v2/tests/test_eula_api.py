@@ -79,3 +79,20 @@ def test_new_eula_requires_new_acceptance(request, api_client, user, eula_v1):
     assert response_data.get("version") == eula_new_version.version
     assert response_data.get("eula_url") == eula_new_version.eula_url
     assert response_data.get("accepted") == False
+
+
+@pytest.mark.parametrize("user", [
+    ("superuser"),
+    ("org_admin_user"),
+    ("org_viewer_user"),
+])
+def test_retrieve_active_eula(request, api_client, user):
+    user = request.getfixturevalue(user)
+    api_client.force_authenticate(user)
+
+    response = api_client.get(
+        reverse("eula-list")
+    )
+
+    # No active EULA exists
+    assert response.status_code == status.HTTP_404_NOT_FOUND
