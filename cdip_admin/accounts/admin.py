@@ -36,6 +36,11 @@ class EULAAdmin(admin.ModelAdmin):
     )
     list_filter = ("active", )
 
+    def get_readonly_fields(self, request, obj=None):
+        if not obj:  # New EULAs are always added as active
+            return ['active']
+        return []
+
 
 @admin.register(UserAgreement)
 class UserAgreementAdmin(admin.ModelAdmin):
