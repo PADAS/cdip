@@ -100,20 +100,37 @@ class Command(BaseCommand):
                 if not integration:
                     self.stderr.write("Integration not found")
                     return
+                source = source.lower().strip()
                 new_settings = {"source_code_path": source} if integration.is_er_site else {"docker_image_url": source}
                 integrations_to_update = [integration]
             elif type := options.get("type"):
-                if "max" not in options:
-                    self.stdout.write("Please either specify a maximum number of integrations to update or an integration ID")
-                    return
-                new_settings = {"source_code_path": source} if type == "earthranger" else {"docker_image_url": source}
                 if options.get("v1"):
+                    if type == "earth_ranger":
+                        source_up_to_date_q = {
+                            "dispatcher_by_outbound__configuration__deployment_settings__source_code_path": source
+                        }
+                        new_settings = {"source_code_path": source}
+                    else:
+                        source_up_to_date_q = {
+                            "dispatcher_by_outbound__configuration__deployment_settings__docker_image_url": source
+                        }
+                        new_settings = {"docker_image_url": source}
                     integrations_to_update = OutboundIntegrationConfiguration.objects.filter(
-                        type__slug=type.lower().strip()
+                        Q(type__slug=type.lower().strip()) & ~Q(**source_up_to_date_q)
                     )[:options["max"]]
                 else:
+                    if type == "earth_ranger":
+                        source_up_to_date_q = {
+                            "dispatcher_by_integration__configuration__deployment_settings__source_code_path": source
+                        }
+                        new_settings = {"source_code_path": source}
+                    else:
+                        source_up_to_date_q = {
+                            "dispatcher_by_integration__configuration__deployment_settings__docker_image_url": source
+                        }
+                        new_settings = {"docker_image_url": source}
                     integrations_to_update = Integration.objects.filter(
-                        type__value=type.lower().strip()
+                        Q(type__value=type.lower().strip()) & ~Q(**source_up_to_date_q)
                     )[:options["max"]]
             else:
                 self.stdout.write("Please specify an integration ID or a type")
@@ -274,12 +291,18 @@ class Command(BaseCommand):
                     dispatcher_deployment.configuration["env_vars"].update(env_vars)
                 if deployment_settings:
                     dispatcher_deployment.configuration["deployment_settings"].update(deployment_settings)
-                dispatcher_deployment.save()
 
-            except Exception as e:
-                self.stdout.write(
-                    f"Error deploying dispatcher for {integration.name}: {e}"
+                dispatcher_deployment.save()
+            except DispatcherDeployment.DoesNotExist:
+                self.stderr.write(
+                    f"Dispatcher for {integration.name} (id: {integration.id}) does not exist. Please deploy a dispatcher first."
                 )
+                continue
+            except Exception as e:
+                self.stderr.write(
+                    f"Error deploying dispatcher for {integration.name} (id: {integration.id}): {e}"
+                )
+                continue
             else:
                 self.stdout.write(
                     f"Update triggered for {integration.name} ({version})\nDispatcher: {dispatcher_deployment.name}"
