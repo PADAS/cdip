@@ -29,11 +29,10 @@ jobs:
 
   unit-test:
     uses: ./.github/workflows/_unit-test.yml
-    needs: build
+    needs: [vars, build]
     with:
       environment: stage
-      image: "us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal:${{ github.head_ref || github.ref_name }}-${{ github.run_number }}"
-      # image: "europe-west3-docker.pkg.dev/padas-app/er-mt/das-server:${{ github.head_ref || github.ref_name }}-${{ github.run_number }}"
+      image: "us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal:"${{ needs.vars.outputs.repository }}:${{ needs.vars.outputs.tag }}""
       command: |
         pytest 
 
