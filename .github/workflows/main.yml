@@ -32,7 +32,7 @@ jobs:
     needs: [vars, build]
     with:
       environment: stage
-      image: "us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal:"${{ needs.vars.outputs.repository }}:${{ needs.vars.outputs.tag }}""
+      image: "${{ needs.vars.outputs.repository }}:${{ needs.vars.outputs.tag }}"
       command: |
         pytest 
 
