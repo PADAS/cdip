@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - gundi-3054 # remove this line before merge
       - 'release-**'
 
 jobs:
