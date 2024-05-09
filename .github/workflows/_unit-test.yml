@@ -64,8 +64,7 @@ jobs:
     steps:
       - name: Setup
         run: |
-          cd /cdip
-          export PYTHONPATH=/cdip/cdip_admin:$PYTHONPATH
+          export PYTHONPATH=/cdip_admin:$PYTHONPATH
           python3 -m pip install -r /dependencies/requirements-dev.txt 
           pytest
         env:
