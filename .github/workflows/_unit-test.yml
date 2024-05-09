@@ -9,6 +9,16 @@ on:
       image:
         required: true
         type: string
+      environment:
+        type: string
+      workload_identity_provider:
+        type: string
+      service_account:
+        type: string
+
+env:
+  WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload_identity_provider || vars.WORKLOAD_IDENTITY_PROVIDER }}
+  SERVICE_ACCOUNT: ${{ inputs.service_account || vars.SERVICE_ACCOUNT }}
 
 jobs:
   vars:
