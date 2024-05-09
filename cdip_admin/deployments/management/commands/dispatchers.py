@@ -56,10 +56,20 @@ class Command(BaseCommand):
             help="Deploy serverless dispatchers for integrations using legacy dispatchers",
         )
         parser.add_argument(
+            "--update-source",
+            type=str,
+            help="Update source code of serverless dispatchers with the specified version",
+        )
+        parser.add_argument(
             "--max",
             type=int,
             default=10,
             help="Specify the maximum number of deployments to list or deploy",
+        )
+        parser.add_argument(
+            "--integration",
+            type=str,
+            help="Select a single integration by ID",
         )
 
     def handle(self, *args, **options):
@@ -68,34 +78,50 @@ class Command(BaseCommand):
             self.list_deployments(options=options)
         elif options["list_missing"]:
             self.list_integrations_using_kafka_dispatchers(options=options)
-        elif integration_id := options["deploy"]:
+        elif integration_id := options.get("deploy"):
+            integration = self._get_integration_by_id(integration_id=integration_id, options=options)
+            self.deploy_dispatchers([integration])
+        elif options["deploy_missing"]:
             if not options.get("v1") and not options.get("v2"):
                 self.stdout.write("Please specify a Gundi version (v1 or v2)")
                 return
-            integration = None
-            if options["v1"]:
-                try:
-                    integration = OutboundIntegrationConfiguration.objects.get(
-                        id=integration_id
-                    )
-                except OutboundIntegrationConfiguration.DoesNotExist:
-                    self.stdout.write(f"Integration {integration_id} v1 not found")
-                    return
-            if options["v2"]:
-                try:
-                    integration = Integration.objects.get(id=integration_id)
-                except Integration.DoesNotExist:
-                    self.stdout.write(f"Integration {integration_id} v2 not found")
-                    return
-            self.deploy_dispatchers([integration])
-        elif options["deploy_missing"]:
             integrations = self._get_integrations_using_kafka_dispatchers()
             if type := options["type"]:
                 integrations = integrations.filter(type__slug=type.lower().strip())
             if max_deploys := options["max"]:
                 integrations = integrations[:max_deploys]
             self.deploy_dispatchers(integrations)
-
+        elif source := options.get("update_source"):
+            if not options.get("v1") and not options.get("v2"):
+                self.stdout.write("Please specify a Gundi version (v1 or v2)")
+                return
+            if integration_id := options["integration"]:
+                integration = self._get_integration_by_id(integration_id=integration_id, options=options)
+                if not integration:
+                    self.stderr.write("Integration not found")
+                    return
+                new_settings = {"source_code_path": source} if integration.is_er_site else {"docker_image_url": source}
+                integrations_to_update = [integration]
+            elif type := options.get("type"):
+                if "max" not in options:
+                    self.stdout.write("Please either specify a maximum number of integrations to update or an integration ID")
+                    return
+                new_settings = {"source_code_path": source} if type == "earthranger" else {"docker_image_url": source}
+                if options.get("v1"):
+                    integrations_to_update = OutboundIntegrationConfiguration.objects.filter(
+                        type__slug=type.lower().strip()
+                    )[:options["max"]]
+                else:
+                    integrations_to_update = Integration.objects.filter(
+                        type__value=type.lower().strip()
+                    )[:options["max"]]
+            else:
+                self.stdout.write("Please specify an integration ID or a type")
+                return
+            self.update_dispatchers(
+                integrations=integrations_to_update,
+                deployment_settings=new_settings
+            )
         self.stdout.write(self.style.SUCCESS("Done."))
 
     def list_deployments(self, options):
@@ -217,6 +243,48 @@ class Command(BaseCommand):
                     f"Deployment triggered for {integration.name} ({version})"
                 )
 
+    def update_dispatchers(self, integrations, env_vars=None, deployment_settings=None):
+        self.stdout.write(self.style.SUCCESS(f"Updating dispatchers for {len(integrations)} integrations..."))
+        for integration in integrations:
+            try:
+                # Skip if the integration is not an ER, SMART site, or WPS Watch Site
+                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site):
+                    self.stdout.write(
+                        f"Integration {integration.name} is not an ER, SMART or WPS Watch site. Skipped"
+                    )
+                    continue
+
+                self.stdout.write(
+                    f"Updating dispatcher for {integration.name} with env_vars: {env_vars}, deployment_settings {deployment_settings}..."
+                )
+
+                if isinstance(integration, OutboundIntegrationConfiguration):
+                    version = "v1"
+                    dispatcher_deployment = integration.dispatcher_by_outbound
+                elif isinstance(integration, Integration):
+                    version = "v2"
+                    dispatcher_deployment = integration.dispatcher_by_integration
+                else:
+                    self.stdout.write(
+                        f"Unknown integration type: {integration}. Skipped"
+                    )
+                    continue
+                # Updating the dispatcher configuration will triggers the re-deployment
+                if env_vars:
+                    dispatcher_deployment.configuration["env_vars"].update(env_vars)
+                if deployment_settings:
+                    dispatcher_deployment.configuration["deployment_settings"].update(deployment_settings)
+                dispatcher_deployment.save()
+
+            except Exception as e:
+                self.stdout.write(
+                    f"Error deploying dispatcher for {integration.name}: {e}"
+                )
+            else:
+                self.stdout.write(
+                    f"Update triggered for {integration.name} ({version})\nDispatcher: {dispatcher_deployment.name}"
+                )
+
     def list_integrations_using_kafka_dispatchers(self, options):
         integrations = self._get_integrations_using_kafka_dispatchers()
         if type := options["type"]:
@@ -233,3 +301,21 @@ class Command(BaseCommand):
         return OutboundIntegrationConfiguration.objects.filter(
             ~Q(additional__has_key="broker") | Q(additional__broker="kafka")
         )
+
+    def _get_integration_by_id(self, integration_id, options):
+        integration = None
+        if options["v1"]:
+            try:
+                integration = OutboundIntegrationConfiguration.objects.get(
+                    id=integration_id
+                )
+            except OutboundIntegrationConfiguration.DoesNotExist:
+                self.stdout.write(f"Integration {integration_id} v1 not found")
+                return None
+        if options["v2"]:
+            try:
+                integration = Integration.objects.get(id=integration_id)
+            except Integration.DoesNotExist:
+                self.stdout.write(f"Integration {integration_id} v2 not found")
+                return None
+        return integration
