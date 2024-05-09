@@ -26,6 +26,15 @@ jobs:
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
+  unit-test:
+    uses: ./.github/workflows/_unit-tests.yml
+    needs: build
+    with:
+      image: "us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal:${{ github.head_ref || github.ref_name }}-${{ github.run_number }}"
+      # image: "europe-west3-docker.pkg.dev/padas-app/er-mt/das-server:${{ github.head_ref || github.ref_name }}-${{ github.run_number }}"
+      command: |
+        pytest 
+
   deploy_dev:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
     if: startsWith(github.ref, 'refs/heads/main')
