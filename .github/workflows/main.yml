@@ -28,7 +28,7 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   unit-test:
-    uses: .github/workflows/_unit-test.yml
+    uses: ./.github/workflows/_unit-test.yml
     needs: build
     with:
       image: "us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal:${{ github.head_ref || github.ref_name }}-${{ github.run_number }}"
