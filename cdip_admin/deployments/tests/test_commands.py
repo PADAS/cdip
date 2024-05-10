@@ -1,7 +1,6 @@
-from unittest.mock import patch
 import pytest
 from django.core.management import call_command
-from django.core.management.base import CommandError
+from django.test import override_settings
 
 
 pytestmark = pytest.mark.django_db
@@ -132,3 +131,61 @@ def test_call_dispatchers_command_deploy_with_integration_id(
 
     # Check that the deploy task was called for the selected ER integration
     assert mock_deploy_serverless_dispatcher.delay.called
+
+
+@pytest.mark.parametrize("integration_type", [
+    "earth_ranger",
+    "smart_connect",
+    "wps_watch"
+])
+@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+def test_call_dispatchers_command_update_source_by_type_with_max_v1(
+    request,
+    integration_type,
+    mocker,
+    capsys,
+    organization,
+    outbound_integrations_list_er,
+    outbound_integrations_list_smart,
+    outbound_integrations_list_wpswatch,
+    dispatcher_source_release_1,
+    dispatcher_source_release_2
+):
+    # Mock the celery task doing the actual deployment
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mock_deploy_serverless_dispatcher = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher,
+    )
+
+    call_command(
+        "dispatchers", "--v1", "--type", integration_type, "--max", "2", "--update-source", dispatcher_source_release_2
+    )
+    captured = capsys.readouterr()
+
+    source_key = "source_code_path" if integration_type == "earth_ranger" else "docker_image_url"
+    if integration_type == "earth_ranger":
+        integrations_list = outbound_integrations_list_er
+    elif integration_type == "smart_connect":
+        integrations_list = outbound_integrations_list_smart
+    else:
+        integrations_list = outbound_integrations_list_wpswatch
+    sorted_integrations = sorted(integrations_list, key=lambda i: i.name)
+    for integration in sorted_integrations[:2]:
+        # Check that configuration was updated to the new release
+        integration.refresh_from_db()
+        source_code_settings = integration.dispatcher_by_outbound.configuration.get("deployment_settings", {}).get(source_key)
+        assert source_code_settings == dispatcher_source_release_2
+        # Check the command output
+        assert f"Updating dispatcher for {integration.name} with env_vars: None, deployment_settings {{'{source_key}': '{dispatcher_source_release_2}'}}..." in captured.out
+        assert f"Update triggered for {integration.name}" in captured.out
+
+    for integration in sorted_integrations[2:]:
+        # Check that configuration was not updated
+        integration.refresh_from_db()
+        source_code_settings = integration.dispatcher_by_outbound.configuration.get("deployment_settings", {}).get(source_key)
+        assert source_code_settings == dispatcher_source_release_1
+
+    # Check that the deploy task was called for the two ER integrations being updated
+    assert mock_deploy_serverless_dispatcher.delay.call_count == 2

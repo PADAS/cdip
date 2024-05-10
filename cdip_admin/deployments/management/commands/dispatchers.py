@@ -109,7 +109,7 @@ class Command(BaseCommand):
                 IntegrationModel = Integration if options.get("v2") else OutboundIntegrationConfiguration
                 type_cleaned = type.lower().strip()
                 integration_type_q = Q(type__value=type_cleaned) if options.get("v2") else Q(type__slug=type_cleaned)
-                source_field = "docker_image_url" if options.get("v2") else "source_code_path"
+                source_field = "source_code_path" if type_cleaned == "earth_ranger"  else "docker_image_url"
                 source_lookup = f"{related_dispatcher_field}__configuration__deployment_settings__{source_field}"
                 source_outdated_q = ~Q(**{source_lookup: source})
                 integrations_to_update = IntegrationModel.objects.filter(

@@ -35,7 +35,7 @@ def _test_list_sources(api_client, user, expected_sources, filters=None):
 
 def test_list_sources_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2,
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2,
 
 ):
     _test_list_sources(
@@ -48,7 +48,7 @@ def test_list_sources_as_superuser(
 
 def test_list_sources_as_org_admin(
         api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -60,7 +60,7 @@ def test_list_sources_as_org_admin(
 
 def test_list_sources_as_org_admin_2(
         api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -72,7 +72,7 @@ def test_list_sources_as_org_admin_2(
 
 def test_list_sources_as_org_viewer(
         api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -84,7 +84,7 @@ def test_list_sources_as_org_viewer(
 
 def test_filter_sources_by_external_id_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     selected_sources = lotek_sources[1::2] + movebank_sources[:2]  # pick some sources semi-randomly
     _test_list_sources(
@@ -101,7 +101,7 @@ def test_filter_sources_by_external_id_as_superuser(
 
 def test_filter_sources_by_external_id_as_org_admin(
         api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     selected_sources = movebank_sources[::2]  # pick some sources semi-randomly
     _test_list_sources(
@@ -118,7 +118,7 @@ def test_filter_sources_by_external_id_as_org_admin(
 
 def test_filter_sources_by_external_id_as_org_viewer(
         api_client, org_viewer_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -132,7 +132,7 @@ def test_filter_sources_by_external_id_as_org_viewer(
 
 def test_filter_sources_by_provider_type_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -146,7 +146,7 @@ def test_filter_sources_by_provider_type_as_superuser(
 
 def test_filter_sources_by_provider_type_as_org_admin(
         api_client, org_admin_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -160,7 +160,7 @@ def test_filter_sources_by_provider_type_as_org_admin(
 
 def test_filter_sources_by_provider_type_as_org_viewer(
         api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2
 ):
     _test_list_sources(
         api_client=api_client,
@@ -174,7 +174,7 @@ def test_filter_sources_by_provider_type_as_org_viewer(
 
 def test_filter_sources_by_destination_type_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -188,7 +188,7 @@ def test_filter_sources_by_destination_type_as_superuser(
 
 def test_filter_sources_by_destination_type_as_org_admin(
         api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -202,7 +202,7 @@ def test_filter_sources_by_destination_type_as_org_admin(
 
 def test_filter_sources_by_destination_type_as_org_viewer(
         api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -216,9 +216,9 @@ def test_filter_sources_by_destination_type_as_org_viewer(
 
 def test_filter_sources_by_multiple_destination_urls_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
-    selected_destinations = integrations_list[:6]  # All the sources are connected to the first 6
+    selected_destinations = integrations_list_er[:6]  # All the sources are connected to the first 6
     _test_list_sources(
         api_client=api_client,
         user=superuser,
@@ -233,9 +233,9 @@ def test_filter_sources_by_multiple_destination_urls_as_superuser(
 
 def test_filter_sources_by_multiple_destination_urls_as_org_admin(
         api_client, org_admin_user, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
-    selected_destinations = integrations_list  # All the destinations
+    selected_destinations = integrations_list_er  # All the destinations
     _test_list_sources(
         api_client=api_client,
         user=org_admin_user,
@@ -250,9 +250,9 @@ def test_filter_sources_by_multiple_destination_urls_as_org_admin(
 
 def test_filter_sources_by_multiple_destination_urls_as_org_viewer(
         api_client, org_viewer_user_2, organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
-    selected_destinations = integrations_list  # All the destinations
+    selected_destinations = integrations_list_er  # All the destinations
     _test_list_sources(
         api_client=api_client,
         user=org_viewer_user_2,
@@ -267,7 +267,7 @@ def test_filter_sources_by_multiple_destination_urls_as_org_viewer(
 
 def test_filter_sources_by_owner_exact_as_superuser(
         api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -281,7 +281,7 @@ def test_filter_sources_by_owner_exact_as_superuser(
 
 def test_filter_sources_by_multiple_owners_as_superuser(
         api_client, superuser, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -295,7 +295,7 @@ def test_filter_sources_by_multiple_owners_as_superuser(
 
 def test_filter_sources_by_owner_exact_as_org_admin(
         api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -309,7 +309,7 @@ def test_filter_sources_by_owner_exact_as_org_admin(
 
 def test_filter_sources_by_multiple_owners_as_org_admin(
         api_client, org_admin_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -323,7 +323,7 @@ def test_filter_sources_by_multiple_owners_as_org_admin(
 
 def test_filter_sources_by_owner_exact_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -337,7 +337,7 @@ def test_filter_sources_by_owner_exact_as_org_viewer(
 
 def test_filter_sources_by_multiple_owners_as_org_viewer(
         api_client, org_viewer_user_2, organization, other_organization, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
+        integrations_list_er, lotek_sources, movebank_sources, route_1, route_2, integration_type_er
 ):
     _test_list_sources(
         api_client=api_client,
@@ -378,7 +378,7 @@ def test_global_search_sources_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     _test_list_sources(
@@ -395,7 +395,7 @@ def test_global_search_sources_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     _test_list_sources(
@@ -412,7 +412,7 @@ def test_global_search_sources_as_org_viewer(
         api_client, org_viewer_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, lotek_sources, movebank_sources, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     _test_list_sources(

@@ -742,7 +742,7 @@ def cellstop_integration(
 
 
 @pytest.fixture
-def integrations_list(
+def integrations_list_er(
         organization,
         other_organization,
         integration_type_er,
@@ -836,14 +836,14 @@ def route_1(
         organization,
         lotek_sources,
         provider_lotek_panthera,
-        integrations_list,
+        integrations_list_er,
 ):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
     )
     rule.data_providers.add(provider_lotek_panthera)
-    rule.destinations.add(*integrations_list)
+    rule.destinations.add(*integrations_list_er)
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -891,7 +891,7 @@ def route_2(
         other_organization,
         movebank_sources,
         provider_movebank_ewt,
-        integrations_list,
+        integrations_list_er,
         er_route_configuration_elephants,
 ):
     route, _ = Route.objects.get_or_create(
@@ -899,7 +899,7 @@ def route_2(
         owner=other_organization,
     )
     route.data_providers.add(provider_movebank_ewt)
-    route.destinations.add(integrations_list[5])
+    route.destinations.add(integrations_list_er[5])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -1011,13 +1011,13 @@ def trap_tagger_to_movebank_observation_trace(provider_trap_tagger):
 
 
 @pytest.fixture
-def event_delivered_trace(provider_trap_tagger, integrations_list):
+def event_delivered_trace(provider_trap_tagger, integrations_list_er):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:35:34.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -1026,13 +1026,13 @@ def event_delivered_trace(provider_trap_tagger, integrations_list):
 
 
 @pytest.fixture
-def event_delivered_trace2(provider_trap_tagger, integrations_list):
+def event_delivered_trace2(provider_trap_tagger, integrations_list_er):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[1],
+        destination=integrations_list_er[1],
         delivered_at="2023-07-10T19:36:15.425974Z",
         external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f",
     )
@@ -1042,14 +1042,14 @@ def event_delivered_trace2(provider_trap_tagger, integrations_list):
 
 @pytest.fixture
 def attachment_delivered_trace(
-        provider_trap_tagger, event_delivered_trace, integrations_list
+        provider_trap_tagger, event_delivered_trace, integrations_list_er
 ):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=event_delivered_trace.object_id,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:37:48.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -1066,7 +1066,7 @@ def mock_cloud_storage(mocker):
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1079,7 +1079,7 @@ def trap_tagger_observation_delivered_event(
             "related_to": None,
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1116,7 +1116,7 @@ def trap_tagger_to_movebank_observation_delivered_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1129,7 +1129,7 @@ def trap_tagger_observation_delivered_event_two(
             "related_to": None,
             "external_id": "46983ced-1216-4d43-81da-01ee90ba9b81",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1140,7 +1140,7 @@ def trap_tagger_observation_delivered_event_two(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1152,7 +1152,7 @@ def trap_tagger_observation_delivery_failed_event(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1163,7 +1163,7 @@ def trap_tagger_observation_delivery_failed_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1175,7 +1175,7 @@ def trap_tagger_observation_delivery_failed_event_two(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1778,8 +1778,8 @@ def observation_delivery_succeeded_event(provider_lotek_panthera, destination_mo
 
 
 @pytest.fixture
-def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list):
-    destination = integrations_list[0]
+def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list_er):
+    destination = integrations_list_er[0]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1821,8 +1821,8 @@ def observation_delivery_failed_event(provider_lotek_panthera, destination_moveb
 
 
 @pytest.fixture
-def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list):
-    destination = integrations_list[1]
+def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list_er):
+    destination = integrations_list_er[1]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1924,7 +1924,7 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
 
 
 @pytest.fixture
-def mock_dispatcher_secrets():
+def mock_dispatcher_secrets_er(dispatcher_source_release_1):
     return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
                          'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
                          'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
@@ -1941,13 +1941,69 @@ def mock_dispatcher_secrets():
                                     'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
                                     'vpc_connector': 'cdip-cloudrun-connector',
                                     'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
-                                    'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
+                                    'source_code_path': dispatcher_source_release_1}}
 
 
 @pytest.fixture
-def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets):
+def mock_dispatcher_secrets_smart(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_dispatcher_secrets_wps_watch(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets_er):
     mock = mocker.MagicMock()
-    mock.return_value = mock_dispatcher_secrets
+    mock.return_value = mock_dispatcher_secrets_er
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_smart(mocker, mock_dispatcher_secrets_smart):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_smart
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch(mocker, mock_dispatcher_secrets_wps_watch):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_wps_watch
     return mock
 
 
@@ -2388,3 +2444,105 @@ def eula_v2():
         version="Gundi_EULA_2024-05-05",
         eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
     )
+
+@pytest.fixture
+def dispatcher_source_release_1():
+    return "release-20231218"
+
+
+@pytest.fixture
+def dispatcher_source_release_2():
+    return "release-20240510"
+
+
+@pytest.fixture
+def outbound_integrations_list_er(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization, legacy_integration_type_earthranger
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets", mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"EarthRanger Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakepamdas.org",
+            type=legacy_integration_type_earthranger,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_smart(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization, legacy_integration_type_smart
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"SMART Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakesmartconnect.com",
+            type=legacy_integration_type_smart,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_wpswatch(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization, legacy_integration_type_wpswatch
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"WPS Watch Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakeswpswatch.com",
+            type=legacy_integration_type_wpswatch,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
