@@ -133,6 +133,7 @@ def test_call_dispatchers_command_deploy_with_integration_id(
     assert mock_deploy_serverless_dispatcher.delay.called
 
 
+@pytest.mark.parametrize("gundi_version", ["v1", "v2"])
 @pytest.mark.parametrize("integration_type", [
     "earth_ranger",
     "smart_connect",
@@ -141,16 +142,22 @@ def test_call_dispatchers_command_deploy_with_integration_id(
 @override_settings(GCP_ENVIRONMENT_ENABLED=True)
 def test_call_dispatchers_command_update_source_by_type_with_max_v1(
     request,
+    gundi_version,
     integration_type,
     mocker,
     capsys,
     organization,
-    outbound_integrations_list_er,
-    outbound_integrations_list_smart,
-    outbound_integrations_list_wpswatch,
     dispatcher_source_release_1,
     dispatcher_source_release_2
 ):
+    if gundi_version == "v1":
+        integrations_er = request.getfixturevalue("outbound_integrations_list_er")
+        integrations_smart = request.getfixturevalue("outbound_integrations_list_smart")
+        integrations_wps = request.getfixturevalue("outbound_integrations_list_wpswatch")
+    else:
+        integrations_er = request.getfixturevalue("integrations_list_er")
+        integrations_smart = request.getfixturevalue("integrations_list_smart")
+        integrations_wps = request.getfixturevalue("integrations_list_wpswatch")
     # Mock the celery task doing the actual deployment
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
     mock_deploy_serverless_dispatcher = mocker.MagicMock()
@@ -160,31 +167,33 @@ def test_call_dispatchers_command_update_source_by_type_with_max_v1(
     )
 
     call_command(
-        "dispatchers", "--v1", "--type", integration_type, "--max", "2", "--update-source", dispatcher_source_release_2
+        "dispatchers", f"--{gundi_version}", "--type", integration_type, "--max", "2", "--update-source", dispatcher_source_release_2
     )
     captured = capsys.readouterr()
 
     source_key = "source_code_path" if integration_type == "earth_ranger" else "docker_image_url"
     if integration_type == "earth_ranger":
-        integrations_list = outbound_integrations_list_er
+        integrations_list = integrations_er
     elif integration_type == "smart_connect":
-        integrations_list = outbound_integrations_list_smart
+        integrations_list = integrations_smart
     else:
-        integrations_list = outbound_integrations_list_wpswatch
+        integrations_list = integrations_wps
     sorted_integrations = sorted(integrations_list, key=lambda i: i.name)
     for integration in sorted_integrations[:2]:
         # Check that configuration was updated to the new release
         integration.refresh_from_db()
-        source_code_settings = integration.dispatcher_by_outbound.configuration.get("deployment_settings", {}).get(source_key)
+        dispatcher = integration.dispatcher_by_outbound if gundi_version == "v1" else integration.dispatcher_by_integration
+        source_code_settings = dispatcher.configuration.get("deployment_settings", {}).get(source_key)
         assert source_code_settings == dispatcher_source_release_2
         # Check the command output
         assert f"Updating dispatcher for {integration.name} with env_vars: None, deployment_settings {{'{source_key}': '{dispatcher_source_release_2}'}}..." in captured.out
         assert f"Update triggered for {integration.name}" in captured.out
 
     for integration in sorted_integrations[2:]:
-        # Check that configuration was not updated
+        # Check that configuration of other integrations was not updated
         integration.refresh_from_db()
-        source_code_settings = integration.dispatcher_by_outbound.configuration.get("deployment_settings", {}).get(source_key)
+        dispatcher = integration.dispatcher_by_outbound if gundi_version == "v1" else integration.dispatcher_by_integration
+        source_code_settings = dispatcher.configuration.get("deployment_settings", {}).get(source_key)
         assert source_code_settings == dispatcher_source_release_1
 
     # Check that the deploy task was called for the two ER integrations being updated

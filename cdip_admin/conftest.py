@@ -516,6 +516,17 @@ def integration_type_wpswatch():
 
 
 @pytest.fixture
+def wpswatch_action_push_events(integration_type_wpswatch):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_wpswatch,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to WPA Watch API",
+    )
+
+
+@pytest.fixture
 def provider_lotek_panthera(
         get_random_id,
         organization,
@@ -743,6 +754,9 @@ def cellstop_integration(
 
 @pytest.fixture
 def integrations_list_er(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
         organization,
         other_organization,
         integration_type_er,
@@ -753,6 +767,19 @@ def integrations_list_er(
         er_action_push_positions,
         er_action_push_events,
 ):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
     integrations = []
     for i in range(10):
         # Create the integration
@@ -785,6 +812,98 @@ def integrations_list_er(
         )
         IntegrationConfiguration.objects.create(
             integration=integration, action=er_action_pull_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_smart(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization,
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_smart)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.smart.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_smart,
+            name=f"SMART Site Test {i}",
+            owner=organization if i < 5 else other_organization,
+            base_url=site_url,
+        )
+        # Configure actions
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=smart_action_auth,
+            data={
+                "api_key": f"SMART-{get_random_id()}-KEY",
+            },
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=smart_action_push_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_wpswatch(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization,
+        integration_type_wpswatch,
+        get_random_id,
+        wpswatch_action_push_events
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.wpswatch.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_wpswatch,
+            name=f"WPS Watch Site Test {i}",
+            owner=organization,
+            base_url=site_url,
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=wpswatch_action_push_events
         )
         integrations.append(integration)
         ensure_default_route(integration=integration)
