@@ -114,7 +114,7 @@ class Command(BaseCommand):
                 source_outdated_q = ~Q(**{source_lookup: source})
                 integrations_to_update = IntegrationModel.objects.filter(
                     integration_type_q & source_outdated_q
-                )[:options["max"]]
+                ).order_by("name")[:options["max"]]
                 new_settings = {"source_code_path": source} if type_cleaned == "earth_ranger" else {"docker_image_url": source}
             else:
                 self.stdout.write("Please specify an integration ID or a type")
