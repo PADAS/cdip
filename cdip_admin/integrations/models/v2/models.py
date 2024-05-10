@@ -153,9 +153,8 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub for ER, SMART and MoveBank Sites
-        # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_smart_site or self.is_mb_site):
+        # Setup topic and broker for destination sites
+        if self._state.adding and any([self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site]):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             if "broker" not in self.additional:
@@ -164,8 +163,13 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER Sites only
-        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
-            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
+        if created and settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
+            if self.is_smart_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+            elif self.is_wpswatch_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+            else:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self),
                 integration=self,
