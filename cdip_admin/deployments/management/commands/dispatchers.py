@@ -104,34 +104,18 @@ class Command(BaseCommand):
                 new_settings = {"source_code_path": source} if integration.is_er_site else {"docker_image_url": source}
                 integrations_to_update = [integration]
             elif type := options.get("type"):
-                if options.get("v1"):
-                    if type == "earth_ranger":
-                        source_up_to_date_q = {
-                            "dispatcher_by_outbound__configuration__deployment_settings__source_code_path": source
-                        }
-                        new_settings = {"source_code_path": source}
-                    else:
-                        source_up_to_date_q = {
-                            "dispatcher_by_outbound__configuration__deployment_settings__docker_image_url": source
-                        }
-                        new_settings = {"docker_image_url": source}
-                    integrations_to_update = OutboundIntegrationConfiguration.objects.filter(
-                        Q(type__slug=type.lower().strip()) & ~Q(**source_up_to_date_q)
-                    )[:options["max"]]
-                else:
-                    if type == "earth_ranger":
-                        source_up_to_date_q = {
-                            "dispatcher_by_integration__configuration__deployment_settings__source_code_path": source
-                        }
-                        new_settings = {"source_code_path": source}
-                    else:
-                        source_up_to_date_q = {
-                            "dispatcher_by_integration__configuration__deployment_settings__docker_image_url": source
-                        }
-                        new_settings = {"docker_image_url": source}
-                    integrations_to_update = Integration.objects.filter(
-                        Q(type__value=type.lower().strip()) & ~Q(**source_up_to_date_q)
-                    )[:options["max"]]
+                # Build the query to get the integrations to update, based on type and version
+                related_dispatcher_field = "dispatcher_by_integration" if options.get("v2") else "dispatcher_by_outbound"
+                IntegrationModel = Integration if options.get("v2") else OutboundIntegrationConfiguration
+                type_cleaned = type.lower().strip()
+                integration_type_q = Q(type__value=type_cleaned) if options.get("v2") else Q(type__slug=type_cleaned)
+                source_field = "docker_image_url" if options.get("v2") else "source_code_path"
+                source_lookup = f"{related_dispatcher_field}__configuration__deployment_settings__{source_field}"
+                source_outdated_q = ~Q(**{source_lookup: source})
+                integrations_to_update = IntegrationModel.objects.filter(
+                    integration_type_q & source_outdated_q
+                )[:options["max"]]
+                new_settings = {"source_code_path": source} if type_cleaned == "earth_ranger" else {"docker_image_url": source}
             else:
                 self.stdout.write("Please specify an integration ID or a type")
                 return
