@@ -15,6 +15,7 @@ Including another URLconf
 """
 from django.conf.urls import url
 from django.contrib import admin
+from django.conf import settings
 from django.urls import path, include
 from website.views import welcome, date, about, index, login_view, logout_view
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
@@ -42,3 +43,5 @@ urlpatterns = [
 handler403 = "cdip_admin.views.custom_error_403"
 
 urlpatterns += staticfiles_urlpatterns()
+if settings.DJANGO_SILK_ENABLED:
+    urlpatterns.append(path("silk/", include("silk.urls", namespace="silk")))
