@@ -65,7 +65,10 @@ ENV DB_HOST=host.docker.internal
 WORKDIR /var/www/app
 
 RUN mkdir -p /var/www/static
+
 # Collect static files (using a stub database)
+ENV DJANGO_SILK_ENABLED=True
 RUN python3 manage.py collectstatic --noinput --settings=cdip_admin.local_settings_nodb
+ENV DJANGO_SILK_ENABLED=False
 
 CMD ["/var/www/app/start_scripts/start.sh"]
