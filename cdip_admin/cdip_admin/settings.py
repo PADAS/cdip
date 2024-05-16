@@ -163,6 +163,12 @@ MIDDLEWARE = [
     "crum.CurrentRequestUserMiddleware",
 ]
 
+# Debugging
+DJANGO_SILK_ENABLED = env.bool("DJANGO_SILK_ENABLED", False)
+if DJANGO_SILK_ENABLED:
+    INSTALLED_APPS.append("silk")
+    MIDDLEWARE.append("silk.middleware.SilkyMiddleware")
+
 ROOT_URLCONF = "cdip_admin.urls"
 
 TEMPLATES = [
