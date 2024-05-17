@@ -11,14 +11,6 @@ on:
         type: string
       environment:
         type: string
-      workload_identity_provider:
-        type: string
-      service_account:
-        type: string
-
-env:
-  WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload_identity_provider || vars.WORKLOAD_IDENTITY_PROVIDER }}
-  SERVICE_ACCOUNT: ${{ inputs.service_account || vars.SERVICE_ACCOUNT }}
 
 jobs:
   vars:
@@ -64,10 +56,14 @@ jobs:
     steps:
       - name: Setup
         run: |
-          cd /workspace
-          export PYTHONPATH=/cdip_admin:$PYTHONPATH
-          python3 -m pip install -r /dependencies/requirements-dev.txt 
-          pytest
+          cd /var/www/app
+          python3 -m pip install -r requirements-dev.txt 
+
+      - name: Run Tests
+        run: |
+          cd /var/www/app
+          ${{ inputs.command }}
+        # export PYTHONPATH=/var/www/app:$PYTHONPATH
         env:
           DB_HOST: postgis
           DB_NAME: testdb
