@@ -72,3 +72,4 @@ jobs:
           DB_PORT: 5432
           FQDN: testing.pamdas.org
           GCP_ENVIRONMENT_ENABLED: false
+          TRACING_ENABLED: false
