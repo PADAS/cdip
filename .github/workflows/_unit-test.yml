@@ -73,3 +73,4 @@ jobs:
           FQDN: testing.pamdas.org
           GCP_ENVIRONMENT_ENABLED: false
           TRACING_ENABLED: false
+          CELERY_TASK_ALWAYS_EAGER: true
