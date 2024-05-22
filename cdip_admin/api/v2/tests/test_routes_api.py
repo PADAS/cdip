@@ -30,21 +30,21 @@ def _test_list_routes(api_client, user):
         assert "additional" in route
 
 
-def test_list_routes_as_superuser(api_client, superuser, organization, integrations_list):
+def test_list_routes_as_superuser(api_client, superuser, organization, integrations_list_er):
     _test_list_routes(
         api_client=api_client,
         user=superuser,
     )
 
 
-def test_list_routes_as_org_admin(api_client, org_admin_user, organization, integrations_list):
+def test_list_routes_as_org_admin(api_client, org_admin_user, organization, integrations_list_er):
     _test_list_routes(
         api_client=api_client,
         user=org_admin_user,
     )
 
 
-def test_list_routes_as_org_viewer(api_client, org_viewer_user, organization, integrations_list):
+def test_list_routes_as_org_viewer(api_client, org_viewer_user, organization, integrations_list_er):
     _test_list_routes(
         api_client=api_client,
         user=org_viewer_user,
@@ -77,7 +77,7 @@ def _test_create_route(api_client, user, data):
         assert response_data["configuration"] is not None
 
 
-def test_create_route_as_superuser(api_client, superuser, organization, integrations_list, provider_lotek_panthera):
+def test_create_route_as_superuser(api_client, superuser, organization, integrations_list_er, provider_lotek_panthera):
     _test_create_route(
         api_client=api_client,
         user=superuser,
@@ -88,7 +88,7 @@ def test_create_route_as_superuser(api_client, superuser, organization, integrat
                 str(provider_lotek_panthera.id)
             ],
             "destinations": [
-                str(i.id) for i in integrations_list[2:4]
+                str(i.id) for i in integrations_list_er[2:4]
             ],
             # "configuration": {},  # This should be optional
             "additional": {}
@@ -97,7 +97,7 @@ def test_create_route_as_superuser(api_client, superuser, organization, integrat
 
 
 def test_create_route_as_org_admin(
-        api_client, org_admin_user_2, organization, other_organization, integrations_list, provider_movebank_ewt
+        api_client, org_admin_user_2, organization, other_organization, integrations_list_er, provider_movebank_ewt
 ):
     _test_create_route(
         api_client=api_client,
@@ -109,7 +109,7 @@ def test_create_route_as_org_admin(
                 str(provider_movebank_ewt.id)
             ],
             "destinations": [
-                str(integrations_list[5].id)
+                str(integrations_list_er[5].id)
             ],
             "additional": {}
         }
@@ -117,7 +117,7 @@ def test_create_route_as_org_admin(
 
 
 def test_create_route_with_configuration_as_org_admin(
-        api_client, org_admin_user_2, organization, other_organization, integrations_list, provider_movebank_ewt
+        api_client, org_admin_user_2, organization, other_organization, integrations_list_er, provider_movebank_ewt
 ):
     _test_create_route(
         api_client=api_client,
@@ -129,7 +129,7 @@ def test_create_route_with_configuration_as_org_admin(
                 str(provider_movebank_ewt.id)
             ],
             "destinations": [
-                str(integrations_list[5].id)
+                str(integrations_list_er[5].id)
             ],
             "configuration": {
                 "name": "Route settings for EWT",
@@ -143,7 +143,7 @@ def test_create_route_with_configuration_as_org_admin(
 
 
 def test_create_route_with_configuration_id_as_org_admin(
-        api_client, org_admin_user_2, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+        api_client, org_admin_user_2, organization, other_organization, integrations_list_er, provider_movebank_ewt, route_2
 ):
     _test_create_route(
         api_client=api_client,
@@ -155,7 +155,7 @@ def test_create_route_with_configuration_id_as_org_admin(
                 str(provider_movebank_ewt.id)
             ],
             "destinations": [
-                str(integrations_list[5].id)
+                str(integrations_list_er[5].id)
             ],
             "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
@@ -175,7 +175,7 @@ def _test_cannot_create_route(api_client, user, data):
 
 
 def test_cannot_create_route_as_org_viewer(
-        api_client, org_viewer_user, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+        api_client, org_viewer_user, organization, other_organization, integrations_list_er, provider_movebank_ewt, route_2
 ):
     _test_cannot_create_route(
         api_client=api_client,
@@ -187,7 +187,7 @@ def test_cannot_create_route_as_org_viewer(
                 str(provider_movebank_ewt.id)
             ],
             "destinations": [
-                str(integrations_list[5].id)
+                str(integrations_list_er[5].id)
             ],
             "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
@@ -196,7 +196,7 @@ def test_cannot_create_route_as_org_viewer(
 
 
 def test_cannot_create_route_for_other_organization_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list, provider_movebank_ewt, route_2
+        api_client, org_admin_user, organization, other_organization, integrations_list_er, provider_movebank_ewt, route_2
 ):
     _test_cannot_create_route(
         api_client=api_client,
@@ -208,7 +208,7 @@ def test_cannot_create_route_for_other_organization_as_org_admin(
                 str(provider_movebank_ewt.id)
             ],
             "destinations": [
-                str(integrations_list[5].id)
+                str(integrations_list_er[5].id)
             ],
             "configuration": str(route_2.configuration.id),  # Reuse config from other route
             "additional": {}
@@ -245,17 +245,17 @@ def _test_retrieve_route_details(api_client, user, route):
 
 
 def test_retrieve_route_details_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list, route_1, route_2
+        api_client, superuser, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_retrieve_route_details(
         api_client=api_client,
         user=superuser,
-        route=integrations_list[0].default_route
+        route=integrations_list_er[0].default_route
     )
 
 
 def test_retrieve_route_details_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_admin_user, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_retrieve_route_details(
         api_client=api_client,
@@ -265,7 +265,7 @@ def test_retrieve_route_details_as_org_admin(
 
 
 def test_retrieve_route_details_as_org_viewer(
-        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_retrieve_route_details(
         api_client=api_client,
@@ -283,7 +283,7 @@ def _test_cannot_retrieve_unrelated_route_details(api_client, user, route):
 
 
 def test_cannot_retrieve_unrelated_route_details_as_org_viewer(
-        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_cannot_retrieve_unrelated_route_details(
         api_client=api_client,
@@ -293,7 +293,7 @@ def test_cannot_retrieve_unrelated_route_details_as_org_viewer(
 
 
 def test_cannot_retrieve_unrelated_route_details_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_admin_user, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_cannot_retrieve_unrelated_route_details(
         api_client=api_client,
@@ -359,7 +359,7 @@ def _test_full_update_route(api_client, user, route, new_data):
 
 
 def test_full_update_route_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list,
+        api_client, superuser, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration, smart_route_configuration
 ):
     _test_full_update_route(
@@ -384,7 +384,7 @@ def test_full_update_route_as_superuser(
 
 
 def test_partial_update_route_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list,
+        api_client, superuser, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
 ):
     _test_partial_update_route(
@@ -398,7 +398,7 @@ def test_partial_update_route_as_superuser(
 
 
 def test_update_route_configuration_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, er_route_configuration_rangers
 ):
     _test_partial_update_route(
@@ -412,7 +412,7 @@ def test_update_route_configuration_as_org_admin(
 
 
 def test_add_destination_in_default_route_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list,
+        api_client, superuser, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
 ):
     default_route = provider_lotek_panthera.default_route
@@ -422,13 +422,13 @@ def test_add_destination_in_default_route_as_superuser(
         user=superuser,
         route=default_route,
         new_data={  # Add one destination
-            "destinations": [*current_destinations, str(integrations_list[1].id)]
+            "destinations": [*current_destinations, str(integrations_list_er[1].id)]
         }
     )
 
 
 def test_add_destination_in_route_as_org_admin(
-        api_client, org_admin_user_2, organization, other_organization, integrations_list,
+        api_client, org_admin_user_2, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     current_destinations = [str(d.id) for d in route_2.destinations.all()]
@@ -443,7 +443,7 @@ def test_add_destination_in_route_as_org_admin(
 
 
 def test_cannot_add_destination_in_route_as_org_viewer(
-        api_client, org_viewer_user_2, organization, other_organization, integrations_list,
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     current_destinations = [str(d.id) for d in route_2.destinations.all()]
@@ -459,7 +459,7 @@ def test_cannot_add_destination_in_route_as_org_viewer(
 
 
 def test_cannot_add_destination_in_unrelated_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     current_destinations = [str(d.id) for d in route_2.destinations.all()]
@@ -475,7 +475,7 @@ def test_cannot_add_destination_in_unrelated_route_as_org_admin(
 
 
 def test_cannot_add_unrelated_destination_in_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     current_destinations = [str(d.id) for d in route_1.destinations.all()]
@@ -491,7 +491,7 @@ def test_cannot_add_unrelated_destination_in_route_as_org_admin(
 
 
 def test_cannot_change_route_owner_to_unrelated_org_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     api_client.force_authenticate(org_admin_user)
@@ -506,7 +506,7 @@ def test_cannot_change_route_owner_to_unrelated_org_as_org_admin(
 
 
 def test_update_data_provider_in_route_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list,
+        api_client, superuser, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
 ):
     default_route = provider_lotek_panthera.default_route
@@ -521,7 +521,7 @@ def test_update_data_provider_in_route_as_superuser(
 
 
 def test_update_data_provider_in_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2
 ):
     _test_partial_update_route(
@@ -529,20 +529,20 @@ def test_update_data_provider_in_route_as_org_admin(
         user=org_admin_user,
         route=route_1,
         new_data={  # Change the data provider
-            "data_providers": [str(integrations_list[2].id)]
+            "data_providers": [str(integrations_list_er[2].id)]
         }
     )
 
 
 def test_cannot_update_data_provider_in_route_as_org_viewer(
-        api_client, org_viewer_user_2, organization, other_organization, integrations_list,
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     api_client.force_authenticate(org_viewer_user_2)
     response = api_client.patch(
         reverse("routes-detail", kwargs={"pk": route_2.id}),
         data={  # Change the data provider
-            "data_providers": [str(integrations_list[7].id)]
+            "data_providers": [str(integrations_list_er[7].id)]
         }
     )
     # Viewers cannot do write operations
@@ -550,7 +550,7 @@ def test_cannot_update_data_provider_in_route_as_org_viewer(
 
 
 def test_cannot_add_unrelated_provider_in_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list,
+        api_client, org_admin_user, organization, other_organization, integrations_list_er,
         provider_lotek_panthera, provider_movebank_ewt, route_1, route_2, smart_integration
 ):
     api_client.force_authenticate(org_admin_user)
@@ -581,7 +581,7 @@ def _test_cannot_delete_route(api_client, user, route):
 
 
 def test_delete_route_as_superuser(
-        api_client, superuser, organization, other_organization, integrations_list, route_1, route_2
+        api_client, superuser, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_delete_route(
         api_client=api_client,
@@ -591,7 +591,7 @@ def test_delete_route_as_superuser(
 
 
 def test_delete_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_admin_user, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_delete_route(
         api_client=api_client,
@@ -601,7 +601,7 @@ def test_delete_route_as_org_admin(
 
 
 def test_cannot_delete_route_as_org_viewer(
-        api_client, org_viewer_user_2, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_viewer_user_2, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_cannot_delete_route(
         api_client=api_client,
@@ -611,7 +611,7 @@ def test_cannot_delete_route_as_org_viewer(
 
 
 def test_cannot_delete_unrelated_route_as_org_admin(
-        api_client, org_admin_user, organization, other_organization, integrations_list, route_1, route_2
+        api_client, org_admin_user, organization, other_organization, integrations_list_er, route_1, route_2
 ):
     _test_cannot_delete_route(
         api_client=api_client,
@@ -644,7 +644,7 @@ def _test_filter_routes(api_client, user, filters, expected_routes):
 
 def test_filter_routes_by_provider_as_superuser(
         api_client, superuser, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     _test_filter_routes(
@@ -659,10 +659,10 @@ def test_filter_routes_by_provider_as_superuser(
 
 def test_filter_routes_by_destination_as_superuser(
         api_client, superuser, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
-    selected_destination = integrations_list[6]
+    selected_destination = integrations_list_er[6]
     _test_filter_routes(
         api_client=api_client,
         user=superuser,
@@ -675,10 +675,10 @@ def test_filter_routes_by_destination_as_superuser(
 
 def test_filter_routes_by_destination_url_as_superuser(
         api_client, superuser, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
-    selected_destination = integrations_list[5]
+    selected_destination = integrations_list_er[5]
     _test_filter_routes(
         api_client=api_client,
         user=superuser,
@@ -691,10 +691,10 @@ def test_filter_routes_by_destination_url_as_superuser(
 
 def test_filter_routes_by_destination_url_as_org_admin(
         api_client, org_admin_user_2, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
-    selected_destination = integrations_list[5]
+    selected_destination = integrations_list_er[5]
     _test_filter_routes(
         api_client=api_client,
         user=org_admin_user_2,
@@ -708,7 +708,7 @@ def test_filter_routes_by_destination_url_as_org_admin(
 
 def test_global_search_routes_by_route_name_as_superuser(
         api_client, superuser, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     _test_filter_routes(
@@ -724,7 +724,7 @@ def test_global_search_routes_by_route_name_as_superuser(
 
 def test_global_search_routes_by_destination_url_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
         route_1, route_2
 ):
     selected_destination = route_1.destinations.last()

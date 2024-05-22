@@ -2,6 +2,9 @@ import json
 import uuid
 from functools import cached_property
 import jsonschema
+import requests
+from urllib.parse import urljoin
+import google.oauth2.id_token
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
@@ -27,6 +30,7 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
         verbose_name="Value (Identifier)"
     )
     description = models.TextField(blank=True)
+    service_url = models.URLField(blank=True, null=True, default="")
 
     class Meta:
         ordering = ("name",)
@@ -79,6 +83,33 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
+    def execute(self, integration, config_overrides=None, run_in_background=False):
+        service_url = integration.type.service_url
+        if not service_url:
+            raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
+
+        # Build the URL for the action runner endpoint
+        actions_execute_path = "v1/actions/execute"
+        actions_execute_url = urljoin(service_url, actions_execute_path)
+
+        # Make an authorized request to the action runner endpoint using google.oauth2.id_token
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+        auth_headers = {"Authorization": f"Bearer {id_token}"}
+        response = requests.post(
+            url=actions_execute_url,
+            headers=auth_headers,
+            json={
+                "integration_id": str(integration.id),
+                "action_id": self.value,
+                "run_in_background": run_in_background,
+                # ToDo: Enable this once it's supported by integrations
+                #"config_overrides": config_overrides,
+            }
+        )
+        response.raise_for_status()
+        return response.json()
+
 
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
@@ -122,9 +153,8 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub for ER, SMART and MoveBank Sites
-        # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_smart_site or self.is_mb_site):
+        # Setup topic and broker for destination sites
+        if self._state.adding and any([self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site]):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             if "broker" not in self.additional:
@@ -133,8 +163,13 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER Sites only
-        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
-            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
+        if created and settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
+            if self.is_smart_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+            elif self.is_wpswatch_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+            else:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self),
                 integration=self,

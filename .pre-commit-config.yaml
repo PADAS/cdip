@@ -1,11 +1,25 @@
 repos:
--   repo: git://github.com/pre-commit/mirrors-autopep8
-    rev: 'v1.5.6'  # Use the sha / tag you want to point at
-    hooks:
-    -   id: autopep8
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0  # Use the ref you want to point at
-    hooks:
-    -   id: check-merge-conflict
-    -   id: debug-statements
-    -   id: end-of-file-fixer
+#- repo: git://github.com/hhatto/autopep8
+#  rev: 'v2.1.0'  # Use the sha / tag you want to point at
+#  hooks:
+#  - id: autopep8
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v3.4.0  # Use the ref you want to point at
+  hooks:
+  - id: check-merge-conflict
+  - id: debug-statements
+  - id: end-of-file-fixer
+- repo: https://github.com/Yelp/detect-secrets
+  rev: v1.4.0
+  hooks:
+  - id: detect-secrets
+    name: Detect secrets
+    language: python
+    entry: detect-secrets-hook
+    args: ['--baseline', '.secrets.baseline']
+- repo: https://github.com/gitguardian/ggshield
+  rev: v1.26.0
+  hooks:
+  - id: ggshield
+    language_version: python3
+    stages: [commit]

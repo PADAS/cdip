@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from datetime import datetime
 from unittest.mock import PropertyMock
 
 import pytest
@@ -11,6 +12,7 @@ from rest_framework.test import APIClient
 from accounts.models import AccountProfile, AccountProfileOrganization
 from activity_log.models import ActivityLog
 from core.enums import DjangoGroups, RoleChoices
+from accounts.models import EULA, UserAgreement
 from integrations.models import (
     InboundIntegrationType,
     OutboundIntegrationType,
@@ -514,6 +516,17 @@ def integration_type_wpswatch():
 
 
 @pytest.fixture
+def wpswatch_action_push_events(integration_type_wpswatch):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_wpswatch,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to WPA Watch API",
+    )
+
+
+@pytest.fixture
 def provider_lotek_panthera(
         get_random_id,
         organization,
@@ -616,7 +629,134 @@ def destination_movebank(
 
 
 @pytest.fixture
-def integrations_list(
+def integration_type_cellstop():
+    return IntegrationType.objects.create(
+        name="Cellstop",
+        value="cellstop",
+        description="Standard integration type for Cellstop",
+        service_url="https://cellstop-actions-runner-fakeurl123-uc.a.run.app"
+    )
+
+
+@pytest.fixture
+def cellstop_action_fetch_samples(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Fetch Samples",
+        value="fetch_samples",
+        description="Extract a data sample from cellstop",
+    )
+
+@pytest.fixture
+def cellstop_fetch_samples_response():
+    return {
+        "observations_extracted": 2,
+        "observations": [
+            {
+                "deviceId": 1234,
+                "vehicleId": 5678,
+                "x": 12.123456789,
+                "y": -21.123456789,
+                "name": "device-name-1",
+                "regNo": "A12345B ",
+                "iconURL": None,
+                "address": "fake street 123, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+132456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            },
+            {
+                "deviceId": 2345,
+                "vehicleId": 6789,
+                "x": 11.123456789,
+                "y": -22.123456789,
+                "name": "device-name-2",
+                "regNo": "B45678C",
+                "iconURL": None,
+                "address": "fake street 456, Somewhere",
+                "alarm": None,
+                "unit_msisdn": "+123456789",
+                "speed": 0,
+                "direction": 0,
+                "time": 1713794324000,
+                "timeStr": "2024-04-22T15:58:44",
+                "ignOn": False
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def cellstop_action_auth(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="API Key to authenticate against Cellstop API",
+        schema={
+            "type": "object",
+            "required": ["username", "password"],
+            "properties": {
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
+    )
+
+
+@pytest.fixture
+def cellstop_action_auth_response():
+    return {
+        "valid_credentials": True
+    }
+
+
+@pytest.fixture
+def cellstop_integration(
+        organization,
+        other_organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstopnm.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Cellstop Site {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    return integration
+
+
+@pytest.fixture
+def integrations_list_er(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
         organization,
         other_organization,
         integration_type_er,
@@ -627,6 +767,19 @@ def integrations_list(
         er_action_push_positions,
         er_action_push_events,
 ):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
     integrations = []
     for i in range(10):
         # Create the integration
@@ -659,6 +812,98 @@ def integrations_list(
         )
         IntegrationConfiguration.objects.create(
             integration=integration, action=er_action_pull_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_smart(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization,
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_smart)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.smart.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_smart,
+            name=f"SMART Site Test {i}",
+            owner=organization if i < 5 else other_organization,
+            base_url=site_url,
+        )
+        # Configure actions
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=smart_action_auth,
+            data={
+                "api_key": f"SMART-{get_random_id()}-KEY",
+            },
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=smart_action_push_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_wpswatch(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization,
+        integration_type_wpswatch,
+        get_random_id,
+        wpswatch_action_push_events
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.wpswatch.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_wpswatch,
+            name=f"WPS Watch Site Test {i}",
+            owner=organization,
+            base_url=site_url,
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=wpswatch_action_push_events
         )
         integrations.append(integration)
         ensure_default_route(integration=integration)
@@ -710,14 +955,14 @@ def route_1(
         organization,
         lotek_sources,
         provider_lotek_panthera,
-        integrations_list,
+        integrations_list_er,
 ):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
     )
     rule.data_providers.add(provider_lotek_panthera)
-    rule.destinations.add(*integrations_list)
+    rule.destinations.add(*integrations_list_er)
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -765,7 +1010,7 @@ def route_2(
         other_organization,
         movebank_sources,
         provider_movebank_ewt,
-        integrations_list,
+        integrations_list_er,
         er_route_configuration_elephants,
 ):
     route, _ = Route.objects.get_or_create(
@@ -773,7 +1018,7 @@ def route_2(
         owner=other_organization,
     )
     route.data_providers.add(provider_movebank_ewt)
-    route.destinations.add(integrations_list[5])
+    route.destinations.add(integrations_list_er[5])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -885,13 +1130,13 @@ def trap_tagger_to_movebank_observation_trace(provider_trap_tagger):
 
 
 @pytest.fixture
-def event_delivered_trace(provider_trap_tagger, integrations_list):
+def event_delivered_trace(provider_trap_tagger, integrations_list_er):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:35:34.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -900,13 +1145,13 @@ def event_delivered_trace(provider_trap_tagger, integrations_list):
 
 
 @pytest.fixture
-def event_delivered_trace2(provider_trap_tagger, integrations_list):
+def event_delivered_trace2(provider_trap_tagger, integrations_list_er):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[1],
+        destination=integrations_list_er[1],
         delivered_at="2023-07-10T19:36:15.425974Z",
         external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f",
     )
@@ -916,14 +1161,14 @@ def event_delivered_trace2(provider_trap_tagger, integrations_list):
 
 @pytest.fixture
 def attachment_delivered_trace(
-        provider_trap_tagger, event_delivered_trace, integrations_list
+        provider_trap_tagger, event_delivered_trace, integrations_list_er
 ):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=event_delivered_trace.object_id,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:37:48.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -940,7 +1185,7 @@ def mock_cloud_storage(mocker):
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -953,7 +1198,7 @@ def trap_tagger_observation_delivered_event(
             "related_to": None,
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -990,7 +1235,7 @@ def trap_tagger_to_movebank_observation_delivered_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1003,7 +1248,7 @@ def trap_tagger_observation_delivered_event_two(
             "related_to": None,
             "external_id": "46983ced-1216-4d43-81da-01ee90ba9b81",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1014,7 +1259,7 @@ def trap_tagger_observation_delivered_event_two(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1026,7 +1271,7 @@ def trap_tagger_observation_delivery_failed_event(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1037,7 +1282,7 @@ def trap_tagger_observation_delivery_failed_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1049,7 +1294,7 @@ def trap_tagger_observation_delivery_failed_event_two(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1652,8 +1897,8 @@ def observation_delivery_succeeded_event(provider_lotek_panthera, destination_mo
 
 
 @pytest.fixture
-def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list):
-    destination = integrations_list[0]
+def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list_er):
+    destination = integrations_list_er[0]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1695,8 +1940,8 @@ def observation_delivery_failed_event(provider_lotek_panthera, destination_moveb
 
 
 @pytest.fixture
-def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list):
-    destination = integrations_list[1]
+def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list_er):
+    destination = integrations_list_er[1]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1798,7 +2043,7 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
 
 
 @pytest.fixture
-def mock_dispatcher_secrets():
+def mock_dispatcher_secrets_er(dispatcher_source_release_1):
     return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
                          'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
                          'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
@@ -1815,21 +2060,78 @@ def mock_dispatcher_secrets():
                                     'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
                                     'vpc_connector': 'cdip-cloudrun-connector',
                                     'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
-                                    'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
+                                    'source_code_path': dispatcher_source_release_1}}
 
 
 @pytest.fixture
-def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets):
+def mock_dispatcher_secrets_smart(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_dispatcher_secrets_wps_watch(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets_er):
     mock = mocker.MagicMock()
-    mock.return_value = mock_dispatcher_secrets
+    mock.return_value = mock_dispatcher_secrets_er
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_smart(mocker, mock_dispatcher_secrets_smart):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_smart
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch(mocker, mock_dispatcher_secrets_wps_watch):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_wps_watch
     return mock
 
 
 @pytest.fixture
 def das_client_events_response():
+    today = datetime.now().strftime('%Y-%m-%d')
     return [
         {'id': '537466c0-f4a8-400a-91ae-b7da981ecfd5', 'location': {'latitude': -41.145026, 'longitude': -71.261822},
-         'time': '2024-04-12T07:37:59-06:00', 'end_time': None, 'serial_number': 49575, 'message': '', 'provenance': '',
+         'time': f'{today}T07:37:59-06:00', 'end_time': None, 'serial_number': 49575, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1838,14 +2140,14 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T07:38:04.287767-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T07:38:04.287767-06:00', 'created_at': '2024-04-12T07:38:00.730106-06:00',
+         'sort_at': f'{today}T07:38:04.287767-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T07:38:04.287767-06:00', 'created_at': f'{today}T07:38:00.730106-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_shelterorcamp',
          'event_details': {'updates': []}, 'files': [{'id': '84ed5275-7c9f-451c-a726-c559fc90e808', 'comment': '',
-                                                      'created_at': '2024-04-12T07:38:04.250161-06:00',
-                                                      'updated_at': '2024-04-12T07:38:04.250249-06:00', 'updates': [
+                                                      'created_at': f'{today}T07:38:04.250161-06:00',
+                                                      'updated_at': f'{today}T07:38:04.250249-06:00', 'updates': [
                 {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
-                 'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+                 'time': f'{today}T13:38:04.270018+00:00', 'text': '',
                  'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                           'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                  'type': 'add_eventfile'}],
@@ -1856,32 +2158,32 @@ def das_client_events_response():
                                                           'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/thumbnail/2024-04-12_10-37-55_shelter_camp_observ....jpg',
                                                           'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/large/2024-04-12_10-37-55_shelter_camp_observ....jpg',
                                                           'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/xlarge/2024-04-12_10-37-55_shelter_camp_observ....jpg'},
-                                                      'filename': '2024-04-12_10-37-55_shelter_camp_observ....jpg',
+                                                      'filename': f'{today}_10-37-55_shelter_camp_observ....jpg',
                                                       'file_type': 'image',
                                                       'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5/file/84ed5275-7c9f-451c-a726-c559fc90e808/icon/2024-04-12_10-37-55_shelter_camp_observ....jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/537466c0-f4a8-400a-91ae-b7da981ecfd5',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261822, -41.145026]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T13:37:59+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T13:37:59+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T13:38:04.303464+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T13:38:04.303464+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
             {'message': 'File Added: 2024-04-12_10-37-55_shelter_camp_observ....jpg',
-             'time': '2024-04-12T13:38:04.270018+00:00', 'text': '',
+             'time': f'{today}T13:38:04.270018+00:00', 'text': '',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T13:38:00.816986+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T13:38:00.816986+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'ecaf94dc-1a75-4163-9795-784db8cbf29e', 'location': {'latitude': -41.145139, 'longitude': -71.262131},
-         'time': '2024-04-12T06:58:32-06:00', 'end_time': None, 'serial_number': 49574, 'message': '', 'provenance': '',
+         'time': f'{today}T06:58:32-06:00', 'end_time': None, 'serial_number': 49574, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_animals', 'priority': 0, 'priority_label': 'Gray',
          'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1890,13 +2192,13 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:58:35.476603-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:58:35.476603-06:00', 'created_at': '2024-04-12T06:58:33.372986-06:00',
+         'sort_at': f'{today}T06:58:35.476603-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:58:35.476603-06:00', 'created_at': f'{today}T06:58:33.372986-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_animals', 'event_details': {'updates': []}, 'files': [
             {'id': '73be60b8-19fb-4e3c-ab66-bada9fcae6c6', 'comment': '',
-             'created_at': '2024-04-12T06:58:35.432821-06:00', 'updated_at': '2024-04-12T06:58:35.432852-06:00',
+             'created_at': f'{today}T06:58:35.432821-06:00', 'updated_at': f'{today}T06:58:35.432852-06:00',
              'updates': [
-                 {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+                 {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': f'{today}T12:58:35.457115+00:00',
                   'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                        'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                   'type': 'add_eventfile'}],
@@ -1907,30 +2209,30 @@ def das_client_events_response():
                  'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/thumbnail/2024-04-12_09-58-23_wildlife.jpg',
                  'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/large/2024-04-12_09-58-23_wildlife.jpg',
                  'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/xlarge/2024-04-12_09-58-23_wildlife.jpg'},
-             'filename': '2024-04-12_09-58-23_wildlife.jpg', 'file_type': 'image',
+             'filename': f'{today}_09-58-23_wildlife.jpg', 'file_type': 'image',
              'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e/file/73be60b8-19fb-4e3c-ab66-bada9fcae6c6/icon/2024-04-12_09-58-23_wildlife.jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ecaf94dc-1a75-4163-9795-784db8cbf29e',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.262131, -41.145139]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:58:32+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:58:32+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:58:35.495824+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T12:58:35.495824+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
-            {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': '2024-04-12T12:58:35.457115+00:00',
+            {'message': 'File Added: 2024-04-12_09-58-23_wildlife.jpg', 'time': f'{today}T12:58:35.457115+00:00',
              'text': '', 'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                   'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:58:33.432933+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T12:58:33.432933+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'e74fd6de-bfa9-44a8-b878-9689afd53079', 'location': {'latitude': -41.145106, 'longitude': -71.26202},
-         'time': '2024-04-12T06:30:19-06:00', 'end_time': None, 'serial_number': 49573, 'message': '', 'provenance': '',
+         'time': f'{today}T06:30:19-06:00', 'end_time': None, 'serial_number': 49573, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1939,15 +2241,15 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'active', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:30:22.850273-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:30:22.850273-06:00', 'created_at': '2024-04-12T06:30:20.768199-06:00',
+         'sort_at': f'{today}T06:30:22.850273-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:30:22.850273-06:00', 'created_at': f'{today}T06:30:20.768199-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_weaponsequipment',
          'event_details': {'numberofweaponorgear': 1, 'actiontakenweaponorgar': 'confiscated',
                            'typeofevidentmaterials': 'other', 'updates': []}, 'files': [
             {'id': 'cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f', 'comment': '',
-             'created_at': '2024-04-12T06:30:22.811731-06:00', 'updated_at': '2024-04-12T06:30:22.811771-06:00',
+             'created_at': f'{today}T06:30:22.811731-06:00', 'updated_at': f'{today}T06:30:22.811771-06:00',
              'updates': [{'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
-                          'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+                          'time': f'{today}T12:30:22.832590+00:00', 'text': '',
                           'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                                    'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
                           'type': 'add_eventfile'}],
@@ -1958,31 +2260,31 @@ def das_client_events_response():
                  'thumbnail': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/thumbnail/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
                  'large': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/large/2024-04-12_09-29-39_weapons_and_gear_se....jpg',
                  'xlarge': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/xlarge/2024-04-12_09-29-39_weapons_and_gear_se....jpg'},
-             'filename': '2024-04-12_09-29-39_weapons_and_gear_se....jpg', 'file_type': 'image',
+             'filename': f'{today}_09-29-39_weapons_and_gear_se....jpg', 'file_type': 'image',
              'icon_url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079/file/cbfe2a06-aba3-489a-bf6d-e4690d1f0c3f/icon/2024-04-12_09-29-39_weapons_and_gear_se....jpg'}],
          'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/e74fd6de-bfa9-44a8-b878-9689afd53079',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.26202, -41.145106]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:30:19+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:30:19+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Changed State: new → active', 'time': '2024-04-12T12:30:22.871420+00:00',
+            {'message': 'Changed State: new → active', 'time': f'{today}T12:30:22.871420+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'}, 'type': 'read'},
             {'message': 'File Added: 2024-04-12_09-29-39_weapons_and_gear_se....jpg',
-             'time': '2024-04-12T12:30:22.832590+00:00', 'text': '',
+             'time': f'{today}T12:30:22.832590+00:00', 'text': '',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
-             'type': 'add_eventfile'}, {'message': 'Created', 'time': '2024-04-12T12:30:20.821637+00:00',
+             'type': 'add_eventfile'}, {'message': 'Created', 'time': f'{today}T12:30:20.821637+00:00',
                                         'user': {'username': 'marianom', 'first_name': 'Mariano',
                                                  'last_name': 'Martinez', 'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c',
                                                  'content_type': 'accounts.user'}, 'type': 'add_event'}],
          'patrols': []},
         {'id': 'ede43c88-f282-46eb-ae63-227da082c2b4', 'location': {'latitude': -41.145032, 'longitude': -71.261906},
-         'time': '2024-04-12T06:22:11-06:00', 'end_time': None, 'serial_number': 49572, 'message': '', 'provenance': '',
+         'time': f'{today}T06:22:11-06:00', 'end_time': None, 'serial_number': 49572, 'message': '', 'provenance': '',
          'event_type': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching', 'priority': 0,
          'priority_label': 'Gray', 'attributes': {}, 'comment': None, 'title': None,
          'reported_by': {'content_type': 'observations.subject', 'id': 'f9f4a3dd-fae2-4147-8259-0551ff5691e6',
@@ -1991,20 +2293,20 @@ def das_client_events_response():
                          'updated_at': '2024-03-13T11:07:40.777391-06:00', 'is_active': True,
                          'user': {'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c'}, 'tracks_available': False,
                          'image_url': '/static/ranger-black.svg'}, 'state': 'new', 'is_contained_in': [],
-         'sort_at': '2024-04-12T06:22:12.044902-06:00', 'patrol_segments': [], 'geometry': None,
-         'updated_at': '2024-04-12T06:22:12.044902-06:00', 'created_at': '2024-04-12T06:22:12.046247-06:00',
+         'sort_at': f'{today}T06:22:12.044902-06:00', 'patrol_segments': [], 'geometry': None,
+         'updated_at': f'{today}T06:22:12.044902-06:00', 'created_at': f'{today}T06:22:12.046247-06:00',
          'icon_id': '169361d0-62b8-411d-a8e6-019823805016_humanactivity_poaching',
          'event_details': {'animalpoached': 'carcass', 'targetspecies': 'birds.greategret', 'numberofanimalpoached': 1,
                            'updates': []}, 'files': [], 'related_subjects': [], 'event_category': 'smart',
          'url': 'https://gundi-er.pamdas.org/api/v1.0/activity/event/ede43c88-f282-46eb-ae63-227da082c2b4',
          'image_url': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
          'geojson': {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-71.261906, -41.145032]},
-                     'properties': {'message': '', 'datetime': '2024-04-12T12:22:11+00:00',
+                     'properties': {'message': '', 'datetime': f'{today}T12:22:11+00:00',
                                     'image': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                     'icon': {'iconUrl': 'https://gundi-er.pamdas.org/static/generic-gray.svg',
                                              'iconSize': [25, 25], 'iconAncor': [12, 12], 'popupAncor': [0, -13],
                                              'className': 'dot'}}}, 'is_collection': False, 'updates': [
-            {'message': 'Created', 'time': '2024-04-12T12:22:12.123550+00:00',
+            {'message': 'Created', 'time': f'{today}T12:22:12.123550+00:00',
              'user': {'username': 'marianom', 'first_name': 'Mariano', 'last_name': 'Martinez',
                       'id': '3f29bdb1-395c-4a29-9c64-5bd79109765c', 'content_type': 'accounts.user'},
              'type': 'add_event'}], 'patrols': []},
@@ -2091,6 +2393,7 @@ def das_client_events_response():
 
 @pytest.fixture
 def das_client_patrols_response():
+    today = datetime.now().strftime('%Y-%m-%d')
     return [
         {'id': 'd0e3542d-6346-4f5d-9d47-805add57f8be', 'priority': 0, 'state': 'open', 'objective': None,
          'serial_number': 24, 'title': None, 'files': [], 'notes': [], 'patrol_segments': [
@@ -2102,16 +2405,16 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:26.608485-06:00',
                         'updated_at': '2024-03-07T14:59:26.608510-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:09:02.760000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:09:13.182000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:09:02.760000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:09:13.182000-06:00', 'end_time': None},
              'start_location': {'latitude': 25.46380455676075, 'longitude': -106.17172113020978}, 'end_location': None,
              'events': [], 'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:13.339878+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:09:13.339878+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:11.808969+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:09:11.808969+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2125,17 +2428,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:33.833433-06:00',
                         'updated_at': '2024-03-07T14:59:33.833460-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T11:45:16.796000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T11:47:29.077000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T11:45:16.796000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T11:47:29.077000-06:00', 'end_time': None},
              'start_location': {'latitude': 25.35092637406109, 'longitude': -106.04704163232911},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T17:47:29.571873+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T17:47:29.571873+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T17:45:33.457184+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T17:45:33.457184+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2149,17 +2452,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:25.786875-06:00',
                         'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:09:17.655000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:09:30.147000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:09:17.655000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:09:30.147000-06:00', 'end_time': None},
              'start_location': {'latitude': 28.01653928410248, 'longitude': -107.91184126931785},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:09:30.309659+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:09:30.309659+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:09:28.626462+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:09:28.626462+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2173,17 +2476,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:25.786875-06:00',
                         'updated_at': '2024-03-07T14:59:25.786909-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:22:37.505000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:22:48.829000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:22:37.505000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:22:48.829000-06:00', 'end_time': None},
              'start_location': {'latitude': 24.901369994330622, 'longitude': -104.92882719106991},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:22:49.164268+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:22:49.164268+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:22:46.466459+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:22:46.466459+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]},
@@ -2197,17 +2500,17 @@ def das_client_patrols_response():
                         'created_at': '2024-03-07T14:59:26.347917-06:00',
                         'updated_at': '2024-03-07T14:59:26.347941-06:00', 'is_active': True, 'user': None,
                         'tracks_available': False, 'image_url': '/static/ranger-black.svg'},
-             'scheduled_start': '2024-04-12T12:26:17.671000-06:00', 'scheduled_end': None,
-             'time_range': {'start_time': '2024-04-12T12:26:32.961000-06:00', 'end_time': None},
+             'scheduled_start': f'{today}T12:26:17.671000-06:00', 'scheduled_end': None,
+             'time_range': {'start_time': f'{today}T12:26:32.961000-06:00', 'end_time': None},
              'start_location': {'latitude': 23.31206200043364, 'longitude': -104.43094585906033},
              'end_location': None, 'events': [],
              'image_url': 'https://gundi-er.pamdas.org/static/sprite-src/routine-patrol-icon.svg',
              'icon_id': 'routine-patrol-icon', 'updates': [
-                {'message': 'Updated fields: Start Time', 'time': '2024-04-12T18:26:33.304716+00:00',
+                {'message': 'Updated fields: Start Time', 'time': f'{today}T18:26:33.304716+00:00',
                  'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                           'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
                  'type': 'update_segment'}]}], 'updates': [
-            {'message': 'Patrol Added', 'time': '2024-04-12T18:26:31.304513+00:00',
+            {'message': 'Patrol Added', 'time': f'{today}T18:26:31.304513+00:00',
              'user': {'username': 'victorl', 'first_name': 'Victor', 'last_name': 'Lujan',
                       'id': '9f90cd67-c355-4168-9a45-99eec559004c', 'content_type': 'accounts.user'},
              'type': 'add_patrol'}]}
@@ -2246,3 +2549,119 @@ def mock_last_poll(mocker):
     mock_last_poll = mocker.MagicMock()
     mock_last_poll.return_value.patrol_last_poll_at = None
     return mock_last_poll
+
+@pytest.fixture
+def eula_v1():
+    return EULA.objects.create(
+        version="Gundi_EULA_2024-05-03",
+        eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
+    )
+
+@pytest.fixture
+def eula_v2():
+    return EULA.objects.create(
+        version="Gundi_EULA_2024-05-05",
+        eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
+    )
+
+@pytest.fixture
+def dispatcher_source_release_1():
+    return "release-20231218"
+
+
+@pytest.fixture
+def dispatcher_source_release_2():
+    return "release-20240510"
+
+
+@pytest.fixture
+def outbound_integrations_list_er(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization, legacy_integration_type_earthranger
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets", mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"EarthRanger Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakepamdas.org",
+            type=legacy_integration_type_earthranger,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_smart(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization, legacy_integration_type_smart
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"SMART Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakesmartconnect.com",
+            type=legacy_integration_type_smart,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_wpswatch(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization, legacy_integration_type_wpswatch
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"WPS Watch Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakeswpswatch.com",
+            type=legacy_integration_type_wpswatch,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations

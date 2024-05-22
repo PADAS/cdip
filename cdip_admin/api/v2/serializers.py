@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
-from accounts.models import AccountProfileOrganization, AccountProfile
+from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
     GundiTrace
@@ -21,6 +21,7 @@ User = get_user_model()
 
 class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    accepted_eula = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -29,11 +30,20 @@ class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "full_name",
-            "is_superuser"
+            "is_superuser",
+            "accepted_eula",
         )
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip().capitalize()
+
+    def get_accepted_eula(self, obj):
+        try:
+            agreement = UserAgreement.objects.get(user=obj, eula=EULA.objects.get_active_eula())
+        except UserAgreement.DoesNotExist as e:
+            return False
+        else:
+            return agreement.accept
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -248,7 +258,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "actions"
+            "actions",
+            "service_url",
         )
 
     def validate_value(self, value):
@@ -284,6 +295,33 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
                 defaults=action_params
             )
         return integration_type
+
+
+class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer):
+    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = IntegrationType
+        fields = (
+            "name",
+            "value",
+            "description",
+            "actions",
+            "service_url",
+        )
+
+    def update(self, instance, validated_data):
+        actions = validated_data.pop("actions", [])
+        # Update the integration type
+        super().update(instance=instance, validated_data=validated_data)
+        # Update or Create nested actions if provided
+        for action_data in actions:  # Usually less than 5 actions
+            action_data["integration_type"] = self.instance
+            IntegrationAction.objects.update_or_create(
+                value=action_data.get("value"),
+                defaults=action_data
+            )
+        return instance
 
 
 class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
@@ -978,3 +1016,57 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
     is_reversible = serializers.BooleanField(read_only=True)
     revert_data = serializers.JSONField(read_only=True)
 
+
+class ActionTriggerSerializer(serializers.Serializer):
+    run_in_background = serializers.BooleanField(required=False, default=False)
+    config_overrides = serializers.JSONField(required=False, write_only=True)
+
+
+class UserAgreementSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    eula = serializers.HiddenField(default=EULA.objects.get_active_eula)
+    accept = serializers.BooleanField(read_only=True)
+    date_accepted = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = UserAgreement
+        fields = (
+            "user",
+            "eula",
+            "accept",
+            "date_accepted",
+        )
+
+    def get_unique_together_validators(self):
+        # Overriden to disable unique together check as it's handled in the create method
+        return []
+
+    def create(self, validated_data):
+        # Creates the user agreement in a idempotent way
+        agreement, created = UserAgreement.objects.update_or_create(
+            user=validated_data["user"],
+            eula=validated_data["eula"],
+            defaults={"accept": True}
+        )
+        return agreement
+
+
+class EULARetrieveSerializer(serializers.ModelSerializer):
+    accepted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EULA
+        fields = (
+            "version",
+            "eula_url",
+            "accepted"
+        )
+
+    def get_accepted(self, obj):
+        try:
+            user = self.context["request"].user
+            agreement = UserAgreement.objects.get(user=user, eula=EULA.objects.get_active_eula())
+        except UserAgreement.DoesNotExist as e:
+            return False
+        else:
+            return agreement.accept

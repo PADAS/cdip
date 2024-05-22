@@ -8,7 +8,7 @@ from activity_log.models import ActivityLog
 from integrations.models import (
     Integration,
     IntegrationAction,
-    IntegrationConfiguration,
+    IntegrationConfiguration, IntegrationType,
 )
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
@@ -51,7 +51,7 @@ def _test_list_integrations(api_client, user, organization):
             assert "data" in configuration
 
 
-def test_list_integrations_as_superuser(api_client, superuser, organization, integrations_list):
+def test_list_integrations_as_superuser(api_client, superuser, organization, integrations_list_er):
     _test_list_integrations(
         api_client=api_client,
         user=superuser,
@@ -59,7 +59,7 @@ def test_list_integrations_as_superuser(api_client, superuser, organization, int
     )
 
 
-def test_list_integrations_as_org_admin(api_client, org_admin_user, organization, integrations_list):
+def test_list_integrations_as_org_admin(api_client, org_admin_user, organization, integrations_list_er):
     _test_list_integrations(
         api_client=api_client,
         user=org_admin_user,
@@ -67,7 +67,7 @@ def test_list_integrations_as_org_admin(api_client, org_admin_user, organization
     )
 
 
-def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organization, integrations_list):
+def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organization, integrations_list_er):
     _test_list_integrations(
         api_client=api_client,
         user=org_viewer_user,
@@ -422,8 +422,8 @@ def _test_filter_integrations(api_client, user, filters, expected_integrations):
         assert dest.get("id") in expected_integrations_ids
 
 
-def test_filter_integrations_exact_as_superuser(api_client, superuser, organization, integrations_list):
-    destination = integrations_list[0]
+def test_filter_integrations_exact_as_superuser(api_client, superuser, organization, integrations_list_er):
+    destination = integrations_list_er[0]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -444,8 +444,8 @@ def test_filter_integrations_exact_as_superuser(api_client, superuser, organizat
     )
 
 
-def test_filter_integrations_iexact_as_superuser(api_client, superuser, organization, integrations_list):
-    destination = integrations_list[0]
+def test_filter_integrations_iexact_as_superuser(api_client, superuser, organization, integrations_list_er):
+    destination = integrations_list_er[0]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -463,7 +463,7 @@ def test_filter_integrations_iexact_as_superuser(api_client, superuser, organiza
     )
 
 
-def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, organization, integrations_list):
+def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, organization, integrations_list_er):
     _test_filter_integrations(
         api_client=api_client,
         user=org_admin_user,
@@ -480,7 +480,8 @@ def test_filter_integrations_exact_as_org_admin(api_client, org_admin_user, orga
     )
 
 
-def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, organization, integration_type_er, integrations_list):
+def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, organization, integration_type_er,
+                                                 integrations_list_er):
     # Viewer belongs to organization which owns the first 5 integrations of type EarthRanger
     _test_filter_integrations(
         api_client=api_client,
@@ -498,10 +499,11 @@ def test_filter_integrations_exact_as_org_viewer(api_client, org_viewer_user, or
     )
 
 
-def test_filter_integrations_multiselect_as_superuser(api_client, superuser, organization, other_organization, integrations_list):
+def test_filter_integrations_multiselect_as_superuser(api_client, superuser, organization, other_organization,
+                                                      integrations_list_er):
     # Superuser can see integrations owned by any organizations
     owners = [organization, other_organization]
-    base_urls = [d.base_url for d in integrations_list[1::2]]
+    base_urls = [d.base_url for d in integrations_list_er[1::2]]
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -518,11 +520,12 @@ def test_filter_integrations_multiselect_as_superuser(api_client, superuser, org
     )
 
 
-def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user, organization, other_organization, integrations_list):
+def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user, organization, other_organization,
+                                                      integrations_list_er):
     # Org Admins can see integrations owned by the organizations they belong to
     # This org admin belongs to "organization" owning the first 5 integrations of "integrations_list"
     owners = org_admin_user.accountprofile.organizations.all()
-    base_urls = [d.base_url for d in integrations_list[:3]]  # Select three out of five possible base_urls
+    base_urls = [d.base_url for d in integrations_list_er[:3]]  # Select three out of five possible base_urls
     _test_filter_integrations(
         api_client=api_client,
         user=org_admin_user,
@@ -539,11 +542,12 @@ def test_filter_integrations_multiselect_as_org_admin(api_client, org_admin_user
     )
 
 
-def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_user, organization, other_organization, integrations_list):
+def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_user, organization, other_organization,
+                                                       integrations_list_er):
     # Org Viewer can see integrations owned by the organizations they belong to
     # This org viewer belongs to "organization" owning the first 5 integrations of "integrations_list"
     owners = org_viewer_user.accountprofile.organizations.all()
-    base_urls = [d.base_url for d in integrations_list[:2]]  # Select two out of five possible base_urls
+    base_urls = [d.base_url for d in integrations_list_er[:2]]  # Select two out of five possible base_urls
     _test_filter_integrations(
         api_client=api_client,
         user=org_viewer_user,
@@ -560,7 +564,8 @@ def test_filter_integrations_multiselect_as_org_viewer(api_client, org_viewer_us
     )
 
 
-def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, organization, other_organization, integrations_list):
+def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, organization, other_organization,
+                                                         integrations_list_er):
     _test_filter_integrations(
         api_client=api_client,
         user=superuser,
@@ -575,7 +580,8 @@ def test_filter_integrations_by_action_type_as_superuser(api_client, superuser, 
     )
 
 
-def test_filter_integrations_by_action_type_as_org_admin(api_client, org_admin_user, organization, other_organization, integrations_list):
+def test_filter_integrations_by_action_type_as_org_admin(api_client, org_admin_user, organization, other_organization,
+                                                         integrations_list_er):
     # Org Admins can see integrations owned by the organizations they belong to
     # This org admin belongs to "organization" owning the first 5 integrations of "integrations_list"
     _test_filter_integrations(
@@ -584,11 +590,12 @@ def test_filter_integrations_by_action_type_as_org_admin(api_client, org_admin_u
         filters={  # Integrations which can be used as data provider
             "action_type": IntegrationAction.ActionTypes.PULL_DATA.value
         },
-        expected_integrations=integrations_list[:5]
+        expected_integrations=integrations_list_er[:5]
     )
 
 
-def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer_user, organization, other_organization, integrations_list):
+def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer_user, organization, other_organization,
+                                                          integrations_list_er):
     # Org Viewer can see integrations owned by the organizations they belong to
     # This org viewer belongs to "organization" owning the first 5 integrations of "integrations_list"
     owners = org_viewer_user.accountprofile.organizations.all()
@@ -605,6 +612,105 @@ def test_filter_integrations_by_action_type_as_org_viewer(api_client, org_viewer
             ).distinct()
         )
     )
+
+
+def test_register_integration_type_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology X",
+        "value": "tech_x",
+        "description": f"Default type for integrations with Technology X",
+        "service_url": "https://techx-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": IntegrationAction.ActionTypes.AUTHENTICATION.value,
+                "name": "Authenticate",
+                "value": "auth",
+                "description": "Technology X Authenticate action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string"
+                        },
+                        "password": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["username", "password"]
+                },
+                "is_periodic_action": False
+            },
+            {
+                "type": IntegrationAction.ActionTypes.PULL_DATA.value,
+                "name": "Fetch Data Sample",
+                "value": "fetch_samples",
+                "description": "Technology X Fetch Data Sample action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "sensor_type": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["sensor_type"]
+                },
+                "is_periodic_action": False
+            },
+            {
+                "type": IntegrationAction.ActionTypes.PULL_DATA.value,
+                "name": "Pull Observations",
+                "value": "pull_observations",
+                "description": "Technology X pull observations action",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["start_date"]
+                },
+                "is_periodic_action": True
+            }
+        ]
+    }
+    response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    integration_type = IntegrationType.objects.get(value=request_data["value"])
+    assert integration_type.name == request_data["name"]
+    assert integration_type.description == request_data["description"]
+    assert integration_type.service_url == request_data["service_url"]
+    for action in request_data["actions"]:
+        action_in_db = IntegrationAction.objects.get(integration_type=integration_type, value=action["value"])
+        assert action_in_db.type == action["type"]
+        assert action_in_db.name == action["name"]
+        assert action_in_db.description == action["description"]
+        assert action_in_db.schema == action["schema"]
+        assert action_in_db.is_periodic_action == action["is_periodic_action"]
+
+
+def test_update_service_url_in_integration_type_as_superuser(api_client, superuser, integration_type_lotek):
+    api_client.force_authenticate(superuser)
+    lotek_integration_url = "https://lotek-actions-runner-fakeurl123-uc.a.run.app"
+    request_data = {
+        "service_url": lotek_integration_url
+    }
+
+    response = api_client.patch(
+        reverse("integration-types-detail", kwargs={"value": integration_type_lotek.value}),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    integration_type_lotek.refresh_from_db()
+    assert integration_type_lotek.service_url == lotek_integration_url
 
 
 def _test_filter_integration_types(api_client, user, filters, expected_integration_types):
@@ -631,7 +737,7 @@ def test_filter_integrations_types_by_action_type_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -647,7 +753,7 @@ def test_filter_integrations_types_by_action_type_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -665,7 +771,7 @@ def test_filter_integrations_types_type_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -681,7 +787,7 @@ def test_filter_integrations_types_by_action_type_and_in_use_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -698,7 +804,7 @@ def test_filter_integrations_types_by_action_type_and_in_use_as_org_admin(
         api_client, org_admin_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -715,7 +821,7 @@ def test_filter_integrations_types_type_and_in_use_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -732,7 +838,7 @@ def test_filter_integrations_types_by_search_term_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -749,7 +855,7 @@ def test_filter_integrations_types_by_search_term_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -766,7 +872,7 @@ def test_filter_integrations_types_by_search_term_as_org_viewer(
         api_client, org_viewer_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera
 ):
     _test_filter_integration_types(
         api_client=api_client,
@@ -805,7 +911,7 @@ def test_filter_integrations_urls_by_search_term_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_urls(
         api_client=api_client,
@@ -823,7 +929,7 @@ def test_filter_integrations_urls_by_search_term_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_urls(
         api_client=api_client,
@@ -833,7 +939,7 @@ def test_filter_integrations_urls_by_search_term_as_org_admin(
         extra_filters={
             "action_type": "push"  # Integrations used as destinations
         },
-        expected_integrations=integrations_list[:5]  # First 5 ER integrations are owned by organization
+        expected_integrations=integrations_list_er[:5]  # First 5 ER integrations are owned by organization
     )
 
 
@@ -841,7 +947,7 @@ def test_filter_integrations_urls_by_search_term_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_urls(
         api_client=api_client,
@@ -881,7 +987,7 @@ def test_filter_integrations_owner_by_search_term_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_owners(
         api_client=api_client,
@@ -899,7 +1005,7 @@ def test_filter_integrations_owner_by_search_term_as_org_admin(
         api_client, org_admin_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_owners(
         api_client=api_client,
@@ -917,7 +1023,7 @@ def test_filter_integrations_owner_by_search_term_as_org_viewer(
         api_client, org_viewer_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_filter_integration_owners(
         api_client=api_client,
@@ -960,13 +1066,13 @@ def test_global_search_integrations_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
         user=superuser,
         search_term="pamdas.org",  # Looking for earth ranger integrations
-        expected_integrations=integrations_list  # As superuser can see all the integrations
+        expected_integrations=integrations_list_er  # As superuser can see all the integrations
     )
 
 
@@ -974,7 +1080,7 @@ def test_global_search_integrations_as_org_admin(
         api_client, org_admin_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
@@ -988,7 +1094,7 @@ def test_global_search_integrations_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
@@ -1002,7 +1108,7 @@ def test_global_search_integrations_combined_with_filters_as_superuser(
         api_client, superuser, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
@@ -1012,7 +1118,7 @@ def test_global_search_integrations_combined_with_filters_as_superuser(
         extra_filters={
             "action_type": "push"  # Destinations
         },
-        expected_integrations=integrations_list  # As superuser can see all the integrations
+        expected_integrations=integrations_list_er  # As superuser can see all the integrations
     )
 
 
@@ -1020,7 +1126,7 @@ def test_global_search_integrations_combined_with_filters_as_org_admin(
         api_client, org_admin_user_2, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
@@ -1039,7 +1145,7 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
         api_client, org_viewer_user, organization, other_organization,
         integration_type_er, integration_type_movebank, integration_type_lotek,
         integration_type_smart, smart_action_auth, smart_action_push_events,
-        integrations_list, provider_movebank_ewt, provider_lotek_panthera,
+        integrations_list_er, provider_movebank_ewt, provider_lotek_panthera,
 ):
     _test_global_search_integrations(
         api_client=api_client,
@@ -1301,4 +1407,3 @@ def test_delete_integration_as_org_admin(
         user=org_admin_user,
         integration=provider_lotek_panthera
     )
-

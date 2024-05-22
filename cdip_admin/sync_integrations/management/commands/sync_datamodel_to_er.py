@@ -32,15 +32,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        sclient = SmartClient(api='https://tempuri.org/', username='', password='', use_language_code='fr')
-        dm = sclient.load_datamodel(filename='/Users/chrisdo/Downloads/Modele de données SMART.xml')
+        sclient = SmartClient(api='https://tempuri.org/', username='', password='', use_language_code='en')
+        dm = sclient.load_datamodel(filename='DATA_MODEL_FILENAME')
 
-        print(dm)
-
+        er_host = 'er_site.pamdas.org'
+        
         das_client = DasClient(
-            service_root='https://ntokoupikounda.pamdas.org/api/v1.0',
-            token="1ddb93be307d9bbda29e44885fd6e8df6030a79d",
-            token_url="https://ntokoupikounda.pamdas.org/oauth2/token",
+            service_root=f'https://{er_host}/api/v1.0',
+            token="AUTH-TOKEN-GOES-HERE",
+            token_url=f"https://{er_host}/oauth2/token",
             client_id="das_web_client",
             provider_key="sample-dev",
         )

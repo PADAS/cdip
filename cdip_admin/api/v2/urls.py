@@ -12,6 +12,8 @@ organizations_router = NestedSimpleRouter(default_router, r'organizations', look
 organizations_router.register(r'members', views.MemberViewSet, basename='members')
 default_router.register('integrations/types', views.IntegrationTypeView, basename='integration-types')
 default_router.register('integrations', views.IntegrationsView, basename="integrations")
+integrations_router = NestedSimpleRouter(default_router, r'integrations', lookup='integration')
+integrations_router.register(r'actions', views.ActionTriggerView, basename='actions')
 default_router.register('connections', views.ConnectionsView, basename="connections")
 default_router.register('sources', views.SourcesView, basename="sources")
 default_router.register('routes', views.RoutesView, basename="routes")
@@ -21,7 +23,7 @@ events_router = NestedSimpleRouter(default_router, r'events', lookup='event')
 events_router.register(r'attachments', views.AttachmentViewSet, basename='attachments')
 default_router.register('traces', views.GundiTraceViewSet, basename="traces")
 default_router.register('logs', views.ActivityLogsViewSet, basename="logs")
-
+default_router.register('eula', views.EULAView, basename="eula")
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 
@@ -38,6 +40,7 @@ urlpatterns = [
         name="user-details"
     ),
     path(r'', include(default_router.urls)),
+    path(r'', include(integrations_router.urls)),
     path(r'', include(organizations_router.urls)),
     path(r'', include(events_router.urls)),
 ]

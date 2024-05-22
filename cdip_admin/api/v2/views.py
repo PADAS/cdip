@@ -1,16 +1,17 @@
 import django_filters
 from django.db.models import Subquery
+from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
-    get_user_routes_qs, GundiTrace
+    get_user_routes_qs, GundiTrace, IntegrationAction
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
-from accounts.models import AccountProfileOrganization
+from accounts.models import AccountProfileOrganization, EULA
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
-from rest_framework import viewsets, status, mixins
+from rest_framework import viewsets, status, mixins, generics
 from rest_framework import filters as drf_filters
 from rest_framework import exceptions as drf_exceptions
 from rest_framework.decorators import action
@@ -32,6 +33,43 @@ class UsersView(
 
     def get_object(self):
         return self.request.user
+
+
+class EULAView(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for retrieving and accepting EULA
+    """
+    # Authenticated users only
+    permission_classes = [IsAuthenticated]
+    queryset = EULA.objects.all()
+
+    def get_serializer_class(self):
+        if self.action == "accept":
+            return v2_serializers.UserAgreementSerializer
+        return v2_serializers.EULARetrieveSerializer
+
+    def get_object(self):
+        return EULA.objects.get_active_eula()
+
+    # Overriden to return a single object (the active eula)
+    def list(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+        except EULA.DoesNotExist:  # No active EULA
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post", "put"])
+    def accept(self, request):
+        # Create a UserAgreement
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class OrganizationView(viewsets.ModelViewSet):
@@ -180,15 +218,12 @@ class IntegrationsView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class IntegrationTypeView(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    viewsets.GenericViewSet
-):
+class IntegrationTypeView(viewsets.ModelViewSet):
     """
     An endpoint for listing integration types.
     """
     queryset = IntegrationType.objects.all()
+    lookup_field = "value"
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
         drf_filters.OrderingFilter,
@@ -201,8 +236,10 @@ class IntegrationTypeView(
     search_fields = ["value", "name", "description"]
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
+        if self.action == "create":
             return v2_serializers.IntegrationTypeIdempotentCreateSerializer
+        elif self.action in ["update", "partial_update"]:
+            return v2_serializers.IntegrationTypeUpdateSerializer
         return v2_serializers.IntegrationTypeFullSerializer
 
 
@@ -452,3 +489,28 @@ class ActivityLogsViewSet(
             raise drf_exceptions.ValidationError("This activity log is not reversible.")
         activity_log.revert()
         return Response({"status": "Activity reverted with success"})
+
+
+class ActionTriggerView(
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for triggering actions
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    lookup_field = "value"
+    serializer_class = v2_serializers.ActionTriggerSerializer
+
+    @action(detail=True, methods=["post", "put"], lookup_field="value")
+    def execute(self, request, integration_pk, value=None):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        integration = Integration.objects.get(id=integration_pk)
+        integration_action = IntegrationAction.objects.get(integration_type=integration.type, value=value)
+        response_data = integration_action.execute(
+            integration=integration,
+            run_in_background=serializer.data.get("run_in_background", False),
+            config_overrides=serializer.data.get("config_overrides")
+        )
+        return Response(response_data, status=status.HTTP_200_OK)
