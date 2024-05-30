@@ -99,7 +99,17 @@ def send_events_to_routing(events, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
+            integration = event.get("integration")
+            source = event.get("source")
+            source_id = source.external_id if source else None
             current_span.set_attribute("gundi_id", gundi_id)
+            current_span.set_attribute("observation_type", StreamPrefixEnum.event.value)
+            current_span.set_attribute("integration_type", integration.type.value)
+            current_span.set_attribute("integration_id", str(integration.id))
+            current_span.set_attribute("integration_name", integration.name)
+            current_span.set_attribute("external_source_id", str(source_id))
+            current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
+
             # Check for duplicates
             is_duplicate = is_duplicate_data(data=event, expiration_time=settings.GEOEVENT_DUPLICATE_CHECK_SECONDS)
             if is_duplicate:
@@ -116,8 +126,6 @@ def send_events_to_routing(events, gundi_ids):
                     f"gundi_api.send_event_to_routing", kind=trace.SpanKind.PRODUCER
             ) as current_span:
                 # Convert the event to the schema supported by routing
-                integration = event.get("integration")
-                source = event.get("source")
                 if event_location := event.get("location"):
                     location = Location(
                         lon=event_location.get("lon"),  # Longitude
@@ -153,7 +161,6 @@ def send_events_to_routing(events, gundi_ids):
                     default=str,
                 )
                 # Send message to routing services
-                # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
@@ -175,7 +182,18 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
+            observation_type = StreamPrefixEnum.attachment.value
+            integration = attachment.get("integration")
+            source = attachment.get("source")
+            source_id = source.external_id if source else None
             current_span.set_attribute("gundi_id", gundi_id)
+            current_span.set_attribute("observation_type", observation_type)
+            current_span.set_attribute("integration_type", integration.type.value)
+            current_span.set_attribute("integration_id", str(integration.id))
+            current_span.set_attribute("integration_name", integration.name)
+            current_span.set_attribute("external_source_id", str(source_id)),
+            current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
+
             # Check for duplicates
             is_duplicate = is_duplicate_attachment(data=attachment)
             if is_duplicate:
@@ -190,19 +208,13 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             # Upload file to the cloud
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.upload_file_to_gcp", kind=trace.SpanKind.PRODUCER
-            ):
-                tracing.instrumentation.enrich_span_with_environment(
-                    span=current_span
-                )
+            ) as gcp_upload_span:
                 file = attachment["file"]
+                gcp_upload_span.set_attribute("file_name", file.name)
                 file_path = default_storage.save(f"attachments/{gundi_id}_{file.name}", ContentFile(file.read()))
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.send_attachment_to_routing", kind=trace.SpanKind.PRODUCER
             ):
-                observation_type = StreamPrefixEnum.attachment.value
-                # Convert the event to the schema supported by routing
-                integration = attachment.get("integration")
-                source = attachment.get("source")
                 msg_for_routing = Attachment(
                     gundi_id=str(gundi_id),
                     data_provider_id=str(integration.id),
@@ -242,7 +254,20 @@ def send_observations_to_routing(observations, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
+            observation_type = StreamPrefixEnum.observation.value
+            integration = observation.get("integration")
+            source = observation.get("source")
+            source_id = source.external_id if source else None
+            location = observation.get("location", {})
             current_span.set_attribute("gundi_id", gundi_id)
+            current_span.set_attribute("observation_type", observation_type)
+            current_span.set_attribute("integration_type", integration.type.value)
+            current_span.set_attribute("integration_id", str(integration.id))
+            current_span.set_attribute("integration_name", integration.name)
+            current_span.set_attribute("external_source_id", str(source_id)),
+            current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
+            current_span.set_attribute("location", str(location))
+
             # Check for duplicates
             is_duplicate = is_duplicate_data(
                 data=observation,
@@ -262,9 +287,6 @@ def send_observations_to_routing(observations, gundi_ids):
                     f"gundi_api.send_observations_to_routing", kind=trace.SpanKind.PRODUCER
             ) as current_span:
                 # Convert the event to the schema supported by routing
-                integration = observation.get("integration")
-                source = observation.get("source")
-                location = observation.get("location", {})
                 msg_for_routing = Observation(
                     gundi_id=str(gundi_id),
                     related_to=observation.get("related_to"),
@@ -295,7 +317,6 @@ def send_observations_to_routing(observations, gundi_ids):
                     default=str,
                 )
                 # Send message to routing services
-                # ToDo: Revisit this once we move transformers from kafka to gcp pubsub
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=json.loads(msg_for_routing.json()),  # This is suboptimal. It's fixed in pydantic v2
