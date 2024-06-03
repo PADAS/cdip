@@ -13,6 +13,8 @@ from .models import (
     Source,
     SourceState,
     GundiTrace,
+    IntegrationWebhook,
+    WebhookConfiguration,
 )
 from .services import *
 from .source_filters import *
