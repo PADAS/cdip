@@ -446,7 +446,6 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
         return queryset
 
     def filter_types_with_webhook(self, queryset, name, value):
-        # Types having pull actions or webhooks can be data providers
         return queryset.filter(~Q(webhook__isnull=value))
 
     def filter_types_is_provider(self, queryset, name, value):
