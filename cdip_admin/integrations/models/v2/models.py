@@ -111,6 +111,38 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         return response.json()
 
 
+class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200)
+    value = models.SlugField(
+        max_length=200,
+        verbose_name="Value (Identifier)"
+    )
+    description = models.TextField(
+        blank=True,
+    )
+    schema = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Schema"
+    )
+    integration_type = models.OneToOneField(
+        "integrations.IntegrationType",
+        on_delete=models.CASCADE,
+        related_name="webhook",
+        verbose_name="Integration Type"
+    )
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return f"{self.integration_type} - {self.name}"
+
+    def validate_configuration(self, configuration: dict):
+        # Helper method to validate a configuration against the webhook schema
+        jsonschema.validate(instance=configuration, schema=self.schema)
+
+
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
         "integrations.IntegrationType",
@@ -297,6 +329,30 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             super().save(*args, **kwargs)
             if execute_post_save:
                 self._post_save(self, *args, **kwargs)
+
+
+class WebhookConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    integration = models.OneToOneField(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="webhook_config_by_integration"
+    )
+    webhook = models.OneToOneField(
+        "integrations.IntegrationWebhook",
+        on_delete=models.CASCADE,
+        related_name="webhook_config_by_webhook"
+    )
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Configuration"
+    )
+
+    class Meta:
+        ordering = ("-updated_at", )
+
+    def __str__(self):
+        return f"{self.webhook.name} - Configuration for {self.integration.name}"
 
 
 class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
