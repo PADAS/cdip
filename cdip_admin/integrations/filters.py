@@ -18,7 +18,7 @@ from integrations.models import (
     Integration,
     IntegrationType,
     get_user_integrations_qs,
-    Source, Route, GundiTrace
+    Source, Route, GundiTrace, IntegrationAction
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -427,6 +427,8 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
     action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact", distinct=True)
     action__in = CharInFilter(field_name="actions__value", lookup_expr="in", distinct=True)
     in_use_only = django_filters_rest.BooleanFilter(method='filter_types_in_use_only')
+    has_webhook = django_filters_rest.BooleanFilter(method="filter_types_with_webhook")
+    is_provider = django_filters_rest.BooleanFilter(method="filter_types_is_provider")
 
     class Meta:
         model = IntegrationType
@@ -442,6 +444,18 @@ class IntegrationTypeFilter(django_filters_rest.FilterSet):
                 id__in=Subquery(user_integrations.values("type").distinct())
             )
         return queryset
+
+    def filter_types_with_webhook(self, queryset, name, value):
+        # Types having pull actions or webhooks can be data providers
+        return queryset.filter(~Q(webhook__isnull=value))
+
+    def filter_types_is_provider(self, queryset, name, value):
+        # Types having pull actions or webhooks can be data providers
+        is_provider_q = Q(actions__type=IntegrationAction.ActionTypes.PULL_DATA.value) | Q(webhook__isnull=False)
+        if value:
+            return queryset.filter(is_provider_q)
+        else:
+            return queryset.filter(~is_provider_q)
 
 
 class SourceFilter(django_filters_rest.FilterSet):
