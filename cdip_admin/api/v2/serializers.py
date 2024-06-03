@@ -6,7 +6,7 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace
+    GundiTrace, WebhookConfiguration, IntegrationWebhook
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -221,6 +221,18 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
         )
 
 
+class IntegrationWebhookFullSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationWebhook
+        fields = (
+            "id",
+            "name",
+            "value",
+            "description",
+            "schema",
+        )
+
+
 class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegrationAction
@@ -236,6 +248,7 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
 
 class IntegrationTypeFullSerializer(serializers.ModelSerializer):
     actions = IntegrationActionFullSerializer(many=True, read_only=True)
+    webhook = IntegrationWebhookFullSerializer(read_only=True)
 
     class Meta:
         model = IntegrationType
@@ -244,7 +257,8 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "actions"
+            "actions",
+            "webhook",
         )
 
 
@@ -329,7 +343,14 @@ class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationConfiguration
-        fields = ["id", "integration", "action", "data"]
+        fields = ("id", "integration", "action", "data",)
+
+
+class WebhookConfigurationRetrieveSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = WebhookConfiguration
+        fields = ("id", "integration", "webhook", "data",)
 
 
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
@@ -343,6 +364,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationRetrieveSerializer(many=True)
+    webhook_configuration = WebhookConfigurationRetrieveSerializer()
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
@@ -356,6 +378,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "webhook_configuration",
             "additional",
             "default_route",
             "status"

@@ -221,6 +221,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return self.configurations_by_integration.all()
 
     @property
+    def webhook_configuration(self):
+        return self.webhook_config_by_integration
+
+    @property
     def routing_rules(self):
         return self.routing_rules_by_provider.all()
 
