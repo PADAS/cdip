@@ -285,7 +285,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
 
 class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
     actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
-    webhook = IntegrationWebhookCreateUpdateSerializer(write_only=True)
+    webhook = IntegrationWebhookCreateUpdateSerializer(required=False, write_only=True)
     value = serializers.CharField(required=True)
 
     class Meta:
@@ -327,7 +327,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         actions = validated_data.pop("actions", [])
-        webhook_data = validated_data.pop("webhook")
+        webhook_data = validated_data.pop("webhook", {})
         # Create the integration type idempotently
         type_slug = validated_data.pop("value")
         integration_type, created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
@@ -350,7 +350,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer):
-    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+    actions = IntegrationActionCreateUpdateSerializer(many=True, required=False, write_only=True)
+    webhook = IntegrationWebhookCreateUpdateSerializer(required=False, write_only=True)
 
     class Meta:
         model = IntegrationType
@@ -359,6 +360,7 @@ class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer)
             "value",
             "description",
             "actions",
+            "webhook",
             "service_url",
         )
 
@@ -452,7 +454,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(required=False, read_only=True)
+    id = serializers.UUIDField(required=False)
     integration = serializers.PrimaryKeyRelatedField(required=False, queryset=Integration.objects.all())
     action = serializers.PrimaryKeyRelatedField(required=False, queryset=IntegrationAction.objects.all())
 
@@ -508,7 +510,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         configurations = validated_data.pop("configurations", [])
-        webhook_configuration = validated_data.pop("webhook_configuration")
+        webhook_configuration = validated_data.pop("webhook_configuration", {})
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
         # Create the integration
@@ -536,7 +538,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         configurations = validated_data.pop("configurations", [])
-        webhook_configuration = validated_data.pop("webhook_configuration")
+        webhook_configuration = validated_data.pop("webhook_configuration", {})
         # Update the integration
         super().update(instance=instance, validated_data=validated_data)
         # Update or Create nested configurations if provided
