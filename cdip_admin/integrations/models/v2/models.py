@@ -341,7 +341,7 @@ class WebhookConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         on_delete=models.CASCADE,
         related_name="webhook_config_by_integration"
     )
-    webhook = models.OneToOneField(
+    webhook = models.ForeignKey(
         "integrations.IntegrationWebhook",
         on_delete=models.CASCADE,
         related_name="webhook_config_by_webhook"
