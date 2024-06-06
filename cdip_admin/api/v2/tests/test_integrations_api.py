@@ -700,7 +700,9 @@ def test_register_integration_type_as_superuser(api_client, superuser):
         assert action_in_db.is_periodic_action == action["is_periodic_action"]
 
 
-def test_register_integration_type_with_webhooks_as_superuser(api_client, superuser):
+def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client, superuser):
+    mock_register_integration_type_in_kong = mocker.MagicMock()
+    mocker.patch("api.v2.serializers.register_integration_type_in_kong", mock_register_integration_type_in_kong)
     api_client.force_authenticate(superuser)
     request_data = {
         "name": "Generic Webhook",
@@ -751,6 +753,7 @@ def test_register_integration_type_with_webhooks_as_superuser(api_client, superu
     assert integration_type.webhook.value == request_data["webhook"]["value"]
     assert integration_type.webhook.description == request_data["webhook"]["description"]
     assert integration_type.webhook.schema == request_data["webhook"]["schema"]
+    mock_register_integration_type_in_kong.assert_called_once_with(integration_type)
 
 
 def test_update_service_url_in_integration_type_as_superuser(api_client, superuser, integration_type_lotek):

@@ -7,11 +7,12 @@ from accounts.models import AccountProfileOrganization, AccountProfile, UserAgre
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
     GundiTrace, WebhookConfiguration, IntegrationWebhook
+from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing
@@ -330,22 +331,26 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
         webhook_data = validated_data.pop("webhook", {})
         # Create the integration type idempotently
         type_slug = validated_data.pop("value")
-        integration_type, created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
-        # Create or update actions if provided
-        for action_params in actions:  # Usually less than 5 actions
-            action_slug = action_params.pop("value")
-            action, created = IntegrationAction.objects.update_or_create(
-                integration_type=integration_type,
-                value=action_slug,
-                defaults=action_params
-            )
-        # Create or update webhook if provided
-        if webhook_data:
-            webhook, created = IntegrationWebhook.objects.update_or_create(
-                integration_type=integration_type,
-                value=webhook_data.pop("value"),
-                defaults=webhook_data
-            )
+        with transaction.atomic():
+            integration_type, type_created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
+            # Create or update actions if provided
+            for action_params in actions:  # Usually less than 5 actions
+                action_slug = action_params.pop("value")
+                action, created = IntegrationAction.objects.update_or_create(
+                    integration_type=integration_type,
+                    value=action_slug,
+                    defaults=action_params
+                )
+            # Create or update webhook if provided
+            if webhook_data:
+                webhook, created = IntegrationWebhook.objects.update_or_create(
+                    integration_type=integration_type,
+                    value=webhook_data.pop("value"),
+                    defaults=webhook_data
+                )
+                # Register the integration type in Kong
+                if type_created:  # Register only once on creation
+                    register_integration_type_in_kong(integration_type)
         return integration_type
 
 
