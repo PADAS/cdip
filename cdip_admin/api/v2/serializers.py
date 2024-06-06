@@ -310,7 +310,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
         for action_data in data.get("actions", []):
             # ToDo: validate action data?
             if self.instance and "value" in action:  # Update
-                action = IntegrationAction.objects.get(integration_type=self, value=action["value"])
+                action = IntegrationAction.objects.get(integration_type=self, value=action_data["value"])
                 serializer = IntegrationActionCreateUpdateSerializer(instance=action, data=action_data)
             else:  # Create
                 # Validate the action data
