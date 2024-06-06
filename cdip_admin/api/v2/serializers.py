@@ -288,6 +288,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
     actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
     webhook = IntegrationWebhookCreateUpdateSerializer(required=False, write_only=True)
     value = serializers.CharField(required=True)
+    register_webhook_in_kong = serializers.BooleanField(write_only=True, default=True)
 
     class Meta:
         model = IntegrationType
@@ -297,6 +298,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             "description",
             "actions",
             "webhook",
+            "register_webhook_in_kong",
             "service_url",
         )
 
@@ -329,6 +331,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         actions = validated_data.pop("actions", [])
         webhook_data = validated_data.pop("webhook", {})
+        register_webhook_in_kong = validated_data.pop("register_webhook_in_kong", True)
         # Create the integration type idempotently
         type_slug = validated_data.pop("value")
         with transaction.atomic():
@@ -343,13 +346,13 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
                 )
             # Create or update webhook if provided
             if webhook_data:
-                webhook, created = IntegrationWebhook.objects.update_or_create(
+                webhook, webhook_created = IntegrationWebhook.objects.update_or_create(
                     integration_type=integration_type,
                     value=webhook_data.pop("value"),
                     defaults=webhook_data
                 )
                 # Register the integration type in Kong
-                if type_created:  # Register only once on creation
+                if webhook_created and register_webhook_in_kong:  # Register only once on creation
                     register_integration_type_in_kong(integration_type)
         return integration_type
 
