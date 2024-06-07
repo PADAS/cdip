@@ -23,6 +23,8 @@ from .models import (
     RouteConfiguration,
     SourceFilter, Source, SourceState, SourceConfiguration,
     GundiTrace,
+    IntegrationWebhook,
+    WebhookConfiguration,
 )
 
 from .forms import (
@@ -260,6 +262,18 @@ class IntegrationActionAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(IntegrationWebhook)
+class IntegrationActionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration_type",
+        "name",
+        "value",
+        "description",
+    )
+    list_filter = (
+        "integration_type",
+    )
 
 
 
@@ -318,6 +332,29 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
         "integration__owner",
         "integration__type",
         "action__type",
+    )
+    search_fields = (
+        "integration__name",
+        "integration__owner__name",
+        "action__name",
+    )
+
+
+@admin.register(WebhookConfiguration)
+class WebhookConfigurationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration",
+        "webhook",
+    )
+    list_filter = (
+        "integration__owner",
+        "integration__type",
+    )
+    search_fields = (
+        "integration__name",
+        "integration__owner__name",
+        "webhook__name",
     )
 
 

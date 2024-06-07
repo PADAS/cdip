@@ -49,6 +49,10 @@ def _test_list_integrations(api_client, user, organization):
             assert "integration" in configuration
             assert "action" in configuration
             assert "data" in configuration
+        webhook_configuration = integration.get("webhook_configuration")
+        if webhook_configuration:
+            assert "integration" in webhook_configuration
+            assert "data" in webhook_configuration
 
 
 def test_list_integrations_as_superuser(api_client, superuser, organization, integrations_list_er):
@@ -76,16 +80,17 @@ def test_list_integrations_as_org_viewer(api_client, org_viewer_user, organizati
 
 
 def _test_create_integration(
-        api_client, user, owner, integration_type, base_url, name, configurations, create_default_route=True, create_configurations=True
+        api_client, user, owner, integration_type, base_url, name, configurations=None, webhook_configuration=None, create_default_route=True, create_configurations=True
 ):
     request_data = {
-      "name": name,
-      "type": str(integration_type.id),
-      "owner": str(owner.id),
-      "base_url": base_url,
-      "configurations": configurations,
-      "create_default_route": create_default_route,
-      "create_configurations": create_configurations
+        "name": name,
+        "type": str(integration_type.id),
+        "owner": str(owner.id),
+        "base_url": base_url,
+        "configurations": configurations or [],
+        "webhook_configuration": webhook_configuration or {},
+        "create_default_route": create_default_route,
+        "create_configurations": create_configurations
     }
     api_client.force_authenticate(user)
     response = api_client.post(
@@ -693,6 +698,62 @@ def test_register_integration_type_as_superuser(api_client, superuser):
         assert action_in_db.description == action["description"]
         assert action_in_db.schema == action["schema"]
         assert action_in_db.is_periodic_action == action["is_periodic_action"]
+
+
+def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client, superuser):
+    mock_register_integration_type_in_kong = mocker.MagicMock()
+    mocker.patch("api.v2.serializers.register_integration_type_in_kong", mock_register_integration_type_in_kong)
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Generic Webhook",
+        "value": "generic_webhook",
+        "description": f"Default type for generic webhook integrations",
+        "service_url": "https://generic-wh-integration-fakeurl123-uc.a.run.app",
+        "actions": [],
+        "webhook": {
+            "name": "Generic Webhook",
+            "value": "generic_webhook",
+            "description": "Generic Webhook Integration",
+            "schema": {
+                "title": "Webhook Integration Config",
+                "type": "object",
+                "properties": {
+                    "json_schema": {"title": "Payload Json Schema", "type": "object"},
+                    "jq_filter": {
+                        "title": "JQ Transformation Filter",
+                        "description": "JQ filter to transform JSON data to Gundi schema.",
+                        "default": ".",
+                        "example": ".",
+                        "type": "string"},
+                    "output_type": {
+                        "title": "Output Type",
+                        "description": "Output type for the transformed data: 'obv' or 'event'",
+                        "type": "string"
+                    },
+                    "hex_format": {"title": "Hex Format", "type": "object"},
+                    "hex_data_field": {"title": "Hex Data Field", "type": "string"}
+                },
+                "required": ["json_schema", "jq_filter", "output_type", "hex_format", "hex_data_field"]
+            }
+        }
+    }
+    response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    integration_type = IntegrationType.objects.get(value=request_data["value"])
+    assert integration_type.name == request_data["name"]
+    assert integration_type.description == request_data["description"]
+    assert integration_type.service_url == request_data["service_url"]
+    assert integration_type.webhook
+    assert integration_type.webhook.name == request_data["webhook"]["name"]
+    assert integration_type.webhook.value == request_data["webhook"]["value"]
+    assert integration_type.webhook.description == request_data["webhook"]["description"]
+    assert integration_type.webhook.schema == request_data["webhook"]["schema"]
+    mock_register_integration_type_in_kong.assert_called_once_with(integration_type)
 
 
 def test_update_service_url_in_integration_type_as_superuser(api_client, superuser, integration_type_lotek):
@@ -1406,4 +1467,57 @@ def test_delete_integration_as_org_admin(
         api_client=api_client,
         user=org_admin_user,
         integration=provider_lotek_panthera
+    )
+
+
+def _test_get_integration_details(api_client, user, organization, integration_id):
+    api_client.force_authenticate(user)
+    url = reverse("integrations-detail", kwargs={"pk": integration_id})
+    response = api_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    integration = response.json()
+    assert integration.get("id") == integration_id
+    assert "name" in integration
+    assert "base_url" in integration
+    assert "enabled" in integration
+    assert "type" in integration
+    webhook = integration.get("type", {}).get("webhook")
+    assert webhook
+    assert "name" in webhook
+    assert "description" in webhook
+    assert "value" in webhook
+    assert "schema" in webhook
+    owner = integration.get("owner")
+    assert owner
+    assert "id" in owner
+    assert "name" in owner
+    assert "description" in owner
+    # Check the action configurations
+    assert "configurations" in integration
+    configurations = integration.get("configurations")
+    for configuration in configurations:
+        assert "integration" in configuration
+        assert "action" in configuration
+        assert "data" in configuration
+    webhook_configuration = integration.get("webhook_configuration")
+    if webhook_configuration:
+        assert "webhook" in webhook_configuration
+        assert "integration" in webhook_configuration
+        assert "data" in webhook_configuration
+
+
+@pytest.mark.parametrize("user", [
+    ("superuser"),
+    ("org_admin_user"),
+    ("org_viewer_user"),
+])
+def test_get_integration_with_webhook_config(
+        request, api_client, user, organization, provider_liquidtech_with_webhook_config
+):
+    user = request.getfixturevalue(user)
+    _test_get_integration_details(
+        api_client=api_client,
+        user=user,
+        organization=organization,
+        integration_id=str(provider_liquidtech_with_webhook_config.id)
     )

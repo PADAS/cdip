@@ -36,7 +36,7 @@ from integrations.models import (
     SourceConfiguration,
     ensure_default_route,
     RouteConfiguration,
-    GundiTrace,
+    GundiTrace, IntegrationWebhook, WebhookConfiguration,
 )
 from organizations.models import Organization
 from pathlib import Path
@@ -587,6 +587,155 @@ def provider_movebank_ewt(
         data={"max_records_per_individual": 20000},
     )
     ensure_default_route(integration=provider)
+    return provider
+
+
+@pytest.fixture
+def integration_type_liquidtech():
+    return IntegrationType.objects.create(
+        name="Liquidtech Integration",
+        value="liquidtech",
+        description="Standard Integration type for Liquidtech.",
+    )
+
+
+@pytest.fixture
+def liquidtech_webhook(integration_type_liquidtech):
+    return IntegrationWebhook.objects.create(
+        name="Liquidtech Webhook",
+        value="liquidtech_webhook",
+        description="Liquidtech Webhook",
+        integration_type=integration_type_liquidtech,
+        schema={
+            "title": "Liquidtech Payload Format",
+            "type": "object",
+            "properties": {
+                "hex_format": {"title": "Data Format", "type": "object"},
+                "hex_data_field": {"title": "Data Field", "type": "string"}
+            },
+            "required": ["hex_format", "hex_data_field"]
+        }
+    )
+
+
+@pytest.fixture
+def provider_liquidtech_with_webhook_config(
+        get_random_id,
+        organization,
+        integration_type_liquidtech,
+        liquidtech_webhook,
+):
+    provider = Integration.objects.create(
+        type=integration_type_liquidtech,
+        name=f"Liquidtech Webhooks",
+        owner=organization,
+        base_url=f"https://api.test.movebank.com",
+    )
+    # Configure webhook
+    WebhookConfiguration.objects.create(
+        integration=provider,
+        webhook=liquidtech_webhook,
+        data={
+            "hex_data_field": "data",
+            "hex_format": {
+                "fields": [
+                    {
+                        "name": "start_bit",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "v",
+                        "format": "I"
+                    },
+                    {
+                        "name": "interval",
+                        "format": "H",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "meter_state_1",
+                        "format": "B"
+                    },
+                    {
+                        "name": "meter_state_2",
+                        "format": "B",
+                        "bit_fields": [
+                            {
+                                "name": "meter_batter_alarm",
+                                "end_bit": 0,
+                                "start_bit": 0,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "empty_pipe_alarm",
+                                "end_bit": 1,
+                                "start_bit": 1,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "reverse_flow_alarm",
+                                "end_bit": 2,
+                                "start_bit": 2,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "over_range_alarm",
+                                "end_bit": 3,
+                                "start_bit": 3,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "temp_alarm",
+                                "end_bit": 4,
+                                "start_bit": 4,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "ee_error",
+                                "end_bit": 5,
+                                "start_bit": 5,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_in_error",
+                                "end_bit": 6,
+                                "start_bit": 6,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_out_error",
+                                "end_bit": 7,
+                                "start_bit": 7,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_out_error",
+                                "end_bit": 7,
+                                "start_bit": 7,
+                                "output_type": "bool"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "r1",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "r2",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "crc",
+                        "format": "B"
+                    }
+                ],
+                "byte_order": ">"
+            }
+        }
+    )
     return provider
 
 

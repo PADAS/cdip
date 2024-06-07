@@ -12,6 +12,7 @@ from deployments.utils import get_default_topic_name
 KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
 KEYS_PATH = "/key-auth"
+INTEGRATION_TYPES_PATH = "/integration-types/"
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +140,16 @@ def build_mb_tag_id(device, gundi_version):
                   f"{str(device.integration_id)}")
 
     return tag_id
+
+
+def register_integration_type_in_kong(integration_type):
+    kong_admin_url = f"{KONG_PROXY_URL}{INTEGRATION_TYPES_PATH}"
+    response = requests.post(
+        kong_admin_url,
+        data={
+            "integration_type": integration_type.value,
+            "url": integration_type.service_url,
+        }
+    )
+    response.raise_for_status()
+    return response
