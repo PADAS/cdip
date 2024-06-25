@@ -2,7 +2,6 @@ import asyncio
 import base64
 from datetime import datetime
 from unittest.mock import PropertyMock
-
 import pytest
 import random
 from typing import NamedTuple, Any
@@ -40,7 +39,14 @@ from integrations.models import (
 )
 from organizations.models import Organization
 from pathlib import Path
-from google.cloud import pubsub_v1
+from gundi_core.events import (
+    IntegrationWebhookStarted,
+    WebhookExecutionStarted,
+    IntegrationWebhookComplete,
+    WebhookExecutionComplete,
+    IntegrationWebhookFailed,
+    WebhookExecutionFailed, IntegrationWebhookCustomLog, CustomWebhookLog, LogLevel
+)
 
 
 def async_return(result):
@@ -2189,6 +2195,96 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
     data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
+
+
+@pytest.fixture
+def webhook_started_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookStarted(
+        payload=WebhookExecutionStarted(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'obv'
+            }
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_complete_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookComplete(
+        payload=WebhookExecutionComplete(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'obv'
+            },
+            result={'data_points_qty': 1}
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_failed_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookFailed(
+        payload=WebhookExecutionFailed(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'patrol'
+            },
+            error='Invalid output type: patrol. Please review the configuration.'
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_custom_activity_log_event(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookCustomLog(
+        payload=CustomWebhookLog(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={},
+            title='Webhook data transformed successfully',
+            level=LogLevel.DEBUG,
+            data={
+                'transformed_data': [
+                    {
+                        'source': 'test-webhooks-mm',
+                        'source_name': 'test-webhooks-mm',
+                        'type': 'SOURCE_GPS',
+                        'recorded_at': '2024-06-07T15:08:19.841Z',
+                        'location': {'lat': -4.1234567, 'lon': 32.01234567890123},
+                        'additional': {
+                            'application_id': 'lt10-globalsat',
+                            'dev_eui': '123456789ABCDEF0',  # pragma: allowlist secret
+                            'dev_addr': '12345ABC',
+                            'batterypercent': 100,
+                            'gps': '3D fix'
+                        }
+                    }
+                ]
+            }
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
 
 
 @pytest.fixture
