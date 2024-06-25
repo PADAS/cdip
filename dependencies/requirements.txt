@@ -260,13 +260,13 @@ grpcio-status==1.56.0
     # via
     #   google-api-core
     #   google-cloud-pubsub
-gundi-client==1.0.1
+gundi-client==1.0.2
     # via
     #   -r requirements.in
     #   cdip-connector
-gundi-client-v2==2.1.5
+gundi-client-v2==2.3.0
     # via -r requirements.in
-gundi-core==1.3.0
+gundi-core==1.4.1
     # via
     #   -r requirements.in
     #   cdip-connector
