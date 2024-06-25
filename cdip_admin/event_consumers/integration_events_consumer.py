@@ -35,7 +35,7 @@ def handle_integration_action_started_event(event_dict: dict):
         integration=integration,
         value="integration_action_started",
         title=_clean_event_title(message),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -55,7 +55,7 @@ def handle_integration_action_complete_event(event_dict: dict):
         integration=integration,
         value="integration_action_complete",
         title=_clean_event_title(message),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -76,7 +76,7 @@ def handle_integration_action_failed_event(event_dict: dict):
         integration=integration,
         value="integration_action_failed",
         title=_clean_event_title(message),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -95,7 +95,7 @@ def handle_integration_action_custom_log_event(event_dict: dict):
         integration=integration,
         value="integration_custom_log",
         title=_clean_event_title(custom_log.title),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -114,7 +114,7 @@ def handle_integration_webhook_started_event(event_dict: dict):
         integration=integration,
         value="integration_webhook_started",
         title=_clean_event_title(message),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -133,7 +133,7 @@ def handle_integration_webhook_complete_event(event_dict: dict):
         integration=integration,
         value="integration_webhook_complete",
         title=_clean_event_title(message),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -152,7 +152,7 @@ def handle_integration_webhook_failed_event(event_dict: dict):
         integration=integration,
         value="integration_webhook_failed",
         title=_clean_event_title(error),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -171,7 +171,7 @@ def handle_integration_webhook_custom_log_event(event_dict: dict):
         integration=integration,
         value="integration_webhook_custom_log",
         title=_clean_event_title(custom_log.title),
-        details=event_dict["payload"],
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
