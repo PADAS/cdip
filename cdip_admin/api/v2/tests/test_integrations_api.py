@@ -27,7 +27,7 @@ def _test_list_integrations(api_client, user, organization):
     if user.is_superuser:
         # The superuser can see all the integrations
         integrations_qs = Integration.objects.all()
-    else: # Only see integrations owned by the organization(s) where the user is a member
+    else:  # Only see integrations owned by the organization(s) where the user is a member
         integrations_qs = Integration.objects.filter(owner=organization)
     expected_integrations_ids = [str(uid) for uid in integrations_qs.values_list("id", flat=True)]
     assert len(integrations) == len(expected_integrations_ids)

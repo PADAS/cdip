@@ -15,6 +15,11 @@ from activity_log.models import ActivityLog
 logger = logging.getLogger(__name__)
 
 
+def _clean_event_title(title: str) -> str:
+    title = title.strip()
+    return title if len(title) < 200 else f"{title[:197]}..."
+
+
 def handle_integration_action_started_event(event_dict: dict):
     event = system_events.IntegrationActionStarted.parse_obj(event_dict)
     event_data = event.payload
@@ -29,8 +34,8 @@ def handle_integration_action_started_event(event_dict: dict):
         origin=ActivityLog.Origin.INTEGRATION,
         integration=integration,
         value="integration_action_started",
-        title=message,
-        details=event_dict["payload"],
+        title=_clean_event_title(message),
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -49,8 +54,8 @@ def handle_integration_action_complete_event(event_dict: dict):
         origin=ActivityLog.Origin.INTEGRATION,
         integration=integration,
         value="integration_action_complete",
-        title=message,
-        details=event_dict["payload"],
+        title=_clean_event_title(message),
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -70,8 +75,8 @@ def handle_integration_action_failed_event(event_dict: dict):
         origin=ActivityLog.Origin.INTEGRATION,
         integration=integration,
         value="integration_action_failed",
-        title=message,
-        details=event_dict["payload"],
+        title=_clean_event_title(message),
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -89,8 +94,84 @@ def handle_integration_action_custom_log_event(event_dict: dict):
         origin=ActivityLog.Origin.INTEGRATION,
         integration=integration,
         value="integration_custom_log",
-        title=custom_log.title,
-        details=event_dict["payload"],
+        title=_clean_event_title(custom_log.title),
+        details=event_dict.get("payload", {}),
+        is_reversible=False,
+    )
+
+
+def handle_integration_webhook_started_event(event_dict: dict):
+    event = system_events.IntegrationWebhookStarted.parse_obj(event_dict)
+    event_data = event.payload
+    integration_id = event_data.integration_id
+    integration = Integration.objects.get(id=integration_id)
+    message = f"Webhook request received."
+    logger.info(message, extra={"event": event_dict})
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration,
+        value="integration_webhook_started",
+        title=_clean_event_title(message),
+        details=event_dict.get("payload", {}),
+        is_reversible=False,
+    )
+
+
+def handle_integration_webhook_complete_event(event_dict: dict):
+    event = system_events.IntegrationWebhookComplete.parse_obj(event_dict)
+    event_data = event.payload
+    integration_id = event_data.integration_id
+    integration = Integration.objects.get(id=integration_id)
+    message = f"Webhook request processing complete."
+    logger.info(message, extra={"event": event_dict})
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration,
+        value="integration_webhook_complete",
+        title=_clean_event_title(message),
+        details=event_dict.get("payload", {}),
+        is_reversible=False,
+    )
+
+
+def handle_integration_webhook_failed_event(event_dict: dict):
+    event = system_events.IntegrationWebhookFailed.parse_obj(event_dict)
+    event_data = event.payload
+    integration_id = event_data.integration_id
+    integration = Integration.objects.get(id=integration_id) if integration_id else None
+    error = event_dict["payload"].get("error", "No details.")
+    logger.info(error, extra={"event": event_dict})
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration,
+        value="integration_webhook_failed",
+        title=_clean_event_title(error),
+        details=event_dict.get("payload", {}),
+        is_reversible=False,
+    )
+
+
+def handle_integration_webhook_custom_log_event(event_dict: dict):
+    event = system_events.IntegrationWebhookCustomLog.parse_obj(event_dict)
+    custom_log = event.payload
+    integration_id = custom_log.integration_id
+    integration = Integration.objects.get(id=integration_id) if integration_id else None
+    message = f"Webhook Custom Log: {custom_log.title}."
+    logger.info(message, extra={"event": event_dict})
+    ActivityLog.objects.create(
+        log_level=custom_log.level,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration,
+        value="integration_webhook_custom_log",
+        title=_clean_event_title(custom_log.title),
+        details=event_dict.get("payload", {}),
         is_reversible=False,
     )
 
@@ -100,6 +181,10 @@ event_handlers = {
     "IntegrationActionComplete": handle_integration_action_complete_event,
     "IntegrationActionFailed": handle_integration_action_failed_event,
     "IntegrationActionCustomLog": handle_integration_action_custom_log_event,
+    "IntegrationWebhookStarted": handle_integration_webhook_started_event,
+    "IntegrationWebhookComplete": handle_integration_webhook_complete_event,
+    "IntegrationWebhookFailed": handle_integration_webhook_failed_event,
+    "IntegrationWebhookCustomLog": handle_integration_webhook_custom_log_event,
 }
 
 
