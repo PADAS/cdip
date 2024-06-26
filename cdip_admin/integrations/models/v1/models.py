@@ -1,4 +1,6 @@
 import uuid
+
+from urllib.parse import urlparse
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -227,8 +229,17 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         if self._state.adding:
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v1")})
-            if "broker" not in self.additional:
-                self.additional.update({"broker": "gcp_pubsub"})
+            self.additional.setdefault('broker', 'gcp_pubsub')
+
+        if self.is_er_site:
+            # Cleanup
+            url_parse = urlparse(self.endpoint)
+
+            scheme = url_parse.scheme
+            if scheme == "http":
+                scheme = "https"
+
+            self.endpoint = f"{scheme}://{url_parse.netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)

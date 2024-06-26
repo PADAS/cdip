@@ -3,7 +3,7 @@ import uuid
 from functools import cached_property
 import jsonschema
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import google.oauth2.id_token
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -189,8 +189,17 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         if self._state.adding and any([self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site]):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
-            if "broker" not in self.additional:
-                self.additional.update({"broker": "gcp_pubsub"})
+            self.additional.setdefault('broker', 'gcp_pubsub')
+
+        if self.is_er_site:
+            # Cleanup
+            url_parse = urlparse(self.base_url)
+
+            scheme = url_parse.scheme
+            if scheme == "http":
+                scheme = "https"
+
+            self.base_url = f"{scheme}://{url_parse.netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
