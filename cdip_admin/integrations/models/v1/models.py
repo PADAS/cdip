@@ -229,8 +229,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
         if self._state.adding:
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v1")})
-            if "broker" not in self.additional:
-                self.additional.update({"broker": "gcp_pubsub"})
+            self.additional.setdefault('broker', 'gcp_pubsub')
 
         if self.is_er_site:
             # Cleanup
@@ -240,11 +239,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
             if scheme == "http":
                 scheme = "https"
 
-            port = ""
-            if url_parse.port:
-                port = f":{url_parse.port}"
-
-            self.endpoint = f"{scheme}://{url_parse.hostname}{port}/"
+            self.endpoint = f"{scheme}://{url_parse.netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
