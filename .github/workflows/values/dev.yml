@@ -1,4 +1,4 @@
-serviceAccount: gundi-app-sa-b2b9960e@cdip-dev-78ca.iam.gserviceaccount.com
+serviceAccount: admin-portal-sa@cdip-dev-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
     - host: "api.dev.gundiservice.org"
