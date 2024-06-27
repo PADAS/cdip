@@ -193,13 +193,14 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
         if self.is_er_site:
             # Cleanup
-            url_parse = urlparse(self.base_url)
+            url_parse = urlparse(self.base_url, "https")
+            netloc = url_parse.netloc or url_parse.path
 
             scheme = url_parse.scheme
             if scheme == "http":
                 scheme = "https"
 
-            self.base_url = f"{scheme}://{url_parse.netloc}/"
+            self.base_url = f"{scheme}://{netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)

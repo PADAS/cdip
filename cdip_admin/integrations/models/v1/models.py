@@ -233,13 +233,14 @@ class OutboundIntegrationConfiguration(TimestampedModel):
 
         if self.is_er_site:
             # Cleanup
-            url_parse = urlparse(self.endpoint)
+            url_parse = urlparse(self.endpoint, "https")
+            netloc = url_parse.netloc or url_parse.path
 
             scheme = url_parse.scheme
             if scheme == "http":
                 scheme = "https"
 
-            self.endpoint = f"{scheme}://{url_parse.netloc}/"
+            self.endpoint = f"{scheme}://{netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
