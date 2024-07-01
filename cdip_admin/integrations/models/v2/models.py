@@ -103,8 +103,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
                 "integration_id": str(integration.id),
                 "action_id": self.value,
                 "run_in_background": run_in_background,
-                # ToDo: Enable this once it's supported by integrations
-                #"config_overrides": config_overrides,
+                "config_overrides": config_overrides,
             }
         )
         response.raise_for_status()

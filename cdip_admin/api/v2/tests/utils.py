@@ -44,4 +44,8 @@ def _test_activity_logs_on_instance_updated(activity_log, instance, user, expect
         assert changes.get(field) == value
     revert_data = activity_log.revert_data
     for field, value in expected_revert_data.items():
-        assert revert_data.get(field) == value
+        if isinstance(value, dict):
+            for key, val in value.items():
+                assert revert_data.get(field).get(key) == val
+        else:
+            assert revert_data.get(field) == value

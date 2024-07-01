@@ -1126,7 +1126,7 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
 
 class ActionTriggerSerializer(serializers.Serializer):
     run_in_background = serializers.BooleanField(required=False, default=False)
-    config_overrides = serializers.JSONField(required=False, write_only=True)
+    config_overrides = serializers.JSONField(required=False)
 
 
 class UserAgreementSerializer(serializers.ModelSerializer):
