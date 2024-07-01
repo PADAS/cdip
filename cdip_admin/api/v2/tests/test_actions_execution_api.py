@@ -111,15 +111,20 @@ def test_cannot_execute_action_as_org_viewer(
     )
 
 
+@pytest.mark.parametrize("user", [
+    ("superuser"),
+    ("org_admin_user"),
+])
 def test_execute_action_with_config_overrides(
-        api_client, mocker, requests_mock, org_admin_user, organization,
+        request, api_client, mocker, requests_mock, user, organization,
         cellstop_integration, cellstop_action_auth, cellstop_action_auth_response
 ):
+    user = request.getfixturevalue(user)
     _test_execute_action(
         mocker=mocker,
         api_client=api_client,
         requests_mock=requests_mock,
-        user=org_admin_user,
+        user=user,
         integration=cellstop_integration,
         action=cellstop_action_auth,
         action_response=cellstop_action_auth_response,
