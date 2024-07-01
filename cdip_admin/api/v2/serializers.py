@@ -878,7 +878,7 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
         pass
 
 
-class EventCreateSerializer(GundiTraceSerializer):
+class EventCreateUpdateSerializer(GundiTraceSerializer):
     object_type = serializers.HiddenField(default=StreamPrefixEnum.event.value)
     title = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
@@ -934,7 +934,13 @@ class EventCreateSerializer(GundiTraceSerializer):
         return data
 
     def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+        # Publish messages to a topic to be processed by routing services
+        instance.save()  # Touch updated_at timestamp
+        event_ids = []  # ToDo: Finish the implementation
+        send_event_updates_to_routing(
+            events=validated_data,
+            gundi_ids=event_ids
+        )
 
 
 class ObservationBulkCreateSerializer(serializers.ListSerializer):

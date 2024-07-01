@@ -368,8 +368,29 @@ class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
         return Response(serializer.data, headers=headers)
 
 
+class TraceUpdateModelMixin:
+    """
+    Update Gundi Traces based on object id.
+    """
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        traces = self.get_queryset().filter(object_id=kwargs['pk'])
+        serializer = self.get_serializer(traces, many=True,  data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+
 class EventsView(
     SingleOrBulkCreateModelMixin,
+    TraceUpdateModelMixin,
     viewsets.GenericViewSet
 ):
     """
@@ -377,7 +398,7 @@ class EventsView(
     """
     authentication_classes = []  # Authentication is handled by Keycloak
     permission_classes = []
-    serializer_class = v2_serializers.EventCreateSerializer
+    serializer_class = v2_serializers.EventCreateUpdateSerializer
     queryset = GundiTrace.objects.all()
 
 
