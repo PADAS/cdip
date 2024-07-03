@@ -157,7 +157,7 @@ def test_create_single_event_without_source(
         extra=ANY
     )
     # Check that the source is set with a default value
-    assert publish_mock.call_args.kwargs["data"].get("external_source_id") == "default-source"
+    assert publish_mock.call_args.kwargs["data"].get("payload", {}).get("external_source_id") == "default-source"
 
 
 def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
@@ -219,7 +219,7 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher
     )
     # Check that the source is set with a default value
     for call in publish_mock.call_args_list:
-        assert call.kwargs["data"].get("external_source_id") == "default-source"
+        assert call.kwargs["data"].get("payload", {}).get("external_source_id") == "default-source"
 
 
 def test_create_single_event_without_location(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):

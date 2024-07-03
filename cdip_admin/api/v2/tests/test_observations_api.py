@@ -159,7 +159,7 @@ def test_override_observation_source_name_with_new_source(
     )
     # Check that a message was published in the right topic for routing
     assert mock_publisher.publish.called
-    final_message = mock_publisher.publish.call_args.kwargs.get("data")
+    final_message = mock_publisher.publish.call_args.kwargs["data"].get("payload", {})
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]
@@ -199,7 +199,7 @@ def test_override_observation_source_name_with_existent_source(
     )
     # Check that a message was published in the right topic for routing
     assert mock_publisher.publish.called
-    final_message = mock_publisher.publish.call_args.kwargs.get("data")
+    final_message = mock_publisher.publish.call_args.kwargs["data"].get("payload", {})
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]
