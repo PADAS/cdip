@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import jsonschema
 from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
@@ -15,7 +17,8 @@ from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
-from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing
+from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
+    send_event_update_to_routing
 
 User = get_user_model()
 
@@ -822,6 +825,7 @@ class KeyRelatedField(serializers.RelatedField):
 class GundiTraceSerializer(serializers.Serializer):
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     related_to = KeyRelatedField(
         key_field="object_id",
         write_only=True,
@@ -854,7 +858,7 @@ class GundiTraceSerializer(serializers.Serializer):
         return data
 
 
-class EventBulkCreateSerializer(serializers.ListSerializer):
+class EventBulkCreateUpdateSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of events
     """
@@ -889,7 +893,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     annotations = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
-        list_serializer_class = EventBulkCreateSerializer
+        list_serializer_class = EventBulkCreateUpdateSerializer
 
     def validate_location(self, value):
         # I must contain lat and lon and other extra fields are accepted
@@ -926,21 +930,25 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     def validate(self, data):
         data = super().validate(data)
         # Get or create sources as they are discovered
-        source, created = Source.objects.get_or_create(
-            integration=data["integration"],
-            external_id=data["source"]
-        )
-        data["source"] = source
+        if not self.instance:
+            source, created = Source.objects.get_or_create(
+                integration=data["integration"],
+                external_id=data["source"]
+            )
+            data["source"] = source
         return data
 
-    def update(self, instance, validated_data):
-        # Publish messages to a topic to be processed by routing services
-        instance.save()  # Touch updated_at timestamp
-        event_ids = []  # ToDo: Finish the implementation
-        send_event_updates_to_routing(
-            events=validated_data,
-            gundi_ids=event_ids
-        )
+    def update(self, traces, validated_data):
+        # We need to update the event in all the destinations where it was sent previously
+        for trace in traces:
+            trace.object_updated_at = datetime.now(tz=trace.created_at.tzinfo)
+            trace.save()
+            # Publish messages to a topic to be processed by routing services
+            send_event_update_to_routing(
+                event_trace=trace,
+                event_changes=validated_data
+            )
+        return traces[0]  # For the user is a single event update
 
 
 class ObservationBulkCreateSerializer(serializers.ListSerializer):

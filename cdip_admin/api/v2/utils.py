@@ -9,7 +9,8 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
 from cdip_connector.core.publisher import NullPublisher, Publisher
-from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation
+from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation, EventUpdate
+from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, ObservationUpdateReceived
 from core import tracing, cache
 from opentelemetry import trace
 from integrations.models import GundiTrace
@@ -173,87 +174,50 @@ def send_events_to_routing(events, gundi_ids):
                 )
 
 
-def send_event_updates_to_routing(events, gundi_ids):
-    for event, gundi_id in zip(events, gundi_ids):
-        # Trace observations with Open Telemetry
+def send_event_update_to_routing(event_trace, event_changes):
+    # Trace observations with Open Telemetry
+    with tracing.tracer.start_as_current_span(
+            f"gundi_api.process_event_update", kind=trace.SpanKind.PRODUCER
+    ) as current_span:
+        tracing.instrumentation.enrich_span_with_environment(
+            span=current_span
+        )
+        gundi_id = str(event_trace.object_id)
+        integration = event_trace.data_provider
+        current_span.set_attribute("gundi_id", gundi_id)
+        current_span.set_attribute("observation_type", StreamPrefixEnum.event_update.value)
+        current_span.set_attribute("integration_type", integration.type.value)
+        current_span.set_attribute("integration_id", str(integration.id))
+        current_span.set_attribute("integration_name", integration.name)
+        if "integration" in event_changes:
+            event_changes.pop("integration")
         with tracing.tracer.start_as_current_span(
-                f"gundi_api.process_event", kind=trace.SpanKind.PRODUCER
+                f"gundi_api.send_event_update_to_routing", kind=trace.SpanKind.PRODUCER
         ) as current_span:
-            tracing.instrumentation.enrich_span_with_environment(
-                span=current_span
-            )
-            integration = event.get("integration")
-            source = event.get("source")
-            source_id = source.external_id if source else None
-            current_span.set_attribute("gundi_id", gundi_id)
-            current_span.set_attribute("observation_type", StreamPrefixEnum.event.value)
-            current_span.set_attribute("integration_type", integration.type.value)
-            current_span.set_attribute("integration_id", str(integration.id))
-            current_span.set_attribute("integration_name", integration.name)
-            current_span.set_attribute("external_source_id", str(source_id))
-            current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
-
-            # Check for duplicates
-            is_duplicate = is_duplicate_data(data=event, expiration_time=settings.GEOEVENT_DUPLICATE_CHECK_SECONDS)
-            if is_duplicate:
-                current_span.set_attribute("is_duplicate", True)
-                current_span.add_event(
-                    name=f"gundi_api.duplicate.event_discarded"
-                )
-                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
-                gundi_trace.is_duplicate = True
-                gundi_trace.save()
-                continue
-
-            with tracing.tracer.start_as_current_span(
-                    f"gundi_api.send_event_to_routing", kind=trace.SpanKind.PRODUCER
-            ) as current_span:
-                # Convert the event to the schema supported by routing
-                if event_location := event.get("location"):
-                    location = Location(
-                        lon=event_location.get("lon"),  # Longitude
-                        lat=event_location.get("lat"),  # Latitude
-                        alt=event_location.get("alt", 0.0),  # Altitude
-                        hdop=event_location.get("hdop"),
-                        vdop=event_location.get("vdop")
-                    )
-                else:
-                    location = None
-                msg_for_routing = Event(
-                    gundi_id=str(gundi_id),
-                    related_to=event.get("related_to"),
+            msg_for_routing = EventUpdateReceived(
+                payload=EventUpdate(
+                    gundi_id=gundi_id,
+                    related_to=str(event_trace.related_to),
                     data_provider_id=str(integration.id),
-                    source_id=str(source.id),
-                    external_source_id=str(source.external_id),
-                    owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
-                    recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
-                    location=location,
-                    annotations=event.get("annotations", {}),
-                    title=event.get("title"),
-                    event_type=event.get("event_type"),
-                    event_details=event.get("event_details", {}),
-                    geometry=event.get("geometry", {}),
-                    observation_type=StreamPrefixEnum.event.value
+                    owner=str(integration.owner.id),
+                    changes=event_changes,
                 )
-                tracing.instrumentation.enrich_span_from_event(
-                    span=current_span, event=msg_for_routing, gundi_version="v2",
-                    gundi_id=str(gundi_id), related_to=str(event.get("related_to"))
-                )
-                tracing_context = json.dumps(
-                    tracing.instrumentation.build_context_headers(),
-                    default=str,
-                )
-                # Send message to routing services
-                publisher.publish(
-                    topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
-                    extra={
-                        "observation_type": StreamPrefixEnum.event.value,
-                        "gundi_version": "v2",  # Add the version so routing knows how to handle it
-                        "gundi_id": str(gundi_id),
-                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
-                    },
-                )
+            )
+            tracing_context = json.dumps(
+                tracing.instrumentation.build_context_headers(),
+                default=str,
+            )
+            # Send message to routing services
+            publisher.publish(
+                topic=settings.RAW_OBSERVATIONS_TOPIC,
+                data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
+                extra={
+                    "observation_type": StreamPrefixEnum.event_update.value,
+                    "gundi_version": "v2",  # Add the version so routing knows how to handle it
+                    "gundi_id": str(gundi_id),
+                    "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                },
+            )
 
 
 def send_attachments_to_routing(attachments_data, gundi_ids):
