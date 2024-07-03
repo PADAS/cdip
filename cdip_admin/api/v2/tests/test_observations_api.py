@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import ANY
 from django.urls import reverse
 from django.conf import settings
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 from activity_log.models import ActivityLog
 from integrations.models import Source
@@ -10,7 +11,7 @@ from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_
 pytestmark = pytest.mark.django_db
 
 
-def _test_create_observation(api_client, integration, keyauth_headers, data, assert_source_created=True):
+def _test_create_observation(api_client, mock_publisher, integration, keyauth_headers, data, assert_source_created=True):
     response = api_client.post(
         reverse("observations-list"),
         data=data,
@@ -39,6 +40,14 @@ def _test_create_observation(api_client, integration, keyauth_headers, data, ass
                     instance=source,
                     user=None  # Created through API, no user
                 )
+            # Check that an event was published so routing services continue processing the data
+            assert mock_publisher.publish.called
+            data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+            assert data_kwarg.get("payload")
+            extra_arg = mock_publisher.publish.call_args.kwargs["extra"]
+            assert "gundi_id" in extra_arg
+            assert extra_arg.get("gundi_version") == "v2"
+            assert extra_arg.get("observation_type") == StreamPrefixEnum.observation.value
 
 
 def test_create_single_observation(
@@ -49,6 +58,7 @@ def test_create_single_observation(
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_observation(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         integration=provider_trap_tagger,
         keyauth_headers=keyauth_headers_trap_tagger,
         data={
@@ -68,13 +78,6 @@ def test_create_single_observation(
             }
         }
     )
-    # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
 
 
 def test_create_observations_in_bulk(
@@ -85,6 +88,7 @@ def test_create_observations_in_bulk(
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_observation(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         integration=provider_trap_tagger,
         keyauth_headers=keyauth_headers_trap_tagger,
         data=[
@@ -122,14 +126,7 @@ def test_create_observations_in_bulk(
             }
         ]
     )
-    # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
     assert mock_publisher.publish.call_count == 2
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
 
 
 def test_override_observation_source_name_with_new_source(
@@ -153,12 +150,12 @@ def test_override_observation_source_name_with_new_source(
     }
     _test_create_observation(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         integration=provider_trap_tagger,
         keyauth_headers=keyauth_headers_trap_tagger,
         data=observation_data
     )
-    # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
+    # Check that a message was published with the right data for routing services
     final_message = mock_publisher.publish.call_args.kwargs["data"].get("payload", {})
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
@@ -192,13 +189,13 @@ def test_override_observation_source_name_with_existent_source(
     }
     _test_create_observation(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         integration=provider_lotek_panthera,
         keyauth_headers=keyauth_headers_lotek,
         data=observation_data,
         assert_source_created=False
     )
-    # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
+    # Check that a message was published with the right data for routing services
     final_message = mock_publisher.publish.call_args.kwargs["data"].get("payload", {})
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
