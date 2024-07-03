@@ -448,6 +448,7 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
 @admin.register(GundiTrace)
 class GundiTraceAdmin(SimpleHistoryAdmin):
     list_display = (
+        "pk",
         "object_id",
         "related_to",
         "object_type",
@@ -455,6 +456,7 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination",
         "external_id",
         "delivered_at",
+        "object_updated_at",
         "is_duplicate",
         "has_error",
         "error",
