@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from cdip_connector.core.publisher import NullPublisher, Publisher
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation, EventUpdate
-from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, ObservationUpdateReceived
+from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, AttachmentReceived
 from core import tracing, cache
 from opentelemetry import trace
 from integrations.models import GundiTrace
@@ -137,24 +137,26 @@ def send_events_to_routing(events, gundi_ids):
                     )
                 else:
                     location = None
-                msg_for_routing = Event(
-                    gundi_id=str(gundi_id),
-                    related_to=event.get("related_to"),
-                    data_provider_id=str(integration.id),
-                    source_id=str(source.id),
-                    external_source_id=str(source.external_id),
-                    owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
-                    recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
-                    location=location,
-                    annotations=event.get("annotations", {}),
-                    title=event.get("title"),
-                    event_type=event.get("event_type"),
-                    event_details=event.get("event_details", {}),
-                    geometry=event.get("geometry", {}),
-                    observation_type=StreamPrefixEnum.event.value
+                msg_for_routing = EventReceived(
+                    payload=Event(
+                        gundi_id=str(gundi_id),
+                        related_to=event.get("related_to"),
+                        data_provider_id=str(integration.id),
+                        source_id=str(source.id),
+                        external_source_id=str(source.external_id),
+                        owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                        recorded_at=event.get("recorded_at"),  #ToDo: Convet to "2021-03-21 12:01:02-0700"
+                        location=location,
+                        annotations=event.get("annotations", {}),
+                        title=event.get("title"),
+                        event_type=event.get("event_type"),
+                        event_details=event.get("event_details", {}),
+                        geometry=event.get("geometry", {}),
+                        observation_type=StreamPrefixEnum.event.value
+                    )
                 )
                 tracing.instrumentation.enrich_span_from_event(
-                    span=current_span, event=msg_for_routing, gundi_version="v2",
+                    span=current_span, event=msg_for_routing.payload, gundi_version="v2",
                     gundi_id=str(gundi_id), related_to=str(event.get("related_to"))
                 )
                 tracing_context = json.dumps(
@@ -262,17 +264,19 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             with tracing.tracer.start_as_current_span(
                     f"gundi_api.send_attachment_to_routing", kind=trace.SpanKind.PRODUCER
             ):
-                msg_for_routing = Attachment(
-                    gundi_id=str(gundi_id),
-                    data_provider_id=str(integration.id),
-                    source_id=str(source.id if source else None),  # ToDo: Can be null?
-                    external_source_id=str(source.external_id if source else None),
-                    related_to=attachment.get("related_to"),
-                    file_path=file_path,
-                    observation_type=observation_type
+                msg_for_routing = AttachmentReceived(
+                    payload=Attachment(
+                        gundi_id=str(gundi_id),
+                        data_provider_id=str(integration.id),
+                        source_id=str(source.id if source else None),  # ToDo: Can be null?
+                        external_source_id=str(source.external_id if source else None),
+                        related_to=attachment.get("related_to"),
+                        file_path=file_path,
+                        observation_type=observation_type
+                    )
                 )
                 tracing.instrumentation.enrich_span_from_attachment(
-                    span=current_span, attachment=msg_for_routing, file_path=file_path,
+                    span=current_span, attachment=msg_for_routing.payload, file_path=file_path,
                     gundi_version="v2", gundi_id=str(gundi_id), related_to=str(attachment.get("related_to"))
                 )
                 tracing_context = json.dumps(
@@ -334,30 +338,32 @@ def send_observations_to_routing(observations, gundi_ids):
                     f"gundi_api.send_observations_to_routing", kind=trace.SpanKind.PRODUCER
             ) as current_span:
                 # Convert the event to the schema supported by routing
-                msg_for_routing = Observation(
-                    gundi_id=str(gundi_id),
-                    related_to=observation.get("related_to"),
-                    owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
-                    data_provider_id=str(integration.id),
-                    annotations=observation.get("annotations", {}),
-                    source_id=str(source.id),
-                    external_source_id=str(source.external_id),
-                    source_name=observation.get("source_name") or str(source.name),
-                    type=observation.get("type"),
-                    subject_type=observation.get("subject_type"),
-                    recorded_at=observation.get("recorded_at"),
-                    location=Location(
-                        lon=location.get("lon"),  # Longitude
-                        lat=location.get("lat"),  # Latitude
-                        alt=location.get("alt", 0.0),  # Altitude
-                        hdop=location.get("hdop"),
-                        vdop=location.get("vdop")
-                    ),
-                    additional=observation.get("additional", {}),
-                    observation_type=StreamPrefixEnum.observation.value
+                msg_for_routing = ObservationReceived(
+                    payload=Observation(
+                        gundi_id=str(gundi_id),
+                        related_to=observation.get("related_to"),
+                        owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                        data_provider_id=str(integration.id),
+                        annotations=observation.get("annotations", {}),
+                        source_id=str(source.id),
+                        external_source_id=str(source.external_id),
+                        source_name=observation.get("source_name") or str(source.name),
+                        type=observation.get("type"),
+                        subject_type=observation.get("subject_type"),
+                        recorded_at=observation.get("recorded_at"),
+                        location=Location(
+                            lon=location.get("lon"),  # Longitude
+                            lat=location.get("lat"),  # Latitude
+                            alt=location.get("alt", 0.0),  # Altitude
+                            hdop=location.get("hdop"),
+                            vdop=location.get("vdop")
+                        ),
+                        additional=observation.get("additional", {}),
+                        observation_type=StreamPrefixEnum.observation.value
+                    )
                 )
                 tracing.instrumentation.enrich_span_from_observation(
-                    span=current_span, observation=msg_for_routing, gundi_version="v2"
+                    span=current_span, observation=msg_for_routing.payload, gundi_version="v2"
                 )
                 tracing_context = json.dumps(
                     tracing.instrumentation.build_context_headers(),
