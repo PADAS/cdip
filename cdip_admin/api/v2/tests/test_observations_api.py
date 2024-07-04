@@ -139,7 +139,7 @@ def test_override_observation_source_name_with_new_source(
         "source": "STVIC",
         "subject_type": "truck",
         "source_name": "Buttercup32",
-        "recorded_at": "2023-12-14T02:44:32Z",
+        "recorded_at": "2023-12-14 02:44:32Z",
         "location": {
             "lat": -51.669228,
             "lon": -72.664443
@@ -160,7 +160,7 @@ def test_override_observation_source_name_with_new_source(
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]
-    assert final_message.get("recorded_at") == observation_data["recorded_at"].replace("Z", "+00:00")
+    assert str(final_message.get("recorded_at")) == observation_data["recorded_at"].replace("Z", "+00:00")
     assert final_message.get("location", {}).get("lat") == observation_data["location"]["lat"]
     assert final_message.get("location", {}).get("lon") == observation_data["location"]["lon"]
     assert final_message.get("additional") == observation_data["additional"]
@@ -178,7 +178,7 @@ def test_override_observation_source_name_with_existent_source(
         "source": str(source.external_id),
         "subject_type": "truck",
         "source_name": "Buttercup32",
-        "recorded_at": "2023-12-14T02:44:32Z",
+        "recorded_at": "2023-12-14 02:44:32Z",
         "location": {
             "lat": -51.669228,
             "lon": -72.664443
@@ -200,7 +200,7 @@ def test_override_observation_source_name_with_existent_source(
     assert final_message.get("source_name") == observation_data["source_name"]
     assert final_message.get("external_source_id") == observation_data["source"]
     assert final_message.get("subject_type") == observation_data["subject_type"]
-    assert final_message.get("recorded_at") == observation_data["recorded_at"].replace("Z", "+00:00")
+    assert str(final_message.get("recorded_at")) == observation_data["recorded_at"].replace("Z", "+00:00")
     assert final_message.get("location", {}).get("lat") == observation_data["location"]["lat"]
     assert final_message.get("location", {}).get("lon") == observation_data["location"]["lon"]
     assert final_message.get("additional") == observation_data["additional"]
