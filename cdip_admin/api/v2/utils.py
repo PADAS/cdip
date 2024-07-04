@@ -166,7 +166,7 @@ def send_events_to_routing(events, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
+                    data=msg_for_routing.dict(),
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -212,7 +212,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             # Send message to routing services
             publisher.publish(
                 topic=settings.RAW_OBSERVATIONS_TOPIC,
-                data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
+                data=msg_for_routing.dict(),
                 extra={
                     "observation_type": StreamPrefixEnum.event_update.value,
                     "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -286,7 +286,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=json.loads(msg_for_routing.json()),  # This is suboptimal but it's fixed in pydantic 2
+                    data=msg_for_routing.dict(),
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -372,7 +372,7 @@ def send_observations_to_routing(observations, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=json.loads(msg_for_routing.json()),  # This is suboptimal. It's fixed in pydantic v2
+                    data=msg_for_routing.dict(),
                     extra={
                         "observation_type": StreamPrefixEnum.observation.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
