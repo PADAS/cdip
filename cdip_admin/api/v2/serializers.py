@@ -914,6 +914,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -933,7 +934,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         if not self.instance:
             source, created = Source.objects.get_or_create(
                 integration=data["integration"],
-                external_id=data["source"]
+                external_id=data.get("source", "default-source")
             )
             data["source"] = source
         return data
@@ -1021,7 +1022,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data["source"],
+            external_id=data.get("source", "default-source"),
             defaults={
                 "name": data.get("source_name", "")
             }
@@ -1030,7 +1031,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         return data
 
     def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+        pass  # ToDo: Implement if we decide to support updating tracking data
 
 
 class EventAttachmentListSerializer(serializers.ListSerializer):
