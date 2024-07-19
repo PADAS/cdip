@@ -68,13 +68,14 @@ class GooglePublisher(Publisher):
     @backoff.on_exception(
         backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
     )
-    def publish(self, topic: str, data: dict, extra: dict = None):
+    def publish(self, topic: str, data: dict, ordering_key="", extra: dict = None):
         extra = extra or {}
         # Specify the topic path
         topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
         publish_future = self.pubsub_client.publish(
             topic=topic_path,
             data=json.dumps(data, default=str).encode("utf-8"),
+            ordering_key=ordering_key,
             **extra
         )
         result = publish_future.result()
@@ -186,6 +187,7 @@ def send_event_update_to_routing(event_trace, event_changes):
         )
         gundi_id = str(event_trace.object_id)
         integration = event_trace.data_provider
+        source = event_trace.source
         current_span.set_attribute("gundi_id", gundi_id)
         current_span.set_attribute("observation_type", StreamPrefixEnum.event_update.value)
         current_span.set_attribute("integration_type", integration.type.value)
@@ -201,7 +203,8 @@ def send_event_update_to_routing(event_trace, event_changes):
                     gundi_id=gundi_id,
                     related_to=str(event_trace.related_to),
                     data_provider_id=str(integration.id),
-                    owner=str(integration.owner.id),
+                    source_id=str(source.id if source else None),  # ToDo: Can be null?
+                    external_source_id=str(source.external_id if source else None),                    owner=str(integration.owner.id),
                     changes=event_changes,
                 )
             )
@@ -213,6 +216,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             publisher.publish(
                 topic=settings.RAW_OBSERVATIONS_TOPIC,
                 data=msg_for_routing.dict(),
+                ordering_key=gundi_id,  # Order is important in case there are consecutive updates
                 extra={
                     "observation_type": StreamPrefixEnum.event_update.value,
                     "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -268,7 +272,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     payload=Attachment(
                         gundi_id=str(gundi_id),
                         data_provider_id=str(integration.id),
-                        source_id=str(source.id if source else None),  # ToDo: Can be null?
+                        source_id=str(source.id if source else None),
                         external_source_id=str(source.external_id if source else None),
                         related_to=attachment.get("related_to"),
                         file_path=file_path,
