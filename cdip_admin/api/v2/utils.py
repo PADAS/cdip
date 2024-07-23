@@ -35,6 +35,16 @@ def is_duplicate_data(data: dict, expiration_time):
     return is_duplicate
 
 
+def is_attachment_related_event_discarded(data: dict):
+    event_id = str(data["related_to"])
+    try:
+        related_event_gundi_trace = GundiTrace.objects.get(object_id=event_id)
+    except GundiTrace.DoesNotExist:
+        return True
+    else:
+        return related_event_gundi_trace.is_duplicate
+
+
 def is_duplicate_attachment(data: dict):
     integration_id = str(data["integration"].id)
     source = data.get('source')
@@ -193,6 +203,19 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
             current_span.set_attribute("integration_name", integration.name)
             current_span.set_attribute("external_source_id", str(source_id)),
             current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
+
+            # Check if related event was discarded as duplicate
+            is_related_event_discarded = is_attachment_related_event_discarded(data=attachment)
+            if is_related_event_discarded:
+                current_span.set_attribute("is_related_event_discarded", True)
+                current_span.add_event(
+                    name=f"gundi_api.related_event_discarded.attachment_discarded"
+                )
+                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
+                gundi_trace.has_error = True
+                gundi_trace.error = "Related event discarded as duplicate"
+                gundi_trace.save()
+                continue
 
             # Check for duplicates
             is_duplicate = is_duplicate_attachment(data=attachment)
