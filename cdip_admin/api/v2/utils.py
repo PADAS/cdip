@@ -216,7 +216,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             publisher.publish(
                 topic=settings.RAW_OBSERVATIONS_TOPIC,
                 data=msg_for_routing.dict(),
-                ordering_key=gundi_id,  # Order is important in case there are consecutive updates
+                ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                 extra={
                     "observation_type": StreamPrefixEnum.event_update.value,
                     "gundi_version": "v2",  # Add the version so routing knows how to handle it
