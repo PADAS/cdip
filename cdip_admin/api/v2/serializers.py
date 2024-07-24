@@ -1004,6 +1004,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
