@@ -152,7 +152,7 @@ def send_events_to_routing(events, gundi_ids):
                         title=event.get("title"),
                         event_type=event.get("event_type"),
                         event_details=event.get("event_details", {}),
-                        geometry=event.get("geometry", {}),
+                        geometry=event.get("geometry", None),
                         observation_type=StreamPrefixEnum.event.value
                     )
                 )
@@ -167,7 +167,7 @@ def send_events_to_routing(events, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=msg_for_routing.dict(),
+                    data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -215,7 +215,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             # Send message to routing services
             publisher.publish(
                 topic=settings.RAW_OBSERVATIONS_TOPIC,
-                data=msg_for_routing.dict(),
+                data=msg_for_routing.dict(exclude_none=True),
                 ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                 extra={
                     "observation_type": StreamPrefixEnum.event_update.value,
@@ -290,7 +290,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=msg_for_routing.dict(),
+                    data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -376,7 +376,7 @@ def send_observations_to_routing(observations, gundi_ids):
                 # Send message to routing services
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
-                    data=msg_for_routing.dict(),
+                    data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.observation.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
