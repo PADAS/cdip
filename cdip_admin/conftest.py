@@ -1105,6 +1105,13 @@ def movebank_sources(
 
 
 @pytest.fixture
+def trap_tagger_sources(
+        get_random_id, other_organization, provider_trap_tagger, make_random_sources
+):
+    return make_random_sources(provider=provider_trap_tagger, qty=5)
+
+
+@pytest.fixture
 def route_1(
         get_random_id,
         organization,
@@ -1261,11 +1268,29 @@ def wilddog_image_file():
 
 
 @pytest.fixture
-def trap_tagger_event_trace(provider_trap_tagger):
+def trap_tagger_event_trace(provider_trap_tagger, trap_tagger_sources):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         object_type="ev",
+        source=trap_tagger_sources[0]
+        # Other fields are filled in later by the routing services
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def trap_tagger_event_update_trace(provider_trap_tagger, trap_tagger_sources, integrations_list_er):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        object_type="ev",
+        source=trap_tagger_sources[0],
+        destination_id=str(integrations_list_er[0].id),
+        delivered_at="2023-07-10T19:35:34.425974Z",  # It was delivered
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",  # ER uuid
+        object_updated_at="2023-07-25T12:25:34.425974Z",  # Then the user sent an update
         # Other fields are filled in later by the routing services
     )
     trace.save()
@@ -1363,6 +1388,29 @@ def trap_tagger_observation_delivered_event(
 
 
 @pytest.fixture
+def trap_tagger_observation_updated_event(
+        mocker, trap_tagger_event_update_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationUpdated",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_update_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "updated_at": "2024-07-25 12:25:44.442696+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
 def trap_tagger_to_movebank_observation_delivered_event(
         mocker, trap_tagger_to_movebank_observation_trace, destination_movebank
 ):
@@ -1451,6 +1499,29 @@ def trap_tagger_observation_delivery_failed_event_two(
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
             "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_update_failed_event(
+        mocker, trap_tagger_event_update_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationUpdateFailed",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_update_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "updated_at": "2024-07-25 12:25:44.442696+00:00",
         },
     }
     data_bytes = json.dumps(event_dict).encode("utf-8")

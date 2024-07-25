@@ -448,27 +448,33 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
 @admin.register(GundiTrace)
 class GundiTraceAdmin(SimpleHistoryAdmin):
     list_display = (
+        "pk",
         "object_id",
         "related_to",
         "object_type",
         "data_provider",
+        "source",
         "destination",
         "external_id",
+        "created_at",
         "delivered_at",
+        "object_updated_at",
+        "last_update_delivered_at",
         "is_duplicate",
         "has_error",
         "error",
-        "created_at",
-        "updated_at",
         "created_by",
     )
     search_fields = (
         "object_id",
         "related_to",
         "external_id",
+        "data_provider__id",
+        "source__id",
         "data_provider__name",
         "data_provider__owner__name",
         "data_provider__type__name",
+        "destination__id",
         "destination__name",
         "destination__owner__name",
         "destination__type__name",
@@ -481,6 +487,4 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "object_type",
         "data_provider__type",
         "destination__type",
-        "data_provider",
-        "destination",
     )

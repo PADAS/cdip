@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import jsonschema
 from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
@@ -15,7 +17,8 @@ from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
-from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing
+from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
+    send_event_update_to_routing
 
 User = get_user_model()
 
@@ -822,6 +825,7 @@ class KeyRelatedField(serializers.RelatedField):
 class GundiTraceSerializer(serializers.Serializer):
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     related_to = KeyRelatedField(
         key_field="object_id",
         write_only=True,
@@ -854,7 +858,7 @@ class GundiTraceSerializer(serializers.Serializer):
         return data
 
 
-class EventBulkCreateSerializer(serializers.ListSerializer):
+class EventBulkCreateUpdateSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of events
     """
@@ -878,7 +882,7 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
         pass
 
 
-class EventCreateSerializer(GundiTraceSerializer):
+class EventCreateUpdateSerializer(GundiTraceSerializer):
     object_type = serializers.HiddenField(default=StreamPrefixEnum.event.value)
     title = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
@@ -889,7 +893,7 @@ class EventCreateSerializer(GundiTraceSerializer):
     annotations = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
-        list_serializer_class = EventBulkCreateSerializer
+        list_serializer_class = EventBulkCreateUpdateSerializer
 
     def validate_location(self, value):
         # I must contain lat and lon and other extra fields are accepted
@@ -910,6 +914,7 @@ class EventCreateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -926,15 +931,25 @@ class EventCreateSerializer(GundiTraceSerializer):
     def validate(self, data):
         data = super().validate(data)
         # Get or create sources as they are discovered
-        source, created = Source.objects.get_or_create(
-            integration=data["integration"],
-            external_id=data["source"]
-        )
-        data["source"] = source
+        if not self.instance:
+            source, created = Source.objects.get_or_create(
+                integration=data["integration"],
+                external_id=data.get("source", "default-source")
+            )
+            data["source"] = source
         return data
 
-    def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+    def update(self, traces, validated_data):
+        # We need to update the event in all the destinations where it was sent previously
+        for trace in traces:
+            trace.object_updated_at = datetime.now(tz=trace.created_at.tzinfo)
+            trace.save()
+            # Publish messages to a topic to be processed by routing services
+            send_event_update_to_routing(
+                event_trace=trace,
+                event_changes=validated_data
+            )
+        return traces[0]  # For the user is a single event update
 
 
 class ObservationBulkCreateSerializer(serializers.ListSerializer):
@@ -989,6 +1004,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -1007,7 +1023,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data["source"],
+            external_id=data.get("source", "default-source"),
             defaults={
                 "name": data.get("source_name", "")
             }
@@ -1016,7 +1032,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         return data
 
     def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+        pass  # ToDo: Implement if we decide to support updating tracking data
 
 
 class EventAttachmentListSerializer(serializers.ListSerializer):
@@ -1104,9 +1120,12 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
         read_only=True,
     )
     delivered_at = serializers.DateTimeField(read_only=True)
+    last_update_delivered_at = serializers.DateTimeField(read_only=True)
     external_id = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
+    is_duplicate = serializers.BooleanField(read_only=True)
+    has_error = serializers.BooleanField(read_only=True)
 
 
 class ActivityLogRetrieveSerializer(serializers.Serializer):
