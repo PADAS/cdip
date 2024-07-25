@@ -1120,9 +1120,12 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
         read_only=True,
     )
     delivered_at = serializers.DateTimeField(read_only=True)
+    last_update_delivered_at = serializers.DateTimeField(read_only=True)
     external_id = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
+    is_duplicate = serializers.BooleanField(read_only=True)
+    has_error = serializers.BooleanField(read_only=True)
 
 
 class ActivityLogRetrieveSerializer(serializers.Serializer):
