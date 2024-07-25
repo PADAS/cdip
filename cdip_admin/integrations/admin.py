@@ -456,13 +456,13 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "source",
         "destination",
         "external_id",
+        "created_at",
         "delivered_at",
         "object_updated_at",
+        "last_update_delivered_at",
         "is_duplicate",
         "has_error",
         "error",
-        "created_at",
-        "updated_at",
         "created_by",
     )
     search_fields = (

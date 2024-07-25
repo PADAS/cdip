@@ -627,6 +627,7 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     )
     delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
     object_updated_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    last_update_delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
     external_id = models.CharField(max_length=250, db_index=True, null=True, blank=True)  # Object ID in the destination system
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")
