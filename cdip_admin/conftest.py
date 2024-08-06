@@ -1364,7 +1364,7 @@ def mock_cloud_storage(mocker):
 
 
 @pytest.fixture
-def trap_tagger_observation_delivered_event(
+def trap_tagger_to_er_observation_delivered_event(
         mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
@@ -1379,6 +1379,30 @@ def trap_tagger_observation_delivered_event(
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
             "destination_id": str(integrations_list_er[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_to_smart_observation_delivered_event(
+        mocker, trap_tagger_event_trace, integrations_list_smart
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": "",
+            "external_id": str(trap_tagger_event_trace.object_id),  # gundi_id is used as id in smart
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id": str(integrations_list_smart[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }

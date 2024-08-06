@@ -9,12 +9,12 @@ from integrations.models import GundiTrace
 pytestmark = pytest.mark.django_db
 
 
-def test_process_observation_delivered_event_with_single_destination(
-        trap_tagger_event_trace, trap_tagger_observation_delivered_event
+def test_process_observation_delivered_event_with_er_destination(
+        trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event
 ):
     # Test the case when an observation is delivered to a single destination successfully
-    process_event(trap_tagger_observation_delivered_event)
-    event_data = json.loads(trap_tagger_observation_delivered_event.data)["payload"]
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
     event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
     trap_tagger_event_trace.refresh_from_db()
     assert str(trap_tagger_event_trace.destination.id) == str(event_data["destination_id"])
@@ -31,13 +31,35 @@ def test_process_observation_delivered_event_with_single_destination(
     assert activity_log.details == event_data
 
 
-def test_process_observation_delivered_event_with_two_destinations(
-        trap_tagger_event_trace, trap_tagger_observation_delivered_event, trap_tagger_observation_delivered_event_two
+def test_process_observation_delivered_event_with_smart_destination(
+        trap_tagger_event_trace, trap_tagger_to_smart_observation_delivered_event
+):
+    # Test the case when an observation is delivered to a single destination successfully
+    process_event(trap_tagger_to_smart_observation_delivered_event)
+    event_data = json.loads(trap_tagger_to_smart_observation_delivered_event.data)["payload"]
+    event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+    trap_tagger_event_trace.refresh_from_db()
+    assert str(trap_tagger_event_trace.destination.id) == str(event_data["destination_id"])
+    assert str(trap_tagger_event_trace.external_id) == str(event_data["external_id"])
+    assert str(trap_tagger_event_trace.delivered_at) == str(event_data["delivered_at"])
+    # Check that the event was recorded in the activity log
+    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    assert activity_log
+    assert activity_log.log_type == ActivityLog.LogTypes.EVENT
+    assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.value == "observation_delivery_succeeded"
+    assert activity_log.title == f"Observation Delivered to '{trap_tagger_event_trace.destination.base_url}'"
+    assert activity_log.details == event_data
+
+
+def test_process_observation_delivered_event_with_two_er_destinations(
+        trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event, trap_tagger_observation_delivered_event_two
 ):
     # Test the case when an observation is delivered to two destinations successfully
-    process_event(trap_tagger_observation_delivered_event)  # One event for one destination
+    process_event(trap_tagger_to_er_observation_delivered_event)  # One event for one destination
     # Check that we have two traces in the database now (for the second destination)
-    event_data = json.loads(trap_tagger_observation_delivered_event.data)["payload"]
+    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
     assert GundiTrace.objects.filter(object_id=event_data["gundi_id"]).count() == 1
 
     # Check that the data related to the first destination was saved in the database
@@ -61,6 +83,52 @@ def test_process_observation_delivered_event_with_two_destinations(
     assert GundiTrace.objects.filter(object_id=event_data["gundi_id"]).count() == 2
     # Check that the data related to the second destination was saved in the database
     event_data = json.loads(trap_tagger_observation_delivered_event_two.data)["payload"]
+    trace_two = GundiTrace.objects.get(
+        object_id=event_data["gundi_id"],
+        destination__id=event_data["destination_id"]
+    )
+    event_data["source_external_id"] = trace_two.source.external_id
+    assert str(trace_two.external_id) == str(event_data["external_id"])
+    # Check that the event was recorded in the activity log
+    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    assert activity_log
+    assert activity_log.log_type == ActivityLog.LogTypes.EVENT
+    assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.value == "observation_delivery_succeeded"
+    assert activity_log.title == f"Observation Delivered to '{trace_two.destination.base_url}'"
+    assert activity_log.details == event_data
+
+def test_process_observation_delivered_event_with_er_and_smart_destinations(
+        trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event, trap_tagger_to_smart_observation_delivered_event
+):
+    # Test the case when an observation is delivered to two destinations successfully
+    process_event(trap_tagger_to_er_observation_delivered_event)  # One event for one destination
+    # Check that we have two traces in the database now (for the second destination)
+    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
+    assert GundiTrace.objects.filter(object_id=event_data["gundi_id"]).count() == 1
+
+    # Check that the data related to the first destination was saved in the database
+    trace_one = GundiTrace.objects.get(
+        object_id=event_data["gundi_id"],
+        destination__id=event_data["destination_id"]
+    )
+    event_data["source_external_id"] = trace_one.source.external_id
+    assert str(trace_one.external_id) == str(event_data["external_id"])
+    # Check that the event was recorded in the activity log
+    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    assert activity_log
+    assert activity_log.log_type == ActivityLog.LogTypes.EVENT
+    assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.value == "observation_delivery_succeeded"
+    assert activity_log.title == f"Observation Delivered to '{trace_one.destination.base_url}'"
+    assert activity_log.details == event_data
+
+    process_event(trap_tagger_to_smart_observation_delivered_event)  # A second event for the other destination
+    assert GundiTrace.objects.filter(object_id=event_data["gundi_id"]).count() == 2
+    # Check that the data related to the second destination was saved in the database
+    event_data = json.loads(trap_tagger_to_smart_observation_delivered_event.data)["payload"]
     trace_two = GundiTrace.objects.get(
         object_id=event_data["gundi_id"],
         destination__id=event_data["destination_id"]
@@ -118,7 +186,8 @@ def test_process_observation_delivered_event_without_external_id(
 
 
 def test_process_observation_delivered_event_after_retry_with_single_destination(
-        trap_tagger_event_trace, trap_tagger_observation_delivery_failed_event, trap_tagger_observation_delivered_event
+        trap_tagger_event_trace, trap_tagger_observation_delivery_failed_event,
+        trap_tagger_to_er_observation_delivered_event
 ):
     # Test the case when an observation fails to get delivered the first time
     # and succeeds on a second try.
@@ -139,8 +208,8 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert activity_log.details == event_data
 
     # Process the second event. The observation was delivered with success now
-    process_event(trap_tagger_observation_delivered_event)
-    event_data = json.loads(trap_tagger_observation_delivered_event.data)["payload"]
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
     trap_tagger_event_trace.refresh_from_db()
     event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
     assert not trap_tagger_event_trace.has_error
@@ -163,7 +232,7 @@ def test_process_observation_delivered_event_after_retry_with_two_destinations(
         trap_tagger_event_trace,
         trap_tagger_observation_delivery_failed_event,
         trap_tagger_observation_delivery_failed_event_two,
-        trap_tagger_observation_delivered_event,
+        trap_tagger_to_er_observation_delivered_event,
         trap_tagger_observation_delivered_event_two
 ):
     # Test the case when an observation fails to get delivered the first time to two destinations
@@ -181,8 +250,8 @@ def test_process_observation_delivered_event_after_retry_with_two_destinations(
     assert trap_tagger_event_trace_2.has_error
     assert trap_tagger_event_trace_2.error == "Delivery Failed at the Dispatcher."
 
-    process_event(trap_tagger_observation_delivered_event)
-    event_data = json.loads(trap_tagger_observation_delivered_event.data)["payload"]
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
     trap_tagger_event_trace.refresh_from_db()
     assert not trap_tagger_event_trace.has_error
     assert not trap_tagger_event_trace.error
