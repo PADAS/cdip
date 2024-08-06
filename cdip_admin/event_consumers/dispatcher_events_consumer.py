@@ -62,7 +62,7 @@ def handle_observation_delivered_event(event_dict: dict):
             object_id=trace.object_id,
             object_type=trace.object_type,
             source=trace.source,
-            related_to=event_data.related_to,
+            related_to=event_data.related_to or None,  # Empy string to None
             created_by=trace.created_by,
             data_provider=trace.data_provider,
             destination_id=event_data.destination_id,
@@ -124,7 +124,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
             object_id=trace.object_id,
             object_type=trace.object_type,
             source=trace.source,
-            related_to=event_data.related_to,
+            related_to=event_data.related_to or None,  # Empy string to None
             created_by=trace.created_by,
             data_provider=trace.data_provider,
             destination_id=event_data.destination_id,
