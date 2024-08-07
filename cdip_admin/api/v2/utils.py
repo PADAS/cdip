@@ -69,7 +69,11 @@ def is_duplicate_attachment(data: dict):
 class GooglePublisher(Publisher):
 
     def __init__(self):
-        self.pubsub_client = pubsub_v1.PublisherClient()
+        self.pubsub_client = pubsub_v1.PublisherClient(
+            publisher_options=pubsub_v1.types.PublisherOptions(
+                enable_message_ordering=True,
+            )
+        )
 
     @backoff.on_exception(
         backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
@@ -173,6 +177,7 @@ def send_events_to_routing(events, gundi_ids):
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=msg_for_routing.dict(exclude_none=True),
+                    ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -221,8 +226,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             publisher.publish(
                 topic=settings.RAW_OBSERVATIONS_TOPIC,
                 data=msg_for_routing.dict(exclude_none=True),
-                # ToDo: enable ordering key once we update the infra to support it
-                #ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
+                ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                 extra={
                     "observation_type": StreamPrefixEnum.event_update.value,
                     "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -307,6 +311,7 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=msg_for_routing.dict(exclude_none=True),
+                    ordering_key=attachment.get("related_to"),  # Attachment will be delivered after the related event
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
