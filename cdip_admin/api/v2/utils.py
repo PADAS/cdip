@@ -38,12 +38,8 @@ def is_duplicate_data(data: dict, expiration_time):
 
 def is_attachment_related_event_discarded(data: dict):
     event_id = str(data["related_to"])
-    try:
-        related_event_gundi_trace = GundiTrace.objects.get(object_id=event_id)
-    except GundiTrace.DoesNotExist:
-        return True
-    else:
-        return related_event_gundi_trace.is_duplicate
+    # Can be more than one trace when having multiple destinations.
+    return GundiTrace.objects.filter(object_id=event_id, is_duplicate=True).exists()
 
 
 def is_duplicate_attachment(data: dict):
@@ -129,9 +125,8 @@ def send_events_to_routing(events, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.event_discarded"
                 )
-                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
-                gundi_trace.is_duplicate = True
-                gundi_trace.save()
+                # Mark traces for this event as duplicates and discard the event
+                GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
 
             with tracing.tracer.start_as_current_span(
@@ -265,10 +260,8 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.related_event_discarded.attachment_discarded"
                 )
-                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
-                gundi_trace.has_error = True
-                gundi_trace.error = "Related event discarded as duplicate"
-                gundi_trace.save()
+                # Mark traces for this attachment as having an error and discard the attachment
+                GundiTrace.objects.filter(object_id=gundi_id).update(has_error=True, error="Related event discarded as duplicate")
                 continue
 
             # Check for duplicates
@@ -278,9 +271,8 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.attachment_discarded"
                 )
-                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
-                gundi_trace.is_duplicate = True
-                gundi_trace.save()
+                # Mark traces for this attachment as duplicates and discard the attachment
+                GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
             # Upload file to the cloud
             with tracing.tracer.start_as_current_span(
@@ -357,9 +349,8 @@ def send_observations_to_routing(observations, gundi_ids):
                 current_span.add_event(
                     name=f"gundi_api.duplicate.observation_discarded"
                 )
-                gundi_trace = GundiTrace.objects.get(object_id=gundi_id)
-                gundi_trace.is_duplicate = True
-                gundi_trace.save()
+                # Mark traces for this observation as duplicates and discard the observation
+                GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
 
             with tracing.tracer.start_as_current_span(
