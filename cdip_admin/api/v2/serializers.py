@@ -891,6 +891,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     event_type = serializers.CharField(write_only=True, required=False)
     event_details = serializers.JSONField(write_only=True, required=False)
     annotations = serializers.JSONField(write_only=True, required=False)
+    status = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         list_serializer_class = EventBulkCreateUpdateSerializer
