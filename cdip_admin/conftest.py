@@ -1325,9 +1325,9 @@ def event_delivered_trace(provider_trap_tagger, integrations_list_er):
 
 
 @pytest.fixture
-def event_delivered_trace2(provider_trap_tagger, integrations_list_er):
+def event_delivered_trace2(provider_trap_tagger, event_delivered_trace, integrations_list_er):
     trace = GundiTrace(
-        # We save only IDs, no sensitive data is saved
+        object_id=event_delivered_trace.object_id,
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
