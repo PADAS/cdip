@@ -20,6 +20,7 @@ database:
   connection_name: "cdip-78ca:us-central1:postgres-cdip-dev"
 admin_portal:
   env:
+    LOGGING_LEVEL: "INFO"
     TRACE_ENVIRONMENT: "stage"
     BROKER_URL: "redis://10.243.180.36:6379"
     GCP_PROJECT_ID: cdip-stage-78ca
