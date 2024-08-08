@@ -177,7 +177,6 @@ def send_events_to_routing(events, gundi_ids):
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=msg_for_routing.dict(exclude_none=True),
-                    ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
@@ -311,7 +310,6 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                 publisher.publish(
                     topic=settings.RAW_OBSERVATIONS_TOPIC,
                     data=msg_for_routing.dict(exclude_none=True),
-                    ordering_key=attachment.get("related_to"),  # Attachment will be delivered after the related event
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
                         "gundi_version": "v2",  # Add the version so routing knows how to handle it
