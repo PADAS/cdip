@@ -940,16 +940,15 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         return data
 
     def update(self, traces, validated_data):
-        # We need to update the event in all the destinations where it was sent previously
-        for trace in traces:
-            trace.object_updated_at = datetime.now(tz=trace.created_at.tzinfo)
-            trace.save()
-            # Publish messages to a topic to be processed by routing services
-            send_event_update_to_routing(
-                event_trace=trace,
-                event_changes=validated_data
-            )
-        return traces[0]  # For the user is a single event update
+        trace = traces.first()  # For the user it's a single update
+        # Add a timestamp to all the traces in case of multiple destinations
+        traces.update(object_updated_at=datetime.now(tz=trace.created_at.tzinfo))
+        # Routing services take care of sending updates for each destination as needed
+        send_event_update_to_routing(
+            event_trace=trace,
+            event_changes=validated_data
+        )
+        return trace
 
 
 class ObservationBulkCreateSerializer(serializers.ListSerializer):
