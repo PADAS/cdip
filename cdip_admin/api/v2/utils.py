@@ -1,4 +1,5 @@
 import json
+import logging
 from hashlib import md5
 
 import backoff
@@ -14,6 +15,9 @@ from gundi_core.events import EventUpdateReceived, ObservationReceived, EventRec
 from core import tracing, cache
 from opentelemetry import trace
 from integrations.models import GundiTrace
+
+
+logger = logging.getLogger(__name__)
 
 
 deduplication_db = cache.get_deduplication_db()
@@ -174,8 +178,12 @@ def send_events_to_routing(events, gundi_ids):
                     default=str,
                 )
                 # Send message to routing services
+                observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+                logger.debug(
+                    f"Publishing EventReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+                )
                 publisher.publish(
-                    topic=settings.RAW_OBSERVATIONS_TOPIC,
+                    topic=observations_topic,
                     data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.event.value,
@@ -222,8 +230,12 @@ def send_event_update_to_routing(event_trace, event_changes):
                 default=str,
             )
             # Send message to routing services
+            observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+            logger.debug(
+                f"Publishing EventUpdateReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+            )
             publisher.publish(
-                topic=settings.RAW_OBSERVATIONS_TOPIC,
+                topic=observations_topic,
                 data=msg_for_routing.dict(exclude_none=True),
                 ordering_key=str(gundi_id),  # Order is important in case there are consecutive updates
                 extra={
@@ -307,8 +319,12 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
                     default=str,
                 )
                 # Send message to routing services
+                observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+                logger.debug(
+                    f"Publishing AttachmentReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+                )
                 publisher.publish(
-                    topic=settings.RAW_OBSERVATIONS_TOPIC,
+                    topic=observations_topic,
                     data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.attachment.value,
@@ -392,8 +408,12 @@ def send_observations_to_routing(observations, gundi_ids):
                     default=str,
                 )
                 # Send message to routing services
+                observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+                logger.debug(
+                    f"Publishing ObservationReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+                )
                 publisher.publish(
-                    topic=settings.RAW_OBSERVATIONS_TOPIC,
+                    topic=observations_topic,
                     data=msg_for_routing.dict(exclude_none=True),
                     extra={
                         "observation_type": StreamPrefixEnum.observation.value,
