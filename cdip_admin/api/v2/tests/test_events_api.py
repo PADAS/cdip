@@ -268,6 +268,8 @@ def test_update_event(api_client, mocker, trap_tagger_event_trace, mock_publishe
     payload = data_kwarg.get("payload", {})
     assert payload.get("changes") == data
     extra_arg = mock_publisher.publish.call_args.kwargs["extra"]
-    assert extra_arg.get("gundi_id") == str(trap_tagger_event_trace.object_id)
+    gundi_id = str(trap_tagger_event_trace.object_id)
+    assert extra_arg.get("gundi_id") == gundi_id
+    assert mock_publisher.publish.call_args.kwargs["ordering_key"] == gundi_id
     assert extra_arg.get("gundi_version") == "v2"
     assert extra_arg.get("observation_type") == StreamPrefixEnum.event_update.value
