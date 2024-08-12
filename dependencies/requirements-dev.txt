@@ -40,7 +40,7 @@ cached-property==1.5.1
     # via -r requirements.in
 cachetools==5.3.1
     # via google-auth
-cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.5.1/cdip_connector-1.5.1-py3-none-any.whl
+cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.5.3/cdip_connector-1.5.3-py3-none-any.whl
     # via -r requirements.in
 celery==5.2.3
     # via
