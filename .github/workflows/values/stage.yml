@@ -27,6 +27,7 @@ admin_portal:
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
     REDIS_HOST: "10.243.180.36"
     GS_BUCKET_NAME: "cdip-files-stage"
+    BUCKET_NAME: "cdip-files-stage"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
