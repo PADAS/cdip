@@ -46,6 +46,10 @@ keycloak:
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
 
 portal:
-  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
 worker:
   replicaCount: 2
