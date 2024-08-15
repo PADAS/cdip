@@ -23,6 +23,8 @@ from .models import (
     RouteConfiguration,
     SourceFilter, Source, SourceState, SourceConfiguration,
     GundiTrace,
+    IntegrationWebhook,
+    WebhookConfiguration,
 )
 
 from .forms import (
@@ -260,6 +262,18 @@ class IntegrationActionAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(IntegrationWebhook)
+class IntegrationActionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration_type",
+        "name",
+        "value",
+        "description",
+    )
+    list_filter = (
+        "integration_type",
+    )
 
 
 
@@ -318,6 +332,29 @@ class IntegrationConfigurationAdmin(admin.ModelAdmin):
         "integration__owner",
         "integration__type",
         "action__type",
+    )
+    search_fields = (
+        "integration__name",
+        "integration__owner__name",
+        "action__name",
+    )
+
+
+@admin.register(WebhookConfiguration)
+class WebhookConfigurationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "integration",
+        "webhook",
+    )
+    list_filter = (
+        "integration__owner",
+        "integration__type",
+    )
+    search_fields = (
+        "integration__name",
+        "integration__owner__name",
+        "webhook__name",
     )
 
 
@@ -411,27 +448,33 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
 @admin.register(GundiTrace)
 class GundiTraceAdmin(SimpleHistoryAdmin):
     list_display = (
+        "pk",
         "object_id",
         "related_to",
         "object_type",
         "data_provider",
+        "source",
         "destination",
         "external_id",
+        "created_at",
         "delivered_at",
+        "object_updated_at",
+        "last_update_delivered_at",
         "is_duplicate",
         "has_error",
         "error",
-        "created_at",
-        "updated_at",
         "created_by",
     )
     search_fields = (
         "object_id",
         "related_to",
         "external_id",
+        "data_provider__id",
+        "source__id",
         "data_provider__name",
         "data_provider__owner__name",
         "data_provider__type__name",
+        "destination__id",
         "destination__name",
         "destination__owner__name",
         "destination__type__name",
@@ -444,6 +487,4 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "object_type",
         "data_provider__type",
         "destination__type",
-        "data_provider",
-        "destination",
     )

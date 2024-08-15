@@ -52,6 +52,33 @@ def test_create_single_attachment(
     )
 
 
+def test_create_single_attachment_for_multiple_destinations(
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger,
+        event_delivered_trace, event_delivered_trace2, leopard_image_file, mock_cloud_storage
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.default_storage", mock_cloud_storage)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_attachment", mock_deduplication)
+    _test_create_attachment(
+        api_client=api_client,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        event_id=str(event_delivered_trace.object_id),
+        files={
+            "file1": leopard_image_file
+        }
+    )
+    # Check that the file was saved
+    assert mock_cloud_storage.save.called
+    # Check that a message was published in the right topic for routing
+    assert mock_publisher.publish.called
+    mock_publisher.publish.assert_called_with(
+        topic=settings.RAW_OBSERVATIONS_TOPIC,
+        data=ANY,
+        extra=ANY
+    )
+
+
 def test_create_attachments_multiple_files(
         api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger,
         trap_tagger_event_trace, leopard_image_file, wilddog_image_file, mock_cloud_storage

@@ -2,7 +2,6 @@ import asyncio
 import base64
 from datetime import datetime
 from unittest.mock import PropertyMock
-
 import pytest
 import random
 from typing import NamedTuple, Any
@@ -36,11 +35,18 @@ from integrations.models import (
     SourceConfiguration,
     ensure_default_route,
     RouteConfiguration,
-    GundiTrace,
+    GundiTrace, IntegrationWebhook, WebhookConfiguration,
 )
 from organizations.models import Organization
 from pathlib import Path
-from google.cloud import pubsub_v1
+from gundi_core.events import (
+    IntegrationWebhookStarted,
+    WebhookExecutionStarted,
+    IntegrationWebhookComplete,
+    WebhookExecutionComplete,
+    IntegrationWebhookFailed,
+    WebhookExecutionFailed, IntegrationWebhookCustomLog, CustomWebhookLog, LogLevel
+)
 
 
 def async_return(result):
@@ -516,6 +522,17 @@ def integration_type_wpswatch():
 
 
 @pytest.fixture
+def wpswatch_action_push_events(integration_type_wpswatch):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_wpswatch,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to WPA Watch API",
+    )
+
+
+@pytest.fixture
 def provider_lotek_panthera(
         get_random_id,
         organization,
@@ -576,6 +593,155 @@ def provider_movebank_ewt(
         data={"max_records_per_individual": 20000},
     )
     ensure_default_route(integration=provider)
+    return provider
+
+
+@pytest.fixture
+def integration_type_liquidtech():
+    return IntegrationType.objects.create(
+        name="Liquidtech Integration",
+        value="liquidtech",
+        description="Standard Integration type for Liquidtech.",
+    )
+
+
+@pytest.fixture
+def liquidtech_webhook(integration_type_liquidtech):
+    return IntegrationWebhook.objects.create(
+        name="Liquidtech Webhook",
+        value="liquidtech_webhook",
+        description="Liquidtech Webhook",
+        integration_type=integration_type_liquidtech,
+        schema={
+            "title": "Liquidtech Payload Format",
+            "type": "object",
+            "properties": {
+                "hex_format": {"title": "Data Format", "type": "object"},
+                "hex_data_field": {"title": "Data Field", "type": "string"}
+            },
+            "required": ["hex_format", "hex_data_field"]
+        }
+    )
+
+
+@pytest.fixture
+def provider_liquidtech_with_webhook_config(
+        get_random_id,
+        organization,
+        integration_type_liquidtech,
+        liquidtech_webhook,
+):
+    provider = Integration.objects.create(
+        type=integration_type_liquidtech,
+        name=f"Liquidtech Webhooks",
+        owner=organization,
+        base_url=f"https://api.test.movebank.com",
+    )
+    # Configure webhook
+    WebhookConfiguration.objects.create(
+        integration=provider,
+        webhook=liquidtech_webhook,
+        data={
+            "hex_data_field": "data",
+            "hex_format": {
+                "fields": [
+                    {
+                        "name": "start_bit",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "v",
+                        "format": "I"
+                    },
+                    {
+                        "name": "interval",
+                        "format": "H",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "meter_state_1",
+                        "format": "B"
+                    },
+                    {
+                        "name": "meter_state_2",
+                        "format": "B",
+                        "bit_fields": [
+                            {
+                                "name": "meter_batter_alarm",
+                                "end_bit": 0,
+                                "start_bit": 0,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "empty_pipe_alarm",
+                                "end_bit": 1,
+                                "start_bit": 1,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "reverse_flow_alarm",
+                                "end_bit": 2,
+                                "start_bit": 2,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "over_range_alarm",
+                                "end_bit": 3,
+                                "start_bit": 3,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "temp_alarm",
+                                "end_bit": 4,
+                                "start_bit": 4,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "ee_error",
+                                "end_bit": 5,
+                                "start_bit": 5,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_in_error",
+                                "end_bit": 6,
+                                "start_bit": 6,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_out_error",
+                                "end_bit": 7,
+                                "start_bit": 7,
+                                "output_type": "bool"
+                            },
+                            {
+                                "name": "transduce_out_error",
+                                "end_bit": 7,
+                                "start_bit": 7,
+                                "output_type": "bool"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "r1",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "r2",
+                        "format": "B",
+                        "output_type": "int"
+                    },
+                    {
+                        "name": "crc",
+                        "format": "B"
+                    }
+                ],
+                "byte_order": ">"
+            }
+        }
+    )
     return provider
 
 
@@ -742,7 +908,10 @@ def cellstop_integration(
 
 
 @pytest.fixture
-def integrations_list(
+def integrations_list_er(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
         organization,
         other_organization,
         integration_type_er,
@@ -753,6 +922,19 @@ def integrations_list(
         er_action_push_positions,
         er_action_push_events,
 ):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
     integrations = []
     for i in range(10):
         # Create the integration
@@ -785,6 +967,98 @@ def integrations_list(
         )
         IntegrationConfiguration.objects.create(
             integration=integration, action=er_action_pull_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_smart(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization,
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_smart)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.smart.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_smart,
+            name=f"SMART Site Test {i}",
+            owner=organization if i < 5 else other_organization,
+            base_url=site_url,
+        )
+        # Configure actions
+        IntegrationConfiguration.objects.create(
+            integration=integration,
+            action=smart_action_auth,
+            data={
+                "api_key": f"SMART-{get_random_id()}-KEY",
+            },
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=smart_action_push_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+
+@pytest.fixture
+def integrations_list_wpswatch(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization,
+        integration_type_wpswatch,
+        get_random_id,
+        wpswatch_action_push_events
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.wpswatch.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_wpswatch,
+            name=f"WPS Watch Site Test {i}",
+            owner=organization,
+            base_url=site_url,
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=wpswatch_action_push_events
         )
         integrations.append(integration)
         ensure_default_route(integration=integration)
@@ -831,19 +1105,26 @@ def movebank_sources(
 
 
 @pytest.fixture
+def trap_tagger_sources(
+        get_random_id, other_organization, provider_trap_tagger, make_random_sources
+):
+    return make_random_sources(provider=provider_trap_tagger, qty=5)
+
+
+@pytest.fixture
 def route_1(
         get_random_id,
         organization,
         lotek_sources,
         provider_lotek_panthera,
-        integrations_list,
+        integrations_list_er,
 ):
     rule, _ = Route.objects.get_or_create(
         name=f"Device Set to multiple destinations",
         owner=organization,
     )
     rule.data_providers.add(provider_lotek_panthera)
-    rule.destinations.add(*integrations_list)
+    rule.destinations.add(*integrations_list_er)
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -891,7 +1172,7 @@ def route_2(
         other_organization,
         movebank_sources,
         provider_movebank_ewt,
-        integrations_list,
+        integrations_list_er,
         er_route_configuration_elephants,
 ):
     route, _ = Route.objects.get_or_create(
@@ -899,7 +1180,7 @@ def route_2(
         owner=other_organization,
     )
     route.data_providers.add(provider_movebank_ewt)
-    route.destinations.add(integrations_list[5])
+    route.destinations.add(integrations_list_er[5])
     # Filter data coming only from a subset of sources
     SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
@@ -987,11 +1268,29 @@ def wilddog_image_file():
 
 
 @pytest.fixture
-def trap_tagger_event_trace(provider_trap_tagger):
+def trap_tagger_event_trace(provider_trap_tagger, trap_tagger_sources):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         object_type="ev",
+        source=trap_tagger_sources[0]
+        # Other fields are filled in later by the routing services
+    )
+    trace.save()
+    return trace
+
+
+@pytest.fixture
+def trap_tagger_event_update_trace(provider_trap_tagger, trap_tagger_sources, integrations_list_er):
+    trace = GundiTrace(
+        # We save only IDs, no sensitive data is saved
+        data_provider=provider_trap_tagger,
+        object_type="ev",
+        source=trap_tagger_sources[0],
+        destination_id=str(integrations_list_er[0].id),
+        delivered_at="2023-07-10T19:35:34.425974Z",  # It was delivered
+        external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",  # ER uuid
+        object_updated_at="2023-07-25T12:25:34.425974Z",  # Then the user sent an update
         # Other fields are filled in later by the routing services
     )
     trace.save()
@@ -1011,13 +1310,13 @@ def trap_tagger_to_movebank_observation_trace(provider_trap_tagger):
 
 
 @pytest.fixture
-def event_delivered_trace(provider_trap_tagger, integrations_list):
+def event_delivered_trace(provider_trap_tagger, integrations_list_er):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:35:34.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -1026,13 +1325,13 @@ def event_delivered_trace(provider_trap_tagger, integrations_list):
 
 
 @pytest.fixture
-def event_delivered_trace2(provider_trap_tagger, integrations_list):
+def event_delivered_trace2(provider_trap_tagger, event_delivered_trace, integrations_list_er):
     trace = GundiTrace(
-        # We save only IDs, no sensitive data is saved
+        object_id=event_delivered_trace.object_id,
         data_provider=provider_trap_tagger,
         related_to=None,
         object_type="ev",
-        destination=integrations_list[1],
+        destination=integrations_list_er[1],
         delivered_at="2023-07-10T19:36:15.425974Z",
         external_id="b358f9f7-1a2e-4932-8d60-3acd2f59a15f",
     )
@@ -1042,14 +1341,14 @@ def event_delivered_trace2(provider_trap_tagger, integrations_list):
 
 @pytest.fixture
 def attachment_delivered_trace(
-        provider_trap_tagger, event_delivered_trace, integrations_list
+        provider_trap_tagger, event_delivered_trace, integrations_list_er
 ):
     trace = GundiTrace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=event_delivered_trace.object_id,
         object_type="ev",
-        destination=integrations_list[0],
+        destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:37:48.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
     )
@@ -1065,8 +1364,8 @@ def mock_cloud_storage(mocker):
 
 
 @pytest.fixture
-def trap_tagger_observation_delivered_event(
-        mocker, trap_tagger_event_trace, integrations_list
+def trap_tagger_to_er_observation_delivered_event(
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1079,8 +1378,55 @@ def trap_tagger_observation_delivered_event(
             "related_to": None,
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_to_smart_observation_delivered_event(
+        mocker, trap_tagger_event_trace, integrations_list_smart
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_trace.object_id),
+            "related_to": "",
+            "external_id": str(trap_tagger_event_trace.object_id),  # gundi_id is used as id in smart
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id": str(integrations_list_smart[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_updated_event(
+        mocker, trap_tagger_event_update_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationUpdated",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_update_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "updated_at": "2024-07-25 12:25:44.442696+00:00",
         },
     }
     data_bytes = json.dumps(event_dict).encode("utf-8")
@@ -1116,7 +1462,7 @@ def trap_tagger_to_movebank_observation_delivered_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivered_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1129,7 +1475,7 @@ def trap_tagger_observation_delivered_event_two(
             "related_to": None,
             "external_id": "46983ced-1216-4d43-81da-01ee90ba9b81",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1140,7 +1486,7 @@ def trap_tagger_observation_delivered_event_two(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1152,7 +1498,7 @@ def trap_tagger_observation_delivery_failed_event(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[0].id),
+            "destination_id": str(integrations_list_er[0].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
         },
     }
@@ -1163,7 +1509,7 @@ def trap_tagger_observation_delivery_failed_event(
 
 @pytest.fixture
 def trap_tagger_observation_delivery_failed_event_two(
-        mocker, trap_tagger_event_trace, integrations_list
+        mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
     event_dict = {
@@ -1175,8 +1521,31 @@ def trap_tagger_observation_delivery_failed_event_two(
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
-            "destination_id": str(integrations_list[1].id),
+            "destination_id": str(integrations_list_er[1].id),
             "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_update_failed_event(
+        mocker, trap_tagger_event_update_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationUpdateFailed",
+        "payload": {
+            "gundi_id": str(trap_tagger_event_update_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "updated_at": "2024-07-25 12:25:44.442696+00:00",
         },
     }
     data_bytes = json.dumps(event_dict).encode("utf-8")
@@ -1778,8 +2147,8 @@ def observation_delivery_succeeded_event(provider_lotek_panthera, destination_mo
 
 
 @pytest.fixture
-def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list):
-    destination = integrations_list[0]
+def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list_er):
+    destination = integrations_list_er[0]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1821,8 +2190,8 @@ def observation_delivery_failed_event(provider_lotek_panthera, destination_moveb
 
 
 @pytest.fixture
-def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list):
-    destination = integrations_list[1]
+def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list_er):
+    destination = integrations_list_er[1]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -1924,7 +2293,97 @@ def pull_observations_action_custom_log_event(mocker, provider_lotek_panthera):
 
 
 @pytest.fixture
-def mock_dispatcher_secrets():
+def webhook_started_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookStarted(
+        payload=WebhookExecutionStarted(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'obv'
+            }
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_complete_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookComplete(
+        payload=WebhookExecutionComplete(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'obv'
+            },
+            result={'data_points_qty': 1}
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_failed_event_pubsub(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookFailed(
+        payload=WebhookExecutionFailed(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={
+                'json_schema': {'type': 'object', 'properties': {'received_at': {'type': 'string', 'format': 'date-time'}, 'end_device_ids': {'type': 'object', 'properties': {'dev_eui': {'type': 'string'}, 'dev_addr': {'type': 'string'}, 'device_id': {'type': 'string'}, 'application_ids': {'type': 'object', 'properties': {'application_id': {'type': 'string'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'uplink_message': {'type': 'object', 'properties': {'f_cnt': {'type': 'integer'}, 'f_port': {'type': 'integer'}, 'settings': {'type': 'object', 'properties': {'time': {'type': 'string', 'format': 'date-time'}, 'data_rate': {'type': 'object', 'properties': {'lora': {'type': 'object', 'properties': {'bandwidth': {'type': 'integer'}, 'coding_rate': {'type': 'string'}, 'spreading_factor': {'type': 'integer'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frequency': {'type': 'string'}, 'timestamp': {'type': 'integer'}}, 'additionalProperties': False}, 'locations': {'type': 'object', 'properties': {'frm-payload': {'type': 'object', 'properties': {'source': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}}, 'additionalProperties': False}}, 'additionalProperties': False}, 'frm_payload': {'type': 'string'}, 'network_ids': {'type': 'object', 'properties': {'ns_id': {'type': 'string'}, 'net_id': {'type': 'string'}, 'tenant_id': {'type': 'string'}, 'cluster_id': {'type': 'string'}, 'tenant_address': {'type': 'string'}, 'cluster_address': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'rx_metadata': {'type': 'array', 'items': {'type': 'object', 'properties': {'snr': {'type': 'number'}, 'rssi': {'type': 'integer'}, 'time': {'type': 'string', 'format': 'date-time'}, 'gps_time': {'type': 'string', 'format': 'date-time'}, 'timestamp': {'type': 'integer'}, 'gateway_ids': {'type': 'object', 'properties': {'eui': {'type': 'string'}, 'gateway_id': {'type': 'string'}}, 'additionalProperties': False}, 'received_at': {'type': 'string', 'format': 'date-time'}, 'channel_rssi': {'type': 'integer'}, 'uplink_token': {'type': 'string'}, 'channel_index': {'type': 'integer'}}, 'additionalProperties': False}}, 'decoded_payload': {'type': 'object', 'properties': {'gps': {'type': 'string'}, 'latitude': {'type': 'number'}, 'longitude': {'type': 'number'}, 'batterypercent': {'type': 'integer'}}, 'additionalProperties': False}, 'consumed_airtime': {'type': 'string'}}, 'additionalProperties': False}, 'correlation_ids': {'type': 'array', 'items': {'type': 'string'}}}, 'additionalProperties': False},
+                'jq_filter': '{"source": .end_device_ids.device_id, "source_name": .end_device_ids.device_id, "type": .uplink_message.locations."frm-payload".source, "recorded_at": .uplink_message.settings.time, "location": { "lat": .uplink_message.locations."frm-payload".latitude, "lon": .uplink_message.locations."frm-payload".longitude}, "additional": {"application_id": .end_device_ids.application_ids.application_id, "dev_eui": .end_device_ids.dev_eui, "dev_addr": .end_device_ids.dev_addr, "batterypercent": .uplink_message.decoded_payload.batterypercent, "gps": .uplink_message.decoded_payload.gps}}',
+                'output_type': 'patrol'
+            },
+            error='Invalid output type: patrol. Please review the configuration.'
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def webhook_custom_activity_log_event(mocker, provider_liquidtech_with_webhook_config):
+    pubsub_message = mocker.MagicMock()
+    event = IntegrationWebhookCustomLog(
+        payload=CustomWebhookLog(
+            integration_id=str(provider_liquidtech_with_webhook_config.id),
+            webhook_id='liquidtech_webhook',
+            config_data={},
+            title='Webhook data transformed successfully',
+            level=LogLevel.DEBUG,
+            data={
+                'transformed_data': [
+                    {
+                        'source': 'test-webhooks-mm',
+                        'source_name': 'test-webhooks-mm',
+                        'type': 'SOURCE_GPS',
+                        'recorded_at': '2024-06-07T15:08:19.841Z',
+                        'location': {'lat': -4.1234567, 'lon': 32.01234567890123},
+                        'additional': {
+                            'application_id': 'lt10-globalsat',
+                            'dev_eui': '123456789ABCDEF0',  # pragma: allowlist secret
+                            'dev_addr': '12345ABC',
+                            'batterypercent': 100,
+                            'gps': '3D fix'
+                        }
+                    }
+                ]
+            }
+        )
+    )
+    pubsub_message.data = json.dumps(event.dict(), default=str).encode("utf-8")
+    return pubsub_message
+
+
+@pytest.fixture
+def mock_dispatcher_secrets_er(dispatcher_source_release_1):
     return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
                          'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
                          'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
@@ -1941,13 +2400,69 @@ def mock_dispatcher_secrets():
                                     'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
                                     'vpc_connector': 'cdip-cloudrun-connector',
                                     'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
-                                    'source_code_path': 'er-serverless-dispatchers-v1-src.zip'}}
+                                    'source_code_path': dispatcher_source_release_1}}
 
 
 @pytest.fixture
-def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets):
+def mock_dispatcher_secrets_smart(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_dispatcher_secrets_wps_watch(dispatcher_source_release_1):
+    return {'env_vars': {'REDIS_HOST': '127.0.0.1', 'BUCKET_NAME': 'cdip-files-dev', 'LOGGING_LEVEL': 'INFO',
+                         'GCP_PROJECT_ID': 'cdip-test-proj', 'KEYCLOAK_REALM': 'cdip-test',
+                         'KEYCLOAK_ISSUER': 'https://cdip-test.pamdas.org/auth/realms/cdip-dev',
+                         'KEYCLOAK_SERVER': 'https://cdip-test.pamdas.org', 'PORTAL_AUTH_TTL': '300',
+                         'DEAD_LETTER_TOPIC': 'dispatchers-dead-letter-dev', 'KEYCLOAK_AUDIENCE': 'cdip-test',
+                         'TRACE_ENVIRONMENT': 'dev', 'CLOUD_STORAGE_TYPE': 'google',
+                         'GUNDI_API_BASE_URL': 'https://api.dev.gundiservice.org', 'KEYCLOAK_CLIENT_ID': 'cdip-test-id',
+                         'CDIP_ADMIN_ENDPOINT': 'https://cdip-prod01.pamdas.org',
+                         'KEYCLOAK_CLIENT_UUID': 'test1234-5b2c-474b-99b1-aa85b8e6dabc',
+                         'MAX_EVENT_AGE_SECONDS': '86400',
+                         'KEYCLOAK_CLIENT_SECRET': 'test1234-d163-11ab-22b1-8f97f875e123',
+                         'DISPATCHER_EVENTS_TOPIC': 'dispatcher-events-dev'},
+            'deployment_settings': {'cpu': '1', 'region': 'us-central1', 'bucket_name': 'dispatchers-code-dev',
+                                    'concurrency': 4, 'max_instances': 2, 'min_instances': 0,
+                                    'vpc_connector': 'cdip-cloudrun-connector',
+                                    'service_account': 'er-serverless-dispatchers@cdip-78ca.iam.gserviceaccount.com',
+                                    'docker_image_url': dispatcher_source_release_1}}
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets(mocker, mock_dispatcher_secrets_er):
     mock = mocker.MagicMock()
-    mock.return_value = mock_dispatcher_secrets
+    mock.return_value = mock_dispatcher_secrets_er
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_smart(mocker, mock_dispatcher_secrets_smart):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_smart
+    return mock
+
+
+@pytest.fixture
+def mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch(mocker, mock_dispatcher_secrets_wps_watch):
+    mock = mocker.MagicMock()
+    mock.return_value = mock_dispatcher_secrets_wps_watch
     return mock
 
 
@@ -2388,3 +2903,105 @@ def eula_v2():
         version="Gundi_EULA_2024-05-05",
         eula_url="https://projectgundi.org/Legal-Pages/User-Agreement"
     )
+
+@pytest.fixture
+def dispatcher_source_release_1():
+    return "release-20231218"
+
+
+@pytest.fixture
+def dispatcher_source_release_2():
+    return "release-20240510"
+
+
+@pytest.fixture
+def outbound_integrations_list_er(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization, legacy_integration_type_earthranger
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets", mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"EarthRanger Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakepamdas.org",
+            type=legacy_integration_type_earthranger,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_smart(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_smart,
+        organization, legacy_integration_type_smart
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_smart
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"SMART Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakesmartconnect.com",
+            type=legacy_integration_type_smart,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations
+
+
+@pytest.fixture
+def outbound_integrations_list_wpswatch(
+        mocker, settings, mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization, legacy_integration_type_wpswatch
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch(
+        "integrations.models.v1.models.get_dispatcher_defaults_from_gcp_secrets",
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch
+    )
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v1.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        integration = OutboundIntegrationConfiguration.objects.create(
+            name=f"WPS Watch Integration v1 Test {i}",
+            endpoint=f"https://test{i}.fakeswpswatch.com",
+            type=legacy_integration_type_wpswatch,
+            owner=organization
+        )
+        integrations.append(integration)
+    return integrations

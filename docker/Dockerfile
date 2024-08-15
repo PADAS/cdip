@@ -37,6 +37,12 @@ RUN pip3 install -r requirements.txt --no-cache-dir
 
 COPY ./cdip_admin .
 COPY ./swagger-fix/index.html /usr/local/lib/python3.8/dist-packages/rest_framework_swagger/templates/rest_framework_swagger/
+RUN mkdir -p /var/www/static
+
+# Collect static files (using a stub database)
+ENV DJANGO_SILK_ENABLED=True
+RUN python3 manage.py collectstatic --noinput --settings=cdip_admin.local_settings_nodb
+ENV DJANGO_SILK_ENABLED=False
 
 RUN mkdir -p /var/www/static && \
     python3 manage.py collectstatic --noinput --settings=cdip_admin.local_settings_nodb

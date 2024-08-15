@@ -199,10 +199,10 @@ def test_get_inbound_integration_configuration_list_filter_by_enabled_unset(
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
-# ToDo: Mock external dependencies. This test fails when Kong isn't available / reachable
 def test_get_inbound_integration_configurations_detail_organization_member_hybrid(
-        client, organization_member_user, setup_data
+        client, organization_member_user, setup_data, mocker
 ):
+    mocker.patch("integrations.views.get_api_key", mocker.MagicMock(return_value="TestAPiKey"))
     org1 = setup_data["org1"]
     org2 = setup_data["org2"]
     ii = setup_data["ii1"]
@@ -240,8 +240,9 @@ def test_get_inbound_integration_configurations_detail_organization_member_hybri
 
 
 def test_inbound_integration_update_form_save(
-    client, global_admin_user, setup_data
+    client, global_admin_user, setup_data, mocker
 ):
+    mocker.patch("integrations.views.get_api_key", mocker.MagicMock(return_value="TestAPiKey"))
     client.force_login(global_admin_user.user)
     org2 = setup_data["org2"]
     iit3 = setup_data["iit3"]
@@ -657,8 +658,9 @@ def test_dynamic_form_div_bridge_update_form(
 
 
 def test_bridge_update_form_save(
-        client, global_admin_user, setup_data
+        client, global_admin_user, setup_data, mocker
 ):
+    mocker.patch("integrations.views.get_api_key", mocker.MagicMock(return_value="TestAPiKey"))
     client.force_login(global_admin_user.user)
     org2 = setup_data["org2"]
     bit2 = setup_data["bit2"]

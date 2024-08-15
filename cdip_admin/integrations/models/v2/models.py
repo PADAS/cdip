@@ -3,7 +3,7 @@ import uuid
 from functools import cached_property
 import jsonschema
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import google.oauth2.id_token
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -103,12 +103,43 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
                 "integration_id": str(integration.id),
                 "action_id": self.value,
                 "run_in_background": run_in_background,
-                # ToDo: Enable this once it's supported by integrations
-                #"config_overrides": config_overrides,
+                "config_overrides": config_overrides,
             }
         )
         response.raise_for_status()
         return response.json()
+
+
+class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
+    name = models.CharField(max_length=200)
+    value = models.SlugField(
+        max_length=200,
+        verbose_name="Value (Identifier)"
+    )
+    description = models.TextField(
+        blank=True,
+    )
+    schema = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Schema"
+    )
+    integration_type = models.OneToOneField(
+        "integrations.IntegrationType",
+        on_delete=models.CASCADE,
+        related_name="webhook",
+        verbose_name="Integration Type"
+    )
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return f"{self.integration_type} - {self.name}"
+
+    def validate_configuration(self, configuration: dict):
+        # Helper method to validate a configuration against the webhook schema
+        jsonschema.validate(instance=configuration, schema=self.schema)
 
 
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
@@ -153,19 +184,33 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return f"{self.owner.name} - {self.name} - {self.type.name}"
 
     def _pre_save(self, *args, **kwargs):
-        # Use pubsub for ER, SMART and MoveBank Sites
-        # ToDo. We will use PubSub for all the sites in the future, once me migrate SMART and WPSWatch dispatchers
-        if self._state.adding and (self.is_er_site or self.is_smart_site or self.is_mb_site):
+        # Setup topic and broker for destination sites
+        if self._state.adding and any([self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site]):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
-            if "broker" not in self.additional:
-                self.additional.update({"broker": "gcp_pubsub"})
+            self.additional.setdefault('broker', 'gcp_pubsub')
+
+        if self.is_er_site:
+            # Cleanup
+            url_parse = urlparse(self.base_url, "https")
+            netloc = url_parse.netloc or url_parse.path
+
+            scheme = url_parse.scheme
+            if scheme == "http":
+                scheme = "https"
+
+            self.base_url = f"{scheme}://{netloc}/"
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
         # Deploy serverless dispatcher for ER Sites only
-        if created and settings.GCP_ENVIRONMENT_ENABLED and (self.is_er_site or self.is_smart_site):
-            secret_id = settings.DISPATCHER_DEFAULTS_SECRET if self.is_er_site else settings.DISPATCHER_DEFAULTS_SECRET_SMART
+        if created and settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
+            if self.is_smart_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+            elif self.is_wpswatch_site:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+            else:
+                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
             DispatcherDeployment.objects.create(
                 name=get_default_dispatcher_name(integration=self),
                 integration=self,
@@ -183,6 +228,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def configurations(self):
         return self.configurations_by_integration.all()
+
+    @property
+    def webhook_configuration(self):
+        return self.webhook_config_by_integration
 
     @property
     def routing_rules(self):
@@ -293,6 +342,30 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             super().save(*args, **kwargs)
             if execute_post_save:
                 self._post_save(self, *args, **kwargs)
+
+
+class WebhookConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    integration = models.OneToOneField(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="webhook_config_by_integration"
+    )
+    webhook = models.ForeignKey(
+        "integrations.IntegrationWebhook",
+        on_delete=models.CASCADE,
+        related_name="webhook_config_by_webhook"
+    )
+    data = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="JSON Configuration"
+    )
+
+    class Meta:
+        ordering = ("-updated_at", )
+
+    def __str__(self):
+        return f"{self.webhook.name} - Configuration for {self.integration.name}"
 
 
 class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
@@ -545,7 +618,16 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
         null=True,
         blank=True
     )
+    source = models.ForeignKey(
+        "integrations.Source",
+        on_delete=models.CASCADE,
+        related_name="objects_by_source",
+        null=True,
+        blank=True
+    )
     delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    object_updated_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    last_update_delivered_at = models.DateTimeField(blank=True, null=True, db_index=True)
     external_id = models.CharField(max_length=250, db_index=True, null=True, blank=True)  # Object ID in the destination system
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")

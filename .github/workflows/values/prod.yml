@@ -1,4 +1,4 @@
-serviceAccount: gundi-app-sa-4bb07e9c@cdip-prod1-78ca.iam.gserviceaccount.com
+serviceAccount: admin-portal-sa@cdip-prod1-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
     - host: "api.gundiservice.org"
@@ -25,12 +25,14 @@ database:
   connection_name: "cdip-78ca:us-central1:postgres-cdip-prod01"
 admin_portal:
   env:
+    LOGGING_LEVEL: "INFO"
     TRACE_ENVIRONMENT: "prod"
     BROKER_URL: "redis://10.208.106.172:6379"
     GCP_PROJECT_ID: cdip-prod1-78ca
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-prod
     REDIS_HOST: "10.208.106.172"
     GS_BUCKET_NAME: "cdip-files-prod"
+    BUCKET_NAME: "cdip-files-prod"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-prod"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-prod"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-prod"

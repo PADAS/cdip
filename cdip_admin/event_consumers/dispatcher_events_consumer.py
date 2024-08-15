@@ -61,7 +61,8 @@ def handle_observation_delivered_event(event_dict: dict):
         trace = GundiTrace.objects.create(
             object_id=trace.object_id,
             object_type=trace.object_type,
-            related_to=event_data.related_to,
+            source=trace.source,
+            related_to=event_data.related_to or None,  # Empy string to None
             created_by=trace.created_by,
             data_provider=trace.data_provider,
             destination_id=event_data.destination_id,
@@ -74,6 +75,10 @@ def handle_observation_delivered_event(event_dict: dict):
         extra={"event": event_dict}
     )
     title = f"Observation Delivered to '{trace.destination.base_url}'"
+    log_data = {
+        **event_dict["payload"],
+        "source_external_id": str(trace.source.external_id) if trace.source else None,
+    }
     ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -81,7 +86,7 @@ def handle_observation_delivered_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_delivery_succeeded",
         title=title,
-        details=event_dict["payload"],
+        details=log_data,
         is_reversible=False
     )
 
@@ -118,7 +123,8 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         GundiTrace.objects.create(
             object_id=trace.object_id,
             object_type=trace.object_type,
-            related_to=event_data.related_to,
+            source=trace.source,
+            related_to=event_data.related_to or None,  # Empy string to None
             created_by=trace.created_by,
             data_provider=trace.data_provider,
             destination_id=event_data.destination_id,
@@ -137,7 +143,11 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         f"Recording delivery error event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
         extra={"event": event_dict}
     )
-    title = f"Error Delivering observation to '{trace.destination.base_url}'"
+    title = f"Error Delivering observation {trace.object_id} to '{trace.destination.base_url}'"
+    log_data = {
+        **event_dict["payload"],
+        "source_external_id": str(trace.source.external_id) if trace.source else None,
+    }
     ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -145,14 +155,98 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_delivery_failed",
         title=title,
-        details=event_dict["payload"],
+        details=log_data,
+        is_reversible=False
+    )
+
+
+def handle_observation_updated_event(event_dict: dict):
+    event = system_events.ObservationUpdated.parse_obj(event_dict)
+    # Update the status and save the external id
+    event_data = event.payload
+    gundi_id = str(event_data.gundi_id)
+    destination_id = str(event_data.destination_id)
+    logger.info(
+        f"Observation Update Succeeded for gundi_id: {gundi_id}, destination_id: {destination_id}",
+        extra={"event": event_dict}
+    )
+    # Look the related trace in the database
+    try:
+        trace = GundiTrace.objects.get(object_id=gundi_id, destination__id=destination_id)
+    except GundiTrace.DoesNotExist:
+        logger.warning(f"Unknown Observation with id {gundi_id} for destination {destination_id}. Event Ignored.")
+        return
+    # Save the time when it was updated in the destination system
+    trace.last_update_delivered_at = event_data.updated_at
+    trace.save()
+    # Generate Activity log to be seen in the portal
+    logger.debug(
+        f"Recording update event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+        extra={"event": event_dict}
+    )
+    title = f"Observation {gundi_id} updated in '{trace.destination.base_url}'"
+    log_data = {
+        **event_dict["payload"],
+        "source_external_id": str(trace.source.external_id) if trace.source else None,
+    }
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.DEBUG,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=trace.data_provider,
+        value="observation_update_succeeded",
+        title=title,
+        details=log_data,
+        is_reversible=False
+    )
+
+
+def handle_observation_update_failed_event(event_dict: dict):
+    event = system_events.ObservationUpdateFailed.parse_obj(event_dict)
+    event_data = event.payload
+    gundi_id = str(event_data.gundi_id)
+    destination_id = str(event_data.destination_id)
+    logger.warning(
+        f"Observation Update Failed. gundi_id: {gundi_id}, destination_id: {destination_id}",
+        extra={"event": event_dict}
+    )
+    # Look the related trace in the database
+    try:
+        trace = GundiTrace.objects.get(object_id=gundi_id, destination__id=destination_id)
+    except GundiTrace.DoesNotExist:
+        logger.warning(f"Unknown Observation with id {gundi_id} for destination {destination_id}. Event Ignored.")
+        return
+    # Update the trace with the error
+    trace.has_error = True
+    trace.error = "Update Failed at the Dispatcher."
+    trace.save()
+    # Generate Activity log to be seen in the portal
+    logger.debug(
+        f"Recording update error event in the activity log for gundi_id {gundi_id}, destination_id: {destination_id}",
+        extra={"event": event_dict}
+    )
+    title = f"Error Updating observation {gundi_id} in '{trace.destination.base_url}'"
+    log_data = {
+        **event_dict["payload"],
+        "source_external_id": str(trace.source.external_id) if trace.source else None,
+    }
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=trace.data_provider,
+        value="observation_update_failed",
+        title=title,
+        details=log_data,
         is_reversible=False
     )
 
 
 event_handlers = {
     "ObservationDelivered": handle_observation_delivered_event,
-    "ObservationDeliveryFailed": handle_observation_delivery_failed_event
+    "ObservationDeliveryFailed": handle_observation_delivery_failed_event,
+    "ObservationUpdated": handle_observation_updated_event,
+    "ObservationUpdateFailed": handle_observation_update_failed_event,
 }
 
 

@@ -35,7 +35,7 @@ def _test_list_activity_logs(api_client, user, expected_logs, params=None):
 
 def test_list_logs_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        integrations_list, observation_delivery_succeeded_event
+        integrations_list_er, observation_delivery_succeeded_event
 ):
     _test_list_activity_logs(
         api_client=api_client,
@@ -87,7 +87,7 @@ def test_filter_logs_by_integration_as_superuser(
 
 def test_filter_logs_by_integration_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
 ):
     integration_id = str(provider_lotek_panthera.id)
     _test_list_activity_logs(
@@ -102,7 +102,7 @@ def test_filter_logs_by_integration_as_org_admin(
 
 def test_filter_logs_by_type_data_change_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     _test_list_activity_logs(
@@ -119,7 +119,7 @@ def test_filter_logs_by_type_data_change_as_superuser(
 
 def test_filter_logs_by_type_data_change_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     user_integrations = get_user_integrations_qs(user=org_admin_user)
@@ -138,7 +138,7 @@ def test_filter_logs_by_type_data_change_as_org_admin(
 
 def test_filter_logs_by_type_event_as_org_admin(
         api_client, org_admin_user_2, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     integration_id = str(destination_movebank.id)
@@ -158,7 +158,7 @@ def test_filter_logs_by_type_event_as_org_admin(
 
 def test_filter_logs_by_origin_portal_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     _test_list_activity_logs(
@@ -175,7 +175,7 @@ def test_filter_logs_by_origin_portal_as_superuser(
 
 def test_filter_logs_by_origin_portal_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     user_integrations = get_user_integrations_qs(user=org_admin_user)
@@ -213,7 +213,7 @@ def test_filter_logs_by_origin_dispatcher_as_org_admin(
 
 def test_filter_logs_by_log_level_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     _test_list_activity_logs(
@@ -230,7 +230,7 @@ def test_filter_logs_by_log_level_as_superuser(
 
 def test_filter_logs_by_log_level_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2, observation_delivery_failed_event,
 ):
     user_integrations = get_user_integrations_qs(user=org_admin_user)
@@ -249,7 +249,7 @@ def test_filter_logs_by_log_level_as_org_admin(
 
 def test_filter_logs_in_date_range_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
 ):
     selected_events = ActivityLog.objects.all()[2:4]
@@ -268,7 +268,7 @@ def test_filter_logs_in_date_range_as_superuser(
 
 def test_get_logs_with_multiple_filters_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
         observation_delivery_failed_event, observation_delivery_failed_event_2
 ):
@@ -277,7 +277,7 @@ def test_get_logs_with_multiple_filters_as_org_admin(
         user=org_admin_user,
         params={  # Get events of log level info or higher for a single connection from lotek to an ER site
             "from_date": observation_delivery_succeeded_event.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "integration__in": ",".join([str(provider_lotek_panthera.id), str(integrations_list[1].id)]),
+            "integration__in": ",".join([str(provider_lotek_panthera.id), str(integrations_list_er[1].id)]),
             "log_level": ActivityLog.LogLevels.INFO.value,
             "log_type": ActivityLog.LogTypes.EVENT.value,
         },
@@ -287,7 +287,7 @@ def test_get_logs_with_multiple_filters_as_org_admin(
 
 def test_search_logs_by_value_as_org_admin(
         api_client, org_admin_user, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
         observation_delivery_failed_event, observation_delivery_failed_event_2
 ):
@@ -303,7 +303,7 @@ def test_search_logs_by_value_as_org_admin(
 
 def test_search_logs_by_value_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
         observation_delivery_failed_event, observation_delivery_failed_event_2
 ):
@@ -319,7 +319,7 @@ def test_search_logs_by_value_as_superuser(
 
 def test_search_logs_and_filter_as_superuser(
         api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
-        destination_movebank, smart_integration, integrations_list,
+        destination_movebank, smart_integration, integrations_list_er,
         observation_delivery_succeeded_event, observation_delivery_succeeded_event_2,
         observation_delivery_failed_event, observation_delivery_failed_event_2
 ):
@@ -425,11 +425,11 @@ def test_cannot_revert_activity_of_not_reversible_activity_as_org_admin(
 
 def test_cannot_revert_activity_of_other_org_as_org_admin(
         api_client, org_admin_user_2, provider_lotek_panthera, destination_movebank,
-        integrations_list, observation_delivery_failed_event_2
+        integrations_list_er, observation_delivery_failed_event_2
 ):
     # Get the activity log for a change that belongs to another org
     log = ActivityLog.objects.filter(
-        integration=integrations_list[1],
+        integration=integrations_list_er[1],
         is_reversible=True,
     ).first()
 

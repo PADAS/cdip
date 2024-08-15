@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import jsonschema
 from rest_framework import serializers
 from rest_framework import exceptions as drf_exceptions
@@ -6,15 +8,17 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace
+    GundiTrace, WebhookConfiguration, IntegrationWebhook
+from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from gundi_core.schemas.v2 import StreamPrefixEnum
-from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing
+from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
+    send_event_update_to_routing
 
 User = get_user_model()
 
@@ -221,6 +225,39 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
         )
 
 
+class IntegrationWebhookSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationAction
+        fields = (
+            "id",
+            "name",
+            "value"
+        )
+
+
+class IntegrationWebhookFullSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationWebhook
+        fields = (
+            "id",
+            "name",
+            "value",
+            "description",
+            "schema",
+        )
+
+
+class IntegrationWebhookCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationWebhook
+        fields = (
+            "name",
+            "value",
+            "description",
+            "schema",
+        )
+
+
 class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegrationAction
@@ -236,6 +273,7 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
 
 class IntegrationTypeFullSerializer(serializers.ModelSerializer):
     actions = IntegrationActionFullSerializer(many=True, read_only=True)
+    webhook = IntegrationWebhookFullSerializer(read_only=True)
 
     class Meta:
         model = IntegrationType
@@ -244,13 +282,16 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "actions"
+            "actions",
+            "webhook",
         )
 
 
 class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
     actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+    webhook = IntegrationWebhookCreateUpdateSerializer(required=False, write_only=True)
     value = serializers.CharField(required=True)
+    register_webhook_in_kong = serializers.BooleanField(write_only=True, default=True)
 
     class Meta:
         model = IntegrationType
@@ -259,6 +300,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "actions",
+            "webhook",
+            "register_webhook_in_kong",
             "service_url",
         )
 
@@ -268,37 +311,58 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """
-        Validate the actions
+        Validate the actions or webhook data
         """
         for action_data in data.get("actions", []):
             # ToDo: validate action data?
             if self.instance and "value" in action:  # Update
-                action = IntegrationAction.objects.get(value=action["value"]).action
+                action = IntegrationAction.objects.get(integration_type=self, value=action_data["value"])
                 serializer = IntegrationActionCreateUpdateSerializer(instance=action, data=action_data)
             else:  # Create
                 # Validate the action data
                 serializer = IntegrationActionCreateUpdateSerializer(data=action_data)
             serializer.is_valid(raise_exception=True)
+        if webhook_data := data.get("webhook"):  # Update
+            if self.instance and "value" in webhook_data:
+                webhook = IntegrationWebhook.objects.get(integration_type=self, value=webhook_data["value"])
+                serializer = IntegrationWebhookCreateUpdateSerializer(instance=webhook, data=webhook_data)
+            else:  # Create
+                serializer = IntegrationWebhookCreateUpdateSerializer(data=webhook_data)
+                serializer.is_valid(raise_exception=True)
         return data
 
     def create(self, validated_data):
-        actions = validated_data.pop("actions")
+        actions = validated_data.pop("actions", [])
+        webhook_data = validated_data.pop("webhook", {})
+        register_webhook_in_kong = validated_data.pop("register_webhook_in_kong", True)
         # Create the integration type idempotently
         type_slug = validated_data.pop("value")
-        integration_type, created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
-        # Create or update actions if provided
-        for action_params in actions:  # Usually less than 5 actions
-            action_slug = action_params.pop("value")
-            action, created = IntegrationAction.objects.update_or_create(
-                integration_type=integration_type,
-                value=action_slug,
-                defaults=action_params
-            )
+        with transaction.atomic():
+            integration_type, type_created = IntegrationType.objects.update_or_create(value=type_slug, defaults=validated_data)
+            # Create or update actions if provided
+            for action_params in actions:  # Usually less than 5 actions
+                action_slug = action_params.pop("value")
+                action, created = IntegrationAction.objects.update_or_create(
+                    integration_type=integration_type,
+                    value=action_slug,
+                    defaults=action_params
+                )
+            # Create or update webhook if provided
+            if webhook_data:
+                webhook, webhook_created = IntegrationWebhook.objects.update_or_create(
+                    integration_type=integration_type,
+                    value=webhook_data.pop("value"),
+                    defaults=webhook_data
+                )
+                # Register the integration type in Kong
+                if webhook_created and register_webhook_in_kong:  # Register only once on creation
+                    register_integration_type_in_kong(integration_type)
         return integration_type
 
 
 class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer):
-    actions = IntegrationActionCreateUpdateSerializer(many=True, write_only=True)
+    actions = IntegrationActionCreateUpdateSerializer(many=True, required=False, write_only=True)
+    webhook = IntegrationWebhookCreateUpdateSerializer(required=False, write_only=True)
 
     class Meta:
         model = IntegrationType
@@ -307,6 +371,7 @@ class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer)
             "value",
             "description",
             "actions",
+            "webhook",
             "service_url",
         )
 
@@ -321,6 +386,13 @@ class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer)
                 value=action_data.get("value"),
                 defaults=action_data
             )
+        # Create or update webhook if provided
+        if webhook_data := validated_data.get("webhook"):
+            webhook, created = IntegrationWebhook.objects.update_or_create(
+                integration_type=instance.value,
+                value=webhook_data.pop("value"),
+                defaults=webhook_data
+            )
         return instance
 
 
@@ -329,7 +401,25 @@ class IntegrationConfigurationRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationConfiguration
-        fields = ["id", "integration", "action", "data"]
+        fields = ("id", "integration", "action", "data",)
+
+
+class WebhookConfigurationRetrieveSerializer(serializers.ModelSerializer):
+    webhook = IntegrationWebhookSummarySerializer()
+
+    class Meta:
+        model = WebhookConfiguration
+        fields = ("id", "integration", "webhook", "data",)
+
+
+class WebhookConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False, read_only=True)
+    integration = serializers.PrimaryKeyRelatedField(required=False, queryset=Integration.objects.all())
+    webhook = serializers.PrimaryKeyRelatedField(required=False, queryset=IntegrationWebhook.objects.all())
+
+    class Meta:
+        model = WebhookConfiguration
+        fields = ["id", "integration", "webhook", "data"]
 
 
 class RoutingRuleSummarySerializer(serializers.ModelSerializer):
@@ -343,6 +433,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     type = IntegrationTypeFullSerializer()
     owner = OwnerSerializer()
     configurations = IntegrationConfigurationRetrieveSerializer(many=True)
+    webhook_configuration = WebhookConfigurationRetrieveSerializer()
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
 
@@ -356,6 +447,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "webhook_configuration",
             "additional",
             "default_route",
             "status"
@@ -385,6 +477,7 @@ class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     configurations = IntegrationConfigurationCreateUpdateSerializer(many=True, required=False)
+    webhook_configuration = WebhookConfigurationCreateUpdateSerializer(required=False)
     default_route = RoutingRuleSummarySerializer(read_only=True)
     create_default_route = serializers.BooleanField(write_only=True, default=True)
     create_configurations = serializers.BooleanField(write_only=True, default=True)
@@ -399,6 +492,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             "type",
             "owner",
             "configurations",
+            "webhook_configuration",
             "default_route",
             "create_default_route",
             "create_configurations"
@@ -426,7 +520,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        configurations = validated_data.pop("configurations")
+        configurations = validated_data.pop("configurations", [])
+        webhook_configuration = validated_data.pop("webhook_configuration", {})
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
         # Create the integration
@@ -443,10 +538,18 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         # Create a default route as needed
         if create_default_route:
             ensure_default_route(integration=integration)
+        # Create webhook configuration if provided
+        if webhook_configuration and integration.type.webhook:
+            WebhookConfiguration.objects.create(
+                integration=integration,
+                webhook=integration.type.webhook,
+                data=webhook_configuration.get("data", {})
+            )
         return integration
 
     def update(self, instance, validated_data):
         configurations = validated_data.pop("configurations", [])
+        webhook_configuration = validated_data.pop("webhook_configuration", {})
         # Update the integration
         super().update(instance=instance, validated_data=validated_data)
         # Update or Create nested configurations if provided
@@ -455,6 +558,13 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
             IntegrationConfiguration.objects.update_or_create(
                 id=config_data.get("id"),
                 defaults=config_data
+            )
+        # Update or Create webhook configuration if provided
+        if webhook_configuration and instance.type.webhook:
+            WebhookConfiguration.objects.update_or_create(
+                integration=self.instance,
+                webhook=self.instance.type.webhook,
+                defaults={"data": webhook_configuration.get("data", {})}
             )
         return instance
 
@@ -715,6 +825,7 @@ class KeyRelatedField(serializers.RelatedField):
 class GundiTraceSerializer(serializers.Serializer):
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     related_to = KeyRelatedField(
         key_field="object_id",
         write_only=True,
@@ -747,7 +858,7 @@ class GundiTraceSerializer(serializers.Serializer):
         return data
 
 
-class EventBulkCreateSerializer(serializers.ListSerializer):
+class EventBulkCreateUpdateSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of events
     """
@@ -771,7 +882,7 @@ class EventBulkCreateSerializer(serializers.ListSerializer):
         pass
 
 
-class EventCreateSerializer(GundiTraceSerializer):
+class EventCreateUpdateSerializer(GundiTraceSerializer):
     object_type = serializers.HiddenField(default=StreamPrefixEnum.event.value)
     title = serializers.CharField(write_only=True, required=False)
     recorded_at = serializers.DateTimeField(write_only=True)
@@ -782,7 +893,7 @@ class EventCreateSerializer(GundiTraceSerializer):
     annotations = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
-        list_serializer_class = EventBulkCreateSerializer
+        list_serializer_class = EventBulkCreateUpdateSerializer
 
     def validate_location(self, value):
         # I must contain lat and lon and other extra fields are accepted
@@ -803,6 +914,7 @@ class EventCreateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -819,15 +931,25 @@ class EventCreateSerializer(GundiTraceSerializer):
     def validate(self, data):
         data = super().validate(data)
         # Get or create sources as they are discovered
-        source, created = Source.objects.get_or_create(
-            integration=data["integration"],
-            external_id=data["source"]
-        )
-        data["source"] = source
+        if not self.instance:
+            source, created = Source.objects.get_or_create(
+                integration=data["integration"],
+                external_id=data.get("source", "default-source")
+            )
+            data["source"] = source
         return data
 
-    def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+    def update(self, traces, validated_data):
+        # We need to update the event in all the destinations where it was sent previously
+        for trace in traces:
+            trace.object_updated_at = datetime.now(tz=trace.created_at.tzinfo)
+            trace.save()
+            # Publish messages to a topic to be processed by routing services
+            send_event_update_to_routing(
+                event_trace=trace,
+                event_changes=validated_data
+            )
+        return traces[0]  # For the user is a single event update
 
 
 class ObservationBulkCreateSerializer(serializers.ListSerializer):
@@ -882,6 +1004,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
             # We save only IDs, no sensitive data is saved
             data_provider=validated_data["integration"],
             related_to=validated_data.get("related_to"),
+            source=validated_data["source"],
             object_type=validated_data["object_type"],
             created_by=created_by
             # Other fields are filled in later by the routing services
@@ -900,7 +1023,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data["source"],
+            external_id=data.get("source", "default-source"),
             defaults={
                 "name": data.get("source_name", "")
             }
@@ -909,7 +1032,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         return data
 
     def update(self, instance, validated_data):
-        pass  # ToDo: Implement once we support updating events
+        pass  # ToDo: Implement if we decide to support updating tracking data
 
 
 class EventAttachmentListSerializer(serializers.ListSerializer):
@@ -997,9 +1120,12 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
         read_only=True,
     )
     delivered_at = serializers.DateTimeField(read_only=True)
+    last_update_delivered_at = serializers.DateTimeField(read_only=True)
     external_id = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
+    is_duplicate = serializers.BooleanField(read_only=True)
+    has_error = serializers.BooleanField(read_only=True)
 
 
 class ActivityLogRetrieveSerializer(serializers.Serializer):
@@ -1019,7 +1145,7 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
 
 class ActionTriggerSerializer(serializers.Serializer):
     run_in_background = serializers.BooleanField(required=False, default=False)
-    config_overrides = serializers.JSONField(required=False, write_only=True)
+    config_overrides = serializers.JSONField(required=False)
 
 
 class UserAgreementSerializer(serializers.ModelSerializer):

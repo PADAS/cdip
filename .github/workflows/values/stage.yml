@@ -1,4 +1,4 @@
-serviceAccount: gundi-app-sa-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+serviceAccount: admin-portal-sa@cdip-stage-78ca.iam.gserviceaccount.com
 ingress:
   hosts:
     - host: "api.stage.gundiservice.org"
@@ -20,12 +20,14 @@ database:
   connection_name: "cdip-78ca:us-central1:postgres-cdip-dev"
 admin_portal:
   env:
+    LOGGING_LEVEL: "INFO"
     TRACE_ENVIRONMENT: "stage"
     BROKER_URL: "redis://10.243.180.36:6379"
     GCP_PROJECT_ID: cdip-stage-78ca
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
     REDIS_HOST: "10.243.180.36"
     GS_BUCKET_NAME: "cdip-files-stage"
+    BUCKET_NAME: "cdip-files-stage"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"

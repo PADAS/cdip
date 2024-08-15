@@ -2,13 +2,14 @@ import pytest
 from unittest.mock import ANY
 from django.urls import reverse
 from django.conf import settings
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 
 
 pytestmark = pytest.mark.django_db
 
 
-def _test_create_event(api_client, keyauth_headers, data):
+def _test_create_event(api_client, mock_publisher, keyauth_headers, data):
     response = api_client.post(
         reverse("events-list"),
         data=data,
@@ -23,6 +24,16 @@ def _test_create_event(api_client, keyauth_headers, data):
     for obj in response_data:
         assert "object_id" in obj
         assert "created_at" in obj
+    # Check that a message was published in the right topic for routing
+    assert mock_publisher.publish.called
+    topic_kwarg = mock_publisher.publish.call_args.kwargs["topic"]
+    assert topic_kwarg == settings.RAW_OBSERVATIONS_TOPIC
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    assert data_kwarg.get("payload")
+    extra_arg = mock_publisher.publish.call_args.kwargs["extra"]
+    assert "gundi_id" in extra_arg
+    assert extra_arg.get("gundi_version") == "v2"
+    assert extra_arg.get("observation_type") == StreamPrefixEnum.event.value
 
 
 def test_create_single_event(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
@@ -31,6 +42,7 @@ def test_create_single_event(api_client, mocker, mock_publisher, mock_deduplicat
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         keyauth_headers=keyauth_headers_trap_tagger,
         data={
             "source": "Xyz123",
@@ -52,13 +64,6 @@ def test_create_single_event(api_client, mocker, mock_publisher, mock_deduplicat
             }
         }
     )
-    # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
 
 
 def test_create_events_in_bulk(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
@@ -67,6 +72,7 @@ def test_create_events_in_bulk(api_client, mocker, mock_publisher, mock_deduplic
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         keyauth_headers=keyauth_headers_trap_tagger,
         data=[
             {
@@ -110,13 +116,8 @@ def test_create_events_in_bulk(api_client, mocker, mock_publisher, mock_deduplic
         ]
     )
     # Check that a message was published in the right topic for routing
-    assert mock_publisher.publish.called
     assert mock_publisher.publish.call_count == 2
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
+
 
 
 def test_create_single_event_without_source(
@@ -127,6 +128,7 @@ def test_create_single_event_without_source(
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         keyauth_headers=keyauth_headers_trap_tagger,
         data={
             #"source": "Xyz123",  # Source is optional
@@ -148,16 +150,9 @@ def test_create_single_event_without_source(
             }
         }
     )
-    # Check that a message was published in the right topic for routing
     publish_mock = mock_publisher.publish
-    assert publish_mock.called
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
     # Check that the source is set with a default value
-    assert publish_mock.call_args.kwargs["data"].get("external_source_id") == "default-source"
+    assert publish_mock.call_args.kwargs["data"].get("payload", {}).get("external_source_id") == "default-source"
 
 
 def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
@@ -166,6 +161,7 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         keyauth_headers=keyauth_headers_trap_tagger,
         data=[
             {
@@ -210,16 +206,10 @@ def test_create_events_in_bulk_without_source(api_client, mocker, mock_publisher
     )
     # Check that a message was published in the right topic for routing
     publish_mock = mock_publisher.publish
-    assert publish_mock.called
     assert publish_mock.call_count == 2
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
     # Check that the source is set with a default value
     for call in publish_mock.call_args_list:
-        assert call.kwargs["data"].get("external_source_id") == "default-source"
+        assert call.kwargs["data"].get("payload", {}).get("external_source_id") == "default-source"
 
 
 def test_create_single_event_without_location(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
@@ -228,6 +218,7 @@ def test_create_single_event_without_location(api_client, mocker, mock_publisher
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
     _test_create_event(
         api_client=api_client,
+        mock_publisher=mock_publisher,
         keyauth_headers=keyauth_headers_trap_tagger,
         data={  # Analizer events do not require location
             'event_type': 'silence_source_provider_rep',
@@ -251,10 +242,32 @@ def test_create_single_event_without_location(api_client, mocker, mock_publisher
                            'patrols': []}
         }
     )
+
+
+def test_update_event(api_client, mocker, trap_tagger_event_trace, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = {
+        "event_details": {
+          "species": "Puma"
+        }
+    }
+    response = api_client.patch(
+        reverse("events-detail", kwargs={"pk": trap_tagger_event_trace.object_id}),
+        data=data,
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_200_OK
     # Check that a message was published in the right topic for routing
     assert mock_publisher.publish.called
-    mock_publisher.publish.assert_called_with(
-        topic=settings.RAW_OBSERVATIONS_TOPIC,
-        data=ANY,
-        extra=ANY
-    )
+    topic_kwarg = mock_publisher.publish.call_args.kwargs["topic"]
+    assert topic_kwarg == settings.RAW_OBSERVATIONS_TOPIC
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    payload = data_kwarg.get("payload", {})
+    assert payload.get("changes") == data
+    extra_arg = mock_publisher.publish.call_args.kwargs["extra"]
+    assert extra_arg.get("gundi_id") == str(trap_tagger_event_trace.object_id)
+    assert extra_arg.get("gundi_version") == "v2"
+    assert extra_arg.get("observation_type") == StreamPrefixEnum.event_update.value
