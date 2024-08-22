@@ -1558,6 +1558,21 @@ def mock_get_api_key():
     return PropertyMock(return_value="TestAp1k3y1234")
 
 
+@pytest.fixture
+def species_update_request_data():
+    return {
+        "event_details": {
+          "species": "Puma"
+        }
+    }
+
+
+@pytest.fixture
+def status_update_request_data():
+    return {
+        "status": "resolved"
+    }
+
 ########################################################################################################################
 # GUNDI 1.0
 ########################################################################################################################

@@ -244,15 +244,43 @@ def test_create_single_event_without_location(api_client, mocker, mock_publisher
     )
 
 
-def test_update_event(api_client, mocker, trap_tagger_event_trace, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+def test_create_single_event_with_status(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
     mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
-    data = {
-        "event_details": {
-          "species": "Puma"
+    _test_create_event(
+        api_client=api_client,
+        mock_publisher=mock_publisher,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        data={
+            "source": "camera123",
+            "title": "Animal Detected",
+            "event_type": "animals",
+            "recorded_at": "2024-08-22 13:01:26-0300",
+            "location": {
+                "lon": -109.239682,
+                "lat": -27.104423
+            },
+            "event_details": {
+                "species": "lion"
+            },
+            "status": "active"
         }
-    }
+    )
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    assert data_kwarg.get("payload")
+    assert data_kwarg.get("payload", {}).get("status") == "active"
+
+
+@pytest.mark.parametrize("request_data", [
+    ("species_update_request_data"),
+    ("status_update_request_data"),
+])
+def test_update_event(api_client, mocker, request, request_data, trap_tagger_event_trace, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = request.getfixturevalue(request_data)
     response = api_client.patch(
         reverse("events-detail", kwargs={"pk": trap_tagger_event_trace.object_id}),
         data=data,
