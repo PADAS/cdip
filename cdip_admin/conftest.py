@@ -8,6 +8,7 @@ from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 from rest_framework.test import APIClient
+from gundi_core.schemas import v2 as gundi_schemas_v2
 from accounts.models import AccountProfile, AccountProfileOrganization
 from activity_log.models import ActivityLog
 from core.enums import DjangoGroups, RoleChoices
@@ -1546,6 +1547,30 @@ def trap_tagger_observation_update_failed_event(
             "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
             "destination_id": str(integrations_list_er[0].id),
             "updated_at": "2024-07-25 12:25:44.442696+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+@pytest.fixture
+def wpswatch_dispatcher_log_event(
+        mocker, trap_tagger_event_trace, integrations_list_wpswatch
+):
+    message = mocker.MagicMock()
+    gundi_id = str(trap_tagger_event_trace.object_id)
+    event_dict = {
+        "event_id": "505535df-1b9b-412b-9fd5-e29b09582901",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "DispatcherCustomLog",
+        "payload": {
+            "gundi_id": gundi_id,
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id": str(integrations_list_wpswatch[0].id),
+            "title": f"Observation {gundi_id} buffered in wait for attachment",
+            "level": gundi_schemas_v2.LogLevel.INFO.value,
         },
     }
     data_bytes = json.dumps(event_dict).encode("utf-8")

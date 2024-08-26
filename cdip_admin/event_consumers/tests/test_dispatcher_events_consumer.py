@@ -309,3 +309,20 @@ def test_process_observation_update_failed_event(
     assert activity_log.value == "observation_update_failed"
     assert activity_log.title == f"Error Updating observation {trap_tagger_event_update_trace.object_id} in '{trap_tagger_event_update_trace.destination.base_url}'"
     assert activity_log.details == event_data
+
+
+def test_process_dispatcher_log_event(
+        trap_tagger_event_trace, wpswatch_dispatcher_log_event
+):
+    # Test the case when a dispatcher logs a message
+    process_event(wpswatch_dispatcher_log_event)
+    event_data = json.loads(wpswatch_dispatcher_log_event.data)["payload"]
+    # Check that the event was recorded in the activity log
+    activity_log = ActivityLog.objects.filter(integration_id=event_data["destination_id"]).first()
+    assert activity_log
+    assert activity_log.log_type == ActivityLog.LogTypes.EVENT
+    assert activity_log.log_level == event_data["level"]
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.value == "custom_dispatcher_log"
+    assert activity_log.title == event_data['title']
+    assert not activity_log.is_reversible
