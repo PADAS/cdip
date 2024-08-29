@@ -389,6 +389,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
     destination_type__in = CharInFilter(method='filter_by_destination_type', lookup_expr="in")
     destination_url = django_filters_rest.CharFilter(method='filter_by_destination_url')
     destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
+    destination_id = django_filters_rest.CharFilter(method='filter_by_destination_id')
 
     class Meta:
         model = Integration
@@ -419,6 +420,12 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         )
         # Filter integrations having at least one destination with an url matching at least one of the provided values
         return qs_with_destination_urls.filter(destination_urls__overlap=destination_urls)
+
+    def filter_by_destination_id(self, queryset, name, value):
+        # Filter integrations having at destination with id matching the provided value
+        return queryset.filter(
+            routing_rules_by_provider__destinations__id=str(value)
+        )
 
 
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
