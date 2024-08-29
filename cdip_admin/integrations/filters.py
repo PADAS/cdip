@@ -389,7 +389,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
     destination_type__in = CharInFilter(method='filter_by_destination_type', lookup_expr="in")
     destination_url = django_filters_rest.CharFilter(method='filter_by_destination_url')
     destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
-    destination_id = django_filters_rest.CharFilter(method='filter_by_destination_id')
+    destination_id = django_filters_rest.UUIDFilter(method='filter_by_destination_id')
 
     class Meta:
         model = Integration
