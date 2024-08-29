@@ -36,7 +36,7 @@ from integrations.models import (
     SourceConfiguration,
     ensure_default_route,
     RouteConfiguration,
-    GundiTrace, IntegrationWebhook, WebhookConfiguration,
+    GundiTrace, IntegrationWebhook, WebhookConfiguration, RouteProvider, RouteDestination,
 )
 from organizations.models import Organization
 from pathlib import Path
@@ -508,6 +508,60 @@ def smart_integration(
         },
     )
     ensure_default_route(integration=integration)
+    return integration
+
+
+@pytest.fixture
+def smart_destination_1(
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+):
+    # Create the integration
+    site_url = "smarttest.smart.wps.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        },
+    )
+    return integration
+
+
+@pytest.fixture
+def smart_destination_2_same_url_as_1(
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+        smart_destination_1
+):
+    # Create the integration
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=smart_destination_1.base_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        },
+    )
     return integration
 
 
