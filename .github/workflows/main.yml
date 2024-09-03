@@ -33,7 +33,7 @@ jobs:
     with:
       environment: dev
       chart_name: admin-portal
-      chart_version: '1.0.2'
+      chart_version: '1.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit
@@ -45,7 +45,7 @@ jobs:
     with:
       environment: stage
       chart_name: admin-portal
-      chart_version: '1.0.2'
+      chart_version: '1.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit
@@ -57,7 +57,7 @@ jobs:
     with:
       environment: prod
       chart_name: admin-portal
-      chart_version: '1.0.2'
+      chart_version: '1.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit

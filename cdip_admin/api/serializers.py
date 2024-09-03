@@ -1,8 +1,6 @@
 from django.urls import reverse
 from core.utils import add_base_url
 from rest_framework import serializers
-
-from organizations.models import Organization
 from integrations.models import *
 
 

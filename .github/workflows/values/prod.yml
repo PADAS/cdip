@@ -32,6 +32,7 @@ admin_portal:
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-prod
     REDIS_HOST: "10.208.106.172"
     GS_BUCKET_NAME: "cdip-files-prod"
+    BUCKET_NAME: "cdip-files-prod"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-prod"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-prod"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-prod"
@@ -50,7 +51,11 @@ keycloak:
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
 
 portal:
-  replicaCount: 4
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 80
 worker:
   replicaCount: 2
 dispatcherEvents:

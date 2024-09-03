@@ -203,6 +203,49 @@ def test_filter_connections_by_destination_type_as_org_viewer(
     )
 
 
+def test_filter_connections_by_destination_id_as_superuser(
+        api_client, superuser, other_organization,
+        provider_movebank_ewt, provider_trap_tagger,
+        smart_destination_1, smart_destination_2_same_url_as_1,
+):
+    assert smart_destination_1.base_url == smart_destination_2_same_url_as_1.base_url
+    # Connection 1: Movebank -> Smart Destination 1 (url: "https://smarttest.smart.wps.org")
+    provider_movebank_ewt.default_route.destinations.add(smart_destination_1)
+    # Connection 1: Trap Tagger -> Smart Destination 2 (same url: "https://smarttest.smart.wps.org")
+    provider_trap_tagger.default_route.destinations.add(smart_destination_2_same_url_as_1)
+
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "destination_id": str(smart_destination_1.id)
+        },
+        expected_integrations=[provider_movebank_ewt]  # Connections are not mixed when filtering by destination ID
+    )
+
+
+def test_filter_connections_validates_destination_id(
+        api_client, superuser, other_organization,
+        provider_movebank_ewt, provider_trap_tagger,
+        smart_destination_1, smart_destination_2_same_url_as_1,
+):
+    assert smart_destination_1.base_url == smart_destination_2_same_url_as_1.base_url
+    # Connection 1: Movebank -> Smart Destination 1 (url: "https://smarttest.smart.wps.org")
+    provider_movebank_ewt.default_route.destinations.add(smart_destination_1)
+    # Connection 1: Trap Tagger -> Smart Destination 2 (same url: "https://smarttest.smart.wps.org")
+    provider_trap_tagger.default_route.destinations.add(smart_destination_2_same_url_as_1)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={
+            "destination_id": 1  # invalid UUID
+        }
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+
 def test_filter_connections_by_multiple_destination_urls_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
         integrations_list_er, route_1, route_2, integration_type_er

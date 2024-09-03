@@ -166,7 +166,8 @@ def send_events_to_routing(events, gundi_ids):
                         event_type=event.get("event_type"),
                         event_details=event.get("event_details", {}),
                         geometry=event.get("geometry", None),
-                        observation_type=StreamPrefixEnum.event.value
+                        observation_type=StreamPrefixEnum.event.value,
+                        status=event.get("status")
                     )
                 )
                 tracing.instrumentation.enrich_span_from_event(

@@ -242,11 +242,49 @@ def handle_observation_update_failed_event(event_dict: dict):
     )
 
 
+def handle_dispatcher_log_event(event_dict):
+    event = system_events.DispatcherCustomLog.parse_obj(event_dict)
+    event_data = event.payload
+    gundi_id = str(event_data.gundi_id)
+    destination_id = str(event_data.destination_id)
+    logger.info(
+        f"Dispatcher Custom Log Event. gundi_id: {gundi_id}, destination_id: {destination_id}: \n{event_data.title}",
+        extra={"event": event_dict}  # FixMe: extra doesn't show up in GCP logs
+    )
+    # Look the related trace in the database
+    trace = GundiTrace.objects.filter(object_id=gundi_id).first()
+    if not trace:
+        logger.warning(f"Unknown Observation with id {gundi_id}. Event Ignored.")
+        return
+    # Look for the related destination integration
+    integration = Integration.objects.filter(id=destination_id).first()
+    if not integration:
+        logger.warning(f"Unknown Destination Integration with id {destination_id}. Event Ignored.")
+        return
+    # Generate Activity log to be seen in the portal
+    title = event_data.title
+    log_data = {
+        **event_dict["payload"],
+        "source_external_id": str(trace.source.external_id) if trace.source else None,
+    }
+    ActivityLog.objects.create(
+        log_level=event_data.level,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=integration,
+        value="custom_dispatcher_log",
+        title=title,
+        details=log_data,
+        is_reversible=False
+    )
+
+
 event_handlers = {
     "ObservationDelivered": handle_observation_delivered_event,
     "ObservationDeliveryFailed": handle_observation_delivery_failed_event,
     "ObservationUpdated": handle_observation_updated_event,
     "ObservationUpdateFailed": handle_observation_update_failed_event,
+    "DispatcherCustomLog": handle_dispatcher_log_event
 }
 
 
@@ -301,6 +339,7 @@ def main():
         except Exception as e:
             logger.exception(f"Internal Error {e}. Restarting..")
             continue
+
 
 if __name__ == '__main__':
     main()

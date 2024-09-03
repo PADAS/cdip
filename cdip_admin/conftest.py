@@ -8,6 +8,7 @@ from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
 from rest_framework.utils import json
 from rest_framework.test import APIClient
+from gundi_core.schemas import v2 as gundi_schemas_v2
 from accounts.models import AccountProfile, AccountProfileOrganization
 from activity_log.models import ActivityLog
 from core.enums import DjangoGroups, RoleChoices
@@ -35,7 +36,7 @@ from integrations.models import (
     SourceConfiguration,
     ensure_default_route,
     RouteConfiguration,
-    GundiTrace, IntegrationWebhook, WebhookConfiguration,
+    GundiTrace, IntegrationWebhook, WebhookConfiguration, RouteProvider, RouteDestination,
 )
 from organizations.models import Organization
 from pathlib import Path
@@ -507,6 +508,60 @@ def smart_integration(
         },
     )
     ensure_default_route(integration=integration)
+    return integration
+
+
+@pytest.fixture
+def smart_destination_1(
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+):
+    # Create the integration
+    site_url = "smarttest.smart.wps.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        },
+    )
+    return integration
+
+
+@pytest.fixture
+def smart_destination_2_same_url_as_1(
+        other_organization,
+        integration_type_smart,
+        get_random_id,
+        smart_action_auth,
+        smart_action_push_events,
+        smart_destination_1
+):
+    # Create the integration
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_smart,
+        name=f"SMART Site {get_random_id()}",
+        owner=other_organization,
+        base_url=smart_destination_1.base_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=smart_action_auth,
+        data={
+            "api_key": f"SMART-{get_random_id()}-KEY",
+        },
+    )
     return integration
 
 
@@ -1552,11 +1607,50 @@ def trap_tagger_observation_update_failed_event(
     message.data = data_bytes
     return message
 
+@pytest.fixture
+def wpswatch_dispatcher_log_event(
+        mocker, trap_tagger_event_trace, integrations_list_wpswatch
+):
+    message = mocker.MagicMock()
+    gundi_id = str(trap_tagger_event_trace.object_id)
+    event_dict = {
+        "event_id": "505535df-1b9b-412b-9fd5-e29b09582901",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "DispatcherCustomLog",
+        "payload": {
+            "gundi_id": gundi_id,
+            "related_to": None,
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id": str(integrations_list_wpswatch[0].id),
+            "title": f"Observation {gundi_id} buffered in wait for attachment",
+            "level": gundi_schemas_v2.LogLevel.INFO.value,
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
 
 @pytest.fixture
 def mock_get_api_key():
     return PropertyMock(return_value="TestAp1k3y1234")
 
+
+@pytest.fixture
+def species_update_request_data():
+    return {
+        "event_details": {
+          "species": "Puma"
+        }
+    }
+
+
+@pytest.fixture
+def status_update_request_data():
+    return {
+        "status": "resolved"
+    }
 
 ########################################################################################################################
 # GUNDI 1.0
