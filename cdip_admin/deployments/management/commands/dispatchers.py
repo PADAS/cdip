@@ -119,6 +119,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write("Please specify an integration ID or a type")
                 return
+
             self.update_dispatchers(
                 integrations=integrations_to_update,
                 deployment_settings=new_settings

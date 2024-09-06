@@ -1,6 +1,7 @@
 import google.auth
 from celery import shared_task
 from google.cloud import pubsub_v1
+from google.cloud.pubsub_v1.types import pubsub_gapic_types
 from google.cloud import functions_v2, run_v2
 from google.cloud import eventarc_v1
 from google.cloud.eventarc_v1 import CreateTriggerRequest
@@ -14,6 +15,7 @@ from . import utils
 if settings.GCP_ENVIRONMENT_ENABLED:
     credentials, project_id = google.auth.default()
     pubsub_client = pubsub_v1.PublisherClient()  # This raises  credentials error when running in th CI pipeline
+    subscriptions_client = pubsub_v1.SubscriberClient()
     functions_client = functions_v2.FunctionServiceClient()
     cloudrun_client = run_v2.ServicesClient(credentials=credentials)
     eventarc_client = eventarc_v1.EventarcClient(credentials=credentials)
@@ -28,6 +30,8 @@ if settings.GCP_ENVIRONMENT_ENABLED:
     )
 else:
     pubsub_client = utils.PubSubDummyClient()
+    # ToDo: Implement dummy client for subscriptions
+    #subscriptions_client = utils.SubscriberDummyClient()
     functions_client = utils.FunctionsDummyClient()
     cloudrun_client = utils.CloudRunDummyClient()
     eventarc_client = utils.EventarcDummyClient()
@@ -35,8 +39,31 @@ else:
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
 
 
+def get_function_subscription_request(function, topic_path):
+    function_name = function.name
+    project_id = function_name.split("/")[1]
+    function_id = function_name.split("/")[5]
+    subscription_name = f"{function_id[:250]}-sub".replace("--", "-")
+    push_endpoint = function.url
+    subscription = pubsub_gapic_types.Subscription(
+        name=f"projects/{project_id}/subscriptions/{subscription_name}",
+        topic=topic_path,
+        push_config=pubsub_gapic_types.PushConfig(
+            push_endpoint=push_endpoint
+        ),
+        expiration_policy=pubsub_gapic_types.ExpirationPolicy(),
+        ack_deadline_seconds=600,
+        enable_message_ordering=True,
+        retry_policy=pubsub_gapic_types.RetryPolicy(
+            minimum_backoff="10s",
+            maximum_backoff="600s"
+        )
+    )
+    return subscription
+
+
 @shared_task
-def deploy_serverless_dispatcher(deployment_id):
+def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
     deployment.status = DispatcherDeployment.Status.IN_PROGRESS
@@ -78,13 +105,26 @@ def deploy_serverless_dispatcher(deployment_id):
                 function_name=function_name,
                 topic_path=topic_path
             )
-            response = create_or_update_function(function_request=function_request)
+
+            if force_recreate:
+                delete_function(function_name=function_name)
+
+            function_response = create_or_update_function(
+                function_request=function_request,
+            )
+            print(function_response)
+            # Create a subscription to the topic
+            subscription = get_function_subscription_request(function_response, topic_path)
+            subscription_response = subscriptions_client.create_subscription(request=subscription)
+            print(subscription_response)
         elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
             response = create_or_update_cloud_run_service(
                 configuration=configuration,
                 service_name=function_name,
                 topic_path=topic_path,
+                force_recreate=force_recreate
             )
+            print(response)
         else:
             error_msg = f"Integration type '{integration.type.value}' is not supported."
             print(error_msg)
@@ -93,7 +133,6 @@ def deploy_serverless_dispatcher(deployment_id):
             deployment.save()
             return
         print(f"Deploy complete.")
-        print(response)
         deployment.status = DispatcherDeployment.Status.COMPLETE
         deployment.save()
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
@@ -169,11 +208,7 @@ def get_function_request(configuration, function_name, topic_path):
         runtime="python38",
         source=source
     )
-    event_trigger = functions_v2.types.EventTrigger(
-        event_type="google.cloud.pubsub.topic.v1.messagePublished",
-        pubsub_topic=topic_path,
-        retry_policy=functions_v2.types.EventTrigger.RetryPolicy.RETRY_POLICY_RETRY
-    )
+
     service_config = functions_v2.types.ServiceConfig(
         vpc_connector=deployment_settings.get("vpc_connector"),
         service_account_email=deployment_settings.get("service_account"),
@@ -189,7 +224,6 @@ def get_function_request(configuration, function_name, topic_path):
         name=f"{parent}/functions/{function_id}",
         description="A serverless dispatcher",
         build_config=build_config,
-        event_trigger=event_trigger,
         service_config=service_config
     )
     request = functions_v2.CreateFunctionRequest(
@@ -253,7 +287,7 @@ def delete_topic(topic_name):
     pubsub_client.delete_topic(request=request)
 
 
-def create_or_update_cloud_run_service(configuration, service_name, topic_path):
+def create_or_update_cloud_run_service(configuration, service_name, topic_path, force_recreate=False):
     print(f"Deploying Cloud Run service {service_name}...")
     deployment_settings = configuration.get("deployment_settings", {})
     region = deployment_settings.get("region", "us-central1")
