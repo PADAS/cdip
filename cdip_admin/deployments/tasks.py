@@ -39,17 +39,24 @@ else:
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
 
 
-def get_function_subscription_request(function, topic_path):
+def get_function_subscription_request(function, topic_path, configuration):
     function_name = function.name
-    project_id = function_name.split("/")[1]
+    deployment_settings = configuration.get("deployment_settings", {})
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
     function_id = function_name.split("/")[5]
     subscription_name = f"{function_id[:250]}-sub".replace("--", "-")
-    push_endpoint = function.url
+    push_endpoint = function.service_config.uri
+    service_account = deployment_settings.get("service_account")
     subscription = pubsub_gapic_types.Subscription(
         name=f"projects/{project_id}/subscriptions/{subscription_name}",
         topic=topic_path,
         push_config=pubsub_gapic_types.PushConfig(
-            push_endpoint=push_endpoint
+            push_endpoint=push_endpoint,
+            oidc_token=pubsub_gapic_types.PushConfig.OidcToken(
+                service_account_email=service_account,
+                audience=push_endpoint
+            )
         ),
         expiration_policy=pubsub_gapic_types.ExpirationPolicy(),
         ack_deadline_seconds=600,
@@ -114,7 +121,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
             )
             print(function_response)
             # Create a subscription to the topic
-            subscription = get_function_subscription_request(function_response, topic_path)
+            subscription = get_function_subscription_request(function_response, topic_path, configuration)
             subscription_response = subscriptions_client.create_subscription(request=subscription)
             print(subscription_response)
         elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
