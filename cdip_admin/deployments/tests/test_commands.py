@@ -251,3 +251,135 @@ def test_call_dispatchers_command_update_source_by_id_v1(
 
     # Check that the deploy task was called for the two ER integrations being updated
     assert mock_deploy_serverless_dispatcher.delay.called
+
+
+@pytest.mark.parametrize("gundi_version", ["v1", "v2"])
+@pytest.mark.parametrize("integration_type", [
+    "earth_ranger",
+    "smart_connect",
+    "wps_watch"
+])
+@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+def test_call_dispatchers_command_recreate_by_type_with_max_v1(
+    request,
+    gundi_version,
+    integration_type,
+    mocker,
+    capsys,
+    organization,
+    dispatcher_source_release_1
+):
+    if gundi_version == "v1":
+        integrations_er = request.getfixturevalue("outbound_integrations_list_er")
+        integrations_smart = request.getfixturevalue("outbound_integrations_list_smart")
+        integrations_wps = request.getfixturevalue("outbound_integrations_list_wpswatch")
+    else:
+        integrations_er = request.getfixturevalue("integrations_list_er")
+        integrations_smart = request.getfixturevalue("integrations_list_smart")
+        integrations_wps = request.getfixturevalue("integrations_list_wpswatch")
+    # Mock the celery task doing the actual deployment
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mock_deploy_serverless_dispatcher = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher,
+    )
+    mocker.patch(
+        "deployments.management.commands.dispatchers.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher
+    )
+
+    call_command(
+        "dispatchers", f"--{gundi_version}", "--type", integration_type, "--max", "2",
+        "--recreate"
+    )
+
+    if integration_type == "earth_ranger":
+        integrations_list = integrations_er
+    elif integration_type == "smart_connect":
+        integrations_list = integrations_smart
+    else:
+        integrations_list = integrations_wps
+    sorted_integrations = sorted(integrations_list, key=lambda i: i.name)
+    # Check that the deployment task is triggered for each integration
+    assert mock_deploy_serverless_dispatcher.delay.call_count == 2
+    for integration in sorted_integrations[:2]:
+        if gundi_version == "v1":
+            mock_deploy_serverless_dispatcher.delay.assert_any_call(
+                deployment_id=integration.dispatcher_by_outbound.id,
+                force_recreate=True,
+                deployment_settings=None  # Reuse existent settings
+            )
+        else:
+            mock_deploy_serverless_dispatcher.delay.assert_any_call(
+                deployment_id=integration.dispatcher_by_integration.id,
+                force_recreate=True,
+                deployment_settings=None  # Reuse existent settings
+            )
+
+
+@pytest.mark.parametrize("gundi_version", ["v1", "v2"])
+@pytest.mark.parametrize("integration_type", [
+    "earth_ranger",
+    "smart_connect",
+    "wps_watch"
+])
+@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1(
+    request,
+    gundi_version,
+    integration_type,
+    mocker,
+    capsys,
+    organization,
+    dispatcher_source_release_1,
+    dispatcher_source_release_2
+):
+    if gundi_version == "v1":
+        integrations_er = request.getfixturevalue("outbound_integrations_list_er")
+        integrations_smart = request.getfixturevalue("outbound_integrations_list_smart")
+        integrations_wps = request.getfixturevalue("outbound_integrations_list_wpswatch")
+    else:
+        integrations_er = request.getfixturevalue("integrations_list_er")
+        integrations_smart = request.getfixturevalue("integrations_list_smart")
+        integrations_wps = request.getfixturevalue("integrations_list_wpswatch")
+    # Mock the celery task doing the actual deployment
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mock_deploy_serverless_dispatcher = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher,
+    )
+    mocker.patch(
+        "deployments.management.commands.dispatchers.deploy_serverless_dispatcher",
+        mock_deploy_serverless_dispatcher
+    )
+
+    call_command(
+        "dispatchers", f"--{gundi_version}", "--type", integration_type, "--max", "2",
+        "--recreate", "--update-source", dispatcher_source_release_2
+    )
+
+    source_key = "source_code_path" if integration_type == "earth_ranger" else "docker_image_url"
+    if integration_type == "earth_ranger":
+        integrations_list = integrations_er
+    elif integration_type == "smart_connect":
+        integrations_list = integrations_smart
+    else:
+        integrations_list = integrations_wps
+    sorted_integrations = sorted(integrations_list, key=lambda i: i.name)
+    # Check that the deployment task is triggered for each integration
+    assert mock_deploy_serverless_dispatcher.delay.call_count == 2
+    for integration in sorted_integrations[:2]:
+        if gundi_version == "v1":
+            mock_deploy_serverless_dispatcher.delay.assert_any_call(
+                deployment_id=integration.dispatcher_by_outbound.id,
+                force_recreate=True,
+                deployment_settings={source_key: dispatcher_source_release_2}
+            )
+        else:
+            mock_deploy_serverless_dispatcher.delay.assert_any_call(
+                deployment_id=integration.dispatcher_by_integration.id,
+                force_recreate=True,
+                deployment_settings={source_key: dispatcher_source_release_2}
+            )
