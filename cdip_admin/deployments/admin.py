@@ -36,8 +36,16 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "status",
+        "integration__type",
+        "legacy_integration__type",
     )
     actions = [restart_deployments, recreate_dispatchers]
+    search_fields = (
+        "id",
+        "name",
+        "integration__name",
+        "legacy_integration__name",
+    )
 
     def delete_queryset(self, request, queryset):
         for deployment in queryset:
