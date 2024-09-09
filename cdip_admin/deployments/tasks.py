@@ -30,8 +30,7 @@ if settings.GCP_ENVIRONMENT_ENABLED:
     )
 else:
     pubsub_client = utils.PubSubDummyClient()
-    # ToDo: Implement dummy client for subscriptions
-    #subscriptions_client = utils.SubscriberDummyClient()
+    subscriptions_client = utils.SubscriberDummyClient()
     functions_client = utils.FunctionsDummyClient()
     cloudrun_client = utils.CloudRunDummyClient()
     eventarc_client = utils.EventarcDummyClient()

@@ -136,6 +136,34 @@ class EventarcDummyClient:
         return None
 
 
+class SubscriberDummyClient:
+
+    def create_subscription(
+            self,
+            request=None,
+            *,
+            name=None,
+            subscription=None,
+            retry=None,
+            timeout=None,
+            metadata=(),
+    ) -> None:
+        logger.warning(f"Using SubscriberDummyClient. Subscription creation ignored.")
+        return None
+
+    def delete_subscription(
+            self,
+            request=None,
+            *,
+            subscription=None,
+            retry=None,
+            timeout=None,
+            metadata=(),
+    ) -> None:
+        logger.warning(f"Using SubscriberDummyClient. Subscription deletion ignored.")
+        return None
+
+
 def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAULTS_SECRET):
     # Load default settings for serverless dispatchers from GCP secrets
     client = secretmanager.SecretManagerServiceClient()
