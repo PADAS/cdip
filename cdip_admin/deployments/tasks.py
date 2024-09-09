@@ -6,7 +6,7 @@ from google.cloud import functions_v2, run_v2
 from google.cloud import eventarc_v1
 from google.cloud.eventarc_v1 import CreateTriggerRequest
 from google.cloud.eventarc_v1.types import Trigger, Destination, CloudRun
-from google.api_core.exceptions import AlreadyExists
+from google.api_core.exceptions import AlreadyExists, NotFound
 from django.apps import apps
 from django.conf import settings
 from . import utils
@@ -70,7 +70,7 @@ def get_function_subscription_request(function, topic_path, configuration):
 
 
 @shared_task
-def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
+def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment_settings=None):
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
     deployment.status = DispatcherDeployment.Status.IN_PROGRESS
@@ -95,6 +95,8 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
     if not deployment.configuration:  # Use default settings
         deployment.configuration = DISPATCHER_DEFAULT_SETTINGS_ER
     configuration = deployment.configuration
+    if deployment_settings:
+        configuration["deployment_settings"].update(deployment_settings)
     env_vars = configuration.get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
     topic = integration.additional.get("topic", utils.get_default_topic_name(integration=integration, gundi_version=gundi_version))
@@ -114,16 +116,22 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
             )
 
             if force_recreate:
-                delete_function(function_name=function_name)
-
+                try:
+                    delete_function(function_name=function_name, configuration=configuration)
+                except NotFound as e:
+                    print(f"Function {function_name} not found. Skipping deletion.")
+                except Exception as e:
+                    print(f"Error deleting function {function_name}: {e}")
+                    deployment.status = DispatcherDeployment.Status.ERROR
+                    deployment.status_details = f"Error deleting function {function_name}: {e}"
+                    deployment.save()
+                    return
             function_response = create_or_update_function(
                 function_request=function_request,
             )
-            print(function_response)
             # Create a subscription to the topic
             subscription = get_function_subscription_request(function_response, topic_path, configuration)
-            subscription_response = subscriptions_client.create_subscription(request=subscription)
-            print(subscription_response)
+            create_subscription(request=subscription)
         elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
             response = create_or_update_cloud_run_service(
                 configuration=configuration,
@@ -132,6 +140,8 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False):
                 force_recreate=force_recreate
             )
             print(response)
+            # ToDo: Create a subscription to the topic
+            # ToDO: Check if the subscription already exists
         else:
             error_msg = f"Integration type '{integration.type.value}' is not supported."
             print(error_msg)
@@ -165,20 +175,52 @@ def delete_serverless_dispatcher(deployment_id, topic):
 
     try:
         if is_er_site:
-            response = delete_function(function_name=deployment.name)
+            response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
         else:  # SMART or others will use Cloud Run
-            response = delete_cloudrun_service(service_name=deployment.name)
-        delete_topic(topic_name=topic)
-        print(f"Delete complete.")
-        print(response)
+            response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
+    except NotFound as e:
+        print(f"Function or Service {deployment.name} not found. Skipping deletion.")
     except Exception as e:
         error_msg = f"Error deleting function: {e}"
         print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
         deployment.save()
-    else:  # No errors deleting resources in GCP
-        deployment.delete()  # Remove it from the DB
+    else:
+        print(response)
+        print("Function or Service deletion complete.")
+
+    try:
+        delete_topic(topic_name=topic, configuration=deployment.configuration)
+    except NotFound as e:
+        print(f"Topic {topic} not found. Skipping deletion.")
+    except Exception as e:
+        print(f"Error deleting topic {topic}: {e}")
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = f"Error deleting topic {topic}: {e}"
+        deployment.save()
+        return
+    else:
+        print("Topic deletion complete.")
+
+    try:
+        subscription_name = f"{deployment.name[:250]}-sub".replace("--", "-")
+        delete_subscription(
+            subscription_name=subscription_name,
+            configuration=deployment.configuration
+        )
+    except NotFound as e:
+        print(f"Subscription {subscription_name} not found. Skipping deletion.")
+    except Exception as e:
+        print(f"Error deleting subscription {subscription_name}: {e}")
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = f"Error deleting subscription {subscription_name}: {e}"
+        deployment.save()
+        return
+    else:
+        print(f"Subscription deletion complete.")
+    # No errors deleting resources in GCP
+    deployment.delete()  # Remove it from the DB
 
 
 def create_topic(topic_path):
@@ -243,10 +285,13 @@ def get_function_request(configuration, function_name, topic_path):
 
 def create_or_update_function(function_request):
     try:
+        print(f"Creating function {function_request.function_id} ...")
         operation = functions_client.create_function(request=function_request)
         print(f"Waiting for the operation to finish..")
         print(operation)
         response = operation.result()
+        print(response)
+        print(f"Function {function_request.function_id} CREATED.")
         return response
     except AlreadyExists:
         print(f"Function {function_request.function_id} already exists.")
@@ -259,39 +304,80 @@ def create_or_update_function(function_request):
         print(f"Waiting for the operation to finish..")
         print(operation)
         response = operation.result()
+        print(response)
+        print(f"Function {function_request.function_id} UPDATED.")
         return response
 
 
-def delete_function(function_name):
-    print(f"Deleting {function_name} function.")
+def create_subscription(request):
+    try:
+        print(f"Creating subscription {request.name} ...")
+        response = subscriptions_client.create_subscription(request=request)
+        print(response)
+        print(f"Subscription {request.name} CREATED.")
+    except AlreadyExists:
+        print(f"Subscription {request.name} already exists. Skipping creation.")
+        return
+    return response
+
+
+def delete_subscription(subscription_name, configuration):
+    print(f"Deleting subscription {subscription_name} ...")
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    full_subscription_name = f"projects/{project_id}/subscriptions/{subscription_name}"
+    subscription_request = pubsub_gapic_types.DeleteSubscriptionRequest(
+        subscription=full_subscription_name
+    )
+    response = subscriptions_client.delete_subscription(request=subscription_request)
+    print(f"Subscription {subscription_name} DELETED.")
+    return response
+
+
+
+def delete_function(function_name, configuration):
+    print(f"Deleting CLoud function {function_name} ...")
+    deployment_settings = configuration.get("deployment_settings", {})
+    region = deployment_settings.get("region", "us-central1")
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    full_function_name = f"projects/{project_id}/locations/{region}/functions/{function_name}"
     function_request = functions_v2.DeleteFunctionRequest(
-        name=function_name
+        name=full_function_name
     )
     operation = functions_client.delete_function(
         request=function_request
     )
     response = operation.result()
+    print(f"Function {function_name} DELETED.")
     return response
 
 
-def delete_cloudrun_service(service_name):
-    print(f"Deleting {service_name} service.")
+def delete_cloudrun_service(service_name, configuration):
+    print(f"Deleting CloudRun service {service_name} ...")
+    deployment_settings = configuration.get("deployment_settings", {})
+    region = deployment_settings.get("region", "us-central1")
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    full_service_name = f"projects/{project_id}/locations/{region}/services/{service_name}"
     delete_request = run_v2.types.DeleteServiceRequest(
-        name=service_name
+        name=full_service_name
     )
     operation = cloudrun_client.delete_service(
         request=delete_request
     )
     response = operation.result()
+    print(f"Service {service_name} DELETED.")
     return response
 
 
-def delete_topic(topic_name):
-    print(f"Deleting Topic {topic_name}..")
-    request = pubsub_v1.DeleteTopicRequest(
-        topic=topic_name,
-    )
-    pubsub_client.delete_topic(request=request)
+def delete_topic(topic_name, configuration):
+    print(f"Deleting Topic {topic_name}...")
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    topic_path = f'projects/{project_id}/topics/{topic_name}'
+    pubsub_client.delete_topic(topic=topic_path)
+    print(f"Topic {topic_name} DELETED.")
 
 
 def create_or_update_cloud_run_service(configuration, service_name, topic_path, force_recreate=False):
@@ -335,38 +421,7 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path, 
     try:
         operation = cloudrun_client.create_service(request=request)
         response = operation.result()
-        # Trigger the service on new PubSub messages
-        print(f"Service {service_name} deployed to Cloud Run. Creating trigger..")
-        trigger_name = service_name.replace("dis", "tri")[:63]
-        trigger = Trigger(
-            name=f"{parent}/triggers/{trigger_name}",
-            event_filters=[
-                eventarc_v1.EventFilter(
-                    attribute="type",
-                    value="google.cloud.pubsub.topic.v1.messagePublished"
-                )
-            ],
-            destination=Destination(
-                cloud_run=CloudRun(
-                    service=service_name,
-                    region=region
-                )
-            ),
-            transport=eventarc_v1.Transport(
-                pubsub=eventarc_v1.Pubsub(
-                    topic=topic_path
-                )
-            ),
-            service_account = service_account
-        )
-        create_trigger_request = CreateTriggerRequest(
-            parent=parent,
-            trigger=trigger,
-            trigger_id=trigger_name
-        )
-        operation = eventarc_client.create_trigger(request=create_trigger_request)
-        operation.result()
-        print(f"Trigger created for service {service_name}.")
+        print(f"Service {service_name} CREATED.")
     except AlreadyExists:
         print(f"Service {service_name} already exists.")
         print(f"Updating service {service_name}..")
@@ -382,5 +437,5 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path, 
         # Update the service
         operation = cloudrun_client.update_service(service=current_service)
         response = operation.result()
-    print(f"Deployment for service {service_name} Done.")
+        print(f"Service {service_name} UPDATED.")
     return response

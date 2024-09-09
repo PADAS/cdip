@@ -70,7 +70,7 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         # Trigger the deployment of a dispatcher.
         # https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
         config_changed = self.tracker.has_changed("configuration")
-        if self.status == DispatcherDeployment.Status.SCHEDULED or config_changed:
+        if self.status == DispatcherDeployment.Status.SCHEDULED or (config_changed and self.status != DispatcherDeployment.Status.IN_PROGRESS):
             transaction.on_commit(
                 lambda: deploy_serverless_dispatcher.delay(deployment_id=self.id)
             )

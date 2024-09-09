@@ -7,6 +7,7 @@ from deployments.utils import (
     get_dispatcher_defaults_from_gcp_secrets,
     get_default_dispatcher_name,
 )
+from deployments.tasks import deploy_serverless_dispatcher
 from integrations.models import Integration, OutboundIntegrationConfiguration
 from integrations.utils import get_dispatcher_topic_default_name
 
@@ -50,6 +51,12 @@ class Command(BaseCommand):
             help="Deploy serverless dispatcher for the specified integration by ID",
         )
         parser.add_argument(
+            "--recreate",
+            action="store_true",
+            default=False,
+            help="Re-create dispatchers and related subscriptions, copying setings from existent dispatchers",
+        )
+        parser.add_argument(
             "--deploy-missing",
             action="store_true",
             default=False,
@@ -91,7 +98,9 @@ class Command(BaseCommand):
             if max_deploys := options["max"]:
                 integrations = integrations[:max_deploys]
             self.deploy_dispatchers(integrations)
-        elif source := options.get("update_source"):
+        elif options.get("update_source") or options.get("recreate"):
+            source = options.get("update_source")
+            recreate = options.get("recreate")
             if not options.get("v1") and not options.get("v2"):
                 self.stdout.write("Please specify a Gundi version (v1 or v2)")
                 return
@@ -100,30 +109,42 @@ class Command(BaseCommand):
                 if not integration:
                     self.stderr.write("Integration not found")
                     return
-                source = source.lower().strip()
-                new_settings = {"source_code_path": source} if integration.is_er_site else {"docker_image_url": source}
-                integrations_to_update = [integration]
+                if source:
+                    source = source.lower().strip()
+                    new_settings = {"source_code_path": source} if integration.is_er_site else {"docker_image_url": source}
+                    integrations_to_update = [integration]
             elif type := options.get("type"):
                 # Build the query to get the integrations to update, based on type and version
                 related_dispatcher_field = "dispatcher_by_integration" if options.get("v2") else "dispatcher_by_outbound"
                 IntegrationModel = Integration if options.get("v2") else OutboundIntegrationConfiguration
                 type_cleaned = type.lower().strip()
                 integration_type_q = Q(type__value=type_cleaned) if options.get("v2") else Q(type__slug=type_cleaned)
-                source_field = "source_code_path" if type_cleaned == "earth_ranger"  else "docker_image_url"
-                source_lookup = f"{related_dispatcher_field}__configuration__deployment_settings__{source_field}"
-                source_outdated_q = ~Q(**{source_lookup: source})
-                integrations_to_update = IntegrationModel.objects.filter(
-                    integration_type_q & source_outdated_q
-                ).order_by("name")[:options["max"]]
-                new_settings = {"source_code_path": source} if type_cleaned == "earth_ranger" else {"docker_image_url": source}
+                if source:
+                    source_field = "source_code_path" if type_cleaned == "earth_ranger"  else "docker_image_url"
+                    source_lookup = f"{related_dispatcher_field}__configuration__deployment_settings__{source_field}"
+                    source_outdated_q = ~Q(**{source_lookup: source})
+                    integrations_to_update = IntegrationModel.objects.filter(
+                        integration_type_q & source_outdated_q
+                    ).order_by("name")[:options["max"]]
+                    new_settings = {"source_code_path": source} if type_cleaned == "earth_ranger" else {"docker_image_url": source}
+                else:
+                    integrations_to_update = IntegrationModel.objects.filter(
+                        integration_type_q
+                    ).order_by("name")[:options["max"]]
+                    new_settings = None
             else:
                 self.stdout.write("Please specify an integration ID or a type")
                 return
-
-            self.update_dispatchers(
-                integrations=integrations_to_update,
-                deployment_settings=new_settings
-            )
+            if recreate:
+                self.recreate_dispatchers(
+                    integrations=integrations_to_update,
+                    deployment_settings=new_settings
+                )
+            else:
+                self.update_dispatchers(
+                    integrations=integrations_to_update,
+                    deployment_settings=new_settings
+                )
         self.stdout.write(self.style.SUCCESS("Done."))
 
     def list_deployments(self, options):
@@ -291,6 +312,55 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     f"Update triggered for {integration.name} ({version})\nDispatcher: {dispatcher_deployment.name}"
+                )
+
+
+    def recreate_dispatchers(self, integrations, env_vars=None, deployment_settings=None):
+        self.stdout.write(self.style.SUCCESS(f"Re-creating dispatchers for {len(integrations)} integrations..."))
+        for integration in integrations:
+            try:
+                # Skip if the integration is not an ER, SMART site, or WPS Watch Site
+                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site):
+                    self.stdout.write(
+                        f"Integration {integration.name} is not an ER, SMART or WPS Watch site. Skipped"
+                    )
+                    continue
+
+                self.stdout.write(
+                    f"Re-creating dispatcher for {integration.name} with env_vars: {env_vars}, deployment_settings {deployment_settings}..."
+                )
+
+                if isinstance(integration, OutboundIntegrationConfiguration):
+                    version = "v1"
+                    dispatcher_deployment = integration.dispatcher_by_outbound
+                elif isinstance(integration, Integration):
+                    version = "v2"
+                    dispatcher_deployment = integration.dispatcher_by_integration
+                else:
+                    self.stdout.write(
+                        f"Unknown integration type: {integration}. Skipped"
+                    )
+                    continue
+
+                deploy_serverless_dispatcher.delay(
+                    deployment_id=dispatcher_deployment.id,
+                    force_recreate=True,
+                    deployment_settings=deployment_settings
+                )
+
+            except DispatcherDeployment.DoesNotExist:
+                self.stderr.write(
+                    f"Dispatcher for {integration.name} (id: {integration.id}) does not exist. Please deploy a dispatcher first."
+                )
+                continue
+            except Exception as e:
+                self.stderr.write(
+                    f"Error recreating dispatcher for {integration.name} (id: {integration.id}): {e}"
+                )
+                continue
+            else:
+                self.stdout.write(
+                    f"Dispatcher re-create triggered for {integration.name} ({version})\nDispatcher: {dispatcher_deployment.name}"
                 )
 
     def list_integrations_using_kafka_dispatchers(self, options):
