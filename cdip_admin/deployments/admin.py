@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import DispatcherDeployment
+from .tasks import deploy_serverless_dispatcher
 
 
 def restart_deployments(modeladmin, request, queryset):
@@ -9,6 +10,16 @@ def restart_deployments(modeladmin, request, queryset):
 
 
 restart_deployments.short_description = "Restart selected deployments"
+
+
+def recreate_dispatchers(modeladmin, request, queryset):
+    for deployment in queryset:
+        deploy_serverless_dispatcher.delay(
+            deployment_id=deployment.id,
+            force_recreate=True        )
+
+
+recreate_dispatchers.short_description = "Recreate selected dispatchers"
 
 
 @admin.register(DispatcherDeployment)
@@ -26,7 +37,7 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
     )
-    actions = [restart_deployments]
+    actions = [restart_deployments, recreate_dispatchers]
 
     def delete_queryset(self, request, queryset):
         for deployment in queryset:
