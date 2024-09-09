@@ -69,6 +69,36 @@ def get_function_subscription_request(function, topic_path, configuration):
     return subscription
 
 
+def get_service_subscription_request(service_response, topic_path, configuration):
+    service_name = service_response.name
+    deployment_settings = configuration.get("deployment_settings", {})
+    env_vars = configuration.get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    service_id = service_name.split("/")[5]
+    subscription_name = f"{service_id[:250]}-sub".replace("--", "-")
+    push_endpoint = service_response.uri
+    service_account = deployment_settings.get("service_account")
+    subscription = pubsub_gapic_types.Subscription(
+        name=f"projects/{project_id}/subscriptions/{subscription_name}",
+        topic=topic_path,
+        push_config=pubsub_gapic_types.PushConfig(
+            push_endpoint=push_endpoint,
+            oidc_token=pubsub_gapic_types.PushConfig.OidcToken(
+                service_account_email=service_account,
+                audience=push_endpoint
+            )
+        ),
+        expiration_policy=pubsub_gapic_types.ExpirationPolicy(),
+        ack_deadline_seconds=600,
+        enable_message_ordering=True,
+        retry_policy=pubsub_gapic_types.RetryPolicy(
+            minimum_backoff="10s",
+            maximum_backoff="600s"
+        )
+    )
+    return subscription
+
+
 @shared_task
 def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment_settings=None):
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
@@ -133,15 +163,28 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
             subscription = get_function_subscription_request(function_response, topic_path, configuration)
             create_subscription(request=subscription)
         elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
-            response = create_or_update_cloud_run_service(
+
+            if force_recreate:
+                try:
+                    delete_cloudrun_service(service_name=function_name, configuration=configuration)
+                except NotFound as e:
+                    print(f"Cloudrun Service {function_name} not found. Skipping deletion.")
+                except Exception as e:
+                    print(f"Error deleting Cloudrun service {function_name}: {e}")
+                    deployment.status = DispatcherDeployment.Status.ERROR
+                    deployment.status_details = f"Error deleting Cloudrun service {function_name}: {e}"
+                    deployment.save()
+                    return
+
+            service_response = create_or_update_cloud_run_service(
                 configuration=configuration,
                 service_name=function_name,
                 topic_path=topic_path,
                 force_recreate=force_recreate
             )
-            print(response)
-            # ToDo: Create a subscription to the topic
-            # ToDO: Check if the subscription already exists
+            # Create a subscription to the topic
+            subscription = get_service_subscription_request(service_response, topic_path, configuration)
+            create_subscription(request=subscription)
         else:
             error_msg = f"Integration type '{integration.type.value}' is not supported."
             print(error_msg)
@@ -393,7 +436,6 @@ def create_or_update_cloud_run_service(configuration, service_name, topic_path, 
     min_instances = deployment_settings.get("min_instances", 0)
     max_instances = deployment_settings.get("max_instances", 2)
     parent = f"projects/{project_id}/locations/{region}"
-    service_account = deployment_settings.get("service_account")
     # Define the service resource
     service = run_v2.types.Service(
         template=run_v2.types.RevisionTemplate(
