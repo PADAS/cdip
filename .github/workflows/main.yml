@@ -60,7 +60,7 @@ jobs:
         deployment: 
           - cdip-portal
           - celery-beat
-          - celeary-deployments-worker
+          - celery-deployments-worker
           - celery-permissions-worker
           - celery-worker
     with:
@@ -93,7 +93,7 @@ jobs:
         deployment: 
           - cdip-portal
           - celery-beat
-          - celeary-deployments-worker
+          - celery-deployments-worker
           - celery-permissions-worker
           - celery-worker
     with:
