@@ -50,6 +50,27 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit
 
+  deploy_dev_legacy:
+    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@main
+    if: startsWith(github.ref, 'refs/heads/release')
+    needs: [vars, build]
+    strategy:
+      matrix:
+        deployment: 
+          - cdip-portal
+          - celery-beat
+          - celeary-deployments-worker
+          - celery-permissions-worker
+          - celery-worker
+    with:
+      environment: dev-legacy
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.tag }}
+      deployment: ${{ matrix.deployment }}
+      container: main
+      namespace: cdip-v1
+    secrets: inherit
+
   deploy_prod:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
     if: startsWith(github.ref, 'refs/heads/release')
@@ -60,4 +81,25 @@ jobs:
       chart_version: '1.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+    secrets: inherit
+
+  deploy_prod_legacy:
+    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@main
+    if: startsWith(github.ref, 'refs/heads/release')
+    needs: [vars, build, deploy_stage]
+    strategy:
+      matrix:
+        deployment: 
+          - cdip-portal
+          - celery-beat
+          - celeary-deployments-worker
+          - celery-permissions-worker
+          - celery-worker
+    with:
+      environment: prod-legacy
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.tag }}
+      deployment: ${{ matrix.deployment }}
+      container: main
+      namespace: cdip-prod01
     secrets: inherit
