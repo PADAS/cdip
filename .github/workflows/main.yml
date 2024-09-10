@@ -51,7 +51,7 @@ jobs:
     secrets: inherit
 
   deploy_dev_legacy:
-    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@main
+    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@v2
     if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build]
     strategy:
@@ -84,7 +84,7 @@ jobs:
     secrets: inherit
 
   deploy_prod_legacy:
-    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@main
+    uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@v2
     if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build, deploy_stage]
     strategy:
