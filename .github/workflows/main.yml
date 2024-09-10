@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - 'release-**'
+      - GUNDI-3467
 
 jobs:
   vars:
@@ -52,7 +53,7 @@ jobs:
 
   deploy_dev_legacy:
     uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@main
-    if: startsWith(github.ref, 'refs/heads/release')
+    # if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build]
     strategy:
       matrix:
