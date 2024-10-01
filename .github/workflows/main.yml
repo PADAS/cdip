@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - gundi-3054 # remove this line before merge
       - 'release-**'
 
 jobs:
@@ -25,6 +26,15 @@ jobs:
       environment: stage
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
+
+  unit-test:
+    uses: ./.github/workflows/_unit-test.yml
+    needs: [vars, build]
+    with:
+      environment: stage
+      image: "${{ needs.vars.outputs.repository }}:${{ needs.vars.outputs.tag }}"
+      command: |
+        pytest 
 
   deploy_dev:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2

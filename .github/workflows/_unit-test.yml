@@ -1,0 +1,76 @@
+name: Run unit tests
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+      environment:
+        type: string
+
+jobs:
+  vars:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    outputs:
+      token: ${{ steps.vars.outputs.token }}
+    environment: 
+      name: ${{ inputs.environment }}
+    steps:
+      - name: GCP Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT }}
+      - id: vars
+        run: |
+          echo "token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: [vars]
+    container: 
+      image: ${{ inputs.image }}
+      credentials:
+        username: oauth2accesstoken
+        password: ${{ needs.vars.outputs.token }}
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: fancypassword
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Setup
+        run: |
+          cd /var/www/app
+          python3 -m pip install -r requirements-dev.txt 
+
+      - name: Run Tests
+        run: |
+          cd /var/www/app
+          ${{ inputs.command }}
+        # export PYTHONPATH=/var/www/app:$PYTHONPATH
+        env:
+          DB_HOST: postgis
+          DB_NAME: testdb
+          DB_USER: testuser
+          DB_PASSWORD: fancypassword
+          DB_PORT: 5432
+          FQDN: testing.pamdas.org
+          GCP_ENVIRONMENT_ENABLED: false
+          TRACING_ENABLED: false
+          CELERY_TASK_ALWAYS_EAGER: true
