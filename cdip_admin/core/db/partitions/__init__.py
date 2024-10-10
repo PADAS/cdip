@@ -1,1 +1,1 @@
-from partition import *
+from .partition import *
