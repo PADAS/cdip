@@ -36,7 +36,7 @@ class PartitionActivityLogsTable(PartitionTableTool):
           FOREIGN KEY (created_by_id)
               REFERENCES public.auth_user (id) DEFERRABLE INITIALLY DEFERRED
         ) PARTITION BY RANGE ({self.partition_column}) 
-        PARTITION BY LIST ({self.subpartition_list});
+        PARTITION BY LIST ({self.subpartition_column});
         """
         self._execute_sql_command(command=sql)
         self._set_current_step(step=1)
