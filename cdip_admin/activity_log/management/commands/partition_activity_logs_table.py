@@ -13,6 +13,7 @@ from core.db.partitions import (
 class PartitionActivityLogsTable(PartitionTableTool):
 
     def _create_parent_table(self) -> None:
+        partitioning_values_str = ','.join([f"'{v}'" for v in self.subpartition_list])
         sql = f"""
         -- Create the parent table with partitioning
         CREATE TABLE IF NOT EXISTS {self.partitioned_table_name}
@@ -21,7 +22,7 @@ class PartitionActivityLogsTable(PartitionTableTool):
           updated_at timestamp with time zone NOT NULL,
           id uuid NOT NULL,
           log_level integer NOT NULL,
-          log_type character varying(5) NOT NULL CHECK (log_type IN ({','.join(self.subpartition_list)})),
+          log_type character varying(5) NOT NULL CHECK (log_type IN ({partitioning_values_str})),
           origin character varying(5) NOT NULL,
           value character varying(40) NOT NULL,
           title character varying(200) NOT NULL,
