@@ -15,7 +15,7 @@ class PartitionActivityLogsTable(PartitionTableTool):
     def _create_parent_table(self) -> None:
         sql = f"""
         -- Create the parent table with partitioning
-        CREATE TABLE {self.partitioned_table_name}
+        CREATE TABLE IF NOT EXISTS {self.partitioned_table_name}
         (
           created_at timestamp with time zone NOT NULL,
           updated_at timestamp with time zone NOT NULL,
@@ -35,9 +35,9 @@ class PartitionActivityLogsTable(PartitionTableTool):
               REFERENCES public.integrations_integration (id) DEFERRABLE INITIALLY DEFERRED,
           FOREIGN KEY (created_by_id)
               REFERENCES public.auth_user (id) DEFERRABLE INITIALLY DEFERRED
-        ) PARTITION BY RANGE ({self.partition_column}) 
-        PARTITION BY LIST ({self.subpartition_column});
+        ) PARTITION BY RANGE ({self.partition_column});
         """
+        self.logger.debug(f"PARENT TABLE SQL: {sql}")
         self._execute_sql_command(command=sql)
         self._set_current_step(step=1)
         self.logger.info(f"Parent table: {self.partitioned_table_name} created successfully.")
