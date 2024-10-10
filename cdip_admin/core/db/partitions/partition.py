@@ -151,6 +151,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
     def _store_subpartitioning_function(self) -> None:
         if self.subpartition_column:
+            self.logger.info(f"Creating Sub-partitioning function 'create_list_subpartitions()'...")
             sql = f"""
             CREATE OR REPLACE FUNCTION create_list_subpartitions()
             RETURNS void AS $$
@@ -176,11 +177,13 @@ class PartitionTableTool(PartitionTableToolProtocol):
             """
             # ToDo: make this work with more than two values in subpartition_list
             self._execute_sql_command(command=sql)
+            self.logger.info(f"Sub-partitioning function 'create_list_subpartitions()' created.")
+
         self._set_current_step(step=3)
-        self.logger.info(f"Sub-partitioning function 'create_list_subpartitions()' created.")
 
     def _create_subpartition_trigger(self) -> None:
         if self.subpartition_column:
+            self.logger.info(f"Creating Sub-partitioning trigger on table '{self.partitioned_table_name}'...")
             sql = f"""
             CREATE OR REPLACE FUNCTION trigger_on_partition_creation()
             RETURNS trigger AS $$
@@ -201,8 +204,9 @@ class PartitionTableTool(PartitionTableToolProtocol):
             EXECUTE FUNCTION trigger_on_partition_creation();
             """
             self._execute_sql_command(command=sql)
+            self.logger.info(f"Sub-partitioning trigger on table '{self.partitioned_table_name}' created.")
+
         self._set_current_step(step=4)
-        self.logger.info(f"Sub-partitioning trigger on table '{self.partitioned_table_name}' created.")
 
     def _partition_setup(self) -> None:
         sql = f"""
