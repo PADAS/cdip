@@ -160,7 +160,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             BEGIN
                 -- Get the name of the last partition created by pg_partman
                 SELECT partition_name INTO parent_partition_name
-                FROM pg_partman.part_config 
+                FROM partman.part_config 
                 WHERE parent_table = '{self.partitioned_table_name}'
                 ORDER BY partition_creation_date DESC
                 LIMIT 1;
@@ -198,7 +198,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             # Attach the trigger to the partman table
             sql = f"""
             CREATE TRIGGER after_partition_creation
-            AFTER INSERT ON pg_partman.part_config
+            AFTER INSERT ON partman.part_config
             FOR EACH ROW
             WHEN (NEW.parent_table = '{self.partitioned_table_name}')
             EXECUTE FUNCTION trigger_on_partition_creation();
