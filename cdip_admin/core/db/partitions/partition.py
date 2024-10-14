@@ -197,7 +197,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             self._execute_sql_command(command=sql)
             # Attach the trigger to the partman table
             sql = f"""
-            CREATE TRIGGER after_partition_creation
+            CREATE TRIGGER IF NOT EXISTS after_partition_creation 
             AFTER INSERT ON partman.part_config
             FOR EACH ROW
             WHEN (NEW.parent_table = '{self.partitioned_table_name}')
