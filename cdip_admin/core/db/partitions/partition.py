@@ -260,14 +260,17 @@ class PartitionTableTool(PartitionTableToolProtocol):
         )
 
     def _set_partition_schema_with_existing_tables(self) -> None:
+        self.logger.info(f"Setting Partition schema with existent tables...")
         try:
+            self.logger.info(f"Locking tables...")
             self._execute_sql_command(command="BEGIN;")
             lock_tables_sql = f"""
             LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
             LOCK TABLE public.{self.partitioned_table_name} IN ACCESS EXCLUSIVE MODE;
             """
             self._execute_sql_command(command=lock_tables_sql)
-
+            self.logger.info(f"Tables locked.")
+            self.logger.info(f"Renaming tables...")
             rename_tables_sql = f"""
             ALTER TABLE public.{self.original_table_name}
                 RENAME TO {self.original_table_name}_default;
@@ -276,7 +279,9 @@ class PartitionTableTool(PartitionTableToolProtocol):
                 RENAME TO {self.original_table_name};
             """
             self._execute_sql_command(command=rename_tables_sql)
+            self.logger.info(f"Tables renamed.")
 
+            self.logger.info(f"Setting default partition...")
             attach_sql = f"""
             ALTER TABLE public.{self.original_table_name}
                 ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
@@ -289,8 +294,9 @@ class PartitionTableTool(PartitionTableToolProtocol):
                 p_partition_times := ARRAY [ '2015-01-01 00:00:00'::timestamptz ]);
             """
             self._execute_sql_command(command=create_default_partition_sql)
-
+            self.logger.info(f"Default partition set.")
             self._execute_sql_command(command="COMMIT;")
+            self.logger.info(f"Setting Partition schema with existent tables completed.")
 
         except Exception:
             self._execute_sql_command(command="ROLLBACK;")
