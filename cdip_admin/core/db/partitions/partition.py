@@ -197,11 +197,18 @@ class PartitionTableTool(PartitionTableToolProtocol):
             self._execute_sql_command(command=sql)
             # Attach the trigger to the partman table
             sql = f"""
-            CREATE TRIGGER IF NOT EXISTS after_partition_creation 
-            AFTER INSERT ON partman.part_config
-            FOR EACH ROW
-            WHEN (NEW.parent_table = '{self.partitioned_table_name}')
-            EXECUTE FUNCTION trigger_on_partition_creation();
+            DO $$
+            BEGIN
+               IF NOT EXISTS (
+                   SELECT 1 FROM pg_trigger 
+                   WHERE tgname = 'after_partition_creation') THEN
+                   CREATE TRIGGER after_partition_creation 
+                    AFTER INSERT ON partman.part_config
+                    FOR EACH ROW
+                    WHEN (NEW.parent_table = '{self.partitioned_table_name}')
+                    EXECUTE FUNCTION trigger_on_partition_creation();
+               END IF;
+            END $$;
             """
             self._execute_sql_command(command=sql)
             self.logger.info(f"Sub-partitioning trigger on table '{self.partitioned_table_name}' created.")
@@ -209,6 +216,9 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._set_current_step(step=4)
 
     def _partition_setup(self) -> None:
+        self.logger.info(
+            f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
+        )
         sql = f"""
             SELECT partman.create_parent(
                p_parent_table := 'public.{self.partitioned_table_name}',
@@ -290,7 +300,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._set_current_step(step=6)
 
     def _process_data_partition(self) -> None:
-        self.logger.info("Starting proccesing data partititon")
+        self.logger.info("Moving existent data to partititons...")
         migrate_sql = f"""
             CALL partman.partition_data_proc(
             'public.{self.original_table_name}',
@@ -300,7 +310,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         """
 
         self._execute_sql_command(command=migrate_sql)
-        self.logger.info("Data partititon is completed.")
+        self.logger.info("Moving existent data to partititons...completed")
 
         create_default_partition_sql = f"""
             DO $$
@@ -342,7 +352,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._set_current_step(step=7)
 
     def _validate_data(self) -> None:
-        self.logger.info("Start to validate data.")
+        self.logger.info("Validating data...")
         create_function_to_validate_sql = f"""
             CREATE FUNCTION find_missing_records()
                 RETURNS TABLE
@@ -398,7 +408,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             self.logger.info("Data isn't validate. Procced to rollback.")
             exit(1)
         self._set_current_step(step=7)
-        self.logger.info("Data is validated successfully.")
+        self.logger.info("Data was validated successfully.")
 
     def _pre_requirements_check(self) -> None:
         result = self._execute_sql_command(
