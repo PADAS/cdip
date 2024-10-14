@@ -317,7 +317,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
         self._execute_sql_command(command=migrate_sql)
         self.logger.info("Moving existent data to partititons...completed")
-
+        self.logger.info("Creating future partititons...")
         create_default_partition_sql = f"""
             DO $$
                 DECLARE
@@ -338,23 +338,33 @@ class PartitionTableTool(PartitionTableToolProtocol):
                 $$;
             """
         self._execute_sql_command(command=create_default_partition_sql)
+        self.logger.info("Future partititons created.")
 
+        self.logger.info("Running VACUUM ANALYZE...")
         self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
         self._execute_sql_command(command="VACUUM;")
-
         self.logger.info("VACUUM ANALYZE is completed.")
+
+        self.logger.info("Restoring triggers...")
         for trigger in self.table_data.triggers if self.table_data.triggers else []:
             self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
             self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
+        self.logger.info("Triggers restored")
 
+        self.logger.info("Creating unique index on PK...")
+        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
         self._create_index(
             table_name=self.original_table_name,
-            index_data=IndexData(name="unique", columns=self.table_data.primary_key_columns),
+            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
             is_unique=True,
         )
+        self.logger.info("Unique index on PK creted.")
+
+        self.logger.info("Restoring unique constraints...")
         for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
             self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
-        self.logger.info("Triggers restored")
+        self.logger.info("Unique constraints restored.")
+
         self._set_current_step(step=7)
 
     def _validate_data(self) -> None:
@@ -413,7 +423,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         if result and result[0] == 0:
             self.logger.info("Data isn't validate. Procced to rollback.")
             exit(1)
-        self._set_current_step(step=7)
+        self._set_current_step(step=8)
         self.logger.info("Data was validated successfully.")
 
     def _pre_requirements_check(self) -> None:
