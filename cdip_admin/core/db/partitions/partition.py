@@ -167,8 +167,8 @@ class PartitionTableTool(PartitionTableToolProtocol):
             
                 -- Dynamically create list sub-partitions for values list
                 EXECUTE format('
-                    CREATE TABLE %I_{self.subpartition_list[0]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[0]}'');
-                    CREATE TABLE %I_{self.subpartition_list[1]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[1]}'');',
+                    CREATE TABLE %I_{self.subpartition_list[0]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[0]}'') IF NOT EXISTS;
+                    CREATE TABLE %I_{self.subpartition_list[1]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[1]}'') IF NOT EXISTS;',
                     parent_partition_name, parent_partition_name,
                     parent_partition_name, parent_partition_name
                 );

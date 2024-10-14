@@ -31,7 +31,6 @@ class PartitionActivityLogsTable(PartitionTableTool):
           revert_data jsonb NOT NULL,
           created_by_id integer,
           integration_id uuid,
-          PRIMARY KEY (id, {self.partition_column}, {self.subpartition_column}),
           FOREIGN KEY (integration_id)
               REFERENCES public.integrations_integration (id) DEFERRABLE INITIALLY DEFERRED,
           FOREIGN KEY (created_by_id)
