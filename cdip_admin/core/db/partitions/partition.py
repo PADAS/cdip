@@ -95,6 +95,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             "_set_partition_schema_with_existing_tables",
             "_store_subpartitioning_function",
             "_create_subpartition_trigger",
+            "_partman_run_maintenance",
             "_process_data_partition",
         ]
 
@@ -225,7 +226,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             create_default_partition_sql = f"""
             SELECT partman.create_partition_time(
                 'public.{self.original_table_name}',
-                p_partition_times := ARRAY [ '2015-01-01 00:00:00'::timestamptz ]);
+                p_partition_times := ARRAY [ '2023-11-01 00:00:00'::timestamptz ]);
             """
             self._execute_sql_command(command=create_default_partition_sql)
             self.logger.info(f"Default partition set.")
@@ -305,6 +306,19 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
         self._set_current_step(step=6)
 
+    def _partman_run_maintenance(self) -> None:
+        self.logger.info(
+            f"Running partman.run_maintenance() to create past partitions in '{self.original_table_name}'..."
+        )
+        sql = f"""
+            SELECT partman.run_maintenance('{self.original_table_name}');
+        """
+        self._execute_sql_command(command=sql)
+        self._set_current_step(step=7)
+        self.logger.info(
+            f"partman.run_maintenance() for '{self.original_table_name}' completed."
+        )
+
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
         migrate_sql = f"""
@@ -317,6 +331,8 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
         self._execute_sql_command(command=migrate_sql)
         self.logger.info("Moving existent data to partititons...completed")
+
+        # ToDo. Do we need this or is handled by pg_partman?
         self.logger.info("Creating future partititons...")
         create_default_partition_sql = f"""
             DO $$
