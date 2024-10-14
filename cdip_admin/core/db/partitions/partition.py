@@ -91,10 +91,10 @@ class PartitionTableTool(PartitionTableToolProtocol):
         steps_commands = [
             "_create_parent_table",
             "_make_template_table",
-            "_store_subpartitioning_function",
-            "_create_subpartition_trigger",
             "_partition_setup",
             "_set_partition_schema_with_existing_tables",
+            "_store_subpartitioning_function",
+            "_create_subpartition_trigger",
             "_process_data_partition",
         ]
 
@@ -149,72 +149,6 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._set_current_step(step=2)
         self.logger.info(f"Make template '{self.template_table_name}' completed.")
 
-    def _store_subpartitioning_function(self) -> None:
-        if self.subpartition_column:
-            self.logger.info(f"Creating Sub-partitioning function 'create_list_subpartitions()'...")
-            sql = f"""
-            CREATE OR REPLACE FUNCTION create_list_subpartitions()
-            RETURNS void AS $$
-            DECLARE
-                parent_partition_name text;
-            BEGIN
-                -- Get the name of the last partition created by pg_partman
-                SELECT partition_name INTO parent_partition_name
-                FROM partman.part_config 
-                WHERE parent_table = '{self.partitioned_table_name}'
-                ORDER BY partition_creation_date DESC
-                LIMIT 1;
-            
-                -- Dynamically create list sub-partitions for values list
-                EXECUTE format('
-                    CREATE TABLE %I_{self.subpartition_list[0]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[0]}'') IF NOT EXISTS;
-                    CREATE TABLE %I_{self.subpartition_list[1]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[1]}'') IF NOT EXISTS;',
-                    parent_partition_name, parent_partition_name,
-                    parent_partition_name, parent_partition_name
-                );
-            END;
-            $$ LANGUAGE plpgsql;   
-            """
-            # ToDo: make this work with more than two values in subpartition_list
-            self._execute_sql_command(command=sql)
-            self.logger.info(f"Sub-partitioning function 'create_list_subpartitions()' created.")
-
-        self._set_current_step(step=3)
-
-    def _create_subpartition_trigger(self) -> None:
-        if self.subpartition_column:
-            self.logger.info(f"Creating Sub-partitioning trigger on table '{self.partitioned_table_name}'...")
-            sql = f"""
-            CREATE OR REPLACE FUNCTION trigger_on_partition_creation()
-            RETURNS trigger AS $$
-            BEGIN
-                -- Call the function to create the list sub-partitions
-                PERFORM create_list_subpartitions();
-                RETURN NULL;
-            END;
-            $$ LANGUAGE plpgsql;
-            """
-            self._execute_sql_command(command=sql)
-            # Attach the trigger to the partman table
-            sql = f"""
-            DO $$
-            BEGIN
-               IF NOT EXISTS (
-                   SELECT 1 FROM pg_trigger 
-                   WHERE tgname = 'after_partition_creation') THEN
-                   CREATE TRIGGER after_partition_creation 
-                    AFTER INSERT ON partman.part_config
-                    FOR EACH ROW
-                    WHEN (NEW.parent_table = '{self.partitioned_table_name}')
-                    EXECUTE FUNCTION trigger_on_partition_creation();
-               END IF;
-            END $$;
-            """
-            self._execute_sql_command(command=sql)
-            self.logger.info(f"Sub-partitioning trigger on table '{self.partitioned_table_name}' created.")
-
-        self._set_current_step(step=4)
-
     def _partition_setup(self) -> None:
         self.logger.info(
             f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
@@ -254,7 +188,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         WHERE parent_table = 'public.{self.partitioned_table_name}';
         """
         self._execute_sql_command(command=sql)
-        self._set_current_step(step=5)
+        self._set_current_step(step=3)
         self.logger.info(
             f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
         )
@@ -302,6 +236,72 @@ class PartitionTableTool(PartitionTableToolProtocol):
             self._execute_sql_command(command="ROLLBACK;")
             self.logger.exception("Failed to migrate batch data")
             exit(1)
+
+        self._set_current_step(step=4)
+
+    def _store_subpartitioning_function(self) -> None:
+        if self.subpartition_column:
+            self.logger.info(f"Creating Sub-partitioning function 'create_list_subpartitions()'...")
+            sql = f"""
+            CREATE OR REPLACE FUNCTION create_list_subpartitions()
+            RETURNS void AS $$
+            DECLARE
+                parent_partition_name text;
+            BEGIN
+                -- Get the name of the last partition created by pg_partman
+                SELECT partition_name INTO parent_partition_name
+                FROM partman.part_config 
+                WHERE parent_table = '{self.original_table_name}'
+                ORDER BY partition_creation_date DESC
+                LIMIT 1;
+
+                -- Dynamically create list sub-partitions for values list
+                EXECUTE format('
+                    CREATE TABLE %I_{self.subpartition_list[0]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[0]}'') IF NOT EXISTS;
+                    CREATE TABLE %I_{self.subpartition_list[1]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[1]}'') IF NOT EXISTS;',
+                    parent_partition_name, parent_partition_name,
+                    parent_partition_name, parent_partition_name
+                );
+            END;
+            $$ LANGUAGE plpgsql;   
+            """
+            # ToDo: make this work with more than two values in subpartition_list
+            self._execute_sql_command(command=sql)
+            self.logger.info(f"Sub-partitioning function 'create_list_subpartitions()' created.")
+
+        self._set_current_step(step=5)
+
+    def _create_subpartition_trigger(self) -> None:
+        if self.subpartition_column:
+            self.logger.info(f"Creating Sub-partitioning trigger on table '{self.original_table_name}'...")
+            sql = f"""
+            CREATE OR REPLACE FUNCTION trigger_on_partition_creation()
+            RETURNS trigger AS $$
+            BEGIN
+                -- Call the function to create the list sub-partitions
+                PERFORM create_list_subpartitions();
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+            """
+            self._execute_sql_command(command=sql)
+            # Attach the trigger to the partman table
+            sql = f"""
+            DO $$
+            BEGIN
+               IF NOT EXISTS (
+                   SELECT 1 FROM pg_trigger 
+                   WHERE tgname = 'after_partition_creation') THEN
+                   CREATE TRIGGER after_partition_creation 
+                    AFTER INSERT ON partman.part_config
+                    FOR EACH ROW
+                    WHEN (NEW.parent_table = '{self.original_table_name}')
+                    EXECUTE FUNCTION trigger_on_partition_creation();
+               END IF;
+            END $$;
+            """
+            self._execute_sql_command(command=sql)
+            self.logger.info(f"Sub-partitioning trigger on table '{self.original_table_name}' created.")
 
         self._set_current_step(step=6)
 
@@ -365,7 +365,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
             self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
         self.logger.info("Unique constraints restored.")
 
-        self._set_current_step(step=7)
+        self._set_current_step(step=8)
 
     def _validate_data(self) -> None:
         self.logger.info("Validating data...")
@@ -423,7 +423,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         if result and result[0] == 0:
             self.logger.info("Data isn't validate. Procced to rollback.")
             exit(1)
-        self._set_current_step(step=8)
+        self._set_current_step(step=9)
         self.logger.info("Data was validated successfully.")
 
     def _pre_requirements_check(self) -> None:
