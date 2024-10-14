@@ -245,7 +245,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
                 -- Get the name of the last partition created by pg_partman
                 SELECT partition_name INTO parent_partition_name
                 FROM partman.part_config 
-                WHERE parent_table = '{self.original_table_name}'
+                WHERE parent_table = 'public.{self.original_table_name}'
                 ORDER BY partition_creation_date DESC
                 LIMIT 1;
 
