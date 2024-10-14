@@ -218,18 +218,11 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
             self.logger.info(f"Setting default partition...")
             attach_sql = f"""
-            ALTER TABLE public.{self.original_table_name}
-                ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
+            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default_part 
+            PARTITION OF {self.original_table_name} DEFAULT;
             """
             self._execute_sql_command(command=attach_sql)
-
-            create_default_partition_sql = f"""
-            SELECT partman.create_partition_time(
-                'public.{self.original_table_name}',
-                p_partition_times := ARRAY [ '2023-11-01 00:00:00'::timestamptz ]);
-            """
-            self._execute_sql_command(command=create_default_partition_sql)
-            self.logger.info(f"Default partition set.")
+            self.logger.info(f"Default partition created.")
             self._execute_sql_command(command="COMMIT;")
             self.logger.info(f"Setting Partition schema with existent tables completed.")
 
