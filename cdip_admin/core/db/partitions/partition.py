@@ -279,23 +279,20 @@ class PartitionTableTool(PartitionTableToolProtocol):
             $$ LANGUAGE plpgsql;
             """
             self._execute_sql_command(command=sql)
-            # Attach the trigger to the partman table
+            # Create or replace trigger in partman table
+            sql = """
+            DROP TRIGGER IF EXISTS after_partition_creation ON partman.part_config;
+            """
+            self._execute_sql_command(command=sql);
             sql = f"""
-            DO $$
-            BEGIN
-               IF NOT EXISTS (
-                   SELECT 1 FROM pg_trigger 
-                   WHERE tgname = 'after_partition_creation') THEN
-                   CREATE TRIGGER after_partition_creation 
-                    AFTER INSERT ON partman.part_config
-                    FOR EACH ROW
-                    WHEN (NEW.parent_table = '{self.original_table_name}')
-                    EXECUTE FUNCTION trigger_on_partition_creation();
-               END IF;
-            END $$;
+            CREATE TRIGGER after_partition_creation 
+            AFTER INSERT ON partman.part_config
+            FOR EACH ROW
+            WHEN (NEW.parent_table = '{self.original_table_name}')
+            EXECUTE FUNCTION trigger_on_partition_creation();
             """
             self._execute_sql_command(command=sql)
-            self.logger.info(f"Sub-partitioning trigger on table '{self.original_table_name}' created.")
+            self.logger.info(f"Sub-partitioning trigger on table '{self.original_table_name}' created or replaced.")
 
         self._set_current_step(step=6)
 
