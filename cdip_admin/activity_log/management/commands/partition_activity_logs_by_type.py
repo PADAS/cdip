@@ -89,8 +89,6 @@ class Command(BaseCommand):
             indexes=indexes,
             foreign_keys=foreign_keys
         )
-        if not should_rollback:
-            table_data.primary_key_columns.append("created_at")
 
         # Partition by log type
         logs_partitioner = LogTypeActivityLogsPartitioner(
