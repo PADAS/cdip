@@ -66,7 +66,7 @@ class LogTypeActivityLogsPartitioner(ValuesListTablePartitioner):
               REFERENCES public.integrations_integration (id) DEFERRABLE INITIALLY DEFERRED,
           FOREIGN KEY (created_by_id)
               REFERENCES public.auth_user (id) DEFERRABLE INITIALLY DEFERRED
-        ) PARTITION BY LIST ({self.partition_values});
+        ) PARTITION BY LIST ({self.partition_column});
         """
         self.logger.debug(f"PARENT TABLE SQL: {sql}")
         self._execute_sql_command(command=sql)
