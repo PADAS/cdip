@@ -473,6 +473,7 @@ class TablePartitionerBase(PartitionTableToolProtocol):
         result = None
         with connection.cursor() as cursor:
             try:
+                self.logger.info(f"Executing SQL: {command} ...")
                 cursor.execute(command)
             except ProgrammingError as e:
                 self.logger.error(e)
