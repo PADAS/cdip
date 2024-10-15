@@ -17,6 +17,9 @@ class PartitionTableToolProtocol(Protocol):
     def _create_parent_table(self) -> None:
         raise NotImplementedError
 
+    def _partition_setup(self) -> None:
+        raise NotImplementedError
+
 
 @dataclass
 class IndexData:
@@ -52,30 +55,28 @@ class TableData:
     triggers: Optional[List[TriggerData]] = None
 
 
-class PartitionTableTool(PartitionTableToolProtocol):
+class TablePartitionerBase(PartitionTableToolProtocol):
     logger = logging.getLogger(__name__)
+    steps_commands = [
+        "_create_parent_table",
+        "_make_template_table",
+        "_partition_setup",
+        "_set_partition_schema_with_existing_tables",
+        "_partman_run_maintenance",
+        "_process_data_partition",
+    ]
 
     def __init__(
         self,
         original_table_name: str,
         partition_column: str,
-        partition_interval: str,
         table_data: TableData,
-        migrate_batch_size_per_interval: int,
-        partitions_in_the_future: int = 5,
-        subpartition_column: str = None,
-        subpartition_list: list = None,
     ) -> None:
         self.partition_column = partition_column
-        self.partition_interval = partition_interval
-        self.subpartition_column = subpartition_column
-        self.subpartition_list = subpartition_list
         self.original_table_name = original_table_name
         self.partitioned_table_name = f"{original_table_name}_partitioned"
         self.template_table_name = f"{original_table_name}_template"
         self.table_data = table_data
-        self.migrate_batch_size = migrate_batch_size_per_interval
-        self.partitions_in_the_future = partitions_in_the_future
         self.log_data = {
             "current_step": 0,
             "last_migrated_date": None,
@@ -88,19 +89,8 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._pre_requirements_check()
         self._validate_table_partititon_state()
 
-        steps_commands = [
-            "_create_parent_table",
-            "_make_template_table",
-            "_partition_setup",
-            "_set_partition_schema_with_existing_tables",
-            "_store_subpartitioning_function",
-            "_create_subpartition_trigger",
-            "_partman_run_maintenance",
-            "_process_data_partition",
-        ]
-
-        for index in range(self.log_data["current_step"], len(steps_commands)):
-            getattr(self, steps_commands[index])()
+        for index in range(self.log_data["current_step"], len(self.steps_commands)):
+            getattr(self, self.steps_commands[index])()
 
         self.logger.info(f"Partitioning for {self.original_table_name} table is completed.")
         self.logger.info(f"Process takes {(datetime.datetime.now(pytz.utc)) - self.log_data['start_time']}")
@@ -150,50 +140,6 @@ class PartitionTableTool(PartitionTableToolProtocol):
         self._set_current_step(step=2)
         self.logger.info(f"Make template '{self.template_table_name}' completed.")
 
-    def _partition_setup(self) -> None:
-        self.logger.info(
-            f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
-        )
-        sql = f"""
-            SELECT partman.create_parent(
-               p_parent_table := 'public.{self.partitioned_table_name}',
-               p_control := '{self.partition_column}',
-               p_type := 'native',
-               p_interval := '{self.partition_interval}',
-               p_template_table := 'public.{self.template_table_name}',
-               p_premake := 1
-               );
-        """
-        self._execute_sql_command(command=sql)
-
-        sql = f"DROP TABLE public.{self.partitioned_table_name}_default;"
-        self._execute_sql_command(command=sql)
-
-        drop_default_partitions_sql = f"""
-            DO $$
-            DECLARE
-                partition_table TEXT;
-            BEGIN
-                FOR partition_table IN
-                    SELECT partman.show_partitions('public.{self.partitioned_table_name}')
-                LOOP
-                    EXECUTE 'DROP TABLE IF EXISTS ' || REGEXP_REPLACE(partition_table::TEXT, '\\(.*?,(.*)\\)', '\\1');
-                END LOOP;
-            END $$;
-            """
-        self._execute_sql_command(command=drop_default_partitions_sql)
-
-        sql = f"""
-        UPDATE partman.part_config
-        SET parent_table = 'public.{self.original_table_name}'
-        WHERE parent_table = 'public.{self.partitioned_table_name}';
-        """
-        self._execute_sql_command(command=sql)
-        self._set_current_step(step=3)
-        self.logger.info(
-            f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
-        )
-
     def _set_partition_schema_with_existing_tables(self) -> None:
         self.logger.info(f"Setting Partition schema with existent tables...")
         try:
@@ -233,69 +179,6 @@ class PartitionTableTool(PartitionTableToolProtocol):
 
         self._set_current_step(step=4)
 
-    def _store_subpartitioning_function(self) -> None:
-        if self.subpartition_column:
-            self.logger.info(f"Creating Sub-partitioning function 'create_list_subpartitions()'...")
-            sql = f"""
-            CREATE OR REPLACE FUNCTION create_list_subpartitions()
-            RETURNS void AS $$
-            DECLARE
-                parent_partition_name text;
-            BEGIN
-                -- Get the name of the last partition created by pg_partman
-                SELECT partition_name INTO parent_partition_name
-                FROM partman.part_config 
-                WHERE parent_table = 'public.{self.original_table_name}'
-                ORDER BY partition_creation_date DESC
-                LIMIT 1;
-
-                -- Dynamically create list sub-partitions for values list
-                EXECUTE format('
-                    CREATE TABLE %I_{self.subpartition_list[0]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[0]}'') IF NOT EXISTS;
-                    CREATE TABLE %I_{self.subpartition_list[1]} PARTITION OF %I FOR VALUES IN (''{self.subpartition_list[1]}'') IF NOT EXISTS;',
-                    parent_partition_name, parent_partition_name,
-                    parent_partition_name, parent_partition_name
-                );
-            END;
-            $$ LANGUAGE plpgsql;   
-            """
-            # ToDo: make this work with more than two values in subpartition_list
-            self._execute_sql_command(command=sql)
-            self.logger.info(f"Sub-partitioning function 'create_list_subpartitions()' created.")
-
-        self._set_current_step(step=5)
-
-    def _create_subpartition_trigger(self) -> None:
-        if self.subpartition_column:
-            self.logger.info(f"Creating Sub-partitioning trigger on table '{self.original_table_name}'...")
-            sql = f"""
-            CREATE OR REPLACE FUNCTION trigger_on_partition_creation()
-            RETURNS trigger AS $$
-            BEGIN
-                -- Call the function to create the list sub-partitions
-                PERFORM create_list_subpartitions();
-                RETURN NULL;
-            END;
-            $$ LANGUAGE plpgsql;
-            """
-            self._execute_sql_command(command=sql)
-            # Create or replace trigger in partman table
-            sql = """
-            DROP TRIGGER IF EXISTS after_partition_creation ON partman.part_config;
-            """
-            self._execute_sql_command(command=sql);
-            sql = f"""
-            CREATE TRIGGER after_partition_creation 
-            AFTER INSERT ON partman.part_config
-            FOR EACH ROW
-            WHEN (NEW.parent_table = '{self.original_table_name}')
-            EXECUTE FUNCTION trigger_on_partition_creation();
-            """
-            self._execute_sql_command(command=sql)
-            self.logger.info(f"Sub-partitioning trigger on table '{self.original_table_name}' created or replaced.")
-
-        self._set_current_step(step=6)
-
     def _partman_run_maintenance(self) -> None:
         self.logger.info(
             f"Running partman.run_maintenance() to create past partitions in '{self.original_table_name}'..."
@@ -304,74 +187,14 @@ class PartitionTableTool(PartitionTableToolProtocol):
             SELECT partman.run_maintenance('{self.original_table_name}');
         """
         self._execute_sql_command(command=sql)
-        self._set_current_step(step=7)
+        self._set_current_step(step=5)
         self.logger.info(
             f"partman.run_maintenance() for '{self.original_table_name}' completed."
         )
 
     def _process_data_partition(self) -> None:
-        self.logger.info("Moving existent data to partititons...")
-        migrate_sql = f"""
-            CALL partman.partition_data_proc(
-            'public.{self.original_table_name}',
-            p_wait:= 2,
-            p_batch := {self.migrate_batch_size}
-            );
-        """
-
-        self._execute_sql_command(command=migrate_sql)
-        self.logger.info("Moving existent data to partititons...completed")
-
-        # ToDo. Do we need this or is handled by pg_partman?
-        self.logger.info("Creating future partititons...")
-        create_default_partition_sql = f"""
-            DO $$
-                DECLARE
-                    i INT;
-                    partition_start_date DATE;
-                    partition_end_date DATE;
-                BEGIN
-                    FOR i IN 1..{self.partitions_in_the_future} LOOP
-                        partition_start_date := date_trunc('month', current_date) + interval '1 month' * i;
-                        partition_end_date := partition_start_date + interval '1 month';
-
-                        PERFORM partman.create_partition_time(
-                            'public.{self.original_table_name}',
-                            p_partition_times := ARRAY[partition_start_date]
-                        );
-                    END LOOP;
-                END;
-                $$;
-            """
-        self._execute_sql_command(command=create_default_partition_sql)
-        self.logger.info("Future partititons created.")
-
-        self.logger.info("Running VACUUM ANALYZE...")
-        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-        self._execute_sql_command(command="VACUUM;")
-        self.logger.info("VACUUM ANALYZE is completed.")
-
-        self.logger.info("Restoring triggers...")
-        for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
-            self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
-        self.logger.info("Triggers restored")
-
-        self.logger.info("Creating unique index on PK...")
-        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
-        self._create_index(
-            table_name=self.original_table_name,
-            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
-            is_unique=True,
-        )
-        self.logger.info("Unique index on PK creted.")
-
-        self.logger.info("Restoring unique constraints...")
-        for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
-            self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
-        self.logger.info("Unique constraints restored.")
-
-        self._set_current_step(step=8)
+        self.logger.warning("_process_data_partition() is not implemented. Existent data won't be moved to partititons.")
+        self._set_current_step(step=5)
 
     def _validate_data(self) -> None:
         self.logger.info("Validating data...")
@@ -429,7 +252,7 @@ class PartitionTableTool(PartitionTableToolProtocol):
         if result and result[0] == 0:
             self.logger.info("Data isn't validate. Procced to rollback.")
             exit(1)
-        self._set_current_step(step=9)
+        self._set_current_step(step=7)
         self.logger.info("Data was validated successfully.")
 
     def _pre_requirements_check(self) -> None:
@@ -658,3 +481,253 @@ class PartitionTableTool(PartitionTableToolProtocol):
             if fetch:
                 result = cursor.fetchone()
         return result
+
+
+class ValuesListTablePartitioner(TablePartitionerBase):
+    def __init__(
+        self,
+        original_table_name: str,
+        partition_column: str,
+        partition_values: List[str],
+        table_data: TableData,
+    ) -> None:
+        super().__init__(
+            partition_column=partition_column,
+            original_table_name=original_table_name,
+            table_data=table_data,
+        )
+        self.partition_values = partition_values
+
+    def _partition_setup(self) -> None:
+        self.logger.info(
+            f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
+        )
+        self.logger.info(
+            f"Registering parent table {self.partitioned_table_name} with pgpartman..."
+        )
+        sql = f"""
+            SELECT partman.create_parent(
+                p_parent_table := 'public.{self.partitioned_table_name}', 
+                p_control := '{self.partition_column}', 
+                p_type := 'list'
+                p_template_table := 'public.{self.template_table_name}'
+            );
+        """
+        self._execute_sql_command(command=sql)
+        self.logger.info(
+            f"Parent table {self.partitioned_table_name} registered."
+        )
+        self.logger.info(
+            f"Creating partitions for values {self.partition_values}..."
+        )
+        # Create one partition for each value
+        for value in self.partition_values:
+            sql = f"""
+            CREATE TABLE {self.original_table_name}_{value} PARTITION OF public.{self.partitioned_table_name}
+            FOR VALUES IN ('{value}');
+            """
+            self._execute_sql_command(command=sql)
+        self.logger.info(
+            f"Partitions for values {self.partition_values} created."
+        )
+
+        # self.logger.info(
+        #     f"Dropping default partition..."
+        # )
+        # sql = f"DROP TABLE public.{self.partitioned_table_name}_default;"
+        # self._execute_sql_command(command=sql)
+        #
+        # drop_default_partitions_sql = f"""
+        #     DO $$
+        #     DECLARE
+        #         partition_table TEXT;
+        #     BEGIN
+        #         FOR partition_table IN
+        #             SELECT partman.show_partitions('public.{self.partitioned_table_name}')
+        #         LOOP
+        #             EXECUTE 'DROP TABLE IF EXISTS ' || REGEXP_REPLACE(partition_table::TEXT, '\\(.*?,(.*)\\)', '\\1');
+        #         END LOOP;
+        #     END $$;
+        #     """
+        # self._execute_sql_command(command=drop_default_partitions_sql)
+
+        sql = f"""
+        UPDATE partman.part_config
+        SET parent_table = 'public.{self.original_table_name}'
+        WHERE parent_table = 'public.{self.partitioned_table_name}';
+        """
+        self._execute_sql_command(command=sql)
+        self._set_current_step(step=3)
+        self.logger.info(
+            f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
+        )
+
+    def _process_data_partition(self) -> None:
+        self.logger.info("Moving existent data to partititons...")
+        migrate_sql = f"""
+            CALL partman.partition_data_proc(
+            'public.{self.original_table_name}',
+            p_wait:= 2,
+            p_batch := {self.migrate_batch_size}
+            );
+        """
+
+        self._execute_sql_command(command=migrate_sql)
+        self.logger.info("Moving existent data to partititons...completed")
+
+        self.logger.info("Running VACUUM ANALYZE...")
+        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+        self._execute_sql_command(command="VACUUM;")
+        self.logger.info("VACUUM ANALYZE is completed.")
+
+        self.logger.info("Restoring triggers...")
+        for trigger in self.table_data.triggers if self.table_data.triggers else []:
+            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
+            self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
+        self.logger.info("Triggers restored")
+
+        self.logger.info("Creating unique index on PK...")
+        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
+        self._create_index(
+            table_name=self.original_table_name,
+            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
+            is_unique=True,
+        )
+        self.logger.info("Unique index on PK creted.")
+
+        self.logger.info("Restoring unique constraints...")
+        for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
+            self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
+        self.logger.info("Unique constraints restored.")
+
+        self._set_current_step(step=6)
+
+
+class DateRangeTablePartitioner(TablePartitionerBase):
+
+    def __init__(
+        self,
+        original_table_name: str,
+        partition_column: str,
+        partition_interval: str,
+        table_data: TableData,
+        migrate_batch_size_per_interval: int,
+        partitions_in_the_future: int = 5,
+    ) -> None:
+        super().__init__(
+            partition_column=partition_column,
+            original_table_name=original_table_name,
+            table_data=table_data,
+        )
+        self.partition_interval = partition_interval
+        self.migrate_batch_size = migrate_batch_size_per_interval
+        self.partitions_in_the_future = partitions_in_the_future
+
+    def _partition_setup(self) -> None:
+        self.logger.info(
+            f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
+        )
+        sql = f"""
+            SELECT partman.create_parent(
+               p_parent_table := 'public.{self.partitioned_table_name}',
+               p_control := '{self.partition_column}',
+               p_type := 'native',
+               p_interval := '{self.partition_interval}',
+               p_template_table := 'public.{self.template_table_name}',
+               p_premake := 1
+               );
+        """
+        self._execute_sql_command(command=sql)
+
+        sql = f"DROP TABLE public.{self.partitioned_table_name}_default;"
+        self._execute_sql_command(command=sql)
+
+        drop_default_partitions_sql = f"""
+            DO $$
+            DECLARE
+                partition_table TEXT;
+            BEGIN
+                FOR partition_table IN
+                    SELECT partman.show_partitions('public.{self.partitioned_table_name}')
+                LOOP
+                    EXECUTE 'DROP TABLE IF EXISTS ' || REGEXP_REPLACE(partition_table::TEXT, '\\(.*?,(.*)\\)', '\\1');
+                END LOOP;
+            END $$;
+            """
+        self._execute_sql_command(command=drop_default_partitions_sql)
+
+        sql = f"""
+        UPDATE partman.part_config
+        SET parent_table = 'public.{self.original_table_name}'
+        WHERE parent_table = 'public.{self.partitioned_table_name}';
+        """
+        self._execute_sql_command(command=sql)
+        self._set_current_step(step=3)
+        self.logger.info(
+            f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
+        )
+
+
+    def _process_data_partition(self) -> None:
+        self.logger.info("Moving existent data to partititons...")
+        migrate_sql = f"""
+            CALL partman.partition_data_proc(
+            'public.{self.original_table_name}',
+            p_wait:= 2,
+            p_batch := {self.migrate_batch_size}
+            );
+        """
+
+        self._execute_sql_command(command=migrate_sql)
+        self.logger.info("Moving existent data to partititons...completed")
+
+        # ToDo. Do we need this or is handled by pg_partman?
+        self.logger.info("Creating future partititons...")
+        create_default_partition_sql = f"""
+            DO $$
+                DECLARE
+                    i INT;
+                    partition_start_date DATE;
+                    partition_end_date DATE;
+                BEGIN
+                    FOR i IN 1..{self.partitions_in_the_future} LOOP
+                        partition_start_date := date_trunc('month', current_date) + interval '1 month' * i;
+                        partition_end_date := partition_start_date + interval '1 month';
+
+                        PERFORM partman.create_partition_time(
+                            'public.{self.original_table_name}',
+                            p_partition_times := ARRAY[partition_start_date]
+                        );
+                    END LOOP;
+                END;
+                $$;
+            """
+        self._execute_sql_command(command=create_default_partition_sql)
+        self.logger.info("Future partititons created.")
+
+        self.logger.info("Running VACUUM ANALYZE...")
+        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+        self._execute_sql_command(command="VACUUM;")
+        self.logger.info("VACUUM ANALYZE is completed.")
+
+        self.logger.info("Restoring triggers...")
+        for trigger in self.table_data.triggers if self.table_data.triggers else []:
+            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
+            self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
+        self.logger.info("Triggers restored")
+
+        self.logger.info("Creating unique index on PK...")
+        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
+        self._create_index(
+            table_name=self.original_table_name,
+            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
+            is_unique=True,
+        )
+        self.logger.info("Unique index on PK creted.")
+
+        self.logger.info("Restoring unique constraints...")
+        for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
+            self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
+        self.logger.info("Unique constraints restored.")
+
+        self._set_current_step(step=6)
