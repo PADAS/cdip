@@ -5,12 +5,12 @@ from core.db.partitions import (
     PARTITION_INTERVALS,
     ForeignKeyData,
     IndexData,
-    PartitionTableTool,
-    TableData,
+    DateRangeTablePartitioner,
+    TableData, ValuesListTablePartitioner,
 )
 
 
-class PartitionActivityLogsTable(PartitionTableTool):
+class DateRangeActivityLogsPartitioner(DateRangeTablePartitioner):
 
     def _create_parent_table(self) -> None:
         sql = f"""
@@ -35,6 +35,38 @@ class PartitionActivityLogsTable(PartitionTableTool):
           FOREIGN KEY (created_by_id)
               REFERENCES public.auth_user (id) DEFERRABLE INITIALLY DEFERRED
         ) PARTITION BY RANGE ({self.partition_column});
+        """
+        self.logger.debug(f"PARENT TABLE SQL: {sql}")
+        self._execute_sql_command(command=sql)
+        self._set_current_step(step=1)
+        self.logger.info(f"Parent table: {self.partitioned_table_name} created successfully.")
+
+
+class LogTypeActivityLogsPartitioner(ValuesListTablePartitioner):
+
+    def _create_parent_table(self) -> None:
+        sql = f"""
+        -- Create the parent table with partitioning
+        CREATE TABLE IF NOT EXISTS {self.partitioned_table_name}
+        (
+          created_at timestamp with time zone NOT NULL,
+          updated_at timestamp with time zone NOT NULL,
+          id uuid NOT NULL,
+          log_level integer NOT NULL,
+          log_type character varying(5) NOT NULL,
+          origin character varying(5) NOT NULL,
+          value character varying(40) NOT NULL,
+          title character varying(200) NOT NULL,
+          details jsonb NOT NULL,
+          is_reversible boolean NOT NULL,
+          revert_data jsonb NOT NULL,
+          created_by_id integer,
+          integration_id uuid,
+          FOREIGN KEY (integration_id)
+              REFERENCES public.integrations_integration (id) DEFERRABLE INITIALLY DEFERRED,
+          FOREIGN KEY (created_by_id)
+              REFERENCES public.auth_user (id) DEFERRABLE INITIALLY DEFERRED
+        ) PARTITION BY LIST ({self.partition_values});
         """
         self.logger.debug(f"PARENT TABLE SQL: {sql}")
         self._execute_sql_command(command=sql)
@@ -94,19 +126,28 @@ class Command(BaseCommand):
         if not should_rollback:
             table_data.primary_key_columns.append("created_at")
 
-        tool = PartitionActivityLogsTable(
+        # Partition by log type
+        logs_partitioner = LogTypeActivityLogsPartitioner(
             original_table_name="activity_log_activitylog",
+            partition_column="log_type",
+            partition_values=[t.value for t in ActivityLog.LogTypes],
+            table_data=table_data,
+        )
+        # Sub-partition events by date range
+        events_partitioner = DateRangeActivityLogsPartitioner(
+            original_table_name=f"activity_log_activitylog_{ActivityLog.LogTypes.EVENT.value}",
             partition_column="created_at",
             partition_interval=PARTITION_INTERVALS.MONTHLY.value,
-            subpartition_column="log_type",
-            subpartition_list=[t.value for t in ActivityLog.LogTypes],
             table_data=table_data,
             migrate_batch_size_per_interval=10000,
         )
         if not should_rollback:
-            self.stdout.write(self.style.SUCCESS("Starting partitioning process."))
-            tool.partition_table()
+            self.stdout.write(self.style.SUCCESS("Partitioning activity logs by type."))
+            logs_partitioner.partition_table()
+            self.stdout.write(self.style.SUCCESS("Partitioning activity logs by date range."))
+            events_partitioner.partition_table()
         else:
             self.stdout.write(self.style.SUCCESS("Starting rollback process."))
-            tool.rollback()
+            events_partitioner.rollback()
+            logs_partitioner.rollback()
         self.stdout.write(self.style.SUCCESS(f"Process [{'rollback' if should_rollback else 'partition'}] finish."))
