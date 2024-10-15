@@ -533,7 +533,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             migrate_sql = f"""
             INSERT INTO {self.original_table_name}_{value}
             SELECT * FROM public.{self.original_table_name}
-            WHERE log_type = {value};
+            WHERE log_type = '{value}';
             """
             self._execute_sql_command(command=migrate_sql)
         self._execute_sql_command(command="COMMIT;")
