@@ -509,7 +509,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             SELECT partman.create_parent(
                 p_parent_table := 'public.{self.partitioned_table_name}', 
                 p_control := '{self.partition_column}', 
-                p_type := 'list'
+                p_type := 'list',
                 p_template_table := 'public.{self.template_table_name}'
             );
         """
