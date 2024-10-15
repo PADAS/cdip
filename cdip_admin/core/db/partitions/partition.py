@@ -533,7 +533,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             self.logger.info(f"Moving data of type '{value}' to partition {partition_name} ...")
             migrate_sql = f"""
             INSERT INTO {self.original_table_name}_{value}
-            SELECT * FROM public.{self.original_table_name}
+            SELECT * FROM public.{self.original_table_name}_backup
             WHERE log_type = '{value}';
             """
             self._execute_sql_command(command=migrate_sql)
