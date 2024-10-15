@@ -90,8 +90,6 @@ class Command(BaseCommand):
             indexes=indexes,
             foreign_keys=foreign_keys
         )
-        if not should_rollback:
-            table_data.primary_key_columns.append("created_at")
 
         # Sub-partition events by date range
         events_partitioner = DateRangeActivityLogsPartitioner(
