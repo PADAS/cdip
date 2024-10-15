@@ -502,21 +502,21 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         self.logger.info(
             f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
         )
-        self.logger.info(
-            f"Registering parent table {self.partitioned_table_name} with pgpartman..."
-        )
-        sql = f"""
-            SELECT partman.create_parent(
-                p_parent_table := 'public.{self.partitioned_table_name}', 
-                p_control := '{self.partition_column}', 
-                p_type := 'native',
-                p_template_table := 'public.{self.template_table_name}'
-            );
-        """
-        self._execute_sql_command(command=sql)
-        self.logger.info(
-            f"Parent table {self.partitioned_table_name} registered."
-        )
+        # self.logger.info(
+        #     f"Registering parent table {self.partitioned_table_name} with pgpartman..."
+        # )
+        # sql = f"""
+        #     SELECT partman.create_parent(
+        #         p_parent_table := 'public.{self.partitioned_table_name}',
+        #         p_control := '{self.partition_column}',
+        #         p_type := 'native',
+        #         p_template_table := 'public.{self.template_table_name}'
+        #     );
+        # """
+        # self._execute_sql_command(command=sql)
+        # self.logger.info(
+        #     f"Parent table {self.partitioned_table_name} registered."
+        # )
         self.logger.info(
             f"Creating partitions for values {self.partition_values}..."
         )
@@ -561,46 +561,6 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         self.logger.info(
             f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
         )
-
-    def _process_data_partition(self) -> None:
-        self.logger.info("Moving existent data to partititons...")
-        migrate_sql = f"""
-            CALL partman.partition_data_proc(
-            'public.{self.original_table_name}',
-            p_wait:= 2,
-            p_batch := {self.migrate_batch_size}
-            );
-        """
-
-        self._execute_sql_command(command=migrate_sql)
-        self.logger.info("Moving existent data to partititons...completed")
-
-        self.logger.info("Running VACUUM ANALYZE...")
-        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-        self._execute_sql_command(command="VACUUM;")
-        self.logger.info("VACUUM ANALYZE is completed.")
-
-        self.logger.info("Restoring triggers...")
-        for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
-            self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
-        self.logger.info("Triggers restored")
-
-        self.logger.info("Creating unique index on PK...")
-        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
-        self._create_index(
-            table_name=self.original_table_name,
-            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
-            is_unique=True,
-        )
-        self.logger.info("Unique index on PK creted.")
-
-        self.logger.info("Restoring unique constraints...")
-        for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
-            self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
-        self.logger.info("Unique constraints restored.")
-
-        self._set_current_step(step=6)
 
 
 class DateRangeTablePartitioner(TablePartitionerBase):
