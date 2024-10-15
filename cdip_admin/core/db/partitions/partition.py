@@ -154,7 +154,7 @@ class TablePartitionerBase(PartitionTableToolProtocol):
             self.logger.info(f"Renaming tables...")
             rename_tables_sql = f"""
             ALTER TABLE public.{self.original_table_name}
-                RENAME TO {self.original_table_name}_default;
+                RENAME TO {self.original_table_name}_backup;
 
             ALTER TABLE public.{self.partitioned_table_name}
                 RENAME TO {self.original_table_name};
@@ -164,7 +164,7 @@ class TablePartitionerBase(PartitionTableToolProtocol):
 
             self.logger.info(f"Setting default partition...")
             attach_sql = f"""
-            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default_part 
+            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default 
             PARTITION OF {self.original_table_name} DEFAULT;
             """
             self._execute_sql_command(command=attach_sql)
@@ -546,7 +546,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
 
         self.logger.info("Restoring triggers...")
         for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
+            self._drop_trigger(table_name=f"{self.original_table_name}_backup", trigger_data=trigger)
             self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
         self.logger.info("Triggers restored")
 
@@ -676,7 +676,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
 
         self.logger.info("Restoring triggers...")
         for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_default", trigger_data=trigger)
+            self._drop_trigger(table_name=f"{self.original_table_name}_backup", trigger_data=trigger)
             self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
         self.logger.info("Triggers restored")
 
