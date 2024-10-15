@@ -550,14 +550,14 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
         self.logger.info("Triggers restored")
 
-        self.logger.info("Creating unique index on PK...")
+        self.logger.info(f"Creating unique index on PK {self.table_data.primary_key_columns}...")
         pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
         self._create_index(
             table_name=self.original_table_name,
             index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
             is_unique=True,
         )
-        self.logger.info("Unique index on PK creted.")
+        self.logger.info("Unique index on PK created.")
 
         self.logger.info("Restoring unique constraints...")
         for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
