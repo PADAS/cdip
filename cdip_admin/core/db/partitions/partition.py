@@ -474,14 +474,31 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         )
         # Create one partition for each value
         for value in self.partition_values:
+            self.logger.info(
+                f"Creating partition for '{value}'..."
+            )
             sql = f"""
             CREATE TABLE {self.original_table_name}_{value} PARTITION OF public.{self.partitioned_table_name}
             FOR VALUES IN ('{value}')
-            PARTITION BY RANGE (created_at);
+            PARTITION BY RANGE ({self.subpartition_column});
             """
             self._execute_sql_command(command=sql)
+            self.logger.info(
+                f"Partition for '{value}' created."
+            )
+            self.logger.info(
+                f"Adding default sub-partition for '{value}'..."
+            )
+            sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.original_table_name}_{value}_default
+            PARTITION OF {self.original_table_name}_{value} DEFAULT;
+            """
+            self._execute_sql_command(command=sql)
+            self.logger.info(
+                f"Default sub-partition for '{value}' created."
+            )
         self.logger.info(
-            f"Partitions for values {self.partition_values} created."
+            f"All partitions for values {self.partition_values} created."
         )
         self._set_current_step(step=3)
         self.logger.info(
