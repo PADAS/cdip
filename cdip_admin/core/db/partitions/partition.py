@@ -454,6 +454,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         original_table_name: str,
         partition_column: str,
         partition_values: List[str],
+        subpartition_column: str,
         table_data: TableData,
     ) -> None:
         super().__init__(
@@ -461,6 +462,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             original_table_name=original_table_name,
             table_data=table_data,
         )
+        self.subpartition_column = subpartition_column
         self.partition_values = partition_values
 
     def _partition_setup(self) -> None:
@@ -474,7 +476,8 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         for value in self.partition_values:
             sql = f"""
             CREATE TABLE {self.original_table_name}_{value} PARTITION OF public.{self.partitioned_table_name}
-            FOR VALUES IN ('{value}');
+            FOR VALUES IN ('{value}')
+            PARTITION BY RANGE (created_at);
             """
             self._execute_sql_command(command=sql)
         self.logger.info(

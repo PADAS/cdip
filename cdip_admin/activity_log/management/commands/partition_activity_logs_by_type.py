@@ -95,6 +95,7 @@ class Command(BaseCommand):
             original_table_name="activity_log_activitylog",
             partition_column="log_type",
             partition_values=[t.value for t in ActivityLog.LogTypes],
+            subpartition_column="created_at",
             table_data=table_data,
         )
         if not should_rollback:
