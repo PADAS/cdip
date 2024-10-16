@@ -152,23 +152,23 @@ class TablePartitionerBase(PartitionTableToolProtocol):
             self._execute_sql_command(command=lock_tables_sql)
             self.logger.info(f"Tables locked.")
             self.logger.info(f"Renaming tables...")
+            # Original table is turned into the default partition
             rename_tables_sql = f"""
             ALTER TABLE public.{self.original_table_name}
-                RENAME TO {self.original_table_name}_backup;
+                RENAME TO {self.original_table_name}_default;
 
             ALTER TABLE public.{self.partitioned_table_name}
                 RENAME TO {self.original_table_name};
             """
             self._execute_sql_command(command=rename_tables_sql)
             self.logger.info(f"Tables renamed.")
-
-            self.logger.info(f"Setting default partition...")
+            self.logger.info(f"Attaching default partition...")
             attach_sql = f"""
-            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default 
-            PARTITION OF {self.original_table_name} DEFAULT;
+            ALTER TABLE public.{self.original_table_name}
+            ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
             """
             self._execute_sql_command(command=attach_sql)
-            self.logger.info(f"Default partition created.")
+            self.logger.info(f"Default partition attached.")
             self._execute_sql_command(command="COMMIT;")
             self.logger.info(f"Setting Partition schema with existent tables completed.")
 
@@ -531,9 +531,10 @@ class ValuesListTablePartitioner(TablePartitionerBase):
         for value in self.partition_values:
             partition_name = f"{self.original_table_name}_{value}"
             self.logger.info(f"Moving data of type '{value}' to partition {partition_name} ...")
+            # ToDo: Copy data in batches
             migrate_sql = f"""
             INSERT INTO {self.original_table_name}_{value}
-            SELECT * FROM public.{self.original_table_name}_backup
+            SELECT * FROM public.{self.original_table_name}_default
             WHERE log_type = '{value}';
             """
             self._execute_sql_command(command=migrate_sql)
@@ -638,51 +639,26 @@ class DateRangeTablePartitioner(TablePartitionerBase):
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
-        self._execute_sql_command(command="BEGIN;")
-        self.logger.info(f"Copying data from backup to partitioned table {self.original_table_name} ...")
-        migrate_sql = f"""
-        INSERT INTO {self.original_table_name}
-        SELECT * FROM public.{self.original_table_name}_backup;
-        """
-        self._execute_sql_command(command=migrate_sql)
-        self._execute_sql_command(command="COMMIT;")
-        self.logger.info(f"Backup data copied to partitioned table {self.original_table_name}.")
-
-        # self.logger.info(f"Processing data with partman.partition_data_proc in batches ...")
+        # self._execute_sql_command(command="BEGIN;")
+        # self.logger.info(f"Copying data from backup to partitioned table {self.original_table_name} ...")
         # migrate_sql = f"""
-        #     CALL partman.partition_data_proc(
-        #     'public.{self.original_table_name}',
-        #     p_wait:= 2,
-        #     p_batch := {self.migrate_batch_size}
-        #     );
+        # INSERT INTO {self.original_table_name}
+        # SELECT * FROM public.{self.original_table_name}_backup;
         # """
-        # self.logger.info(f"partman.partition_data_proc completed.")
         # self._execute_sql_command(command=migrate_sql)
-        # self.logger.info("Moving existent data to partititons...completed")
-
-        # ToDo. Do we need this or can be handled by pg_partman?
-        # self.logger.info("Creating future partititons...")
-        # create_default_partition_sql = f"""
-        #     DO $$
-        #         DECLARE
-        #             i INT;
-        #             partition_start_date DATE;
-        #             partition_end_date DATE;
-        #         BEGIN
-        #             FOR i IN 1..{self.partitions_in_the_future} LOOP
-        #                 partition_start_date := date_trunc('month', current_date) + interval '1 month' * i;
-        #                 partition_end_date := partition_start_date + interval '1 month';
-        #
-        #                 PERFORM partman.create_partition_time(
-        #                     'public.{self.original_table_name}',
-        #                     p_partition_times := ARRAY[partition_start_date]
-        #                 );
-        #             END LOOP;
-        #         END;
-        #         $$;
-        #     """
-        # self._execute_sql_command(command=create_default_partition_sql)
-        # self.logger.info("Future partititons created.")
+        # self._execute_sql_command(command="COMMIT;")
+        # self.logger.info(f"Backup data copied to partitioned table {self.original_table_name}.")
+        self.logger.info(f"Processing data with partman.partition_data_proc in batches ...")
+        migrate_sql = f"""
+            CALL partman.partition_data_proc(
+            'public.{self.original_table_name}',
+            p_wait:= 2,
+            p_batch := {self.migrate_batch_size}
+            );
+        """
+        self.logger.info(f"partman.partition_data_proc completed.")
+        self._execute_sql_command(command=migrate_sql)
+        self.logger.info("Moving existent data to partititons...completed")
 
         self.logger.info("Running VACUUM ANALYZE...")
         self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
