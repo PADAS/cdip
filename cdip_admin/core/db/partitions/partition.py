@@ -551,7 +551,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
 
         self.logger.info("Restoring triggers...")
         for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_backup", trigger_data=trigger)
+            self._drop_trigger(table_name=f"{self.original_table_name}_original", trigger_data=trigger)
             self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
         self.logger.info("Triggers restored")
 
