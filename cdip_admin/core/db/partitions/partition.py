@@ -174,7 +174,7 @@ class TablePartitionerBase(PartitionTableToolProtocol):
 
         except Exception:
             self._execute_sql_command(command="ROLLBACK;")
-            self.logger.exception("Failed to migrate batch data")
+            self.logger.exception("Failed to switch to partitioned table")
             exit(1)
 
         self._set_current_step(step=4)
@@ -592,6 +592,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         self.logger.info(
             f"Applying partition setup for {self.partitioned_table_name} table using {self.template_table_name}..."
         )
+        # ToDo: Ask why they are not using partman for creating partitions (past and future)
         sql = f"""
             SELECT partman.create_parent(
                p_parent_table := 'public.{self.partitioned_table_name}',
@@ -634,11 +635,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
-        self.logger.info(f"Locking table {self.original_table_name}...")
         self._execute_sql_command(command="BEGIN;")
-        lock_table_sql = f"""LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;"""
-        self._execute_sql_command(command=lock_table_sql)
-        self.logger.info(f"Table {self.original_table_name} locked.")
         self.logger.info(f"Copying data from backup to partitioned table {self.original_table_name} ...")
         migrate_sql = f"""
         INSERT INTO {self.original_table_name}
