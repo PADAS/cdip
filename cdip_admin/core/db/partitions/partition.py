@@ -607,7 +607,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
                p_start_partition := '{self.partition_start}',
                p_interval := '{self.partition_interval}',
                p_template_table := 'public.{self.template_table_name}',
-               p_premake := {self.partitions_in_the_future},
+               p_premake := {self.partitions_in_the_future}
                );
         """
         self._execute_sql_command(command=sql)
