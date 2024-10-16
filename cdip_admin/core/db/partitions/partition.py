@@ -20,6 +20,9 @@ class PartitionTableToolProtocol(Protocol):
     def _partition_setup(self) -> None:
         raise NotImplementedError
 
+    def _set_partition_schema_with_existing_tables(self) -> None:
+        raise NotImplementedError
+
 
 @dataclass
 class IndexData:
@@ -139,45 +142,6 @@ class TablePartitionerBase(PartitionTableToolProtocol):
         )
         self._set_current_step(step=2)
         self.logger.info(f"Make template '{self.template_table_name}' completed.")
-
-    def _set_partition_schema_with_existing_tables(self) -> None:
-        self.logger.info(f"Setting Partition schema with existent tables...")
-        try:
-            self.logger.info(f"Locking tables...")
-            self._execute_sql_command(command="BEGIN;")
-            lock_tables_sql = f"""
-            LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
-            LOCK TABLE public.{self.partitioned_table_name} IN ACCESS EXCLUSIVE MODE;
-            """
-            self._execute_sql_command(command=lock_tables_sql)
-            self.logger.info(f"Tables locked.")
-            self.logger.info(f"Renaming tables...")
-            # Original table is turned into the default partition
-            rename_tables_sql = f"""
-            ALTER TABLE public.{self.original_table_name}
-                RENAME TO {self.original_table_name}_default;
-
-            ALTER TABLE public.{self.partitioned_table_name}
-                RENAME TO {self.original_table_name};
-            """
-            self._execute_sql_command(command=rename_tables_sql)
-            self.logger.info(f"Tables renamed.")
-            self.logger.info(f"Attaching default partition...")
-            attach_sql = f"""
-            ALTER TABLE public.{self.original_table_name}
-            ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
-            """
-            self._execute_sql_command(command=attach_sql)
-            self.logger.info(f"Default partition attached.")
-            self._execute_sql_command(command="COMMIT;")
-            self.logger.info(f"Setting Partition schema with existent tables completed.")
-
-        except Exception:
-            self._execute_sql_command(command="ROLLBACK;")
-            self.logger.exception("Failed to switch to partitioned table")
-            exit(1)
-
-        self._set_current_step(step=4)
 
     # def _partman_run_maintenance(self) -> None:
     #     self.logger.info(
@@ -521,6 +485,45 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
         )
 
+    def _set_partition_schema_with_existing_tables(self) -> None:
+        self.logger.info(f"Setting Partition schema with existent tables...")
+        try:
+            self.logger.info(f"Locking tables...")
+            self._execute_sql_command(command="BEGIN;")
+            lock_tables_sql = f"""
+            LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
+            LOCK TABLE public.{self.partitioned_table_name} IN ACCESS EXCLUSIVE MODE;
+            """
+            self._execute_sql_command(command=lock_tables_sql)
+            self.logger.info(f"Tables locked.")
+            self.logger.info(f"Renaming tables...")
+            # Original table is saved as backup
+            rename_tables_sql = f"""
+            ALTER TABLE public.{self.original_table_name}
+                RENAME TO {self.original_table_name}_backup;
+
+            ALTER TABLE public.{self.partitioned_table_name}
+                RENAME TO {self.original_table_name};
+            """
+            self._execute_sql_command(command=rename_tables_sql)
+            self.logger.info(f"Tables renamed.")
+            self.logger.info(f"Creating default partition...")
+            create_default_part_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default
+            PARTITION OF {self.original_table_name} DEFAULT;
+            """
+            self._execute_sql_command(command=create_default_part_sql)
+            self.logger.info(f"Default partition created.")
+            self._execute_sql_command(command="COMMIT;")
+            self.logger.info(f"Setting Partition schema with existent tables completed.")
+
+        except Exception:
+            self._execute_sql_command(command="ROLLBACK;")
+            self.logger.exception("Failed to switch to partitioned table")
+            exit(1)
+
+        self._set_current_step(step=4)
+
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
         self.logger.info(f"Locking table {self.original_table_name}...")
@@ -534,7 +537,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             # ToDo: Copy data in batches
             migrate_sql = f"""
             INSERT INTO {self.original_table_name}_{value}
-            SELECT * FROM public.{self.original_table_name}_default
+            SELECT * FROM public.{self.original_table_name}_original
             WHERE log_type = '{value}';
             """
             self._execute_sql_command(command=migrate_sql)
@@ -609,6 +612,8 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         """
         self._execute_sql_command(command=sql)
 
+        # Remove default partition created by partman.
+        # The original table will be used as default partition.
         sql = f"DROP TABLE public.{self.partitioned_table_name}_default;"
         self._execute_sql_command(command=sql)
 
@@ -636,6 +641,45 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         self.logger.info(
             f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
         )
+
+    def _set_partition_schema_with_existing_tables(self) -> None:
+        self.logger.info(f"Setting Partition schema with existent tables...")
+        try:
+            self.logger.info(f"Locking tables...")
+            self._execute_sql_command(command="BEGIN;")
+            lock_tables_sql = f"""
+            LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
+            LOCK TABLE public.{self.partitioned_table_name} IN ACCESS EXCLUSIVE MODE;
+            """
+            self._execute_sql_command(command=lock_tables_sql)
+            self.logger.info(f"Tables locked.")
+            self.logger.info(f"Renaming tables...")
+            # Original table is turned into the default partition
+            rename_tables_sql = f"""
+            ALTER TABLE public.{self.original_table_name}
+                RENAME TO {self.original_table_name}_default;
+
+            ALTER TABLE public.{self.partitioned_table_name}
+                RENAME TO {self.original_table_name};
+            """
+            self._execute_sql_command(command=rename_tables_sql)
+            self.logger.info(f"Tables renamed.")
+            self.logger.info(f"Attaching default partition...")
+            attach_sql = f"""
+            ALTER TABLE public.{self.original_table_name}
+            ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
+            """
+            self._execute_sql_command(command=attach_sql)
+            self.logger.info(f"Default partition attached.")
+            self._execute_sql_command(command="COMMIT;")
+            self.logger.info(f"Setting Partition schema with existent tables completed.")
+
+        except Exception:
+            self._execute_sql_command(command="ROLLBACK;")
+            self.logger.exception("Failed to switch to partitioned table")
+            exit(1)
+
+        self._set_current_step(step=4)
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
