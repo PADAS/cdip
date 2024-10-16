@@ -509,7 +509,7 @@ class ValuesListTablePartitioner(TablePartitionerBase):
             self.logger.info(f"Tables renamed.")
             self.logger.info(f"Creating default partition...")
             create_default_part_sql = f"""
-            CREATE TABLE IF NOT EXISTS {self.original_table_name}_default
+            CREATE TABLE IF NOT EXISTS {self.original_table_name}_original
             PARTITION OF {self.original_table_name} DEFAULT;
             """
             self._execute_sql_command(command=create_default_part_sql)
@@ -687,7 +687,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         # self.logger.info(f"Copying data from backup to partitioned table {self.original_table_name} ...")
         # migrate_sql = f"""
         # INSERT INTO {self.original_table_name}
-        # SELECT * FROM public.{self.original_table_name}_backup;
+        # SELECT * FROM public.{self.original_table_name}_original;
         # """
         # self._execute_sql_command(command=migrate_sql)
         # self._execute_sql_command(command="COMMIT;")
