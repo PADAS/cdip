@@ -598,9 +598,10 @@ class DateRangeTablePartitioner(TablePartitionerBase):
                p_parent_table := 'public.{self.partitioned_table_name}',
                p_control := '{self.partition_column}',
                p_type := 'native',
+               p_start := '2023-11-01 00:00:00',
                p_interval := '{self.partition_interval}',
                p_template_table := 'public.{self.template_table_name}',
-               p_premake := 1
+               p_premake := 5
                );
         """
         self._execute_sql_command(command=sql)
