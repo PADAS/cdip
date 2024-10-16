@@ -62,8 +62,8 @@ class TablePartitionerBase(PartitionTableToolProtocol):
         "_make_template_table",
         "_partition_setup",
         "_set_partition_schema_with_existing_tables",
-        #"_partman_run_maintenance",
         "_process_data_partition",
+        # "_partman_run_maintenance",
     ]
 
     def __init__(
@@ -576,6 +576,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         partition_column: str,
         partition_interval: str,
         table_data: TableData,
+        partition_start: str,
         migrate_batch_size_per_interval: int,
         partitions_in_the_future: int = 5,
     ) -> None:
@@ -586,6 +587,7 @@ class DateRangeTablePartitioner(TablePartitionerBase):
         )
         self.partition_interval = partition_interval
         self.migrate_batch_size = migrate_batch_size_per_interval
+        self.partition_start = partition_start
         self.partitions_in_the_future = partitions_in_the_future
 
     def _partition_setup(self) -> None:
@@ -598,10 +600,10 @@ class DateRangeTablePartitioner(TablePartitionerBase):
                p_parent_table := 'public.{self.partitioned_table_name}',
                p_control := '{self.partition_column}',
                p_type := 'native',
-               p_start_partition := '2023-11-01 00:00:00',
+               p_start_partition := '{self.partition_start}',
                p_interval := '{self.partition_interval}',
                p_template_table := 'public.{self.template_table_name}',
-               p_premake := 5
+               p_premake := {self.partitions_in_the_future},
                );
         """
         self._execute_sql_command(command=sql)

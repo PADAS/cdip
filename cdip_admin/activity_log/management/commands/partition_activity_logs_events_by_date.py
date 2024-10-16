@@ -96,6 +96,7 @@ class Command(BaseCommand):
             original_table_name=f"activity_log_activitylog_{ActivityLog.LogTypes.EVENT.value}",
             partition_column="created_at",
             partition_interval=PARTITION_INTERVALS.MONTHLY.value,
+            partition_start = '2023-11-01 00:00:00',
             table_data=table_data,
             migrate_batch_size_per_interval=10000,
         )
