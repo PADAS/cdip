@@ -632,43 +632,57 @@ class DateRangeTablePartitioner(TablePartitionerBase):
             f"Partition setup for {self.partitioned_table_name} table using {self.template_table_name} is completed."
         )
 
-
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
+        self.logger.info(f"Locking table {self.original_table_name}...")
+        self._execute_sql_command(command="BEGIN;")
+        lock_table_sql = f"""LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;"""
+        self._execute_sql_command(command=lock_table_sql)
+        self.logger.info(f"Table {self.original_table_name} locked.")
+        self.logger.info(f"Copying data from backup to partitioned table {self.original_table_name} ...")
         migrate_sql = f"""
-            CALL partman.partition_data_proc(
-            'public.{self.original_table_name}',
-            p_wait:= 2,
-            p_batch := {self.migrate_batch_size}
-            );
+        INSERT INTO {self.original_table_name}
+        SELECT * FROM public.{self.original_table_name}_backup;
         """
-
         self._execute_sql_command(command=migrate_sql)
-        self.logger.info("Moving existent data to partititons...completed")
+        self._execute_sql_command(command="COMMIT;")
+        self.logger.info(f"Backup data copied to partitioned table {self.original_table_name}.")
 
-        # ToDo. Do we need this or is handled by pg_partman?
-        self.logger.info("Creating future partititons...")
-        create_default_partition_sql = f"""
-            DO $$
-                DECLARE
-                    i INT;
-                    partition_start_date DATE;
-                    partition_end_date DATE;
-                BEGIN
-                    FOR i IN 1..{self.partitions_in_the_future} LOOP
-                        partition_start_date := date_trunc('month', current_date) + interval '1 month' * i;
-                        partition_end_date := partition_start_date + interval '1 month';
+        # self.logger.info(f"Processing data with partman.partition_data_proc in batches ...")
+        # migrate_sql = f"""
+        #     CALL partman.partition_data_proc(
+        #     'public.{self.original_table_name}',
+        #     p_wait:= 2,
+        #     p_batch := {self.migrate_batch_size}
+        #     );
+        # """
+        # self.logger.info(f"partman.partition_data_proc completed.")
+        # self._execute_sql_command(command=migrate_sql)
+        # self.logger.info("Moving existent data to partititons...completed")
 
-                        PERFORM partman.create_partition_time(
-                            'public.{self.original_table_name}',
-                            p_partition_times := ARRAY[partition_start_date]
-                        );
-                    END LOOP;
-                END;
-                $$;
-            """
-        self._execute_sql_command(command=create_default_partition_sql)
-        self.logger.info("Future partititons created.")
+        # ToDo. Do we need this or can be handled by pg_partman?
+        # self.logger.info("Creating future partititons...")
+        # create_default_partition_sql = f"""
+        #     DO $$
+        #         DECLARE
+        #             i INT;
+        #             partition_start_date DATE;
+        #             partition_end_date DATE;
+        #         BEGIN
+        #             FOR i IN 1..{self.partitions_in_the_future} LOOP
+        #                 partition_start_date := date_trunc('month', current_date) + interval '1 month' * i;
+        #                 partition_end_date := partition_start_date + interval '1 month';
+        #
+        #                 PERFORM partman.create_partition_time(
+        #                     'public.{self.original_table_name}',
+        #                     p_partition_times := ARRAY[partition_start_date]
+        #                 );
+        #             END LOOP;
+        #         END;
+        #         $$;
+        #     """
+        # self._execute_sql_command(command=create_default_partition_sql)
+        # self.logger.info("Future partititons created.")
 
         self.logger.info("Running VACUUM ANALYZE...")
         self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
