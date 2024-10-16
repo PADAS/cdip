@@ -85,7 +85,7 @@ class Command(BaseCommand):
         ]
 
         table_data = TableData(
-            primary_key_columns=["id", "log_type"],
+            primary_key_columns=["id", "log_type", "created_at"],
             indexes=indexes,
             foreign_keys=foreign_keys
         )
