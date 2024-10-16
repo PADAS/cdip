@@ -664,13 +664,14 @@ class DateRangeTablePartitioner(TablePartitionerBase):
             """
             self._execute_sql_command(command=rename_tables_sql)
             self.logger.info(f"Tables renamed.")
-            self.logger.info(f"Attaching default partition...")
-            attach_sql = f"""
-            ALTER TABLE public.{self.original_table_name}
-            ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
-            """
-            self._execute_sql_command(command=attach_sql)
-            self.logger.info(f"Default partition attached.")
+            # ToDo: this fails if the table is a partition already
+            # self.logger.info(f"Attaching default partition...")
+            # attach_sql = f"""
+            # ALTER TABLE public.{self.original_table_name}
+            # ATTACH PARTITION public.{self.original_table_name}_default DEFAULT;
+            # """
+            # self._execute_sql_command(command=attach_sql)
+            # self.logger.info(f"Default partition attached.")
             self._execute_sql_command(command="COMMIT;")
             self.logger.info(f"Setting Partition schema with existent tables completed.")
 
