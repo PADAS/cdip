@@ -193,7 +193,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         retention_sql = f"""
         UPDATE partman.part_config 
         SET retention = '1 mon', retention_keep_table = true 
-        WHERE parent_table = '{self.original_table_name}_ev';
+        WHERE parent_table = 'public.{self.original_table_name}_ev';
         """
         self._execute_sql_command(command=retention_sql)
         self.logger.info("Retention policy set.")
