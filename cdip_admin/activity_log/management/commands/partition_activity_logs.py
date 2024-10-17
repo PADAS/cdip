@@ -154,22 +154,22 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         migrate_sql = f"""
         DO $$ 
         DECLARE
-          batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-          offset INTEGER := 0;
+          v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
+          v_offset INTEGER := 0;
         BEGIN
           LOOP
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original
-            LIMIT batch_size OFFSET offset;
+            LIMIT v_batch_size OFFSET v_offset;
         
             -- Exit the loop if no more rows are left to move
             IF NOT FOUND THEN
               EXIT;
             END IF;
         
-            -- Update the offset for the next batch
-            offset := offset + batch_size;
+            -- Update the v_offset for the next batch
+            v_offset := v_offset + v_batch_size;
           END LOOP;
         END $$;
         """
