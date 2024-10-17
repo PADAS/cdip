@@ -150,10 +150,28 @@ class ActivityLogsPartitioner(TablePartitionerBase):
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
         self._execute_sql_command(command="BEGIN;")
-        # ToDo: Copy data in batches
+        # Copy data in batches, all-or-nothing
         migrate_sql = f"""
-        INSERT INTO {self.original_table_name}
-        SELECT * FROM public.{self.original_table_name}_original;
+        DO $$ 
+        DECLARE
+          batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
+          offset INTEGER := 0;
+        BEGIN
+          LOOP
+            -- Insert a batch of rows into the partition
+            INSERT INTO {self.original_table_name}
+            SELECT * FROM public.{self.original_table_name}_original
+            LIMIT batch_size OFFSET offset;
+        
+            -- Exit the loop if no more rows are left to move
+            IF NOT FOUND THEN
+              EXIT;
+            END IF;
+        
+            -- Update the offset for the next batch
+            offset := offset + batch_size;
+          END LOOP;
+        END $$;
         """
         self._execute_sql_command(command=migrate_sql)
         self._execute_sql_command(command="COMMIT;")
