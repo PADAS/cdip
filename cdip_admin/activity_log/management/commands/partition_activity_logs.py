@@ -22,6 +22,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         subpartitions_in_the_future: int = 5,
         subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
         migrate_batch_size: int = 10000,
+        migrate_start_offset: int = 0,
     ) -> None:
         super().__init__(
             partition_column=partition_column,
@@ -30,6 +31,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         )
         self.subpartition_column = subpartition_column
         self.migrate_batch_size = migrate_batch_size
+        self.migrate_start_offset = migrate_start_offset
         self.subpartition_start = subpartition_start
         self.subpartition_interval = subpartition_interval
         self.subpartitions_in_the_future = subpartitions_in_the_future
@@ -149,26 +151,26 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
-        self._execute_sql_command(command="BEGIN;")
         # Copy data in batches, all-or-nothing
         migrate_sql = f"""
         DO $$ 
         DECLARE
           v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-          v_offset INTEGER := 0;
+          v_offset INTEGER := {self.migrate_start_offset};  -- Offset for the next batch
         BEGIN
           LOOP
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original
-            LIMIT v_batch_size OFFSET v_offset;
+            LIMIT v_batch_size OFFSET v_offset
+            ON CONFLICT DO NOTHING;  -- Idempotency
         
             -- Exit the loop if no more rows are left to move
             IF NOT FOUND THEN
               EXIT;
             END IF;
         
-            -- Update the v_offset for the next batch
+            -- Update the offset for the next batch
             v_offset := v_offset + v_batch_size;
           END LOOP;
         END $$;
