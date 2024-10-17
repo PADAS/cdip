@@ -55,6 +55,7 @@ class TablePartitionerBase:
         "_partition_setup",
         "_set_partition_schema_with_existing_tables",
         "_process_data_partition",
+        "_set_retention_policy",
         # "_partman_run_maintenance",
     ]
 
@@ -148,6 +149,10 @@ class TablePartitionerBase:
     def _process_data_partition(self) -> None:
         self.logger.warning("_process_data_partition() is not implemented. Existent data won't be moved to partititons.")
         self._set_current_step(step=5)
+
+    def _set_retention_policy(self) -> None:
+        self.logger.warning("_set_retention_policy() is not implemented. Retention policy won't be set.")
+        self._set_current_step(step=6)
 
     def _validate_data(self) -> None:
         self.logger.info("Validating data...")

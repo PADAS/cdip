@@ -187,6 +187,17 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._set_current_step(step=5)
 
 
+    def _set_retention_policy(self) -> None:
+        # Set retention policy to detach event partitions older than one month
+        self.logger.info("Setting retention policy in partman...")
+        retention_sql = f"""
+        UPDATE partman.part_config 
+        SET retention = '1 month', retention_keep_table = true 
+        WHERE parent_table = '{self.original_table_name}_ev';
+        """
+        self._execute_sql_command(command=retention_sql)
+        self._set_current_step(step=6)
+
 
 class Command(BaseCommand):
     help = "using pg_partman, partition the activity_logs table."
