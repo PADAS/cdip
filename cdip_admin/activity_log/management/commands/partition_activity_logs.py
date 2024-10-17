@@ -7,7 +7,7 @@ from core.db.partitions import (
     ForeignKeyData,
     IndexData,
     TableData,
-    TablePartitioner, TablePartitionerBase,
+    TablePartitionerBase, PARTITION_INTERVALS,
 )
 
 
@@ -15,12 +15,12 @@ class ActivityLogsPartitioner(TablePartitionerBase):
     def __init__(
         self,
         original_table_name: str,
-        partition_column: str,
-        subpartition_column: str,
-        subpartition_start: str,
-        subpartitions_in_the_future: int,
         table_data: TableData,
-        subpartition_interval: str = "monthly",
+        partition_column: str = "log_type",
+        subpartition_column: str = "created_at",
+        subpartition_start: str = "2023-11-01 00:00:00",
+        subpartitions_in_the_future: int = 5,
+        subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
         migrate_batch_size: int = 10000,
     ) -> None:
         super().__init__(
@@ -241,8 +241,6 @@ class Command(BaseCommand):
         # Partition by log type
         logs_partitioner = ActivityLogsPartitioner(
             original_table_name="activity_log_activitylog",
-            partition_column="log_type",
-            subpartition_column="created_at",
             table_data=table_data,
         )
         if not should_rollback:
