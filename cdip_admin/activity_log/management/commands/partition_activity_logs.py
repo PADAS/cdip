@@ -91,7 +91,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         )
         sql = f"""
             SELECT partman.create_parent(
-               p_parent_table := 'public.{self.original_table_name}',
+               p_parent_table := 'public.{events_table_name}',
                p_control := '{self.subpartition_column}',
                p_type := 'native',
                p_start_partition := '{self.subpartition_start}',
