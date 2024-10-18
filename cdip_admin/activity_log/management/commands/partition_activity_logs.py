@@ -241,7 +241,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
             self.logger.info("Unregistering events table from partman...")
             unregister_from_partman_sql = f"""
-                SELECT SELECT partman.delete_parent('public.{self.original_table_name}_ev');
+            SELECT partman.delete_parent('public.{self.original_table_name}_ev');
             """
             self._execute_sql_command(command=unregister_from_partman_sql)
             self.logger.info("Events table unregistered from partman.")
