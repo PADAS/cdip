@@ -102,9 +102,7 @@ class TablePartitionerBase:
         self.logger.info(
             f"Running partman.run_maintenance_proc() ..."
         )
-        sql = f"""
-            SELECT partman.run_maintenance_proc();
-        """
+        sql = f"CALL partman.run_maintenance_proc();"
         self._execute_sql_command(command=sql)
         self._set_current_step(step=7)
         self.logger.info(
