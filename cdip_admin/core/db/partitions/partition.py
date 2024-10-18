@@ -57,6 +57,7 @@ class TablePartitionerBase:
         "_process_data_partition",
         "_set_retention_policy",
         "_partman_run_maintenance",
+        "_schedule_periodic_maintenance",
     ]
 
     def __init__(
@@ -98,6 +99,14 @@ class TablePartitionerBase:
         self._set_current_step(step=2)
         self.logger.info(f"Make template '{self.template_table_name}' completed.")
 
+    def _process_data_partition(self) -> None:
+        self.logger.warning("_process_data_partition() is not implemented. Existent data won't be moved to partititons.")
+        self._set_current_step(step=5)
+
+    def _set_retention_policy(self) -> None:
+        self.logger.warning("_set_retention_policy() is not implemented. Retention policy won't be set.")
+        self._set_current_step(step=6)
+
     def _partman_run_maintenance(self) -> None:
         self.logger.info(
             f"Running partman.run_maintenance_proc() ..."
@@ -109,13 +118,9 @@ class TablePartitionerBase:
             f"partman.run_maintenance_proc() completed."
         )
 
-    def _process_data_partition(self) -> None:
-        self.logger.warning("_process_data_partition() is not implemented. Existent data won't be moved to partititons.")
-        self._set_current_step(step=5)
-
-    def _set_retention_policy(self) -> None:
-        self.logger.warning("_set_retention_policy() is not implemented. Retention policy won't be set.")
-        self._set_current_step(step=6)
+    def _schedule_periodic_maintenance(self) -> None:
+        self.logger.warning("_schedule_periodic_maintenance() is not implemented.")
+        self._set_current_step(step=8)
 
     def _pre_requirements_check(self) -> None:
         result = self._execute_sql_command(

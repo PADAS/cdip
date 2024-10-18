@@ -1,6 +1,7 @@
 import datetime
 import pytz
 from django.core.management import BaseCommand
+from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from core.db.partitions import (
     ForeignKeyData,
     IndexData,
@@ -150,7 +151,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
-        # Copy data in batches, all-or-nothing
+        # Copy data in batches
         migrate_sql = f"""
         DO $$ 
         DECLARE
@@ -217,6 +218,22 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._execute_sql_command(command=retention_sql)
         self.logger.info("Retention policy set.")
         self._set_current_step(step=6)
+
+    def _schedule_periodic_maintenance(self) -> None:
+        # Get or create periodic task to run every month
+        schedule, created = CrontabSchedule.objects.get_or_create(
+            minute="0",
+            hour="0",
+            day_of_month="1"
+        )
+        PeriodicTask.objects.get_or_create(
+            task="activity_log.tasks.run_partitions_maintenance",
+            defeults={
+                "crontab": schedule,
+                "name": "Run psql partitions maintenance"
+            }
+        )
+        self._set_current_step(step=8)
 
     def rollback(self) -> None:
         start_time = datetime.datetime.now(pytz.utc)
