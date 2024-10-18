@@ -148,9 +148,9 @@ class TablePartitionerBase:
                 AND c.relname LIKE '{self.original_table_name}%';"""
 
         result = self._execute_sql_command(command=sql, fetch=True)
-        if result and result[0] > 0 and self.log_data["current_step"] >= 7:
+        if result and result[0] > 0 and self.log_data["current_step"] >= len(self.steps_commands):
             self.logger.error(f"{self.original_table_name} table is already partitioned.")
-            exit(1)
+            exit(0)
 
     def _duplicate_original_table(self, source_table_name: str, target_table_name: str) -> None:
         create_table_sql = f"""

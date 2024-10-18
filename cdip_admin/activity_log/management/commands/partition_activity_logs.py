@@ -221,6 +221,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
     def _schedule_periodic_maintenance(self) -> None:
         # Get or create periodic task to run every month
+        self.logger.info("Scheduling monthly maintenance...")
         schedule, created = CrontabSchedule.objects.get_or_create(
             minute="0",
             hour="0",
@@ -233,6 +234,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                 "name": "Run psql partitions maintenance"
             }
         )
+        self.logger.info("Monthly maintenance scheduled.")
         self._set_current_step(step=8)
 
     def rollback(self) -> None:
@@ -363,7 +365,7 @@ class Command(BaseCommand):
             table_data=table_data,
         )
         if not should_rollback:
-            self.stdout.write(self.style.SUCCESS("Partitioning activity logs by type."))
+            self.stdout.write(self.style.SUCCESS("Partitioning activity logs ..."))
             logs_partitioner.partition_table()
         else:
             self.stdout.write(self.style.SUCCESS("Starting rollback process."))
