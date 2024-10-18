@@ -56,7 +56,7 @@ class TablePartitionerBase:
         "_set_partition_schema_with_existing_tables",
         "_process_data_partition",
         "_set_retention_policy",
-        # "_partman_run_maintenance",
+        #"_partman_run_maintenance",
     ]
 
     def __init__(
@@ -135,7 +135,7 @@ class TablePartitionerBase:
 
     # def _partman_run_maintenance(self) -> None:
     #     self.logger.info(
-    #         f"Running partman.run_maintenance() to create past partitions in '{self.original_table_name}'..."
+    #         f"Running partman.run_maintenance_proc() ..."
     #     )
     #     sql = f"""
     #         SELECT partman.run_maintenance('{self.original_table_name}');
@@ -143,7 +143,7 @@ class TablePartitionerBase:
     #     self._execute_sql_command(command=sql)
     #     self._set_current_step(step=5)
     #     self.logger.info(
-    #         f"partman.run_maintenance() for '{self.original_table_name}' completed."
+    #         f"partman.run_maintenance() completed."
     #     )
 
     def _process_data_partition(self) -> None:
@@ -153,65 +153,6 @@ class TablePartitionerBase:
     def _set_retention_policy(self) -> None:
         self.logger.warning("_set_retention_policy() is not implemented. Retention policy won't be set.")
         self._set_current_step(step=6)
-
-    def _validate_data(self) -> None:
-        self.logger.info("Validating data...")
-        create_function_to_validate_sql = f"""
-            CREATE FUNCTION find_missing_records()
-                RETURNS TABLE
-                        (
-                            id            UUID,
-                            {self.partition_column}   TIMESTAMP WITH TIME ZONE,
-                            das_tenant_id UUID
-                        )
-            AS
-            $$
-            DECLARE
-                start_date    DATE;
-                end_date      DATE;
-                current_start DATE;
-                current_end   DATE;
-            BEGIN
-                SELECT MIN(o.{self.partition_column}), MAX(o.{self.partition_column})
-                INTO start_date, end_date
-                FROM {self.original_table_name}_backup o;
-
-                current_start := start_date;
-
-                WHILE current_start <= end_date
-                    LOOP
-                        current_end := current_start + INTERVAL '1 week' - INTERVAL '1 day';
-
-                        RETURN QUERY
-                            SELECT o.id,
-                                o.{self.partition_column}::TIMESTAMP WITH TIME ZONE,
-                                o.das_tenant_id
-                            FROM {self.original_table_name}_backup o
-                                    LEFT JOIN {self.original_table_name} b
-                                            ON o.id = b.id
-                                                AND o.{self.partition_column} = b.{self.partition_column}
-                                                AND o.das_tenant_id = b.das_tenant_id
-                            WHERE b.id IS NULL
-                            AND o.{self.partition_column} BETWEEN current_start AND current_end;
-
-                        current_start := current_start + INTERVAL '1 week';
-                    END LOOP;
-
-                RETURN;
-            END
-            $$ LANGUAGE plpgsql;
-
-        """
-        self._execute_sql_command(command=create_function_to_validate_sql)
-        result = self._execute_sql_command(command="SELECT * FROM find_missing_records();", fetch=True)
-
-        self._execute_sql_command(command="DROP FUNCTION find_missing_records;")
-
-        if result and result[0] == 0:
-            self.logger.info("Data isn't validate. Procced to rollback.")
-            exit(1)
-        self._set_current_step(step=7)
-        self.logger.info("Data was validated successfully.")
 
     def _pre_requirements_check(self) -> None:
         result = self._execute_sql_command(
@@ -316,75 +257,6 @@ class TablePartitionerBase:
         sql = f"DROP TRIGGER IF EXISTS {trigger_data.name} on {table_name};"
         self._execute_sql_command(command=sql)
         self.logger.info(f"Trigger: {trigger_data.name} deleted on {table_name}.")
-
-    def _backup_original_table(self) -> None:
-        create_backup_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS public.{self.original_table_name}_backup
-            (
-                LIKE public.{self.original_table_name} INCLUDING ALL
-            );
-        """
-        self._execute_sql_command(command=create_backup_table_sql)
-
-        min_value, max_value = self._get_min_max_partition_column()
-        batch_size_days = 15
-        batch_start = min_value if not self.log_data["last_migrated_date"] else self.log_data["last_migrated_date"]
-        batch_end = None
-
-        self.logger.info(f"Start the backup process from {batch_start} to {max_value}")
-
-        while batch_start < max_value:
-            try:
-                batch_end = batch_start + datetime.timedelta(days=batch_size_days)
-                if batch_end >= max_value:
-                    batch_end = max_value
-
-                self._execute_sql_command(command="BEGIN;")
-
-                insert_sql = f"""
-                    INSERT INTO {self.original_table_name}_backup
-                    SELECT * FROM {self.original_table_name}
-                    WHERE {self.partition_column} >= '{batch_start}'
-                    AND {self.partition_column} <= '{batch_end}'
-                    AND EXISTS (
-                        SELECT 1
-                        FROM {self.original_table_name}
-                        WHERE {self.partition_column} >= '{batch_start}'
-                        AND {self.partition_column} <= '{batch_end}'
-                    )
-                    ORDER BY {self.partition_column}
-                    ON CONFLICT DO NOTHING;
-                """
-                self._execute_sql_command(command=insert_sql)
-
-                update_last_migrated_date_sql = f"""
-                    UPDATE {self.original_table_name}_partition_log
-                    SET last_migrated_date = '{batch_end}'
-                    WHERE id = 1;
-                """
-                self._execute_sql_command(command=update_last_migrated_date_sql)
-
-                self._execute_sql_command(command="COMMIT;")
-                batch_start = batch_end
-            except Exception:
-                self._execute_sql_command(command="ROLLBACK;")
-                self.logger.exception(f"Failed to migrate batch from {batch_start} to {batch_end}")
-
-        self._set_current_step(step=4)
-        self.logger.info("Backup process is completed.")
-
-    def _get_min_max_partition_column(self):
-        sql = f"""
-            SELECT MIN({self.partition_column}), MAX({self.partition_column})
-            FROM {self.original_table_name};
-        """
-        result = self._execute_sql_command(command=sql, fetch=True)
-        min_value = result[0]
-        if not min_value:
-            timezone = pytz.UTC
-            min_value = timezone.localize(self.partition_start)
-        max_value = result[1] or self.log_data["start_time"]
-        return min_value, max_value
 
     def _set_partition_log_data(self) -> None:
         log_table_name = f"{self.original_table_name}_partition_log"
