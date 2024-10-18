@@ -228,7 +228,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         )
         PeriodicTask.objects.get_or_create(
             task="activity_log.tasks.run_partitions_maintenance",
-            defeults={
+            defaults={
                 "crontab": schedule,
                 "name": "Run psql partitions maintenance"
             }
