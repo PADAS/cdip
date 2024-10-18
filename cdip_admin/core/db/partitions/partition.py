@@ -89,42 +89,7 @@ class TablePartitionerBase:
         self.logger.info(f"Process takes {(datetime.datetime.now(pytz.utc)) - self.log_data['start_time']}")
 
     def rollback(self) -> None:
-        start_time = datetime.datetime.now(pytz.utc)
-        temp_table_name = f"{self.original_table_name}_temp"
-
-        self.logger.info(f"Rollback process is started at {start_time}")
-        self._duplicate_original_table(source_table_name=self.original_table_name, target_table_name=temp_table_name)
-
-        undo_partitions_sql = f"""
-        CALL partman.undo_partition_proc('public.{self.original_table_name}',
-                                        p_interval := '15 days',
-                                        p_keep_table := FALSE,
-                                        p_drop_cascade := TRUE,
-                                        p_wait := 3,
-                                        p_target_table := 'public.{temp_table_name}'
-            );
-        """
-        self._execute_sql_command(command=undo_partitions_sql)
-        try:
-            self._execute_sql_command(command="BEGIN;")
-            self.logger.info("Undoing partitions process start.")
-            rename_tables_sql = f"""
-                LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
-
-                DROP TABLE {self.original_table_name};
-
-                ALTER TABLE public.{temp_table_name}
-                    RENAME TO {self.original_table_name};
-            """
-            self._execute_sql_command(command=rename_tables_sql)
-            self._execute_sql_command(command="COMMIT;")
-            self.logger.info("Undoing partitions process is completed.")
-        except Exception:
-            self._execute_sql_command(command="ROLLBACK;")
-            self.logger.exception("Failed at rollback process")
-            exit(1)
-
-        self.logger.info(f"Rollback process is completed in {(datetime.datetime.now(pytz.utc)) - start_time}")
+        self.logger.warning("Rollback is not implemented.")
 
     def _make_template_table(self) -> None:
         self._duplicate_original_table(

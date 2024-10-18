@@ -1,6 +1,8 @@
+import datetime
 from typing import List
 
 from django.core.management import BaseCommand
+from timezone_field.backends import pytz
 
 from activity_log.models import ActivityLog
 from core.db.partitions import (
@@ -219,6 +221,61 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.logger.info("Retention policy set.")
         self._set_current_step(step=6)
 
+    def rollback(self) -> None:
+        start_time = datetime.datetime.now(pytz.utc)
+        original_table_bkp = f"{self.original_table_name}_original"
+
+        self.logger.info(f"Rollback process is started at {start_time}")
+        try:
+            self._execute_sql_command(command="BEGIN;")
+            self.logger.info("Undoing partitions process...")
+
+            self.logger.info("Restoring original activity logs table...")
+            unregister_from_partman_sql = f"""
+                LOCK TABLE public.{self.original_table_name} IN ACCESS EXCLUSIVE MODE;
+
+                DROP TABLE {self.original_table_name};
+
+                ALTER TABLE public.{original_table_bkp}
+                    RENAME TO {self.original_table_name};
+            """
+            self._execute_sql_command(command=unregister_from_partman_sql)
+            self.logger.info("Original activity logs table restored.")
+
+            self.logger.info("Unregistering events table from partman...")
+            unregister_from_partman_sql = f"""
+                SELECT SELECT partman.delete_parent('public.{self.original_table_name}_ev');
+            """
+            self._execute_sql_command(command=unregister_from_partman_sql)
+            self.logger.info("Events table unregistered from partman.")
+
+            self.logger.info("Cleaning up tables...")
+            unregister_from_partman_sql = f"""
+            DROP TABLE IF EXISTS activity_log_activitylog_default;
+            DROP TABLE IF EXISTS activity_log_activitylog_partition_log;
+            DROP TABLE IF EXISTS activity_log_activitylog_partitioned;
+            DROP TABLE IF EXISTS activity_log_activitylog_template; 
+            DROP TABLE IF EXISTS activity_log_activitylog_cdc;
+            DROP TABLE IF EXISTS activity_log_activitylog_ev;
+            DROP TABLE IF EXISTS activity_log_activitylog_ev_default;
+            DROP TABLE IF EXISTS activity_log_activitylog_ev_partition_log;
+            DROP TABLE IF EXISTS activity_log_activitylog_ev_partitioned;
+            DROP TABLE IF EXISTS activity_log_activitylog_ev_template; 
+            DROP TABLE IF EXISTS activity_log_activitylog_ev_template;
+            """
+            self._execute_sql_command(command=unregister_from_partman_sql)
+            self.logger.info("Events table unregistered from partman.")
+            self.logger.info("Tables cleanup complete.")
+
+            self._execute_sql_command(command="COMMIT;")
+            self.logger.info("Undoing partitions process is completed.")
+        except Exception:
+            self._execute_sql_command(command="ROLLBACK;")
+            self.logger.exception("Failed at rollback process")
+            exit(1)
+
+        self.logger.info(f"Rollback process is completed in {(datetime.datetime.now(pytz.utc)) - start_time}")
+
 
 class Command(BaseCommand):
     help = "using pg_partman, partition the activity_logs table."
@@ -228,13 +285,13 @@ class Command(BaseCommand):
             "-r",
             "--rollback",
             dest="rollback",
-            action="store",
+            action="store_true",
             default=False,
             help="Rollback the partitioning of the table.",
         )
 
     def handle(self, *args, **options):
-        should_rollback = bool(options["rollback"])
+        should_rollback = options["rollback"]
 
         self.stdout.write(self.style.SUCCESS(f"Running in [{'rollback' if should_rollback else 'normal'}] mode."))
 
