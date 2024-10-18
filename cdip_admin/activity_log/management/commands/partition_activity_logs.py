@@ -247,7 +247,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self.logger.info("Events table unregistered from partman.")
 
             self.logger.info("Cleaning up tables...")
-            unregister_from_partman_sql = f"""
+            drop_tables_sql = f"""
             DROP TABLE IF EXISTS activity_log_activitylog_default;
             DROP TABLE IF EXISTS activity_log_activitylog_partition_log;
             DROP TABLE IF EXISTS activity_log_activitylog_partitioned;
@@ -260,8 +260,24 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             DROP TABLE IF EXISTS activity_log_activitylog_ev_template; 
             DROP TABLE IF EXISTS activity_log_activitylog_ev_template;
             """
-            self._execute_sql_command(command=unregister_from_partman_sql)
-            self.logger.info("Events table unregistered from partman.")
+            self._execute_sql_command(command=drop_tables_sql)
+            drop_event_partitions_sql = f"""
+            DO $$
+            DECLARE
+                tables_to_drop TEXT;
+            BEGIN
+                SELECT string_agg(table_name, ', ')
+                INTO tables_to_drop
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name LIKE '{self.original_table_name}_ev_p%';
+            
+                IF tables_to_drop IS NOT NULL THEN
+                    EXECUTE 'DROP TABLE IF EXISTS ' || tables_to_drop || ' CASCADE;';
+                END IF;
+            END $$;
+            """
+            self._execute_sql_command(command=drop_event_partitions_sql)
             self.logger.info("Tables cleanup complete.")
 
             self._execute_sql_command(command="COMMIT;")
