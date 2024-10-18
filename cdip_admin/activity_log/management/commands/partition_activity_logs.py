@@ -1,15 +1,12 @@
 import datetime
-from typing import List
-
+import pytz
 from django.core.management import BaseCommand
-from timezone_field.backends import pytz
-
-from activity_log.models import ActivityLog
 from core.db.partitions import (
     ForeignKeyData,
     IndexData,
     TableData,
-    TablePartitionerBase, PARTITION_INTERVALS,
+    TablePartitionerBase,
+    PARTITION_INTERVALS,
 )
 
 
