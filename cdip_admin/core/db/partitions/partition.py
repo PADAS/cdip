@@ -56,7 +56,7 @@ class TablePartitionerBase:
         "_set_partition_schema_with_existing_tables",
         "_process_data_partition",
         "_set_retention_policy",
-        #"_partman_run_maintenance",
+        "_partman_run_maintenance",
     ]
 
     def __init__(
@@ -133,18 +133,18 @@ class TablePartitionerBase:
         self._set_current_step(step=2)
         self.logger.info(f"Make template '{self.template_table_name}' completed.")
 
-    # def _partman_run_maintenance(self) -> None:
-    #     self.logger.info(
-    #         f"Running partman.run_maintenance_proc() ..."
-    #     )
-    #     sql = f"""
-    #         SELECT partman.run_maintenance('{self.original_table_name}');
-    #     """
-    #     self._execute_sql_command(command=sql)
-    #     self._set_current_step(step=5)
-    #     self.logger.info(
-    #         f"partman.run_maintenance() completed."
-    #     )
+    def _partman_run_maintenance(self) -> None:
+        self.logger.info(
+            f"Running partman.run_maintenance_proc() ..."
+        )
+        sql = f"""
+            SELECT partman.run_maintenance_proc();
+        """
+        self._execute_sql_command(command=sql)
+        self._set_current_step(step=7)
+        self.logger.info(
+            f"partman.run_maintenance_proc() completed."
+        )
 
     def _process_data_partition(self) -> None:
         self.logger.warning("_process_data_partition() is not implemented. Existent data won't be moved to partititons.")
