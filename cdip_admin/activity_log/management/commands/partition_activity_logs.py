@@ -157,14 +157,32 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         DECLARE
           v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
           v_offset INTEGER := {self.migrate_start_offset};  -- Offset for the next batch
+          v_rows_moved BIGINT;               -- To capture rows moved
+          v_start_time TIMESTAMP;             -- To record the start time of each batch
+          v_end_time TIMESTAMP;               -- To record the end time of each batch
+          v_elapsed_time INTERVAL;            -- To calculate elapsed time
         BEGIN
           LOOP
+            -- Record the start time
+            v_start_time := clock_timestamp();
+        
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original
             LIMIT v_batch_size OFFSET v_offset
             ON CONFLICT DO NOTHING;  -- Idempotency
         
+            -- Get the number of rows moved
+            GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
+
+            -- Record the end time
+            v_end_time := clock_timestamp();
+            v_elapsed_time := v_end_time - v_start_time;  -- Calculate the elapsed time
+
+            -- Log the batch processing details
+            RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
+                         row_offset / batch_size + 1, v_rows_moved, v_elapsed_time;
+                     
             -- Exit the loop if no more rows are left to move
             IF NOT FOUND THEN
               EXIT;
