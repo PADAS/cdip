@@ -165,7 +165,9 @@ class ActivityLogsPartitioner(TablePartitionerBase):
           LOOP
             -- Record the start time
             v_start_time := clock_timestamp();
-        
+            
+            RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
+                         
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original
