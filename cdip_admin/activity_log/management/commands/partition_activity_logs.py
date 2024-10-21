@@ -23,6 +23,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
         migrate_batch_size: int = 10000,
         migrate_start_offset: int = 0,
+        migrate_events_since: str = "2024-09-01 00:00:00",
     ) -> None:
         super().__init__(
             partition_column=partition_column,
@@ -171,7 +172,8 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
                     -- Insert a batch of rows into the partition
                     INSERT INTO {self.original_table_name}
-                    SELECT * FROM public.{self.original_table_name}_original  WHERE log_type='cdc'
+                    SELECT * FROM public.{self.original_table_name}_original
+                    WHERE log_type='cdc' and created_at >= '{self.migrate_events_since}'
                     LIMIT v_batch_size OFFSET v_offset
                     ON CONFLICT DO NOTHING;  -- Idempotency
 
