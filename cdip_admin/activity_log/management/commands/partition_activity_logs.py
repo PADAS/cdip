@@ -181,7 +181,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
             -- Log the batch processing details
             RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
-                         row_offset / batch_size + 1, v_rows_moved, v_elapsed_time;
+                         v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
                      
             -- Exit the loop if no more rows are left to move
             IF NOT FOUND THEN
