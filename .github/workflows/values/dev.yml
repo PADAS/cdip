@@ -44,3 +44,8 @@ keycloak:
   KEYCLOAK_ADMIN_REALM: "cdip-dev"
   KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
+portal:
+  resources:
+    requests:
+      cpu: 600m
+      memory: 1000Mi
