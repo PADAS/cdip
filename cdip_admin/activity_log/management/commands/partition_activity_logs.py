@@ -36,6 +36,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.subpartition_start = subpartition_start
         self.subpartition_interval = subpartition_interval
         self.subpartitions_in_the_future = subpartitions_in_the_future
+        self.migrate_events_since = migrate_events_since
 
 
     def _create_parent_table(self) -> None:
