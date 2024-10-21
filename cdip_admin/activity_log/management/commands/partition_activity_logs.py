@@ -174,7 +174,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                     -- Insert a batch of rows into the partition
                     INSERT INTO {self.original_table_name}
                     SELECT * FROM public.{self.original_table_name}_original
-                    WHERE log_type='cdc' and created_at >= '{self.migrate_events_since}'
+                    WHERE log_type='cdc'
                     LIMIT v_batch_size OFFSET v_offset
                     ON CONFLICT DO NOTHING;  -- Idempotency
 
