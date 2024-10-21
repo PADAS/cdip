@@ -151,7 +151,54 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
     def _process_data_partition(self) -> None:
         self.logger.info("Moving existent data to partititons...")
+        self.logger.info("Moving data change logs in batches...")
         # Copy data in batches
+        migrate_cdc_sql = f"""
+                DO $$ 
+                DECLARE
+                  v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
+                  v_offset INTEGER := {self.migrate_start_offset};  -- Offset for the next batch
+                  v_rows_moved BIGINT;               -- To capture rows moved
+                  v_start_time TIMESTAMP;             -- To record the start time of each batch
+                  v_end_time TIMESTAMP;               -- To record the end time of each batch
+                  v_elapsed_time INTERVAL;            -- To calculate elapsed time
+                BEGIN
+                  LOOP
+                    -- Record the start time
+                    v_start_time := clock_timestamp();
+
+                    RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
+
+                    -- Insert a batch of rows into the partition
+                    INSERT INTO {self.original_table_name}
+                    SELECT * FROM public.{self.original_table_name}_original  WHERE log_type='cdc'
+                    LIMIT v_batch_size OFFSET v_offset
+                    ON CONFLICT DO NOTHING;  -- Idempotency
+
+                    -- Get the number of rows moved
+                    GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
+
+                    -- Record the end time
+                    v_end_time := clock_timestamp();
+                    v_elapsed_time := v_end_time - v_start_time;  -- Calculate the elapsed time
+
+                    -- Log the batch processing details
+                    RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
+                                 v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
+
+                    -- Exit the loop if no more rows are left to move
+                    IF NOT FOUND THEN
+                      EXIT;
+                    END IF;
+
+                    -- Update the offset for the next batch
+                    v_offset := v_offset + v_batch_size;
+                  END LOOP;
+                END $$;
+                """
+        self._execute_sql_command(command=migrate_cdc_sql)
+        self.logger.info("Data change logs migration complete.")
+        self.logger.info("Moving event logs in batches...")
         migrate_sql = f"""
         DO $$ 
         DECLARE
@@ -170,7 +217,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                          
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
-            SELECT * FROM public.{self.original_table_name}_original
+            SELECT * FROM public.{self.original_table_name}_original WHERE log_type='ev'
             LIMIT v_batch_size OFFSET v_offset
             ON CONFLICT DO NOTHING;  -- Idempotency
         
@@ -196,8 +243,8 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         END $$;
         """
         self._execute_sql_command(command=migrate_sql)
-        self._execute_sql_command(command="COMMIT;")
-        self.logger.info("Moving existent data to partitions...completed")
+        self.logger.info("Event logs migration complete.")
+        self.logger.info("Moving existent data to partitions...completed.")
 
         self.logger.info("Running VACUUM ANALYZE...")
         self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
