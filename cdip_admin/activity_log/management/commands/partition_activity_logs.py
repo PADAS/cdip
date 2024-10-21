@@ -199,7 +199,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._execute_sql_command(command=migrate_cdc_sql)
         self.logger.info("Data change logs migration complete.")
         self.logger.info("Moving event logs in batches...")
-        migrate_sql = f"""
+        migrate_events_sql = f"""
         DO $$ 
         DECLARE
           v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
@@ -242,7 +242,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
           END LOOP;
         END $$;
         """
-        self._execute_sql_command(command=migrate_sql)
+        self._execute_sql_command(command=migrate_events_sql)
         self.logger.info("Event logs migration complete.")
         self.logger.info("Moving existent data to partitions...completed.")
 
