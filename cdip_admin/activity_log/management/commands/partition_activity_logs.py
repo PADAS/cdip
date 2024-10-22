@@ -217,7 +217,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc', '{since_date}');"""
             result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]} rows")
-            start_offset += result[0]
+            start_offset += self.migrate_batch_size
             update_logs_offset_sql = f"""
             -- Save last commited offset
             UPDATE {self.original_table_name}_partition_log
@@ -271,8 +271,8 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
             migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev', '{self.migrate_events_since}');"""
             result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
-            self.logger.info(f"Batch copied: {result[0]}")
-            start_offset += result[0]
+            self.logger.info(f"Batch copied: {result[0]} rows")
+            start_offset += self.migrate_batch_size
             update_logs_offset_sql = f"""
             -- Save last commited offset
             UPDATE {self.original_table_name}_partition_log
