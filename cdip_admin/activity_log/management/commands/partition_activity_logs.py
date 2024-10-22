@@ -186,7 +186,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             SELECT * FROM public.{self.original_table_name}_original
             WHERE log_type = p_log_type  -- Filter by log type
             LIMIT p_batch_size OFFSET p_start_offset
-            ON CONFLICT (your_unique_column) DO NOTHING;  -- Handle constraint violations
+            ON CONFLICT DO NOTHING;  -- Handle constraint violations
         
             -- Get the number of rows moved
             GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
