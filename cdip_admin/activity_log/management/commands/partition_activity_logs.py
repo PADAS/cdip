@@ -205,7 +205,9 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_cdc_offset"]
         self.logger.info(f"Moving data change logs in batches, start offset: {start_offset}...")
         # Copy data in batches
+        batch_num = 0
         while True:
+            self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
             migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc');"""
             result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
             self.logger.info(f"Batch copied: {result}")
@@ -217,6 +219,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             WHERE id = 1;
             """
             self._execute_sql_command(command=update_logs_offset_sql)
+            self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
@@ -228,7 +231,9 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_ev_offset"]
         self.logger.info(f"Moving event logs in batches, start offset: {start_offset}...")
         # Copy data in batches
+        batch_num = 0
         while True:
+            self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
             migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev');"""
             result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
             self.logger.info(f"Batch copied: {result}")
@@ -240,6 +245,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             WHERE id = 1;
             """
             self._execute_sql_command(command=update_logs_offset_sql)
+            self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
