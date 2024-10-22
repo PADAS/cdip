@@ -191,7 +191,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                     -- Set a savepoint for this batch
                     SAVEPOINT cdc_batch_savepoint;
                     
-                    RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
+                    RAISE NOTICE 'Processing Batch: % (offset %) ...', v_offset / v_batch_size + 1, v_offset;
 
                     -- Insert a batch of rows into the partition
                     INSERT INTO {self.original_table_name}
@@ -260,7 +260,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             -- Set a savepoint for this batch
             SAVEPOINT ev_batch_savepoint;
                     
-            RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
+            RAISE NOTICE 'Processing Batch: % (offset %) ...', v_offset / v_batch_size + 1, v_offset;
 
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
