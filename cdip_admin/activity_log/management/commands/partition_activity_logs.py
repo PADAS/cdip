@@ -379,7 +379,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._execute_sql_command(command=sql_create_log_table)
         self._execute_sql_command(
             command=f"""
-                INSERT INTO {log_table_name} (id, current_step, last_migrated_date, start_time)
+                INSERT INTO {log_table_name} (id, current_step, last_migrated_date, start_time, last_migrated_cdc_offset, last_migrated_ev_offset)
                 VALUES (1, 0, NULL, NOW(), 0, 0)
                 ON CONFLICT (id) DO NOTHING;
             """
