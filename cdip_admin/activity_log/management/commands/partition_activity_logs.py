@@ -176,14 +176,14 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         CREATE OR REPLACE FUNCTION insert_activity_log_batch(
             p_start_offset INTEGER,
             p_batch_size INTEGER,
-            p_log_type TEXT  -- New parameter to filter by log type
+            p_log_type TEXT
         ) RETURNS BIGINT AS $$
         DECLARE
             v_rows_moved BIGINT;  -- To capture the number of rows moved
         BEGIN
             -- Insert a batch of rows into the partition, ignoring conflicts
-            INSERT INTO activity_log_activitylog
-            SELECT * FROM public.activity_log_activitylog_original
+            INSERT INTO {self.original_table_name}
+            SELECT * FROM public.{self.original_table_name}_original
             WHERE log_type = p_log_type  -- Filter by log type
             LIMIT p_batch_size OFFSET p_start_offset
             ON CONFLICT (your_unique_column) DO NOTHING;  -- Handle constraint violations
@@ -194,6 +194,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             -- Return the number of rows copied
             RETURN v_rows_moved;
         END;
+        $$ LANGUAGE plpgsql;
         """
         self._execute_sql_command(command=copy_batch_function_sql)
         self.logger.info("insert_activity_log_batch() function created.")
