@@ -36,6 +36,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         migrate_batch_size: int = 10000,
         migrate_start_offset: int = None,
         migrate_events_since: str = "2024-09-01 00:00:00",
+        migrate_max_batches: int = None
     ) -> None:
         super().__init__(
             partition_column=partition_column,
@@ -45,6 +46,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.subpartition_column = subpartition_column
         self.migrate_batch_size = migrate_batch_size
         self.migrate_start_offset = migrate_start_offset
+        self.migrate_max_batches = migrate_max_batches
         self.subpartition_start = subpartition_start
         self.subpartition_interval = subpartition_interval
         self.subpartitions_in_the_future = subpartitions_in_the_future
@@ -211,7 +213,6 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc');"""
             result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]} rows")
-            batch_num += 1
             start_offset += result[0]
             update_logs_offset_sql = f"""
             -- Save last commited offset
@@ -221,6 +222,10 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             """
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
+            batch_num += 1
+            if self.migrate_max_batches and batch_num >= self.migrate_max_batches:
+                self.logger.info(f"Maximum number of batches reached.")
+                break
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
@@ -238,7 +243,6 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev');"""
             result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]}")
-            batch_num += 1
             start_offset += result[0]
             update_logs_offset_sql = f"""
             -- Save last commited offset
@@ -248,6 +252,10 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             """
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
+            batch_num += 1
+            if self.migrate_max_batches and batch_num >= self.migrate_max_batches:
+                self.logger.info(f"Maximum number of batches reached.")
+                break
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
@@ -448,9 +456,18 @@ class Command(BaseCommand):
             default=False,
             help="Rollback the partitioning of the table.",
         )
+        parser.add_argument(
+            "-m",
+            "--max-batches",
+            dest="max_batches",
+            type=int,
+            default=None,
+            help="Maximum number of batches to migrate.",
+        )
 
     def handle(self, *args, **options):
         should_rollback = options["rollback"]
+        max_batches = options["max_batches"]
 
         self.stdout.write(self.style.SUCCESS(f"Running in [{'rollback' if should_rollback else 'normal'}] mode."))
 
@@ -490,6 +507,7 @@ class Command(BaseCommand):
         logs_partitioner = ActivityLogsPartitioner(
             original_table_name="activity_log_activitylog",
             table_data=table_data,
+            migrate_max_batches=max_batches
         )
         if not should_rollback:
             self.stdout.write(self.style.SUCCESS("Partitioning activity logs ..."))
