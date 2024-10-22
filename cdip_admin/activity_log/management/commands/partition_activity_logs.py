@@ -170,14 +170,15 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._set_current_step(step=4)
 
     def _migrate_data_change_logs(self) -> None:
-        self.logger.info("Moving existent data to partititons...")
-        self.logger.info("Moving data change logs in batches...")
+        # Resume from the last commited offset or as commanded
+        start_offset = self.migrate_start_offset or self.log_data["last_migrated_cdc_offset"]
+        self.logger.info(f"Moving data change logs in batches, start offset: {start_offset}...")
         # Copy data in batches
         migrate_cdc_sql = f"""
                 DO $$ 
                 DECLARE
                   v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-                  v_offset INTEGER := {self.migrate_start_offset};  -- Offset for the next batch
+                  v_offset INTEGER := {start_offset};  -- Offset for the next batch
                   v_rows_moved BIGINT;               -- To capture rows moved
                   v_start_time TIMESTAMP;             -- To record the start time of each batch
                   v_end_time TIMESTAMP;               -- To record the end time of each batch
@@ -225,6 +226,12 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         
                     -- Update the offset for the next batch
                     v_offset := v_offset + v_batch_size;
+                    
+                  EXCEPTION
+                    WHEN OTHERS THEN
+                        ROLLBACK TO SAVEPOINT cdc_batch_savepoint;  -- Rollback to the savepoint
+                        RAISE NOTICE 'Error encountered in batch: %, rolling back and exiting.', SQLERRM;
+                        EXIT;  -- Exit the loop after handling the error
                   END LOOP;
                 END $$;
                 """
@@ -287,6 +294,11 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                     
             -- Update the offset for the next batch
             v_offset := v_offset + v_batch_size;
+          EXCEPTION
+            WHEN OTHERS THEN
+                ROLLBACK TO SAVEPOINT ev_batch_savepoint;  -- Rollback to the savepoint
+                RAISE NOTICE 'Error encountered in batch: %, rolling back and exiting.', SQLERRM;
+                EXIT;  -- Exit the loop after handling the error
           END LOOP;
         END $$;
         """
