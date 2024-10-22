@@ -373,7 +373,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                 last_migrated_date          TIMESTAMP WITH TIME ZONE DEFAULT NULL,
                 start_time                  TIMESTAMP WITH TIME ZONE  NOT NULL,
                 last_migrated_cdc_offset    INTEGER     DEFAULT 0     NOT NULL,
-                last_migrated_ev_offset     INTEGER     DEFAULT 0     NOT NULL,
+                last_migrated_ev_offset     INTEGER     DEFAULT 0     NOT NULL
             );
         """
         self._execute_sql_command(command=sql_create_log_table)
