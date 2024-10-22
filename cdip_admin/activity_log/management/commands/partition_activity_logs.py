@@ -31,8 +31,8 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         partition_column: str = "log_type",
         subpartition_column: str = "created_at",
         subpartition_start: str = "2023-11-01 00:00:00",  # Activity logs where implemented this month
-        subpartitions_in_the_future: int = 5,
-        subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
+        subpartitions_in_the_future: int = 24,
+        subpartition_interval: str = PARTITION_INTERVALS.WEEKLY.value,
         migrate_batch_size: int = 10000,
         migrate_start_offset: int = None,
         migrate_events_since: str = "2024-09-01 00:00:00",
@@ -337,11 +337,11 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
 
     def _set_retention_policy(self) -> None:
-        # Set retention policy to detach event partitions older than one month
+        # Set retention policy for partman, to detach old event partitions
         self.logger.info("Setting retention policy in partman...")
         retention_sql = f"""
         UPDATE partman.part_config 
-        SET retention = '1 mon', retention_keep_table = true 
+        SET retention = '3 weeks', retention_keep_table = true 
         WHERE parent_table = 'public.{self.original_table_name}_ev';
         """
         self._execute_sql_command(command=retention_sql)
@@ -349,12 +349,12 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self._set_current_step(step=8)
 
     def _schedule_periodic_maintenance(self) -> None:
-        # Get or create periodic task to run every month
-        self.logger.info("Scheduling monthly maintenance...")
+        # Get or create periodic task to run every week
+        self.logger.info("Scheduling weekly maintenance...")
         schedule, created = CrontabSchedule.objects.get_or_create(
             minute="0",
             hour="0",
-            day_of_month="1"
+            day_of_week="1"  # Monday
         )
         PeriodicTask.objects.get_or_create(
             task="activity_log.tasks.run_partitions_maintenance",
@@ -363,7 +363,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                 "name": "Run psql partitions maintenance"
             }
         )
-        self.logger.info("Monthly maintenance scheduled.")
+        self.logger.info("Weekly maintenance scheduled.")
         self._set_current_step(step=10)
 
     def _set_partition_log_data(self) -> None:

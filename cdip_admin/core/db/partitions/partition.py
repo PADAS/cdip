@@ -11,6 +11,7 @@ from django.db import ProgrammingError, connection
 
 class PARTITION_INTERVALS(Enum):
     MONTHLY = "monthly"
+    WEEKLY = "weekly"
 
 
 @dataclass
