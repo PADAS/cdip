@@ -223,13 +223,26 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             batch_num += 1
-            if self.migrate_max_batches and batch_num >= self.migrate_max_batches:
+            if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
+                self.logger.info("Running VACUUM ANALYZE...")
+                self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+                self._execute_sql_command(command="VACUUM;")
+                self.logger.info("VACUUM ANALYZE is completed.")
+            if result and result[0] == 0:
+                self.logger.info(f"No more data to copy.")
+                is_all_data_copied = True
+                break
+            if self.migrate_max_batches and batch_num > self.migrate_max_batches:
                 self.logger.info(f"Maximum number of batches reached.")
                 break
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
         self.logger.info("Data change logs migration complete.")
+        self.logger.info("Running VACUUM ANALYZE...")
+        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+        self._execute_sql_command(command="VACUUM;")
+        self.logger.info("VACUUM ANALYZE is completed.")
         self._set_current_step(step=6)
 
     def _migrate_event_logs(self) -> None:
@@ -238,6 +251,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.logger.info(f"Moving event logs in batches, start offset: {start_offset}...")
         # Copy data in batches
         batch_num = 0
+        is_all_data_copied = False
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
             migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev');"""
@@ -253,41 +267,48 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             batch_num += 1
-            if self.migrate_max_batches and batch_num >= self.migrate_max_batches:
-                self.logger.info(f"Maximum number of batches reached.")
-                break
+            if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
+                self.logger.info("Running VACUUM ANALYZE...")
+                self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+                self._execute_sql_command(command="VACUUM;")
+                self.logger.info("VACUUM ANALYZE is completed.")
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
+                is_all_data_copied = True
                 break
-        self._execute_sql_command(command=migrate_events_sql)
-        self.logger.info("Event logs migration complete.")
-        self.logger.info("Moving existent data to partitions...completed.")
+            if self.migrate_max_batches and batch_num > self.migrate_max_batches:
+                self.logger.info(f"Maximum number of batches reached.")
+                break
 
-        self.logger.info("Running VACUUM ANALYZE...")
-        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-        self._execute_sql_command(command="VACUUM;")
-        self.logger.info("VACUUM ANALYZE is completed.")
+        if not is_all_data_copied:
+            self.logger.info("Event logs migration complete.")
+            self.logger.info("Moving existent data to partitions...completed.")
 
-        self.logger.info("Restoring triggers...")
-        for trigger in self.table_data.triggers if self.table_data.triggers else []:
-            self._drop_trigger(table_name=f"{self.original_table_name}_original", trigger_data=trigger)
-            self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
-        self.logger.info("Triggers restored")
+            self.logger.info("Running VACUUM ANALYZE...")
+            self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            self._execute_sql_command(command="VACUUM;")
+            self.logger.info("VACUUM ANALYZE is completed.")
 
-        self.logger.info(f"Creating unique index on PK {self.table_data.primary_key_columns}...")
-        pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
-        self._create_index(
-            table_name=self.original_table_name,
-            index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
-            is_unique=True,
-        )
-        self.logger.info("Unique index on PK created.")
+            self.logger.info("Restoring triggers...")
+            for trigger in self.table_data.triggers if self.table_data.triggers else []:
+                self._drop_trigger(table_name=f"{self.original_table_name}_original", trigger_data=trigger)
+                self._create_trigger(table_name=self.original_table_name, trigger_data=trigger)
+            self.logger.info("Triggers restored")
 
-        self.logger.info("Restoring unique constraints...")
-        for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
-            self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
-        self.logger.info("Unique constraints restored.")
-        self._set_current_step(step=7)
+            self.logger.info(f"Creating unique index on PK {self.table_data.primary_key_columns}...")
+            pk_unique_idx_name = f"{'_'.join(self.table_data.primary_key_columns)}_unique_idx"
+            self._create_index(
+                table_name=self.original_table_name,
+                index_data=IndexData(name=pk_unique_idx_name, columns=self.table_data.primary_key_columns),
+                is_unique=True,
+            )
+            self.logger.info("Unique index on PK created.")
+
+            self.logger.info("Restoring unique constraints...")
+            for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
+                self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
+            self.logger.info("Unique constraints restored.")
+            self._set_current_step(step=7)
 
 
     def _set_retention_policy(self) -> None:
