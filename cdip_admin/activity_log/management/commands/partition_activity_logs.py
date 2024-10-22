@@ -211,6 +211,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.logger.info(f"Moving data change logs in batches, start offset: {start_offset}...")
         # Copy data in batches
         batch_num = 0
+        is_all_data_copied = False
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
             migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc', '{since_date}');"""
@@ -241,12 +242,14 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 break
-        self.logger.info("Data change logs migration complete.")
-        self.logger.info("Running VACUUM ANALYZE...")
-        self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-        self._execute_sql_command(command="VACUUM;")
-        self.logger.info("VACUUM ANALYZE is completed.")
-        self._set_current_step(step=6)
+
+        if is_all_data_copied:
+            self.logger.info("Data change logs migration complete.")
+            self.logger.info("Running VACUUM ANALYZE...")
+            self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            self._execute_sql_command(command="VACUUM;")
+            self.logger.info("VACUUM ANALYZE is completed.")
+            self._set_current_step(step=6)
 
     def _migrate_event_logs(self) -> None:
         # Resume from the last commited offset or as commanded
