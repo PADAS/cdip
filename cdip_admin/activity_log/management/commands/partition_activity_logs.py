@@ -213,7 +213,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         batch_num = 0
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
-            migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc', {since_date});"""
+            migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc', '{since_date}');"""
             result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]} rows")
             start_offset += result[0]
@@ -257,7 +257,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         is_all_data_copied = False
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
-            migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev', {self.migrate_events_since});"""
+            migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev', '{self.migrate_events_since}');"""
             result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]}")
             start_offset += result[0]
