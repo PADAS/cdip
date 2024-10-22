@@ -187,6 +187,9 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                     -- Record the start time
                     v_start_time := clock_timestamp();
 
+                    -- Set a savepoint for this batch
+                    SAVEPOINT cdc_batch_savepoint;
+                    
                     RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
 
                     -- Insert a batch of rows into the partition
@@ -208,10 +211,18 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                                  v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
 
                     -- Exit the loop if no more rows are left to move
-                    IF NOT FOUND THEN
+                    IF v_rows_moved = 0 THEN
                       EXIT;
                     END IF;
 
+                    -- Save last commited offset
+                    UPDATE {self.original_table_name}_partition_log
+                    SET last_migrated_cdc_offset = v_offset
+                    WHERE id = 1;
+                
+                    -- Commit the transaction for this batch by releasing the savepoint
+                    RELEASE SAVEPOINT cdc_batch_savepoint;
+        
                     -- Update the offset for the next batch
                     v_offset := v_offset + v_batch_size;
                   END LOOP;
@@ -239,6 +250,9 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             -- Record the start time
             v_start_time := clock_timestamp();
 
+            -- Set a savepoint for this batch
+            SAVEPOINT ev_batch_savepoint;
+                    
             RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
 
             -- Insert a batch of rows into the partition
@@ -259,10 +273,18 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                          v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
 
             -- Exit the loop if no more rows are left to move
-            IF NOT FOUND THEN
+            IF v_rows_moved = 0 THEN
               EXIT;
             END IF;
 
+            -- Save last commited offset
+            UPDATE {self.original_table_name}_partition_log
+            SET last_migrated_cdc_offset = v_offset
+            WHERE id = 1;
+        
+            -- Commit the transaction for this batch by releasing the savepoint
+            RELEASE SAVEPOINT ev_batch_savepoint;
+                    
             -- Update the offset for the next batch
             v_offset := v_offset + v_batch_size;
           END LOOP;
