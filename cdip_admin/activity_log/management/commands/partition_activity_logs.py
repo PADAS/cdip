@@ -30,7 +30,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         table_data: TableData,
         partition_column: str = "log_type",
         subpartition_column: str = "created_at",
-        subpartition_start: str = "2023-11-01 00:00:00",
+        subpartition_start: str = "2023-11-01 00:00:00",  # Activity logs where implemented this month
         subpartitions_in_the_future: int = 5,
         subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
         migrate_batch_size: int = 10000,
@@ -178,7 +178,8 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         CREATE OR REPLACE FUNCTION insert_activity_log_batch(
             p_start_offset INTEGER,
             p_batch_size INTEGER,
-            p_log_type TEXT
+            p_log_type TEXT,
+            p_since_date TIMESTAMP
         ) RETURNS BIGINT AS $$
         DECLARE
             v_rows_moved BIGINT;  -- To capture the number of rows moved
@@ -186,9 +187,10 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             -- Insert a batch of rows into the partition, ignoring conflicts
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original
-            WHERE log_type = p_log_type  -- Filter by log type
+            WHERE log_type = p_log_type
+            AND created_at >= p_since_date
             LIMIT p_batch_size OFFSET p_start_offset
-            ON CONFLICT DO NOTHING;  -- Handle constraint violations
+            ON CONFLICT DO NOTHING;
         
             -- Get the number of rows moved
             GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
@@ -205,12 +207,13 @@ class ActivityLogsPartitioner(TablePartitionerBase):
     def _migrate_data_change_logs(self) -> None:
         # Resume from the last commited offset or as commanded
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_cdc_offset"]
+        since_date = self.subpartition_start
         self.logger.info(f"Moving data change logs in batches, start offset: {start_offset}...")
         # Copy data in batches
         batch_num = 0
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
-            migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc');"""
+            migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc', {since_date});"""
             result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]} rows")
             start_offset += result[0]
@@ -254,7 +257,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         is_all_data_copied = False
         while True:
             self.logger.info(f"Copying batch {batch_num}, offset {start_offset}...")
-            migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev');"""
+            migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev', {self.migrate_events_since});"""
             result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
             self.logger.info(f"Batch copied: {result[0]}")
             start_offset += result[0]
