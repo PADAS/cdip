@@ -113,14 +113,14 @@ class TablePartitionerBase:
         )
         sql = f"CALL partman.run_maintenance_proc();"
         self._execute_sql_command(command=sql)
-        self._set_current_step(step=8)
+        self._set_current_step(step=9)
         self.logger.info(
             f"partman.run_maintenance_proc() completed."
         )
 
     def _schedule_periodic_maintenance(self) -> None:
         self.logger.warning("_schedule_periodic_maintenance() is not implemented.")
-        self._set_current_step(step=8)
+        self._set_current_step(step=10)
 
     def _pre_requirements_check(self) -> None:
         result = self._execute_sql_command(

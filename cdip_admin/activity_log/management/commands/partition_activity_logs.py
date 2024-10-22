@@ -17,6 +17,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         "_make_template_table",
         "_partition_setup",
         "_set_partition_schema_with_existing_tables",
+        "_define_batch_copy_function",
         "_migrate_data_change_logs",
         "_migrate_event_logs",
         "_set_retention_policy",
@@ -169,139 +170,78 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
         self._set_current_step(step=4)
 
+    def _define_batch_copy_function(self) -> None:
+        self.logger.info("Creating insert_activity_log_batch() function...")
+        copy_batch_function_sql = f"""
+        CREATE OR REPLACE FUNCTION insert_activity_log_batch(
+            p_start_offset INTEGER,
+            p_batch_size INTEGER,
+            p_log_type TEXT  -- New parameter to filter by log type
+        ) RETURNS BIGINT AS $$
+        DECLARE
+            v_rows_moved BIGINT;  -- To capture the number of rows moved
+        BEGIN
+            -- Insert a batch of rows into the partition, ignoring conflicts
+            INSERT INTO activity_log_activitylog
+            SELECT * FROM public.activity_log_activitylog_original
+            WHERE log_type = p_log_type  -- Filter by log type
+            LIMIT p_batch_size OFFSET p_start_offset
+            ON CONFLICT (your_unique_column) DO NOTHING;  -- Handle constraint violations
+        
+            -- Get the number of rows moved
+            GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
+        
+            -- Return the number of rows copied
+            RETURN v_rows_moved;
+        END;
+        """
+        self._execute_sql_command(command=copy_batch_function_sql)
+        self.logger.info("insert_activity_log_batch() function created.")
+        self._set_current_step(step=5)
+        
     def _migrate_data_change_logs(self) -> None:
         # Resume from the last commited offset or as commanded
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_cdc_offset"]
         self.logger.info(f"Moving data change logs in batches, start offset: {start_offset}...")
         # Copy data in batches
-        migrate_cdc_sql = f"""
-                DO $$ 
-                DECLARE
-                  v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-                  v_offset INTEGER := {start_offset};  -- Offset for the next batch
-                  v_rows_moved BIGINT;               -- To capture rows moved
-                  v_start_time TIMESTAMP;             -- To record the start time of each batch
-                  v_end_time TIMESTAMP;               -- To record the end time of each batch
-                  v_elapsed_time INTERVAL;            -- To calculate elapsed time
-                BEGIN
-                  LOOP
-                    -- Record the start time
-                    v_start_time := clock_timestamp();
-
-                    -- Set a savepoint for this batch
-                    SAVEPOINT cdc_batch_savepoint;
-                    
-                    RAISE NOTICE 'Processing Batch: % (offset %) ...', v_offset / v_batch_size + 1, v_offset;
-
-                    -- Insert a batch of rows into the partition
-                    INSERT INTO {self.original_table_name}
-                    SELECT * FROM public.{self.original_table_name}_original
-                    WHERE log_type='cdc'
-                    LIMIT v_batch_size OFFSET v_offset
-                    ON CONFLICT DO NOTHING;  -- Idempotency
-
-                    -- Get the number of rows moved
-                    GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
-
-                    -- Record the end time
-                    v_end_time := clock_timestamp();
-                    v_elapsed_time := v_end_time - v_start_time;  -- Calculate the elapsed time
-
-                    -- Log the batch processing details
-                    RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
-                                 v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
-
-                    -- Exit the loop if no more rows are left to move
-                    IF v_rows_moved = 0 THEN
-                      EXIT;
-                    END IF;
-
-                    -- Save last commited offset
-                    UPDATE {self.original_table_name}_partition_log
-                    SET last_migrated_cdc_offset = v_offset
-                    WHERE id = 1;
-                
-                    -- Commit the transaction for this batch by releasing the savepoint
-                    RELEASE SAVEPOINT cdc_batch_savepoint;
-        
-                    -- Update the offset for the next batch
-                    v_offset := v_offset + v_batch_size;
-                    
-                  EXCEPTION
-                    WHEN OTHERS THEN
-                        ROLLBACK TO SAVEPOINT cdc_batch_savepoint;  -- Rollback to the savepoint
-                        RAISE NOTICE 'Error encountered in batch: %, rolling back and exiting.', SQLERRM;
-                        EXIT;  -- Exit the loop after handling the error
-                  END LOOP;
-                END $$;
-                """
-        self._execute_sql_command(command=migrate_cdc_sql)
+        while True:
+            migrate_cdc_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'cdc');"""
+            result = self._execute_sql_command(command=migrate_cdc_sql, fetch=True)
+            self.logger.info(f"Batch copied: {result}")
+            start_offset += self.migrate_batch_size
+            update_logs_offset_sql = f"""
+            -- Save last commited offset
+            UPDATE {self.original_table_name}_partition_log
+            SET last_migrated_cdc_offset = v_offset
+            WHERE id = 1;
+            """
+            self._execute_sql_command(command=update_logs_offset_sql)
+            if result and result[0] == 0:
+                self.logger.info(f"No more data to copy.")
+                break
         self.logger.info("Data change logs migration complete.")
-        self._set_current_step(step=5)
+        self._set_current_step(step=6)
 
     def _migrate_event_logs(self) -> None:
         # Resume from the last commited offset or as commanded
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_ev_offset"]
         self.logger.info(f"Moving event logs in batches, start offset: {start_offset}...")
-        migrate_events_sql = f"""
-        DO $$ 
-        DECLARE
-          v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-          v_offset INTEGER := {start_offset};  -- Offset for the next batch
-          v_rows_moved BIGINT;               -- To capture rows moved
-          v_start_time TIMESTAMP;             -- To record the start time of each batch
-          v_end_time TIMESTAMP;               -- To record the end time of each batch
-          v_elapsed_time INTERVAL;            -- To calculate elapsed time
-        BEGIN
-          LOOP
-            -- Record the start time
-            v_start_time := clock_timestamp();
-
-            -- Set a savepoint for this batch
-            SAVEPOINT ev_batch_savepoint;
-                    
-            RAISE NOTICE 'Processing Batch: % (offset %) ...', v_offset / v_batch_size + 1, v_offset;
-
-            -- Insert a batch of rows into the partition
-            INSERT INTO {self.original_table_name}
-            SELECT * FROM public.{self.original_table_name}_original WHERE log_type='ev'
-            LIMIT v_batch_size OFFSET v_offset
-            ON CONFLICT DO NOTHING;  -- Idempotency
-
-            -- Get the number of rows moved
-            GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
-
-            -- Record the end time
-            v_end_time := clock_timestamp();
-            v_elapsed_time := v_end_time - v_start_time;  -- Calculate the elapsed time
-
-            -- Log the batch processing details
-            RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
-                         v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
-
-            -- Exit the loop if no more rows are left to move
-            IF v_rows_moved = 0 THEN
-              EXIT;
-            END IF;
-
+        # Copy data in batches
+        while True:
+            migrate_events_sql = f"""SELECT insert_activity_log_batch({start_offset}, {self.migrate_batch_size}, 'ev');"""
+            result = self._execute_sql_command(command=migrate_events_sql, fetch=True)
+            self.logger.info(f"Batch copied: {result}")
+            start_offset += self.migrate_batch_size
+            update_logs_offset_sql = f"""
             -- Save last commited offset
             UPDATE {self.original_table_name}_partition_log
-            SET last_migrated_cdc_offset = v_offset
+            SET last_migrated_ev_offset = v_offset
             WHERE id = 1;
-        
-            -- Commit the transaction for this batch by releasing the savepoint
-            RELEASE SAVEPOINT ev_batch_savepoint;
-                    
-            -- Update the offset for the next batch
-            v_offset := v_offset + v_batch_size;
-          EXCEPTION
-            WHEN OTHERS THEN
-                ROLLBACK TO SAVEPOINT ev_batch_savepoint;  -- Rollback to the savepoint
-                RAISE NOTICE 'Error encountered in batch: %, rolling back and exiting.', SQLERRM;
-                EXIT;  -- Exit the loop after handling the error
-          END LOOP;
-        END $$;
-        """
+            """
+            self._execute_sql_command(command=update_logs_offset_sql)
+            if result and result[0] == 0:
+                self.logger.info(f"No more data to copy.")
+                break
         self._execute_sql_command(command=migrate_events_sql)
         self.logger.info("Event logs migration complete.")
         self.logger.info("Moving existent data to partitions...completed.")
@@ -330,7 +270,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
             self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
         self.logger.info("Unique constraints restored.")
-        self._set_current_step(step=6)
+        self._set_current_step(step=7)
 
 
     def _set_retention_policy(self) -> None:
@@ -343,7 +283,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         """
         self._execute_sql_command(command=retention_sql)
         self.logger.info("Retention policy set.")
-        self._set_current_step(step=7)
+        self._set_current_step(step=8)
 
     def _schedule_periodic_maintenance(self) -> None:
         # Get or create periodic task to run every month
@@ -361,7 +301,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             }
         )
         self.logger.info("Monthly maintenance scheduled.")
-        self._set_current_step(step=9)
+        self._set_current_step(step=10)
 
     def _set_partition_log_data(self) -> None:
         log_table_name = f"{self.original_table_name}_partition_log"
