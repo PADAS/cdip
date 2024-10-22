@@ -113,7 +113,7 @@ class TablePartitionerBase:
         )
         sql = f"CALL partman.run_maintenance_proc();"
         self._execute_sql_command(command=sql)
-        self._set_current_step(step=7)
+        self._set_current_step(step=8)
         self.logger.info(
             f"partman.run_maintenance_proc() completed."
         )

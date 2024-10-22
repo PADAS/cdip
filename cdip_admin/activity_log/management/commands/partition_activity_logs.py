@@ -12,6 +12,17 @@ from core.db.partitions import (
 
 
 class ActivityLogsPartitioner(TablePartitionerBase):
+    steps_commands = [
+        "_create_parent_table",
+        "_make_template_table",
+        "_partition_setup",
+        "_set_partition_schema_with_existing_tables",
+        "_migrate_data_change_logs",
+        "_migrate_event_logs",
+        "_set_retention_policy",
+        "_partman_run_maintenance",
+        "_schedule_periodic_maintenance",
+    ]
     def __init__(
         self,
         original_table_name: str,
@@ -22,7 +33,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         subpartitions_in_the_future: int = 5,
         subpartition_interval: str = PARTITION_INTERVALS.MONTHLY.value,
         migrate_batch_size: int = 10000,
-        migrate_start_offset: int = 0,
+        migrate_start_offset: int = None,
         migrate_events_since: str = "2024-09-01 00:00:00",
     ) -> None:
         super().__init__(
@@ -37,6 +48,13 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         self.subpartition_interval = subpartition_interval
         self.subpartitions_in_the_future = subpartitions_in_the_future
         self.migrate_events_since = migrate_events_since
+        self.log_data = {
+            "current_step": 0,
+            "last_migrated_date": None,
+            "start_time": None,
+            "last_migrated_cdc_offset": 0,
+            "last_migrated_ev_offset": 0
+        }
 
 
     def _create_parent_table(self) -> None:
@@ -151,7 +169,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
         self._set_current_step(step=4)
 
-    def _process_data_partition(self) -> None:
+    def _migrate_data_change_logs(self) -> None:
         self.logger.info("Moving existent data to partititons...")
         self.logger.info("Moving data change logs in batches...")
         # Copy data in batches
@@ -201,12 +219,17 @@ class ActivityLogsPartitioner(TablePartitionerBase):
                 """
         self._execute_sql_command(command=migrate_cdc_sql)
         self.logger.info("Data change logs migration complete.")
-        self.logger.info("Moving event logs in batches...")
+        self._set_current_step(step=5)
+
+    def _migrate_event_logs(self) -> None:
+        # Resume from the last commited offset or as commanded
+        start_offset = self.migrate_start_offset or self.log_data["last_migrated_ev_offset"]
+        self.logger.info(f"Moving event logs in batches, start offset: {start_offset}...")
         migrate_events_sql = f"""
         DO $$ 
         DECLARE
           v_batch_size INTEGER := {self.migrate_batch_size};  -- Number of rows per batch
-          v_offset INTEGER := {self.migrate_start_offset};  -- Offset for the next batch
+          v_offset INTEGER := {start_offset};  -- Offset for the next batch
           v_rows_moved BIGINT;               -- To capture rows moved
           v_start_time TIMESTAMP;             -- To record the start time of each batch
           v_end_time TIMESTAMP;               -- To record the end time of each batch
@@ -215,15 +238,15 @@ class ActivityLogsPartitioner(TablePartitionerBase):
           LOOP
             -- Record the start time
             v_start_time := clock_timestamp();
-            
+
             RAISE NOTICE 'Processing Batch: % ...', v_offset / v_batch_size + 1;
-                         
+
             -- Insert a batch of rows into the partition
             INSERT INTO {self.original_table_name}
             SELECT * FROM public.{self.original_table_name}_original WHERE log_type='ev'
             LIMIT v_batch_size OFFSET v_offset
             ON CONFLICT DO NOTHING;  -- Idempotency
-        
+
             -- Get the number of rows moved
             GET DIAGNOSTICS v_rows_moved = ROW_COUNT;
 
@@ -234,12 +257,12 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             -- Log the batch processing details
             RAISE NOTICE 'Processed Batch: %, Rows moved: %, Elapsed Time: %', 
                          v_offset / v_batch_size + 1, v_rows_moved, v_elapsed_time;
-                     
+
             -- Exit the loop if no more rows are left to move
             IF NOT FOUND THEN
               EXIT;
             END IF;
-        
+
             -- Update the offset for the next batch
             v_offset := v_offset + v_batch_size;
           END LOOP;
@@ -273,8 +296,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         for unique_constraint in self.table_data.unique_constraints if self.table_data.unique_constraints else []:
             self._create_unique_constraint(table_name=self.original_table_name, constraint_data=unique_constraint)
         self.logger.info("Unique constraints restored.")
-
-        self._set_current_step(step=5)
+        self._set_current_step(step=6)
 
 
     def _set_retention_policy(self) -> None:
@@ -287,7 +309,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         """
         self._execute_sql_command(command=retention_sql)
         self.logger.info("Retention policy set.")
-        self._set_current_step(step=6)
+        self._set_current_step(step=7)
 
     def _schedule_periodic_maintenance(self) -> None:
         # Get or create periodic task to run every month
@@ -305,7 +327,59 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             }
         )
         self.logger.info("Monthly maintenance scheduled.")
-        self._set_current_step(step=8)
+        self._set_current_step(step=9)
+
+    def _set_partition_log_data(self) -> None:
+        log_table_name = f"{self.original_table_name}_partition_log"
+        sql_create_log_table = f"""
+            CREATE TABLE IF NOT EXISTS {log_table_name}
+            (
+                id                          INTEGER     DEFAULT 1     NOT NULL PRIMARY KEY,
+                current_step                INTEGER     DEFAULT 0     NOT NULL,
+                last_migrated_date          TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+                start_time                  TIMESTAMP WITH TIME ZONE  NOT NULL,
+                last_migrated_cdc_offset    INTEGER     DEFAULT 0     NOT NULL,
+                last_migrated_ev_offset     INTEGER     DEFAULT 0     NOT NULL,
+            );
+        """
+        self._execute_sql_command(command=sql_create_log_table)
+        self._execute_sql_command(
+            command=f"""
+                INSERT INTO {log_table_name} (id, current_step, last_migrated_date, start_time)
+                VALUES (1, 0, NULL, NOW(), 0, 0)
+                ON CONFLICT (id) DO NOTHING;
+            """
+        )
+        for column in ("current_step", "last_migrated_date", "start_time", "last_migrated_cdc_offset", "last_migrated_ev_offset"):
+            result = self._execute_sql_command(
+                command=f"""
+                SELECT {column}
+                FROM {log_table_name}
+                WHERE id = 1;
+            """,
+                fetch=True,
+            )
+            if result[0] and result[0]:
+                self.log_data[column] = result[0]
+        self.logger.info(f"Partition log data is set: {self.log_data}")
+
+    def _set_last_migrated_cdc_offset(self, offset: int) -> None:
+        self._execute_sql_command(
+            command=f"""
+                UPDATE {self.original_table_name}_partition_log
+                SET last_migrated_cdc_offset = '{offset}'
+                WHERE id = 1;
+            """
+        )
+
+    def _set_last_migrated_ev_offset(self, offset: int) -> None:
+        self._execute_sql_command(
+            command=f"""
+                UPDATE {self.original_table_name}_partition_log
+                SET last_migrated_ev_offset = '{offset}'
+                WHERE id = 1;
+            """
+        )
 
     def rollback(self) -> None:
         start_time = datetime.datetime.now(pytz.utc)
