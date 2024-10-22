@@ -215,7 +215,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             update_logs_offset_sql = f"""
             -- Save last commited offset
             UPDATE {self.original_table_name}_partition_log
-            SET last_migrated_cdc_offset = result[0]
+            SET last_migrated_cdc_offset = {start_offset}
             WHERE id = 1;
             """
             self._execute_sql_command(command=update_logs_offset_sql)
@@ -241,7 +241,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             update_logs_offset_sql = f"""
             -- Save last commited offset
             UPDATE {self.original_table_name}_partition_log
-            SET last_migrated_ev_offset = result[0]
+            SET last_migrated_ev_offset = {start_offset}
             WHERE id = 1;
             """
             self._execute_sql_command(command=update_logs_offset_sql)
