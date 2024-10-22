@@ -35,7 +35,7 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         subpartition_interval: str = PARTITION_INTERVALS.WEEKLY.value,
         migrate_batch_size: int = 10000,
         migrate_start_offset: int = None,
-        migrate_events_since: str = "2024-09-01 00:00:00",
+        migrate_events_since: str = "2024-09-29 00:00:00",
         migrate_max_batches: int = None
     ) -> None:
         super().__init__(
