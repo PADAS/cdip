@@ -255,6 +255,15 @@ class ActivityLogsPartitioner(TablePartitionerBase):
         # Resume from the last commited offset or as commanded
         start_offset = self.migrate_start_offset or self.log_data["last_migrated_ev_offset"]
         self.logger.info(f"Moving event logs in batches, start offset: {start_offset}...")
+        self.logger.info(f"Setting event tables unlogged...")
+        disable_log_sql = f"""
+        ALTER TABLE {self.original_table_name}_ev SET UNLOGGED;
+        ALTER TABLE {self.original_table_name}_ev_default  SET UNLOGGED;
+        ALTER TABLE {self.original_table_name}_ev_p2024_09  SET UNLOGGED;
+        ALTER TABLE {self.original_table_name}_ev_p2024_10  SET UNLOGGED;
+        """
+        self._execute_sql_command(command=disable_log_sql)
+        self.logger.info(f"Event tables LOGGED.")
         # Copy data in batches
         batch_num = 0
         is_all_data_copied = False
@@ -285,6 +294,16 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             if self.migrate_max_batches and batch_num > self.migrate_max_batches:
                 self.logger.info(f"Maximum number of batches reached.")
                 break
+
+        self.logger.info(f"Setting event tables logged...")
+        enable_log_sql = f"""
+                ALTER TABLE {self.original_table_name}_ev SET LOGGED;
+                ALTER TABLE {self.original_table_name}_ev_default  SET LOGGED;
+                ALTER TABLE {self.original_table_name}_ev_p2024_09  SET LOGGED;
+                ALTER TABLE {self.original_table_name}_ev_p2024_10  SET LOGGED;
+                """
+        self._execute_sql_command(command=enable_log_sql)
+        self.logger.info(f"Event tables LOGGED.")
 
         if not is_all_data_copied:
             self.logger.info("Event logs migration complete.")
