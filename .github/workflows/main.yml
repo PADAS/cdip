@@ -4,7 +4,6 @@ on:
     branches:
       - main
       - 'release-**'
-      - 'gundi-3561-partition-logs'
 
 jobs:
   vars:
@@ -29,7 +28,7 @@ jobs:
 
   deploy_dev:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
-    if: startsWith(github.ref, 'refs/heads/gundi-3561-partition-logs')
+    if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
       environment: dev
