@@ -227,11 +227,11 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             batch_num += 1
-            if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
-                self.logger.info("Running VACUUM ANALYZE...")
-                self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-                self._execute_sql_command(command="VACUUM;")
-                self.logger.info("VACUUM ANALYZE is completed.")
+            # if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
+            #     self.logger.info("Running VACUUM ANALYZE...")
+            #     self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            #     self._execute_sql_command(command="VACUUM;")
+            #     self.logger.info("VACUUM ANALYZE is completed.")
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 is_all_data_copied = True
@@ -245,10 +245,10 @@ class ActivityLogsPartitioner(TablePartitionerBase):
 
         if is_all_data_copied:
             self.logger.info("Data change logs migration complete.")
-            self.logger.info("Running VACUUM ANALYZE...")
-            self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-            self._execute_sql_command(command="VACUUM;")
-            self.logger.info("VACUUM ANALYZE is completed.")
+            # self.logger.info("Running VACUUM ANALYZE...")
+            # self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            # self._execute_sql_command(command="VACUUM;")
+            # self.logger.info("VACUUM ANALYZE is completed.")
             self._set_current_step(step=6)
 
     def _migrate_event_logs(self) -> None:
@@ -273,11 +273,11 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self._execute_sql_command(command=update_logs_offset_sql)
             self.logger.info(f"Batch {batch_num} copied, offset moved to {start_offset}.")
             batch_num += 1
-            if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
-                self.logger.info("Running VACUUM ANALYZE...")
-                self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-                self._execute_sql_command(command="VACUUM;")
-                self.logger.info("VACUUM ANALYZE is completed.")
+            # if batch_num % 10 == 0:  # Run VACUUM ANALYZE every 10 batches
+            #     self.logger.info("Running VACUUM ANALYZE...")
+            #     self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            #     self._execute_sql_command(command="VACUUM;")
+            #     self.logger.info("VACUUM ANALYZE is completed.")
             if result and result[0] == 0:
                 self.logger.info(f"No more data to copy.")
                 is_all_data_copied = True
@@ -290,10 +290,10 @@ class ActivityLogsPartitioner(TablePartitionerBase):
             self.logger.info("Event logs migration complete.")
             self.logger.info("Moving existent data to partitions...completed.")
 
-            self.logger.info("Running VACUUM ANALYZE...")
-            self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
-            self._execute_sql_command(command="VACUUM;")
-            self.logger.info("VACUUM ANALYZE is completed.")
+            # self.logger.info("Running VACUUM ANALYZE...")
+            # self._execute_sql_command(command=f"VACUUM ANALYZE public.{self.original_table_name};")
+            # self._execute_sql_command(command="VACUUM;")
+            # self.logger.info("VACUUM ANALYZE is completed.")
 
             self.logger.info("Restoring triggers...")
             for trigger in self.table_data.triggers if self.table_data.triggers else []:
