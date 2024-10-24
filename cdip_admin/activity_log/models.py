@@ -1,3 +1,5 @@
+import datetime
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.apps import apps
@@ -6,6 +8,12 @@ from .core import ActivityActions
 
 
 User = get_user_model()
+
+
+class ActivityLogManager(models.Manager):
+    def get_queryset(self):
+        # Avoid scanning future partitions when querying activity logs
+        return super().get_queryset().filter(created_at__lte=datetime.datetime.now(datetime.timezone.utc))
 
 
 class ActivityLog(UUIDAbstractModel, TimestampedModel):
@@ -73,10 +81,13 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         verbose_name="JSON Revert Details"
     )
 
+    objects = ActivityLogManager()
+
     class Meta:
         ordering = ("-created_at", )
         indexes = [
             models.Index(fields=["-created_at"]),
+            models.Index(fields=["integration", "-created_at"]),
         ]
 
     def __str__(self):
