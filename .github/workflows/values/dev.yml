@@ -18,7 +18,7 @@ ingress:
         - "sensors.api.dev.gundiservice.org"
 database:
   private_ip_enabled: True
-  connection_name: cdip-dev-78ca:us-central1:prod-backup
+  connection_name: cdip-dev-78ca:us-central1:sintegrate-b2b9960e
 admin_portal:
   env:
     TRACE_ENVIRONMENT: "dev"
