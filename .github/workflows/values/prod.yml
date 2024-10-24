@@ -51,6 +51,10 @@ keycloak:
   KEYCLOAK_ADMIN_CLIENT_ID: admin-cli
 
 portal:
+  resources:
+    requests:
+      cpu: 600m
+      memory: 1000Mi
   autoscaling:
     enabled: true
     minReplicas: 4
