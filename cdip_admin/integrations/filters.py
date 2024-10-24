@@ -82,7 +82,6 @@ class DeviceStateFilter(django_filters.FilterSet):
         field_name="device__inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
-        #distinct=True,
     )
 
     inbound_config_type = django_filters.ModelChoiceFilter(
@@ -90,7 +89,6 @@ class DeviceStateFilter(django_filters.FilterSet):
         field_name="device__inbound_configuration__type",
         to_field_name="name",
         empty_label=_("Types"),
-        #distinct=True,
     )
 
     class Meta:
@@ -123,7 +121,6 @@ class DeviceGroupFilter(django_filters.FilterSet):
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Organizations"),
-        #distinct=True,
     )
 
     destinations = django_filters.ModelChoiceFilter(
@@ -131,7 +128,6 @@ class DeviceGroupFilter(django_filters.FilterSet):
         field_name="destinations",
         to_field_name="name",
         empty_label=_("All Destinations"),
-        #distinct=True,
     )
 
     class Meta:
@@ -173,7 +169,6 @@ class DeviceFilter(django_filters.FilterSet):
         field_name="inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
-        #distinct=True,
     )
 
     inbound_config_type = django_filters.ModelChoiceFilter(
@@ -181,7 +176,6 @@ class DeviceFilter(django_filters.FilterSet):
         field_name="inbound_configuration__type",
         to_field_name="name",
         empty_label=_("Types"),
-        #distinct=True,
     )
 
     class Meta:
@@ -234,7 +228,6 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
-        #distinct=True,
     )
 
     inbound_config_type = django_filters.ModelChoiceFilter(
@@ -242,7 +235,6 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         field_name="type",
         to_field_name="name",
         empty_label=_("All Types"),
-        #distinct=True,
     )
 
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
@@ -295,7 +287,6 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
-        #distinct=True,
     )
 
     outbound_config_type = django_filters.ModelChoiceFilter(
@@ -303,7 +294,6 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         field_name="type",
         to_field_name="name",
         empty_label=_("All Outbound Types"),
-        #distinct=True,
     )
 
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
@@ -314,7 +304,6 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         to_field_name="name",
         empty_label=_("All Inbound Integration Types"),
         field_name="name",
-        #distinct=True,
     )
 
     class Meta:
@@ -368,8 +357,8 @@ class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFil
 class IntegrationFilter(django_filters_rest.FilterSet):
     action_type = django_filters_rest.CharFilter(field_name="type__actions__type", lookup_expr="iexact", distinct=True)
     action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in", distinct=True)
-    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact", )#distinct=True)
-    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", )#distinct=True)
+    action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact", )
+    action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", )
 
     class Meta:
         model = Integration
@@ -438,8 +427,8 @@ class ConnectionFilter(django_filters_rest.FilterSet):
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
     action_type = django_filters_rest.CharFilter(field_name="actions__type", lookup_expr="iexact", distinct=True)
     action_type__in = CharInFilter(field_name="actions__type", lookup_expr="in", distinct=True)
-    action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact", )#distinct=True)
-    action__in = CharInFilter(field_name="actions__value", lookup_expr="in", )#distinct=True)
+    action = django_filters_rest.CharFilter(field_name="actions__value", lookup_expr="iexact", )
+    action__in = CharInFilter(field_name="actions__value", lookup_expr="in", )
     in_use_only = django_filters_rest.BooleanFilter(method='filter_types_in_use_only')
     has_webhook = django_filters_rest.BooleanFilter(method="filter_types_with_webhook")
     is_provider = django_filters_rest.BooleanFilter(method="filter_types_is_provider")
@@ -517,22 +506,18 @@ class RouteFilter(django_filters_rest.FilterSet):
     provider = django_filters_rest.CharFilter(
         field_name="data_providers__id",
         lookup_expr="iexact",
-        #distinct=True
     )
     provider__in = CharInFilter(
         field_name="data_providers__id",
         lookup_expr="in",
-        #distinct=True
     )
     destination = django_filters_rest.CharFilter(
         field_name="destinations__id",
         lookup_expr="iexact",
-        #distinct=True
     )
     destination__in = CharInFilter(
         field_name="destinations__id",
         lookup_expr="in",
-        #distinct=True
     )
     destination_url = django_filters_rest.CharFilter(
         method='filter_by_destination_url'
@@ -579,27 +564,22 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
     log_type = django_filters_rest.CharFilter(
         field_name="log_type",
         lookup_expr="exact",
-        #distinct=True  # Distinct slows down queries and isn't needed
     )
     origin = django_filters_rest.CharFilter(
         field_name="origin",
         lookup_expr="exact",
-        #distinct=True
     )
     integration = django_filters_rest.CharFilter(
         field_name="integration__id",
         lookup_expr="exact",
-        #distinct=True
     )
     integration__in = CharInFilter(
         field_name="integration__id",
         lookup_expr="in",
-        #distinct=True
     )
     value = django_filters_rest.CharFilter(
         field_name="value",
         lookup_expr="exact",
-        ##distinct=True
     )
     from_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     to_date = django_filters_rest.DateTimeFilter(field_name="created_at", lookup_expr="lte")

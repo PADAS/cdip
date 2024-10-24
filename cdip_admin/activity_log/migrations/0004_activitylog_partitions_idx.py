@@ -31,5 +31,45 @@ class Migration(migrations.Migration):
             ),
             reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_created_at_idx"),
         ),
-        # ToDo: Restore other indexes lost during partitioning
+        # Restore other indexes lost during partitioning
+        migrations.RunSQL(
+            sql=CREATE_INDEX_SQL.format(
+                index_name="activity_log_activitylog_created_by_id_idx",
+                table_name=model_name,
+                columns="created_by_id",
+            ),
+            reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_activitylog_created_by_id_idx"),
+        ),
+        migrations.RunSQL(
+            sql=CREATE_INDEX_SQL.format(
+                index_name="activity_log_activitylog_integration_id_idx",
+                table_name=model_name,
+                columns="integration_id",
+            ),
+            reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_activitylog_integration_id_idx"),
+        ),
+        migrations.RunSQL(
+            sql=CREATE_INDEX_SQL.format(
+                index_name="activity_log_activitylog_log_level_idx",
+                table_name=model_name,
+                columns="log_level",
+            ),
+            reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_activitylog_log_level_idx"),
+        ),
+        migrations.RunSQL(
+            sql=CREATE_INDEX_SQL.format(
+                index_name="activity_log_activitylog_origin_idx",
+                table_name=model_name,
+                columns="origin",
+            ),
+            reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_activitylog_origin_idx"),
+        ),
+        migrations.RunSQL(
+            sql=CREATE_INDEX_SQL.format(
+                index_name="activity_log_activitylog_value_idx",
+                table_name=model_name,
+                columns="value",
+            ),
+            reverse_sql=DROP_INDEX_SQL.format(index_name="activity_log_activitylog_value_idx"),
+        ),
     ]
