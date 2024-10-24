@@ -1,5 +1,3 @@
-import datetime
-
 import django_filters
 from django.db.models import Subquery
 from rest_framework.permissions import IsAuthenticated
@@ -10,7 +8,6 @@ from integrations.models import Route, get_user_integrations_qs, get_integration
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
-from accounts.models import AccountProfileOrganization, EULA
 from accounts.models import AccountProfileOrganization, EULA
 from accounts.utils import remove_members_from_organization, get_user_organizations_qs
 from emails.tasks import send_invite_email_task
@@ -502,14 +499,12 @@ class ActivityLogsViewSet(
     ]
 
     def get_queryset(self):
-        # Avoid scanning future partitions
-        queryset = ActivityLog.objects.filter(created_at__lte=datetime.datetime.now(datetime.timezone.utc))
         # Superusers can see all
         if self.request.user.is_superuser:
-            return queryset
+            return ActivityLog.objects.all()
         # Returns a list with the logs of integrations that the user is allowed to see
         user_integrations = get_user_integrations_qs(user=self.request.user)
-        return queryset.filter(integration__in=Subquery(user_integrations.values("id")))
+        return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values("id")))
 
     @action(detail=True, methods=["post", "put"])
     def revert(self, request, pk=None):
