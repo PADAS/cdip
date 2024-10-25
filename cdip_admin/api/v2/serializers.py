@@ -360,8 +360,8 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
                 )
                 # Register the integration type in Kong
                 if webhook_created and register_webhook_in_kong:  # Register only once on creation
-                    #register_integration_type_in_kong(integration_type)
-                    pass
+                    register_integration_type_in_kong(integration_type)
+
         return integration_type
 
 
