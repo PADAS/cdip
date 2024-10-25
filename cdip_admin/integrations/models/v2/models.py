@@ -129,6 +129,11 @@ class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Schema"
     )
+    ui_schema = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="UI Schema"
+    )
     integration_type = models.OneToOneField(
         "integrations.IntegrationType",
         on_delete=models.CASCADE,
