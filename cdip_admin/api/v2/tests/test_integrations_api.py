@@ -746,6 +746,17 @@ def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client
                     "hex_data_field": {"title": "Hex Data Field", "type": "string"}
                 },
                 "required": ["json_schema", "jq_filter", "output_type", "hex_format", "hex_data_field"]
+            },
+            "ui_schema": {
+                "jq_filter": {
+                    "ui:widget": "textarea"
+                },
+                "json_schema": {
+                    "ui:widget": "textarea"
+                },
+                "output_type": {
+                    "ui:widget": "text"
+                }
             }
         }
     }
@@ -765,6 +776,7 @@ def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client
     assert integration_type.webhook.value == request_data["webhook"]["value"]
     assert integration_type.webhook.description == request_data["webhook"]["description"]
     assert integration_type.webhook.schema == request_data["webhook"]["schema"]
+    assert integration_type.webhook.ui_schema == request_data["webhook"]["ui_schema"]
     mock_register_integration_type_in_kong.assert_called_once_with(integration_type)
 
 
@@ -1499,6 +1511,7 @@ def _test_get_integration_details(api_client, user, organization, integration_id
     assert "description" in webhook
     assert "value" in webhook
     assert "schema" in webhook
+    assert "ui_schema" in webhook
     owner = integration.get("owner")
     assert owner
     assert "id" in owner
