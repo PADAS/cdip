@@ -221,7 +221,8 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "schema"
+            "schema",
+            "ui_schema"
         )
 
 
@@ -267,6 +268,7 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "schema",
+            "ui_schema",
             "is_periodic_action"
         )
 
