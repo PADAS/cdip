@@ -644,6 +644,16 @@ def test_register_integration_type_as_superuser(api_client, superuser):
                     },
                     "required": ["username", "password"]
                 },
+                "ui_schema": {
+                    "ui:order": [
+                        "email",
+                        "password"
+                    ],
+                    "password": {
+                        "ui:label": True,
+                        "ui:widget": "password"
+                    },
+                },
                 "is_periodic_action": False
             },
             {
@@ -697,6 +707,8 @@ def test_register_integration_type_as_superuser(api_client, superuser):
         assert action_in_db.name == action["name"]
         assert action_in_db.description == action["description"]
         assert action_in_db.schema == action["schema"]
+        if ui_schema := action.get("ui_schema"):
+            assert action_in_db.ui_schema == ui_schema
         assert action_in_db.is_periodic_action == action["is_periodic_action"]
 
 
