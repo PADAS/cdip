@@ -65,6 +65,11 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Schema"
     )
+    ui_schema = models.JSONField(
+        blank=True,
+        default=dict,
+        verbose_name="UI Schema"
+    )
     integration_type = models.ForeignKey(
         "integrations.IntegrationType",
         on_delete=models.CASCADE,
