@@ -221,7 +221,8 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
             "name",
             "value",
             "description",
-            "schema"
+            "schema",
+            "ui_schema"
         )
 
 
@@ -244,6 +245,7 @@ class IntegrationWebhookFullSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "schema",
+            "ui_schema",
         )
 
 
@@ -255,6 +257,7 @@ class IntegrationWebhookCreateUpdateSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "schema",
+            "ui_schema",
         )
 
 
@@ -267,6 +270,7 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "schema",
+            "ui_schema",
             "is_periodic_action"
         )
 
@@ -357,6 +361,7 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
                 # Register the integration type in Kong
                 if webhook_created and register_webhook_in_kong:  # Register only once on creation
                     register_integration_type_in_kong(integration_type)
+
         return integration_type
 
 
