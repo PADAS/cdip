@@ -292,6 +292,11 @@ class IntegrationAdmin(admin.ModelAdmin):
         "owner",
         "type",
     )
+    search_fields = (
+        "integration__id",
+        "integration__owner__name",
+        "integration__name",
+    )
     inlines = [
         DispatcherDeploymentInline,
     ]
@@ -326,11 +331,20 @@ class IntegrationAdmin(admin.ModelAdmin):
 class IntegrationStatusAdmin(admin.ModelAdmin):
     list_display = (
         "integration",
+        "integration_id",
         "status",
         "last_delivery",
         "updated_at",
     )
-
+    list_filter = (
+        "status",
+        "integration__type",
+    )
+    search_fields = (
+        "integration__id",
+        "integration__owner__name",
+        "integration__name",
+    )
 
 @admin.register(IntegrationConfiguration)
 class IntegrationConfigurationAdmin(admin.ModelAdmin):
