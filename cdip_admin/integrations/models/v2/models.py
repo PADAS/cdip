@@ -379,6 +379,8 @@ class WebhookConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
 
 class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    # State is persistent information used by the integration in different executions
+    # ToDo: This may be moved from the portal to the integrations db as part of the EDA
     integration = models.OneToOneField(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -395,6 +397,34 @@ class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.data}"
+
+
+class IntegrationStatus(UUIDAbstractModel, TimestampedModel):
+    # Status contains information about the health of the integration and other metrics
+
+    class Status(models.TextChoices):
+        HEALTHY = "healthy", "Healthy"  # Value, Display
+        UNHEALTHY = "unhealthy", "Unhealthy"
+        INACTIVE = "inactive", "Inactive"
+
+    integration = models.OneToOneField(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="status"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.HEALTHY,
+        db_index=True
+    )
+    last_delivery = models.DateTimeField(blank=True, null=True, db_index=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+
+    def __str__(self):
+        return f"{self.status}"
 
 
 class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
