@@ -33,6 +33,7 @@ from .forms import (
     OutboundIntegrationConfigurationForm,
     BridgeIntegrationForm
 )
+from .models.v2.models import HealthCheckSettings
 
 # Register your models here.
 admin.site.register(InboundIntegrationType, SimpleHistoryAdmin)
@@ -345,6 +346,23 @@ class IntegrationStatusAdmin(admin.ModelAdmin):
         "integration__owner__name",
         "integration__name",
     )
+
+
+@admin.register(HealthCheckSettings)
+class HealthCheckSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        "integration",
+        "integration_id",
+        "error_count_threshold",
+        "time_window_minutes",
+        "updated_at",
+    )
+    search_fields = (
+        "integration__id",
+        "integration__owner__name",
+        "integration__name",
+    )
+
 
 @admin.register(IntegrationConfiguration)
 class IntegrationConfigurationAdmin(admin.ModelAdmin):
