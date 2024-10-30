@@ -9,6 +9,7 @@ import os
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
+
 from integrations.utils import build_mb_tag_id, send_message_to_gcp_pubsub
 from activity_log.models import ActivityLog
 
@@ -337,3 +338,26 @@ async def send_permissions_to_movebank(filename: str, **kwargs):
             operation=PermissionOperations.UPDATE_USER_PRIVILEGES
         )
     await client.close()  # Close the session used to send requests
+
+
+@shared_task
+def calculate_integration_statuses(integration_ids: list):
+    from integrations.models.v2 import calculate_integration_status
+    for integration_id in integration_ids:
+        try:
+            logger.info(f"Calculating status for integration {integration_id}")
+            status = calculate_integration_status(integration_id)
+        except Exception as e:
+            logger.exception(f"Error calculating status for integration {integration_id}: {e}")
+            continue
+        else:
+            logger.info(f"Status calculated for integration {integration_id}: {status}")
+
+
+@shared_task
+def calculate_integration_statuses_in_batches(batch_size=20):
+    Integration = apps.get_model("integrations", "Integration")
+    integration_ids = Integration.objects.values_list("id", flat=True)
+    for i in range(0, len(integration_ids), batch_size):
+        batch = integration_ids[i:i + batch_size]
+        calculate_integration_statuses.delay(integration_ids=batch)

@@ -1,7 +1,10 @@
 from django.db.models import Subquery
+from datetime import timezone, timedelta, datetime
+from activity_log.models import ActivityLog
 from organizations.models import Organization
 from accounts.utils import get_user_organizations_qs
 from django.apps import apps
+from .models import IntegrationStatus, HealthCheckSettings
 
 
 def ensure_default_route(integration):
@@ -49,3 +52,35 @@ def get_user_routes_qs(user):
     user_organizations = get_user_organizations_qs(user=user)
     Route = apps.get_model('integrations', 'Route')
     return Route.objects.filter(owner__in=Subquery(user_organizations.values('id')))
+
+
+def calculate_integration_status(integration_id):
+    """
+    Calculate the status of an integration based on the activity logs and other parameters
+    """
+    healthcheck_settings, _ = HealthCheckSettings.objects.get_or_create(integration_id=integration_id)
+    integration_status, _ = IntegrationStatus.objects.get_or_create(integration_id=integration_id)
+    integration_status.status = IntegrationStatus.Status.HEALTHY
+    time_window = datetime.now(timezone.utc) - timedelta(minutes=healthcheck_settings.time_window_minutes)
+    errors_threshold = healthcheck_settings.error_count_threshold
+    if not integration_status.integration.enabled:
+        integration_status.status = IntegrationStatus.Status.INACTIVE
+        integration_status.status_details = "Integration is disabled"
+    elif ActivityLog.objects.filter(
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration_status.integration,
+        log_level=ActivityLog.LogLevels.ERROR,
+        created_at__gte=time_window
+    ).count() >= errors_threshold:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = "Errors where detected while executing the integration"
+    elif ActivityLog.objects.filter(
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=integration_status.integration,
+        log_level=ActivityLog.LogLevels.ERROR,
+        created_at__gte=time_window
+    ).count() >= errors_threshold:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = "Errors where detected while pushing data to the destination"
+    integration_status.save()
+    return integration_status.status

@@ -280,6 +280,7 @@ CELERY_TASK_QUEUES = (
     Queue("default", Exchange("default"), routing_key="default"),
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
     Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
+    Queue("healthchecks", Exchange("healthchecks"), routing_key="healthchecks"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -294,6 +295,12 @@ CELERY_TASK_ROUTES = {
     },
     "integrations.tasks.update_mb_permissions_for_group": {
         "queue": "mb_permissions", "routing_key": "mb_permissions"
+    },
+    "integrations.tasks.calculate_integration_statuses": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    },
+    "integrations.tasks.calculate_integration_statuses_in_batches": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
     },
 }
 
