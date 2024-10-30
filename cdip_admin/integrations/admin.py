@@ -18,6 +18,7 @@ from .models import (
     IntegrationType,
     IntegrationAction,
     Integration,
+    IntegrationStatus,
     IntegrationConfiguration,
     Route,
     RouteConfiguration,
@@ -319,6 +320,16 @@ class IntegrationAdmin(admin.ModelAdmin):
         # Overwritten to call deployment.delete() in bulk deletion
         for obj in queryset:
             self.delete_model(request, obj)
+
+
+@admin.register(IntegrationStatus)
+class IntegrationStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "integration",
+        "status",
+        "last_delivery",
+        "updated_at",
+    )
 
 
 @admin.register(IntegrationConfiguration)

@@ -423,6 +423,7 @@ class IntegrationStatus(UUIDAbstractModel, TimestampedModel):
 
     class Meta:
         ordering = ("-updated_at",)
+        verbose_name_plural = "Integration statuses"
 
     def __str__(self):
         return f"{self.status}"
