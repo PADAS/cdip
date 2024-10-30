@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import timezone, timedelta
+from datetime import timezone, timedelta, datetime
 from functools import cached_property
 import jsonschema
 import requests
@@ -445,13 +445,44 @@ class HealthCheckSettings(UUIDAbstractModel, TimestampedModel):
     error_count_threshold = models.PositiveIntegerField(default=3)
     time_window_minutes = models.PositiveIntegerField(default=60)
 
-
     class Meta:
         ordering = ("-updated_at",)
         verbose_name_plural = "Integration health check settings"
 
     def __str__(self):
         return f"Health check settings for integration {self.integration_id}"
+
+
+def calculate_integration_status(integration_id):
+    """
+    Calculate the status of an integration based on the activity logs and other parameters
+    """
+    healthcheck_settings, _ = HealthCheckSettings.objects.get_or_create(integration_id=integration_id)
+    integration_status, _ = IntegrationStatus.objects.get_or_create(integration_id=integration_id)
+    integration_status.status = IntegrationStatus.Status.HEALTHY
+    time_window = datetime.now(timezone.utc) - timedelta(minutes=healthcheck_settings.time_window_minutes)
+    errors_threshold = healthcheck_settings.error_count_threshold
+    if not integration_status.integration.enabled:
+        integration_status.status = IntegrationStatus.Status.INACTIVE
+        integration_status.status_details = "Integration is disabled"
+    elif ActivityLog.objects.filter(
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=integration_status.integration,
+        log_level=ActivityLog.LogLevels.ERROR,
+        created_at__gte=time_window
+    ).count() >= errors_threshold:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = "Errors where detected while executing the integration"
+    elif ActivityLog.objects.filter(
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=integration_status.integration,
+        log_level=ActivityLog.LogLevels.ERROR,
+        created_at__gte=time_window
+    ).count() >= errors_threshold:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = "Errors where detected while pushing data to the destination"
+    integration_status.save()
+    return integration_status.status
 
 
 class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
