@@ -4,6 +4,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     IntegrationState,
+    IntegrationStatus,
     RouteConfiguration,
     RouteProvider,
     RouteDestination,

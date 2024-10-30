@@ -418,6 +418,7 @@ class IntegrationStatus(UUIDAbstractModel, TimestampedModel):
         default=Status.HEALTHY,
         db_index=True
     )
+    status_details = models.CharField(max_length=200, blank=True, default="")
     last_delivery = models.DateTimeField(blank=True, null=True, db_index=True)
 
     class Meta:
