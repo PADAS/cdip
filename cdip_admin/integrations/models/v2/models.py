@@ -229,8 +229,9 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
                     configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
                 )
 
-            # Create status object
+            # Create default healthcheck settings and status
             IntegrationStatus.objects.get_or_create(integration=self)
+            HealthCheckSettings.objects.get_or_create(integration=self)
 
     def save(self, *args, **kwargs):
         with self.tracker:
