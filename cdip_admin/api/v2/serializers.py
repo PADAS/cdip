@@ -647,10 +647,10 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
         return RoutingRuleSummarySerializer(instance=obj.routing_rules, many=True).data
 
     def get_status(self, obj):
-        if not obj.enabled:
+        provider_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        if provider_status.status == IntegrationStatus.Status.INACTIVE.value:
             return IntegrationStatus.Status.INACTIVE.value
         # Compute status based on provider and destinations statuses
-        provider_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
         if provider_status.status == IntegrationStatus.Status.UNHEALTHY.value:
             return IntegrationStatus.Status.UNHEALTHY.value
         for destination in obj.destinations.all():
