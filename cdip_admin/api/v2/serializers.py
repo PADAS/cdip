@@ -441,6 +441,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     webhook_configuration = WebhookConfigurationRetrieveSerializer()
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
+    status_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
@@ -455,12 +456,17 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "webhook_configuration",
             "additional",
             "default_route",
-            "status"
+            "status",
+            "status_details",
         )
 
     def get_status(self, obj):
         integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
         return integration_status.status
+
+    def get_status_details(self, obj):
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status_details
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
@@ -572,14 +578,19 @@ class IntegrationSummarySerializer(serializers.ModelSerializer):
     owner = OwnerSummarySerializer(read_only=True)
     type = IntegrationTypeSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
+    status_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
-        fields = ("id", "name", "owner", "type", "base_url", "status", )
+        fields = ("id", "name", "owner", "type", "base_url", "status", "status_details", )
 
     def get_status(self, obj):
         integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
         return integration_status.status
+
+    def get_status_details(self, obj):
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status_details
 
 
 class IntegrationURLSerializer(serializers.ModelSerializer):
