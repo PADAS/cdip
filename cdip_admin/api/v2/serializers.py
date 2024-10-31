@@ -648,15 +648,15 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         provider_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
-        if provider_status.status == IntegrationStatus.Status.INACTIVE.value:
-            return IntegrationStatus.Status.INACTIVE.value
+        if provider_status.status == IntegrationStatus.Status.DISABLED.value:
+            return IntegrationStatus.Status.DISABLED.value
         # Compute status based on provider and destinations statuses
         if provider_status.status == IntegrationStatus.Status.UNHEALTHY.value:
             return IntegrationStatus.Status.UNHEALTHY.value
         for destination in obj.destinations.all():
             destination_status, _ = IntegrationStatus.objects.get_or_create(integration=destination)
             # ToDo. We might want to return a "warning" status if the destination is inactive
-            if destination_status.status in [IntegrationStatus.Status.UNHEALTHY.value, IntegrationStatus.Status.INACTIVE.value]:
+            if destination_status.status in [IntegrationStatus.Status.UNHEALTHY.value, IntegrationStatus.Status.DISABLED.value]:
                 return IntegrationStatus.Status.UNHEALTHY.value
         return IntegrationStatus.Status.HEALTHY.value
 

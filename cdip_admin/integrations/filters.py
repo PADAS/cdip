@@ -427,7 +427,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         )
 
     def filter_by_status(self, queryset, name, value):
-        provider_inactive_q = Q(status__status=IntegrationStatus.Status.INACTIVE.value)
+        provider_inactive_q = Q(status__status=IntegrationStatus.Status.DISABLED.value)
         destinations_unhealthy_q = Q(
             routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
         )
@@ -436,7 +436,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         )
         provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
         connection_healthy_q = Q(provider_healthy_q & ~destinations_unhealthy_q)
-        if value == IntegrationStatus.Status.INACTIVE.value:
+        if value == IntegrationStatus.Status.DISABLED.value:
             return queryset.filter(provider_inactive_q)
         if value == IntegrationStatus.Status.UNHEALTHY.value:
             return queryset.filter(connection_unhealthy_q)

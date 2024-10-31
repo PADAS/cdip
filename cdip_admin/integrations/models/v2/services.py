@@ -64,7 +64,7 @@ def calculate_integration_status(integration_id):
     time_window = datetime.now(timezone.utc) - timedelta(minutes=healthcheck_settings.time_window_minutes)
     errors_threshold = healthcheck_settings.error_count_threshold
     if not integration_status.integration.enabled:
-        integration_status.status = IntegrationStatus.Status.INACTIVE
+        integration_status.status = IntegrationStatus.Status.DISABLED
         integration_status.status_details = "Integration is disabled"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.INTEGRATION,

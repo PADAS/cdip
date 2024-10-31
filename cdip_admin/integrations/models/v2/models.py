@@ -411,7 +411,7 @@ class IntegrationStatus(UUIDAbstractModel, TimestampedModel):
     class Status(models.TextChoices):
         HEALTHY = "healthy", "Healthy"  # Value, Display
         UNHEALTHY = "unhealthy", "Unhealthy"
-        INACTIVE = "inactive", "Inactive"
+        DISABLED = "disabled", "Disabled"
 
     integration = models.OneToOneField(
         "integrations.Integration",
