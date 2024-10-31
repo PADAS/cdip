@@ -677,7 +677,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         )
 
     def get_status(self, obj):
-        # ToDo: revisit this once we implement monitoring & troubleshooting
+        # ToDo: revisit this once we implement status at the source level
         return "healthy"
 
     def get_update_frequency(self, obj):
