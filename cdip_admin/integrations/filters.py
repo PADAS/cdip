@@ -18,7 +18,7 @@ from integrations.models import (
     Integration,
     IntegrationType,
     get_user_integrations_qs,
-    Source, Route, GundiTrace, IntegrationAction
+    Source, Route, GundiTrace, IntegrationAction, IntegrationStatus
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -359,6 +359,8 @@ class IntegrationFilter(django_filters_rest.FilterSet):
     action_type__in = CharInFilter(field_name="type__actions__type", lookup_expr="in", distinct=True)
     action = django_filters_rest.CharFilter(field_name="type__actions__value", lookup_expr="iexact", )
     action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", )
+    status = django_filters_rest.CharFilter(field_name="status__status", lookup_expr="iexact", )
+    status__in = CharInFilter(field_name="status__status", lookup_expr="in", )
 
     class Meta:
         model = Integration
@@ -380,6 +382,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
     destination_url__in = CharInFilter(method='filter_by_destination_url', lookup_expr="in")
     destination_id = django_filters_rest.UUIDFilter(method='filter_by_destination_id')
     source_id = django_filters_rest.UUIDFilter(method='filter_by_source_id')
+    status = django_filters_rest.CharFilter(method='filter_by_status')
 
     class Meta:
         model = Integration
@@ -422,6 +425,24 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         return queryset.filter(
             sources_by_integration__id=str(value)
         )
+
+    def filter_by_status(self, queryset, name, value):
+        provider_inactive_q = Q(status__status=IntegrationStatus.Status.INACTIVE.value)
+        destinations_unhealthy_q = Q(
+            routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
+        )
+        connection_unhealthy_q = Q(
+            Q(status__status=IntegrationStatus.Status.UNHEALTHY.value) | destinations_unhealthy_q
+        )
+        provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
+        connection_healthy_q = Q(provider_healthy_q & ~destinations_unhealthy_q)
+        if value == IntegrationStatus.Status.INACTIVE.value:
+            return queryset.filter(provider_inactive_q)
+        if value == IntegrationStatus.Status.UNHEALTHY.value:
+            return queryset.filter(connection_unhealthy_q)
+        if value == IntegrationStatus.Status.HEALTHY.value:
+            return queryset.filter(connection_healthy_q)
+        return queryset
 
 
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
