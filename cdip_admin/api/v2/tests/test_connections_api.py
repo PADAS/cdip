@@ -24,6 +24,8 @@ def _test_list_connections(api_client, user, provider_list):
         assert str(provider.id) == connection_provider.get("id")
         assert str(provider.name) == connection_provider.get("name")
         assert "owner" in connection_provider
+        assert "status" in connection_provider
+        assert "status_details" in connection_provider
         provider_owner = connection_provider.get("owner")
         assert "id" in provider_owner
         assert "name" in provider_owner
@@ -38,6 +40,8 @@ def _test_list_connections(api_client, user, provider_list):
         for destination in connection["destinations"]:
             assert destination.get("id") in expected_destination_ids
             assert "name" in destination
+            assert "status" in destination
+            assert "status_details" in destination
             assert "owner" in destination
             destination_owner = destination.get("owner")
             assert "id" in destination_owner
@@ -48,6 +52,8 @@ def _test_list_connections(api_client, user, provider_list):
         for rule in connection["routing_rules"]:
             assert rule.get("id") in expected_routing_rules_ids
             assert "name" in rule
+        # Check aggregated satus is returned
+        assert "status" in connection
         # Check owner
         assert "owner" in connection
         assert str(provider.owner.id) == connection["owner"].get("id")

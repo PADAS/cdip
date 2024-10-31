@@ -36,6 +36,8 @@ def _test_list_integrations(api_client, user, organization):
         assert "name" in integration
         assert "base_url" in integration
         assert "enabled" in integration
+        assert "status" in integration
+        assert "status_details" in integration
         assert "type" in integration
         owner = integration.get("owner")
         assert owner
