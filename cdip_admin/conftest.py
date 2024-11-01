@@ -2585,7 +2585,76 @@ def outbound_integration_smart(
 
 
 @pytest.fixture
-def observation_delivery_succeeded_event(provider_lotek_panthera, destination_movebank):
+def pull_observations_action_started_activity_log(provider_lotek_panthera):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_started",
+        title=f"Action 'pull_observations' started for integration {provider_lotek_panthera.name}.",
+        details={},
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def pull_observations_action_complete_activity_log(provider_lotek_panthera):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_complete",
+        title=f"Action 'pull_observations' completed.",
+        details={},
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def pull_observations_action_failed_activity_log(provider_lotek_panthera):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_failed",
+        title=f"Error running action 'pull_observations': Error retrieving data from API",
+        details={},
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def pull_observations_action_failed_activity_log_2(provider_lotek_panthera):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_failed",
+        title=f"Error running action 'pull_observations': Error retrieving data from API",
+        details={},
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def pull_observations_action_failed_activity_log_3(provider_lotek_panthera):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_failed",
+        title=f"Error running action 'pull_observations': Error retrieving data from API",
+        details={},
+        is_reversible=False,
+    )
+
+@pytest.fixture
+def observation_delivery_succeeded_activity_log(provider_lotek_panthera, destination_movebank):
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -2606,7 +2675,7 @@ def observation_delivery_succeeded_event(provider_lotek_panthera, destination_mo
 
 
 @pytest.fixture
-def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_list_er):
+def observation_delivery_succeeded_activity_log_2(provider_movebank_ewt, integrations_list_er):
     destination = integrations_list_er[0]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.DEBUG,
@@ -2628,7 +2697,7 @@ def observation_delivery_succeeded_event_2(provider_movebank_ewt, integrations_l
 
 
 @pytest.fixture
-def observation_delivery_failed_event(provider_lotek_panthera, destination_movebank):
+def observation_delivery_to_movebank_failed_activity_log(provider_lotek_panthera, destination_movebank):
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -2649,7 +2718,71 @@ def observation_delivery_failed_event(provider_lotek_panthera, destination_moveb
 
 
 @pytest.fixture
-def observation_delivery_failed_event_2(provider_lotek_panthera, integrations_list_er):
+def observation_delivery_to_movebank_failed_activity_log_2(provider_lotek_panthera, destination_movebank):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination_movebank,
+        value="observation_delivery_failed",
+        title=f"Error Delivering observation to '{destination_movebank.base_url}'",
+        details={
+            "gundi_id": "2f7387e3-fbad-42fb-9ca9-4fb8d001e85a",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination_movebank.id),
+            "data_provider_id": str(provider_lotek_panthera.id),
+        },
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def observation_delivery_to_movebank_failed_activity_log_3(provider_lotek_panthera, destination_movebank):
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination_movebank,
+        value="observation_delivery_failed",
+        title=f"Error Delivering observation to '{destination_movebank.base_url}'",
+        details={
+            "gundi_id": "2f7387e3-fbad-42fb-9ca9-4fb8d001e85a",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination_movebank.id),
+            "data_provider_id": str(provider_lotek_panthera.id),
+        },
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def observation_delivery_failed_activity_log_2(provider_lotek_panthera, integrations_list_er):
+    destination = integrations_list_er[1]
+    return ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=destination,
+        value="observation_delivery_failed",
+        title=f"Error Delivering observation to '{destination.base_url}'",
+        details={
+            "gundi_id": "2f7387e3-fbad-42fb-9ca9-4fb8d001e85a",
+            "related_to": "",
+            "external_id": None,
+            "delivered_at": "2023-12-14 00:16:51.949252+00:00",
+            "destination_id": str(destination.id),
+            "data_provider_id": str(provider_lotek_panthera.id),
+        },
+        is_reversible=False,
+    )
+
+
+@pytest.fixture
+def observation_delivery_failed_activity_log_3(provider_lotek_panthera, integrations_list_er):
     destination = integrations_list_er[1]
     return ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
