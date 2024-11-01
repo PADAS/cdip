@@ -2,6 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from integrations.models import ConnectionStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -251,7 +252,6 @@ def test_filter_connections_validates_destination_id(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-
 def test_filter_connections_by_multiple_destination_urls_as_superuser(
         api_client, superuser, organization, provider_lotek_panthera, provider_movebank_ewt,
         integrations_list_er, route_1, route_2, integration_type_er
@@ -454,4 +454,46 @@ def test_global_search_connections_as_org_viewer(
         user=org_viewer_user_2,
         search_term="Move",  # Looking for connections with Movebank
         expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_status_healthy_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.HEALTHY.value
+        },
+        expected_integrations=[connection_with_healthy_provider_and_destination]
+    )
+
+
+def test_filter_connections_by_status_unhealthy_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.UNHEALTHY.value
+        },
+        expected_integrations=[connection_with_unhealthy_provider, connection_with_unhealthy_destination]
+    )
+
+
+def test_filter_connections_by_status_needs_review_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.NEEDS_REVIEW.value
+        },
+        expected_integrations=[connection_with_disabled_destination]  # provider OK but destination disabled
     )

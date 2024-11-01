@@ -36,7 +36,7 @@ from integrations.models import (
     SourceConfiguration,
     ensure_default_route,
     RouteConfiguration,
-    GundiTrace, IntegrationWebhook, WebhookConfiguration, RouteProvider, RouteDestination,
+    GundiTrace, IntegrationWebhook, WebhookConfiguration, RouteProvider, RouteDestination, IntegrationStatus,
 )
 from organizations.models import Organization
 from pathlib import Path
@@ -1118,6 +1118,337 @@ def integrations_list_wpswatch(
         integrations.append(integration)
         ensure_default_route(integration=integration)
     return integrations
+
+
+@pytest.fixture
+def er_destination_healthy(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_pull_positions,
+        er_action_pull_events,
+        er_action_push_positions,
+        er_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+
+    # Create the integration
+    site_url = f"{get_random_id()}.pamdas.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_er,
+        name=f"ER Site HEALTHY {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    integration.status.status = IntegrationStatus.Status.HEALTHY
+    integration.status.save()
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_auth,
+        data={
+            "username": f"eruser-{get_random_id()}",
+            "password": f"passwd-{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_push_positions,
+        data={"sensor_type": "collar"},
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration, action=er_action_push_events
+    )
+    return integration
+
+
+@pytest.fixture
+def er_destination_unhealthy(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_pull_positions,
+        er_action_pull_events,
+        er_action_push_positions,
+        er_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+
+    # Create the integration
+    site_url = f"{get_random_id()}.pamdas.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_er,
+        name=f"ER Site UNHEALTHY {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    integration.status.status = IntegrationStatus.Status.UNHEALTHY
+    integration.status.save()
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_auth,
+        data={
+            "username": f"eruser-{get_random_id()}",
+            "password": f"passwd-{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_push_positions,
+        data={"sensor_type": "collar"},
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration, action=er_action_push_events
+    )
+    return integration
+
+
+@pytest.fixture
+def er_destination_disabled(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_pull_positions,
+        er_action_pull_events,
+        er_action_push_positions,
+        er_action_push_events,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+
+    # Create the integration
+    site_url = f"{get_random_id()}.pamdas.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_er,
+        name=f"ER Site DISABLED {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+        enabled=False
+    )
+    integration.status.status = IntegrationStatus.Status.DISABLED
+    integration.status.save()
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_auth,
+        data={
+            "username": f"eruser-{get_random_id()}",
+            "password": f"passwd-{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_push_positions,
+        data={"sensor_type": "collar"},
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration, action=er_action_push_events
+    )
+    return integration
+
+
+@pytest.fixture
+def connection_with_healthy_provider_and_destination(
+        organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+        er_destination_healthy
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstop.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Healthy Connection {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    RouteDestination.objects.create(integration=er_destination_healthy, route=integration.default_route)
+    return integration
+
+
+@pytest.fixture
+def connection_with_unhealthy_provider(
+        organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+        er_destination_healthy
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstop.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Unhealthy Connection {get_random_id()} - unhealthy provider",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    # Add ER destination
+    RouteDestination.objects.create(integration=er_destination_healthy, route=integration.default_route)
+    # Set provider unhealthy
+    integration.status.status = IntegrationStatus.Status.UNHEALTHY
+    integration.status.save()
+    return integration
+
+
+@pytest.fixture
+def connection_with_unhealthy_destination(
+        organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+        er_destination_unhealthy
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstop.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Unhealthy Connection {get_random_id()} - unhealthy destination",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    # Add unhealthy ER destination
+    RouteDestination.objects.create(integration=er_destination_unhealthy, route=integration.default_route)
+    return integration
+
+
+@pytest.fixture
+def connection_with_disabled_destination(
+        organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+        er_destination_healthy,
+        er_destination_disabled
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstopnm.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Disabled Cellstop Connection {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    # Add one healthy and one disabled ER destination
+    RouteDestination.objects.create(integration=er_destination_healthy, route=integration.default_route)
+    RouteDestination.objects.create(integration=er_destination_disabled, route=integration.default_route)
+    return integration
 
 
 @pytest.fixture
