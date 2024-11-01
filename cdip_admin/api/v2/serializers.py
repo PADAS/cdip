@@ -8,7 +8,7 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus
+    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
@@ -648,17 +648,19 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         provider_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
-        if provider_status.status == IntegrationStatus.Status.DISABLED.value:
-            return IntegrationStatus.Status.DISABLED.value
-        # Compute status based on provider and destinations statuses
         if provider_status.status == IntegrationStatus.Status.UNHEALTHY.value:
-            return IntegrationStatus.Status.UNHEALTHY.value
+            return ConnectionStatus.UNHEALTHY.value
+        if provider_status.status == IntegrationStatus.Status.DISABLED.value:
+            return ConnectionStatus.DISABLED.value
+        destination_statuses = []
         for destination in obj.destinations.all():
             destination_status, _ = IntegrationStatus.objects.get_or_create(integration=destination)
-            # ToDo. We might want to return a "warning" status if the destination is inactive
-            if destination_status.status in [IntegrationStatus.Status.UNHEALTHY.value, IntegrationStatus.Status.DISABLED.value]:
-                return IntegrationStatus.Status.UNHEALTHY.value
-        return IntegrationStatus.Status.HEALTHY.value
+            destination_statuses.append(destination_status.status)
+        if IntegrationStatus.Status.UNHEALTHY.value in destination_statuses:
+            return ConnectionStatus.UNHEALTHY.value
+        if IntegrationStatus.Status.DISABLED.value in destination_statuses:
+            return ConnectionStatus.NEEDS_REVIEW.value
+        return ConnectionStatus.HEALTHY.value
 
 
 class SourceRetrieveSerializer(serializers.ModelSerializer):

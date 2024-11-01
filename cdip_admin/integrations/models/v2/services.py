@@ -1,3 +1,5 @@
+from enum import Enum
+
 from django.db.models import Subquery
 from datetime import timezone, timedelta, datetime
 from activity_log.models import ActivityLog
@@ -5,6 +7,14 @@ from organizations.models import Organization
 from accounts.utils import get_user_organizations_qs
 from django.apps import apps
 from .models import IntegrationStatus, HealthCheckSettings
+
+
+# Enum for connection statuses
+class ConnectionStatus(str, Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DISABLED = "disabled"
+    NEEDS_REVIEW = "needs_review"
 
 
 def ensure_default_route(integration):
