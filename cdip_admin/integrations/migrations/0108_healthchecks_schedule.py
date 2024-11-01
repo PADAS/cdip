@@ -31,5 +31,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_healthcheck_schedule),
+        migrations.RunPython(create_healthcheck_schedule, reverse_code=migrations.RunPython.noop),
     ]
