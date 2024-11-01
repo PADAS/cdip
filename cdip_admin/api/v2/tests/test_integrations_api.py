@@ -1246,6 +1246,21 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
     )
 
 
+def test_global_search_destinations_with_unhealthy_status(
+        api_client, superuser, organization, integrations_list_er,
+        er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=superuser,
+        search_term="unhealthy",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_integrations=[er_destination_unhealthy]
+    )
+
+
 def _test_update_integration_config(
         api_client, user, integration, new_configurations_data, original_configurations_data=None
 ):
