@@ -8,7 +8,7 @@ from activity_log.models import ActivityLog
 from integrations.models import (
     Integration,
     IntegrationAction,
-    IntegrationConfiguration, IntegrationType,
+    IntegrationConfiguration, IntegrationType, IntegrationStatus,
 )
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
@@ -1121,6 +1121,48 @@ def test_filter_integrations_owner_by_search_term_as_org_viewer(
             "action_type": "push"  # Destinations
         },
         expected_owners=[other_organization]
+    )
+
+
+def test_filter_integrations_with_healthy_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.HEALTHY.value
+        },
+        expected_integrations=[provider_movebank_ewt, provider_lotek_panthera, er_destination_healthy]
+    )
+
+
+def test_filter_integrations_with_unhealthy_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.UNHEALTHY.value
+        },
+        expected_integrations=[provider_movebank_unhealthy, er_destination_unhealthy]
+    )
+
+
+def test_filter_integrations_with_disabled_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.DISABLED
+        },
+        expected_integrations=[er_destination_disabled]
     )
 
 

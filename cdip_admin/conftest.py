@@ -652,6 +652,40 @@ def provider_movebank_ewt(
 
 
 @pytest.fixture
+def provider_movebank_unhealthy(
+        get_random_id,
+        other_organization,
+        integration_type_movebank,
+        mb_action_auth,
+        mb_action_pull_positions,
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_movebank,
+        name=f"Movebank Provider For EWT {get_random_id()}",
+        owner=other_organization,
+        base_url=f"https://api.test.movebank.com",
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=mb_action_auth,
+        data={
+            "email": f"wronguser",
+            "password": f"wrongpassword",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=mb_action_pull_positions,
+        data={"max_records_per_individual": 20000},
+    )
+    ensure_default_route(integration=provider)
+    provider.status.status = IntegrationStatus.Status.UNHEALTHY
+    provider.status.save()
+    return provider
+
+
+@pytest.fixture
 def integration_type_liquidtech():
     return IntegrationType.objects.create(
         name="Liquidtech Integration",
