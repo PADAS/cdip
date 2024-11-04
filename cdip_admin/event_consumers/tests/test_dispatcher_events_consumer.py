@@ -329,13 +329,13 @@ def test_process_dispatcher_log_event(
     assert not activity_log.is_reversible
 
 
-@pytest.mark.parametrize("trace,delivery_event", [
-    ("trap_tagger_event_trace", "trap_tagger_to_er_observation_delivered_event"),
-    ("attachment_delivered_trace", "trap_tagger_to_er_attachment_delivered_event"),
-    ("trap_tagger_to_movebank_observation_trace", "trap_tagger_to_movebank_observation_delivered_event"),
+@pytest.mark.parametrize("trace,delivery_event,stream_type", [
+    ("trap_tagger_event_trace", "trap_tagger_to_er_observation_delivered_event", "Event"),
+    ("attachment_delivered_trace", "trap_tagger_to_er_attachment_delivered_event", "Attachment"),
+    ("trap_tagger_to_movebank_observation_trace", "trap_tagger_to_movebank_observation_delivered_event", "Observation"),
 ])
 def test_show_stream_type_in_activity_log_title_on_observation_delivery(
-        request, trace, delivery_event
+        request, trace, delivery_event, stream_type
 ):
     trace = request.getfixturevalue(trace)
     delivery_event = request.getfixturevalue(delivery_event)
@@ -344,5 +344,4 @@ def test_show_stream_type_in_activity_log_title_on_observation_delivery(
     event_data = json.loads(delivery_event.data)["payload"]
     # Check that the event was recorded with hte right title in the activity logs
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
-    data_type = data_type_str_map.get(trace.object_type, "Data")
-    assert activity_log.title == f"{data_type} Delivered to '{trace.destination.base_url}'"
+    assert activity_log.title == f"{stream_type} Delivered to '{trace.destination.base_url}'"
