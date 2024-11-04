@@ -8,7 +8,7 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace, WebhookConfiguration, IntegrationWebhook
+    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
@@ -441,6 +441,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     webhook_configuration = WebhookConfigurationRetrieveSerializer()
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
+    status_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
@@ -455,18 +456,17 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "webhook_configuration",
             "additional",
             "default_route",
-            "status"
+            "status",
+            "status_details",
         )
 
     def get_status(self, obj):
-        # ToDo: Review this after implenting events related to health status
-        return {
-            "id": "mockid-b16a-4dbd-ad32-197c58aeef59",
-            "is_healthy": True,
-            "details": "Last observation has been delivered with success.",
-            "observation_delivered_24hrs": 50231,
-            "last_observation_delivered_at": "2023-03-31T11:20:00+0200"
-        }
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status
+
+    def get_status_details(self, obj):
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status_details
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
@@ -578,14 +578,19 @@ class IntegrationSummarySerializer(serializers.ModelSerializer):
     owner = OwnerSummarySerializer(read_only=True)
     type = IntegrationTypeSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
+    status_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
-        fields = ("id", "name", "owner", "type", "base_url", "status", )
+        fields = ("id", "name", "owner", "type", "base_url", "status", "status_details", )
 
     def get_status(self, obj):
-        # ToDo: revisit this once we implement monitoring & troubleshooting
-        return "healthy"
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status
+
+    def get_status_details(self, obj):
+        integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        return integration_status.status_details
 
 
 class IntegrationURLSerializer(serializers.ModelSerializer):
@@ -642,8 +647,20 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
         return RoutingRuleSummarySerializer(instance=obj.routing_rules, many=True).data
 
     def get_status(self, obj):
-        # ToDo: Review this after remodeling configurations
-        return "healthy"
+        provider_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
+        if provider_status.status == IntegrationStatus.Status.UNHEALTHY.value:
+            return ConnectionStatus.UNHEALTHY.value
+        if provider_status.status == IntegrationStatus.Status.DISABLED.value:
+            return ConnectionStatus.DISABLED.value
+        destination_statuses = []
+        for destination in obj.destinations.all():
+            destination_status, _ = IntegrationStatus.objects.get_or_create(integration=destination)
+            destination_statuses.append(destination_status.status)
+        if IntegrationStatus.Status.UNHEALTHY.value in destination_statuses:
+            return ConnectionStatus.UNHEALTHY.value
+        if IntegrationStatus.Status.DISABLED.value in destination_statuses:
+            return ConnectionStatus.NEEDS_REVIEW.value
+        return ConnectionStatus.HEALTHY.value
 
 
 class SourceRetrieveSerializer(serializers.ModelSerializer):
@@ -663,7 +680,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         )
 
     def get_status(self, obj):
-        # ToDo: revisit this once we implement monitoring & troubleshooting
+        # ToDo: revisit this once we implement status at the source level
         return "healthy"
 
     def get_update_frequency(self, obj):

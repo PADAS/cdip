@@ -4,6 +4,7 @@ from .models import (
     Integration,
     IntegrationConfiguration,
     IntegrationState,
+    IntegrationStatus,
     RouteConfiguration,
     RouteProvider,
     RouteDestination,
@@ -14,7 +15,7 @@ from .models import (
     SourceState,
     GundiTrace,
     IntegrationWebhook,
-    WebhookConfiguration,
+    WebhookConfiguration
 )
 from .services import *
 from .source_filters import *

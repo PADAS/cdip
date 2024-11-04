@@ -174,7 +174,7 @@ class IntegrationsView(viewsets.ModelViewSet):
     filterset_class = IntegrationFilter
     ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
     ordering = ['id']
-    search_fields = ["name", "base_url", 'type__name', 'type__value', 'owner__name', ]
+    search_fields = ["name", "base_url", 'type__name', 'type__value', 'owner__name', '^status__status',]
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
@@ -266,6 +266,8 @@ class ConnectionsView(
         "routing_rules_by_provider__destinations__type__name",
         "routing_rules_by_provider__destinations__base_url",
         "owner__name",  # Organizations
+        "^status__status",
+        "^routing_rules_by_provider__destinations__status__status",
     ]
 
     def get_queryset(self):

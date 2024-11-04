@@ -2,6 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from integrations.models import ConnectionStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -24,6 +25,8 @@ def _test_list_connections(api_client, user, provider_list):
         assert str(provider.id) == connection_provider.get("id")
         assert str(provider.name) == connection_provider.get("name")
         assert "owner" in connection_provider
+        assert "status" in connection_provider
+        assert "status_details" in connection_provider
         provider_owner = connection_provider.get("owner")
         assert "id" in provider_owner
         assert "name" in provider_owner
@@ -38,6 +41,8 @@ def _test_list_connections(api_client, user, provider_list):
         for destination in connection["destinations"]:
             assert destination.get("id") in expected_destination_ids
             assert "name" in destination
+            assert "status" in destination
+            assert "status_details" in destination
             assert "owner" in destination
             destination_owner = destination.get("owner")
             assert "id" in destination_owner
@@ -48,6 +53,8 @@ def _test_list_connections(api_client, user, provider_list):
         for rule in connection["routing_rules"]:
             assert rule.get("id") in expected_routing_rules_ids
             assert "name" in rule
+        # Check aggregated satus is returned
+        assert "status" in connection
         # Check owner
         assert "owner" in connection
         assert str(provider.owner.id) == connection["owner"].get("id")
@@ -243,7 +250,6 @@ def test_filter_connections_validates_destination_id(
         }
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-
 
 
 def test_filter_connections_by_multiple_destination_urls_as_superuser(
@@ -448,4 +454,46 @@ def test_global_search_connections_as_org_viewer(
         user=org_viewer_user_2,
         search_term="Move",  # Looking for connections with Movebank
         expected_integrations=[provider_movebank_ewt]
+    )
+
+
+def test_filter_connections_by_status_healthy_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.HEALTHY.value
+        },
+        expected_integrations=[connection_with_healthy_provider_and_destination]
+    )
+
+
+def test_filter_connections_by_status_unhealthy_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.UNHEALTHY.value
+        },
+        expected_integrations=[connection_with_unhealthy_provider, connection_with_unhealthy_destination]
+    )
+
+
+def test_filter_connections_by_status_needs_review_as_superuser(
+        api_client, superuser, organization, connection_with_healthy_provider_and_destination,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+):
+    _test_filter_connections(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": ConnectionStatus.NEEDS_REVIEW.value
+        },
+        expected_integrations=[connection_with_disabled_destination]  # provider OK but destination disabled
     )

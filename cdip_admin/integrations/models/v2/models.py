@@ -1,10 +1,11 @@
 import json
 import uuid
+
 from functools import cached_property
 import jsonschema
 import requests
-from urllib.parse import urljoin, urlparse
 import google.oauth2.id_token
+from urllib.parse import urljoin, urlparse
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django.db import models, transaction
@@ -213,19 +214,24 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
-        # Deploy serverless dispatcher for ER Sites only
-        if created and settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
-            if self.is_smart_site:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
-            elif self.is_wpswatch_site:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
-            else:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
-            DispatcherDeployment.objects.create(
-                name=get_default_dispatcher_name(integration=self),
-                integration=self,
-                configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
-            )
+        if created:
+            # Deploy serverless dispatchers for destinations
+            if settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
+                if self.is_smart_site:
+                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+                elif self.is_wpswatch_site:
+                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+                else:
+                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
+                DispatcherDeployment.objects.create(
+                    name=get_default_dispatcher_name(integration=self),
+                    integration=self,
+                    configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
+                )
+
+            # Create default healthcheck settings and status
+            IntegrationStatus.objects.get_or_create(integration=self)
+            HealthCheckSettings.objects.get_or_create(integration=self)
 
     def save(self, *args, **kwargs):
         with self.tracker:
@@ -379,6 +385,8 @@ class WebhookConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
 
 class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    # State is persistent information used by the integration in different executions
+    # ToDo: This may be moved from the portal to the integrations db as part of the EDA
     integration = models.OneToOneField(
         "integrations.Integration",
         on_delete=models.CASCADE,
@@ -395,6 +403,54 @@ class IntegrationState(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.data}"
+
+
+class IntegrationStatus(UUIDAbstractModel, TimestampedModel):
+    # Status contains information about the health of the integration and other metrics
+
+    class Status(models.TextChoices):
+        HEALTHY = "healthy", "Healthy"  # Value, Display
+        UNHEALTHY = "unhealthy", "Unhealthy"
+        DISABLED = "disabled", "Disabled"
+
+    integration = models.OneToOneField(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="status"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.HEALTHY,
+        db_index=True
+    )
+    status_details = models.CharField(max_length=200, blank=True, default="")
+    last_delivery = models.DateTimeField(blank=True, null=True, db_index=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        verbose_name_plural = "Integration statuses"
+
+    def __str__(self):
+        return f"{self.status}"
+
+
+class HealthCheckSettings(UUIDAbstractModel, TimestampedModel):
+    # Settings for the health check of the integration
+    integration = models.OneToOneField(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="health_check_settings"
+    )
+    error_count_threshold = models.PositiveIntegerField(default=3)
+    time_window_minutes = models.PositiveIntegerField(default=60)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        verbose_name_plural = "Integration health check settings"
+
+    def __str__(self):
+        return f"Health check settings for integration {self.integration_id}"
 
 
 class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):

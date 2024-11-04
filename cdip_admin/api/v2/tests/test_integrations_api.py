@@ -8,7 +8,7 @@ from activity_log.models import ActivityLog
 from integrations.models import (
     Integration,
     IntegrationAction,
-    IntegrationConfiguration, IntegrationType,
+    IntegrationConfiguration, IntegrationType, IntegrationStatus,
 )
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
@@ -36,6 +36,8 @@ def _test_list_integrations(api_client, user, organization):
         assert "name" in integration
         assert "base_url" in integration
         assert "enabled" in integration
+        assert "status" in integration
+        assert "status_details" in integration
         assert "type" in integration
         owner = integration.get("owner")
         assert owner
@@ -1122,6 +1124,48 @@ def test_filter_integrations_owner_by_search_term_as_org_viewer(
     )
 
 
+def test_filter_integrations_with_healthy_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.HEALTHY.value
+        },
+        expected_integrations=[provider_movebank_ewt, provider_lotek_panthera, er_destination_healthy]
+    )
+
+
+def test_filter_integrations_with_unhealthy_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.UNHEALTHY.value
+        },
+        expected_integrations=[provider_movebank_unhealthy, er_destination_unhealthy]
+    )
+
+
+def test_filter_integrations_with_disabled_status_as_superuser(
+        api_client, superuser, organization, provider_movebank_ewt, provider_lotek_panthera,
+        provider_movebank_unhealthy, er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_filter_integrations(
+        api_client=api_client,
+        user=superuser,
+        filters={
+            "status": IntegrationStatus.Status.DISABLED
+        },
+        expected_integrations=[er_destination_disabled]
+    )
+
+
 def _test_global_search_integrations(
         api_client, user, search_term, expected_integrations,  extra_filters=None, search_fields=None
 ):
@@ -1241,6 +1285,21 @@ def test_global_search_integrations_combined_with_filters_as_org_viewer(
             "action_type": "pull",  # Provider
         },
         expected_integrations=[provider_lotek_panthera]
+    )
+
+
+def test_global_search_destinations_with_unhealthy_status(
+        api_client, superuser, organization, integrations_list_er,
+        er_destination_healthy, er_destination_unhealthy, er_destination_disabled
+):
+    _test_global_search_integrations(
+        api_client=api_client,
+        user=superuser,
+        search_term="unhealthy",
+        extra_filters={
+            "action_type": "push"  # Destinations
+        },
+        expected_integrations=[er_destination_unhealthy]
     )
 
 
