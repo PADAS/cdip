@@ -2,7 +2,7 @@ import pytest
 import json
 
 from activity_log.models import ActivityLog
-from event_consumers.dispatcher_events_consumer import process_event
+from event_consumers.dispatcher_events_consumer import process_event, data_type_str_map
 from integrations.models import GundiTrace
 
 
@@ -327,3 +327,22 @@ def test_process_dispatcher_log_event(
     assert activity_log.value == "custom_dispatcher_log"
     assert activity_log.title == event_data['title']
     assert not activity_log.is_reversible
+
+
+@pytest.mark.parametrize("trace,delivery_event", [
+    ("trap_tagger_event_trace", "trap_tagger_to_er_observation_delivered_event"),
+    ("attachment_delivered_trace", "trap_tagger_to_er_attachment_delivered_event"),
+    ("trap_tagger_to_movebank_observation_trace", "trap_tagger_to_movebank_observation_delivered_event"),
+])
+def test_show_stream_type_in_activity_log_title_on_observation_delivery(
+        request, trace, delivery_event
+):
+    trace = request.getfixturevalue(trace)
+    delivery_event = request.getfixturevalue(delivery_event)
+    process_event(delivery_event)
+    trace.refresh_from_db()
+    event_data = json.loads(delivery_event.data)["payload"]
+    # Check that the event was recorded with hte right title in the activity logs
+    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    data_type = data_type_str_map.get(trace.object_type, "Data")
+    assert activity_log.title == f"{data_type} Delivered to '{trace.destination.base_url}'"
