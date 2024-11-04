@@ -1767,7 +1767,7 @@ def attachment_delivered_trace(
         # We save only IDs, no sensitive data is saved
         data_provider=provider_trap_tagger,
         related_to=event_delivered_trace.object_id,
-        object_type="ev",
+        object_type="att",
         destination=integrations_list_er[0],
         delivered_at="2023-07-10T19:37:48.425974Z",
         external_id="c258f9f7-1a2e-4932-8d60-3acd2f59a1b2",
@@ -1796,6 +1796,30 @@ def trap_tagger_to_er_observation_delivered_event(
         "payload": {
             "gundi_id": str(trap_tagger_event_trace.object_id),
             "related_to": None,
+            "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
+            "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "delivered_at": "2023-07-11 18:19:19.215015+00:00",
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_to_er_attachment_delivered_event(
+        mocker, trap_tagger_event_trace, attachment_delivered_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationDelivered",
+        "payload": {
+            "gundi_id": str(attachment_delivered_trace.object_id),
+            "related_to": str(trap_tagger_event_trace.object_id),
             "external_id": "35983ced-1216-4d43-81da-01ee90ba9b80",
             "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
             "destination_id": str(integrations_list_er[0].id),

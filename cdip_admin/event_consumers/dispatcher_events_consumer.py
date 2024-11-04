@@ -14,6 +14,13 @@ from activity_log.models import ActivityLog
 logger = logging.getLogger(__name__)
 
 
+data_type_str_map = {
+    "obv": "Observation",
+    "ev": "Event",
+    "att": "Attachment"
+}
+
+
 def handle_observation_delivered_event(event_dict: dict):
     event = system_events.ObservationDelivered.parse_obj(event_dict)
     # Update the status and save the external id
@@ -74,7 +81,8 @@ def handle_observation_delivered_event(event_dict: dict):
         f"Recording delivery event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
         extra={"event": event_dict}
     )
-    title = f"Observation Delivered to '{trace.destination.base_url}'"
+    data_type = data_type_str_map.get(trace.object_type, "Data")
+    title = f"{data_type} Delivered to '{trace.destination.base_url}'"
     log_data = {
         **event_dict["payload"],
         "source_external_id": str(trace.source.external_id) if trace.source else None,
@@ -143,7 +151,8 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         f"Recording delivery error event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
         extra={"event": event_dict}
     )
-    title = f"Error Delivering observation {trace.object_id} to '{trace.destination.base_url}'"
+    data_type = data_type_str_map.get(trace.object_type, "Data")
+    title = f"Error Delivering {data_type} {trace.object_id} to '{trace.destination.base_url}'"
     log_data = {
         **event_dict["payload"],
         "source_external_id": str(trace.source.external_id) if trace.source else None,
@@ -184,7 +193,8 @@ def handle_observation_updated_event(event_dict: dict):
         f"Recording update event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
         extra={"event": event_dict}
     )
-    title = f"Observation {gundi_id} updated in '{trace.destination.base_url}'"
+    data_type = data_type_str_map.get(trace.object_type, "Data")
+    title = f"{data_type} {gundi_id} updated in '{trace.destination.base_url}'"
     log_data = {
         **event_dict["payload"],
         "source_external_id": str(trace.source.external_id) if trace.source else None,
@@ -225,7 +235,8 @@ def handle_observation_update_failed_event(event_dict: dict):
         f"Recording update error event in the activity log for gundi_id {gundi_id}, destination_id: {destination_id}",
         extra={"event": event_dict}
     )
-    title = f"Error Updating observation {gundi_id} in '{trace.destination.base_url}'"
+    data_type = data_type_str_map.get(trace.object_type, "Data")
+    title = f"Error Updating {data_type} {gundi_id} in '{trace.destination.base_url}'"
     log_data = {
         **event_dict["payload"],
         "source_external_id": str(trace.source.external_id) if trace.source else None,
