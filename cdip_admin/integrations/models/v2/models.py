@@ -610,6 +610,8 @@ class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         verbose_name="Additional JSON Configuration",
     )
 
+    logs_id_field = "external_id"
+
     def __str__(self):
         return f"{self.external_id} - {self.integration.type.name}"
 
