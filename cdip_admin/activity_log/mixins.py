@@ -148,7 +148,8 @@ class ChangeLogMixin:
 
     def get_id_display(self):
         if hasattr(self, "logs_id_field"):
-            return str(self.logs_id_field)
+            id_to_display = getattr(self, self.logs_id_field)
+            return str(id_to_display) if id_to_display else None
         return None
 
     def get_user(self):
