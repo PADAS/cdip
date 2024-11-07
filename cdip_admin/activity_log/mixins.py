@@ -62,10 +62,12 @@ class ChangeLogMixin:
                     changes[field_name] = serialized_value
         return changes
 
-    def log_activity(self, integration, action, changes, is_reversible, revert_data=None, user=None):
+    def log_activity(self, integration, action, changes, is_reversible, revert_data=None, user=None, id_display=None):
         model_name = self.__class__.__name__
         value = f"{model_name.lower()}_{action.lower()}"
         title = f"{model_name} {action}"
+        if id_display:
+            title += f" ({id_display})"
         if user and not user.is_anonymous:
             title += f" by {user}"
         ActivityLog.objects.create(
@@ -99,7 +101,8 @@ class ChangeLogMixin:
                     changes=changes or self._original_values,  # FixMe: Some times on creation the changes are empty
                     is_reversible=True,
                     revert_data=self.get_revert_data(action=action, fields=changes.keys()),
-                    user=self.get_user()
+                    user=self.get_user(),
+                    id_display=self.get_id_display()
                 )
         except Exception as e:
             logger.warning(f"Activity Log > Error recording activity for {self}: '{e}'.")
@@ -111,7 +114,8 @@ class ChangeLogMixin:
                 action=ActivityActions.DELETED.value,
                 changes=self._original_values,
                 is_reversible=False,
-                user=self.get_user()
+                user=self.get_user(),
+                id_display=self.get_id_display()
             )
         except Exception as e:
             logger.warning(f"Activity Log > Error recording activity for {self}: '{e}'.")
@@ -141,6 +145,12 @@ class ChangeLogMixin:
             logger.warning(f"Activity Log: '{integration}' isn't an instance of Integration. Integration left empty.")
             integration = None
         return integration
+
+    def get_id_display(self):
+        if hasattr(self, "logs_id_field"):
+            id_to_display = getattr(self, self.logs_id_field)
+            return str(id_to_display) if id_to_display else None
+        return None
 
     def get_user(self):
         return get_current_user()
