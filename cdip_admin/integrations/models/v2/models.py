@@ -232,6 +232,13 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             # Create default healthcheck settings and status
             IntegrationStatus.objects.get_or_create(integration=self)
             HealthCheckSettings.objects.get_or_create(integration=self)
+        else:  # Updated
+            if self.tracker.has_changed("enabled"):
+                # Disable/Enable related periodic tasks for pull actions
+                for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA):
+                    if config.action.is_periodic_action and config.periodic_task:
+                        config.periodic_task.enabled = self.enabled
+                        config.periodic_task.save()
 
     def save(self, *args, **kwargs):
         with self.tracker:
