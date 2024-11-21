@@ -14,3 +14,19 @@ def test_periodic_task_is_created_for_periodic_actions(provider_lotek_panthera, 
     task_parameters = json.loads(periodic_tasks[0].kwargs)
     assert task_parameters.get("integration_id") == str(provider_lotek_panthera.id)
     assert task_parameters.get("action_id") == lotek_action_pull_positions.value
+
+
+def test_disable_periodic_task_on_integration_disabled(provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions):
+    provider_lotek_panthera.enabled = False
+    provider_lotek_panthera.save()
+    periodic_task = PeriodicTask.objects.get(task="integrations.tasks.run_integration")
+    assert not periodic_task.enabled
+
+
+def test_enable_periodic_task_on_integration_enabled(provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions):
+    provider_lotek_panthera.enabled = False
+    provider_lotek_panthera.save()
+    provider_lotek_panthera.enabled = True
+    provider_lotek_panthera.save()
+    periodic_task = PeriodicTask.objects.get(task="integrations.tasks.run_integration")
+    assert periodic_task.enabled
