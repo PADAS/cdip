@@ -373,6 +373,7 @@ def send_unhealthy_connections_email():
     from integrations.models.v2 import Integration, IntegrationStatus, filter_connections_by_status
     providers = Integration.providers.all()
     unhealthy_connections = filter_connections_by_status(queryset=providers, status=IntegrationStatus.Status.UNHEALTHY)
+    # ToDo: Add connections with status NEEDS_REVIEW and DISABLED
     if not unhealthy_connections.exists():
         logger.info("No unhealthy integrations found. Skipping email notification.")
         return
