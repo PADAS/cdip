@@ -9,6 +9,10 @@ import os
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
+from django.core.mail import EmailMultiAlternatives
+from django.db.models import Q
+from django.template.loader import render_to_string
+from django.conf import settings
 
 from integrations.utils import build_mb_tag_id, send_message_to_gcp_pubsub
 from activity_log.models import ActivityLog
@@ -361,3 +365,28 @@ def calculate_integration_statuses_in_batches(batch_size=20):
     for i in range(0, len(integration_ids), batch_size):
         batch = integration_ids[i:i + batch_size]
         calculate_integration_statuses.delay(integration_ids=batch)
+
+
+@shared_task
+def send_unhealthy_connections_email():
+    logger.info("Checking for unhealthy integrations to send email notification...")
+    from integrations.models.v2 import Integration, IntegrationStatus, filter_connections_by_status
+    providers = Integration.providers.all()
+    unhealthy_connections = filter_connections_by_status(queryset=providers, status=IntegrationStatus.Status.UNHEALTHY)
+    if not unhealthy_connections.exists():
+        logger.info("No unhealthy integrations found. Skipping email notification.")
+        return
+
+    logger.info(f"Sending email notification for {len(unhealthy_connections)} unhealthy integrations: {unhealthy_connections}")
+    context = {
+        "unhealthy_connections": unhealthy_connections,
+        "portal_base_url": settings.PORTAL_BASE_URL
+    }
+    html_content = render_to_string("unhealthy_connections_email.html", context)
+    email = EmailMultiAlternatives(
+        subject="Gundi connections need attention",
+        from_email=settings.EMAIL_FROM_DEFAULT,
+        to=settings.EMAIL_ALERT_RECIPIENTS
+    )
+    email.attach_alternative(html_content, "text/html")
+    email.send()
