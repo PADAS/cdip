@@ -55,7 +55,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Unhealthy Gundi Connections</h2>
+        <h2>Gundi connections needing attention</h2>
         <table class="connection-table">
             <thead>
                 <tr>
@@ -72,6 +72,24 @@
                         <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
                     </td>
                     <td class="status-unhealthy">unhealthy</td>
+                </tr>
+                {% endfor %}
+                {% for connection in review_connections %}
+                <tr>
+                    <td>{{ connection.id }}</td>
+                    <td>
+                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                    </td>
+                    <td class="status-needs-review">needs review</td>
+                </tr>
+                {% endfor %}
+                {% for connection in disabled_connections %}
+                <tr>
+                    <td>{{ connection.id }}</td>
+                    <td>
+                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                    </td>
+                    <td class="status-disabled">disabled</td>
                 </tr>
                 {% endfor %}
             </tbody>

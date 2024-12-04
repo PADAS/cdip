@@ -10,7 +10,6 @@ from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.apps import apps
 from django.core.mail import EmailMultiAlternatives
-from django.db.models import Q
 from django.template.loader import render_to_string
 from django.conf import settings
 
@@ -370,17 +369,22 @@ def calculate_integration_statuses_in_batches(batch_size=20):
 @shared_task
 def send_unhealthy_connections_email():
     logger.info("Checking for unhealthy integrations to send email notification...")
-    from integrations.models.v2 import Integration, IntegrationStatus, filter_connections_by_status
+    from integrations.models.v2 import Integration, ConnectionStatus, filter_connections_by_status
     providers = Integration.providers.all()
-    unhealthy_connections = filter_connections_by_status(queryset=providers, status=IntegrationStatus.Status.UNHEALTHY)
+    unhealthy_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.UNHEALTHY.value)
+    review_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.NEEDS_REVIEW.value)
+    disabled_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.DISABLED.value)
+
     # ToDo: Add connections with status NEEDS_REVIEW and DISABLED
-    if not unhealthy_connections.exists():
-        logger.info("No unhealthy integrations found. Skipping email notification.")
+    if not unhealthy_connections.exists() and not review_connections.exists() and not disabled_connections.exists():
+        logger.info("No connections needing attention found. Skipping email notification.")
         return
 
     logger.info(f"Sending email notification for {len(unhealthy_connections)} unhealthy integrations: {unhealthy_connections}")
     context = {
         "unhealthy_connections": unhealthy_connections,
+        "review_connections": review_connections,
+        "disabled_connections": disabled_connections,
         "portal_base_url": settings.PORTAL_BASE_URL
     }
     html_content = render_to_string("unhealthy_connections_email.html", context)
