@@ -12,9 +12,14 @@ from django.db import models, transaction
 from django.db.models import Subquery
 from django.conf import settings
 from django.contrib.auth import get_user_model
+
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
 from model_utils import FieldTracker
-from integrations.tasks import update_mb_permissions_for_group, recreate_and_send_movebank_permissions_csv_file
+from integrations.tasks import (
+    update_mb_permissions_for_group,
+    recreate_and_send_movebank_permissions_csv_file,
+    calculate_integration_statuses
+)
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 from activity_log.mixins import ChangeLogMixin
@@ -234,6 +239,8 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
+                # Update the integration status
+                calculate_integration_statuses([str(self.id)])
                 # Disable/Enable related periodic tasks for pull actions
                 for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA):
                     if config.action.is_periodic_action and config.periodic_task:
