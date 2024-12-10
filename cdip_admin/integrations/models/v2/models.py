@@ -239,7 +239,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
-                # Update the integration status
+                # Reflect the enabled status in the health status asap
                 calculate_integration_statuses([str(self.id)])
                 # Disable/Enable related periodic tasks for pull actions
                 for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA):
