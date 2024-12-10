@@ -219,6 +219,9 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
+        # Reflect the enabled status in the health status asap
+        if created or self.tracker.has_changed("enabled"):
+            calculate_integration_statuses([str(self.id)])
         if created:
             # Deploy serverless dispatchers for destinations
             if settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
@@ -239,8 +242,6 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
-                # Reflect the enabled status in the health status asap
-                calculate_integration_statuses([str(self.id)])
                 # Disable/Enable related periodic tasks for pull actions
                 for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA):
                     if config.action.is_periodic_action and config.periodic_task:
