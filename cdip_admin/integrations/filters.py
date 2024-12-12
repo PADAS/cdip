@@ -429,13 +429,14 @@ class ConnectionFilter(django_filters_rest.FilterSet):
     def filter_by_status(self, queryset, name, value):
         provider_disabled_q = Q(status__status=IntegrationStatus.Status.DISABLED.value)
         destinations_disabled_q = Q(routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.DISABLED.value)
+        provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
+        provider_unhealthy_q = Q(status__status=IntegrationStatus.Status.UNHEALTHY.value)
         destinations_unhealthy_q = Q(
             routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
         )
         connection_unhealthy_q = Q(
-            Q(status__status=IntegrationStatus.Status.UNHEALTHY.value) | destinations_unhealthy_q
+             provider_unhealthy_q | (destinations_unhealthy_q & ~provider_disabled_q)
         )
-        provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
         connection_needs_review_q = Q(provider_healthy_q & destinations_disabled_q)
         connection_healthy_q = Q(provider_healthy_q & ~Q(destinations_unhealthy_q | destinations_disabled_q))
         if value == ConnectionStatus.UNHEALTHY.value:
