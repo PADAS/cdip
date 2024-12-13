@@ -1370,6 +1370,43 @@ def connection_with_healthy_provider_and_destination(
 
 
 @pytest.fixture
+def connection_with_disabled_provider_and_unhealthy_destination(
+        organization,
+        integration_type_cellstop,
+        get_random_id,
+        cellstop_action_auth,
+        cellstop_action_fetch_samples,
+        er_destination_unhealthy
+):
+    # Create the integration
+    site_url = f"fake-{get_random_id()}.cellstop.com"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_cellstop,
+        name=f"Healthy Connection {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+        enabled=False
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_auth,
+        data={
+            "username": f"fake-username",
+            "password": f"fake-passwd",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=cellstop_action_fetch_samples,
+        data={},
+    )
+    ensure_default_route(integration=integration)
+    RouteDestination.objects.create(integration=er_destination_unhealthy, route=integration.default_route)
+    return integration
+
+
+@pytest.fixture
 def connection_with_unhealthy_provider(
         organization,
         integration_type_cellstop,

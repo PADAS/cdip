@@ -1,5 +1,5 @@
 import pytest
-from integrations.models import IntegrationStatus
+from integrations.models import IntegrationStatus, Integration
 from ..models.v2 import calculate_integration_status
 
 
@@ -85,3 +85,28 @@ def test_calculate_destination_integration_status_with_custom_threshold(
     calculate_integration_status(integration_id=destination_movebank.id)
     destination_movebank.status.refresh_from_db()
     assert destination_movebank.status.status == IntegrationStatus.Status.UNHEALTHY
+
+
+@pytest.mark.parametrize('enabled', [False, True,])
+def test_update_health_status_on_integration_enabled_change(
+        request,
+        enabled,
+        provider_lotek_panthera,
+):
+    provider_enabled = request.getfixturevalue('enabled')
+    provider_lotek_panthera.enabled = provider_enabled
+    provider_lotek_panthera.save()
+    health_status = provider_lotek_panthera.status.status
+    expected_status = IntegrationStatus.Status.HEALTHY if provider_enabled else IntegrationStatus.Status.DISABLED
+    assert health_status == expected_status.value
+
+
+def test_health_status_matches_integration_disabled_on_creation(integration_type_lotek, organization):
+    integration = Integration.objects.create(
+        type=integration_type_lotek,
+        name=f"Lotek Provider Disabled",
+        owner=organization,
+        base_url=f"api.test.lotek.com",
+        enabled=False
+    )
+    assert integration.status.status == IntegrationStatus.Status.DISABLED.value

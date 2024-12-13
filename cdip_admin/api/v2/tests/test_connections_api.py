@@ -460,6 +460,7 @@ def test_global_search_connections_as_org_viewer(
 def test_filter_connections_by_status_healthy_as_superuser(
         api_client, superuser, organization, connection_with_healthy_provider_and_destination,
         connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+        connection_with_disabled_provider_and_unhealthy_destination,
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -474,6 +475,7 @@ def test_filter_connections_by_status_healthy_as_superuser(
 def test_filter_connections_by_status_unhealthy_as_superuser(
         api_client, superuser, organization, connection_with_healthy_provider_and_destination,
         connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+        connection_with_disabled_provider_and_unhealthy_destination,
 ):
     _test_filter_connections(
         api_client=api_client,
@@ -488,6 +490,7 @@ def test_filter_connections_by_status_unhealthy_as_superuser(
 def test_filter_connections_by_status_needs_review_as_superuser(
         api_client, superuser, organization, connection_with_healthy_provider_and_destination,
         connection_with_unhealthy_provider, connection_with_unhealthy_destination, connection_with_disabled_destination,
+        connection_with_disabled_provider_and_unhealthy_destination,
 ):
     _test_filter_connections(
         api_client=api_client,
