@@ -375,7 +375,6 @@ def send_unhealthy_connections_email():
     review_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.NEEDS_REVIEW.value)
     disabled_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.DISABLED.value)
 
-    # ToDo: Add connections with status NEEDS_REVIEW and DISABLED
     if not unhealthy_connections.exists() and not review_connections.exists() and not disabled_connections.exists():
         logger.info("No connections needing attention found. Skipping email notification.")
         return
