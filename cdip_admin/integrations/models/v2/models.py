@@ -158,6 +158,14 @@ class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
         jsonschema.validate(instance=configuration, schema=self.schema)
 
 
+class ProvidersManager(models.Manager):
+    def get_queryset(self):
+        # Return integrations being used as a provider in any connection
+        return super().get_queryset().filter(
+            routing_rules_by_provider__isnull=False
+        ).distinct()
+
+
 class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     type = models.ForeignKey(
         "integrations.IntegrationType",
@@ -191,6 +199,8 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         verbose_name="Additional JSON Configuration"
     )
 
+    objects = models.Manager()
+    providers = ProvidersManager()
     tracker = FieldTracker()
 
     class Meta:

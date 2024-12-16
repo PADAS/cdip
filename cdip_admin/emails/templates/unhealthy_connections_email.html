@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 1096px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        h2 {
+            text-align: center;
+            color: #444;
+        }
+        .connection-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .connection-table th, .connection-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .connection-table th {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        .status-unhealthy {
+            color: #D6520E;
+            /*font-weight: bold;*/
+        }
+        .status-needs-review {
+            color: #9D6900;
+            /*font-weight: bold;*/
+        }
+        .status-disabled {
+            color: #8F8F8F;
+            /*font-weight: bold;*/
+        }
+        .connection-link {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .connection-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>The following gundi connections need attention</h2>
+        <table class="connection-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Name</th>
+                    <th>ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for connection in unhealthy_connections %}
+                <tr>
+                    <td class="status-unhealthy">unhealthy</td>
+                    <td>
+                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                    </td>
+                    <td>{{ connection.id }}</td>
+                </tr>
+                {% endfor %}
+                {% for connection in review_connections %}
+                <tr>
+                    <td class="status-needs-review">needs review</td>
+                    <td>
+                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                    </td>
+                    <td>{{ connection.id }}</td>
+                </tr>
+                {% endfor %}
+                {% for connection in disabled_connections %}
+                <tr>
+                    <td class="status-disabled">disabled</td>
+                    <td>
+                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                    </td>
+                    <td>{{ connection.id }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

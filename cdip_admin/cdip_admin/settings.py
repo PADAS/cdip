@@ -302,6 +302,9 @@ CELERY_TASK_ROUTES = {
     "integrations.tasks.calculate_integration_statuses_in_batches": {
         "queue": "healthchecks", "routing_key": "healthchecks"
     },
+    "integrations.tasks.send_unhealthy_connections_email": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    }
 }
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
@@ -324,6 +327,8 @@ EMAIL_FROM_DEFAULT = env.str("EMAIL_FROM_DEFAULT", "notifications.cdip@pamdas.or
 EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifications")
 EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
 EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")
+EMAIL_ALERT_RECIPIENTS = env.list("EMAIL_ALERT_RECIPIENTS", default=["support@earthranger.com", "gundi@earthranger.com"])
+PORTAL_BASE_URL = env.str("PORTAL_BASE_URL", "https://gundiservice.org")  # to render links to the portal in emails
 
 # Used for storing files such as report attachments
 DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"

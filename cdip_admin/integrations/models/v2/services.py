@@ -1,6 +1,6 @@
 from enum import Enum
 
-from django.db.models import Subquery
+from django.db.models import Subquery, Q
 from datetime import timezone, timedelta, datetime
 from activity_log.models import ActivityLog
 from organizations.models import Organization
@@ -95,3 +95,28 @@ def calculate_integration_status(integration_id):
         integration_status.status_details = "Errors where detected while pushing data to the destination"
     integration_status.save()
     return integration_status.status
+
+
+def filter_connections_by_status(queryset, status):
+    provider_disabled_q = Q(status__status=IntegrationStatus.Status.DISABLED.value)
+    destinations_disabled_q = Q(
+        routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.DISABLED.value)
+    provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
+    provider_unhealthy_q = Q(status__status=IntegrationStatus.Status.UNHEALTHY.value)
+    destinations_unhealthy_q = Q(
+        routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
+    )
+    connection_unhealthy_q = Q(
+        provider_unhealthy_q | (destinations_unhealthy_q & ~provider_disabled_q)
+    )
+    connection_needs_review_q = Q(provider_healthy_q & destinations_disabled_q)
+    connection_healthy_q = Q(provider_healthy_q & ~Q(destinations_unhealthy_q | destinations_disabled_q))
+    if status == ConnectionStatus.UNHEALTHY.value:
+        return queryset.filter(connection_unhealthy_q)
+    if status == ConnectionStatus.NEEDS_REVIEW.value:
+        return queryset.filter(connection_needs_review_q)
+    if status == ConnectionStatus.DISABLED.value:
+        return queryset.filter(provider_disabled_q)
+    if status == ConnectionStatus.HEALTHY.value:
+        return queryset.filter(connection_healthy_q)
+    return queryset

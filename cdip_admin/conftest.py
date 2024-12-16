@@ -1382,7 +1382,7 @@ def connection_with_disabled_provider_and_unhealthy_destination(
     site_url = f"fake-{get_random_id()}.cellstop.com"
     integration, _ = Integration.objects.get_or_create(
         type=integration_type_cellstop,
-        name=f"Healthy Connection {get_random_id()}",
+        name=f"Disabled Connection {get_random_id()}",
         owner=organization,
         base_url=site_url,
         enabled=False

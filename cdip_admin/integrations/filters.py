@@ -18,7 +18,7 @@ from integrations.models import (
     Integration,
     IntegrationType,
     get_user_integrations_qs,
-    Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus
+    Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
 from django.db.models import Q
@@ -427,27 +427,7 @@ class ConnectionFilter(django_filters_rest.FilterSet):
         )
 
     def filter_by_status(self, queryset, name, value):
-        provider_disabled_q = Q(status__status=IntegrationStatus.Status.DISABLED.value)
-        destinations_disabled_q = Q(routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.DISABLED.value)
-        provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
-        provider_unhealthy_q = Q(status__status=IntegrationStatus.Status.UNHEALTHY.value)
-        destinations_unhealthy_q = Q(
-            routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
-        )
-        connection_unhealthy_q = Q(
-             provider_unhealthy_q | (destinations_unhealthy_q & ~provider_disabled_q)
-        )
-        connection_needs_review_q = Q(provider_healthy_q & destinations_disabled_q)
-        connection_healthy_q = Q(provider_healthy_q & ~Q(destinations_unhealthy_q | destinations_disabled_q))
-        if value == ConnectionStatus.UNHEALTHY.value:
-            return queryset.filter(connection_unhealthy_q)
-        if value == ConnectionStatus.NEEDS_REVIEW.value:
-            return queryset.filter(connection_needs_review_q)
-        if value == ConnectionStatus.DISABLED.value:
-            return queryset.filter(provider_disabled_q)
-        if value == ConnectionStatus.HEALTHY.value:
-            return queryset.filter(connection_healthy_q)
-        return queryset
+        return filter_connections_by_status(queryset=queryset, status=value)
 
 
 class IntegrationTypeFilter(django_filters_rest.FilterSet):
