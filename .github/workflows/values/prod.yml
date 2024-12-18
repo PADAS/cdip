@@ -39,6 +39,7 @@ admin_portal:
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-prod
     RAW_OBSERVATIONS_TOPIC: raw-observations-prod
     DISPATCHER_DEFAULTS_SECRET_WPSWATCH: wps-dispatcher-defaults-prod
+    PORTAL_BASE_URL: "https://gundiservice.org"
 kongplugin:
   cors:
     - https://gundiservice.org
