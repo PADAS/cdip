@@ -364,7 +364,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
         if self.action.is_periodic_action and not self.periodic_task:
             periodic_task_params = {
-                "name": f"Action: '{self.action.value}' schedule (Integration: '{self.integration} ({self.integration.id})', Configuration {self.pk})",
+                "name": f"Run '{self.action.value}' of Integration: '{self.integration} ({self.integration.id})')",
                 "task": "integrations.tasks.run_integration",
                 "kwargs": {
                     "integration_id": str(self.integration_id),
