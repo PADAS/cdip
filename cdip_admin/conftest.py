@@ -6,6 +6,7 @@ import pytest
 import random
 from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
+from django_celery_beat.models import CrontabSchedule
 from rest_framework.utils import json
 from rest_framework.test import APIClient
 from gundi_core.schemas import v2 as gundi_schemas_v2
@@ -614,6 +615,131 @@ def provider_lotek_panthera(
         integration=provider,
         action=lotek_action_pull_positions,
         data={"start_time": "2023-01-01T00:00:00Z"},
+    )
+    ensure_default_route(integration=provider)
+    return provider
+
+
+@pytest.fixture
+def integration_type_ats():
+    return IntegrationType.objects.create(
+        name="ATS",
+        value="ats",
+        description="Standard integration type for pulling data from ATS API.",
+    )
+
+
+@pytest.fixture
+def ats_action_auth(integration_type_ats):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_ats,
+        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+        name="Authenticate",
+        value="auth",
+        description="Use credentials to authenticate against ATS API",
+        schema={
+            "type": "object",
+            "required": ["username", "password"],
+            "properties": {
+                "password": {"type": "string"},
+                "username": {"type": "string"},
+            },
+        },
+    )
+
+
+@pytest.fixture
+def ats_action_pull_observations(integration_type_ats):
+    schedule_every_ten_min, _ = CrontabSchedule.objects.get_or_create(
+        minute="*/10",  # Run every 10 minutes
+        hour="*",
+        day_of_week="*",
+        day_of_month="*",
+        month_of_year="*"
+    )
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_ats,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        is_periodic_action=True,
+        name="Pull Observations",
+        value="pull_observations",
+        description="Pull Tracking data from ATS API",
+        schema={
+            "type": "object",
+            "title": "PullObservationsConfig",
+            "required": ["data_endpoint", "transmissions_endpoint"],
+            "properties": {
+                "data_endpoint": {"type": "string", "title": "Data Endpoint"},
+                "transmissions_endpoint": {"type": "string", "title": "Transmissions Endpoint"}
+            },
+            "definitions": {}
+        },
+        crontab_schedule=schedule_every_ten_min
+    )
+
+
+@pytest.fixture
+def ats_action_process_observations(integration_type_ats):
+    schedule_after_pull_observations, _ = CrontabSchedule.objects.get_or_create(
+        minute="5-55/10",  # Run every 10 minutes, but 5 minutes after pull_observations
+        hour="*",
+        day_of_week="*",
+        day_of_month="*",
+        month_of_year="*"
+    )
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_ats,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        is_periodic_action=True,
+        name="Process Observations",
+        value="process_observations",
+        description="Process Tracking data from ATS API",
+        schema={
+            "type": "object",
+            "title": "ProcessObservationsConfig",
+            "properties": {},
+            "definitions": {}
+        },
+        crontab_schedule=schedule_after_pull_observations
+    )
+
+
+@pytest.fixture
+def provider_ats(
+        get_random_id,
+        organization,
+        integration_type_ats,
+        ats_action_auth,
+        ats_action_pull_observations,
+        ats_action_process_observations,
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_ats,
+        name=f"ATS Provider {get_random_id()}",
+        owner=organization,
+        base_url=f"https://api.test.ats.org",
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=ats_action_auth,
+        data={
+            "username": f"user-{get_random_id()}",
+            "password": f"passwd-{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=ats_action_pull_observations,
+        data={
+            "data_endpoint": "http://12.34.56.7/Service1.svc/GetPointsAtsIri/1",
+            "transmissions_endpoint": "http://12.34.56.7/Service1.svc/GetAllTransmission/1"
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=provider,
+        action=ats_action_process_observations,
+        data={},
     )
     ensure_default_route(integration=provider)
     return provider

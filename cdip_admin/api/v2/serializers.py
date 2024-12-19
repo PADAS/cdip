@@ -6,6 +6,7 @@ from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
+from core.utils import timezone_from_offset, parse_crontab_schedule_from_dict
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
     GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
@@ -16,6 +17,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ObjectDoesNotExist
+from django_celery_beat.models import CrontabSchedule
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
     send_event_update_to_routing
@@ -262,6 +264,8 @@ class IntegrationWebhookCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
+    crontab_schedule = serializers.JSONField(write_only=True, required=False)
+
     class Meta:
         model = IntegrationAction
         fields = (
@@ -271,7 +275,8 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
             "description",
             "schema",
             "ui_schema",
-            "is_periodic_action"
+            "is_periodic_action",
+            "crontab_schedule"
         )
 
 
@@ -346,6 +351,9 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
             # Create or update actions if provided
             for action_params in actions:  # Usually less than 5 actions
                 action_slug = action_params.pop("value")
+                if crontab_values := action_params.pop("crontab_schedule", None):
+                    crontab_schedule = parse_crontab_schedule_from_dict(crontab_values)
+                    action_params["crontab_schedule"] = crontab_schedule
                 action, created = IntegrationAction.objects.update_or_create(
                     integration_type=integration_type,
                     value=action_slug,
