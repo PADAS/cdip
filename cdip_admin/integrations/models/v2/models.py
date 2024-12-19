@@ -366,11 +366,11 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             periodic_task_params = {
                 "name": f"Run '{self.action.value}' of Integration: '{self.integration} ({self.integration.id})')",
                 "task": "integrations.tasks.run_integration",
-                "kwargs": {
+                "kwargs": json.dumps({
                     "integration_id": str(self.integration_id),
                     "action_id": self.action.value,
                     "pubsub_topic": f"{self.integration.type.value}-actions-topic"
-                }
+                })
             }
             # Check for custom crontab schedule
             if self.action.crontab_schedule:
