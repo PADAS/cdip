@@ -363,24 +363,26 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             )
 
         if self.action.is_periodic_action and not self.periodic_task:
-            # Get or create interval and periodic task for this config
-            schedule, created = IntervalSchedule.objects.get_or_create(
-                every=10,
-                period=IntervalSchedule.MINUTES,
-            )
+            periodic_task_params = {
+                "name": f"Action: '{self.action.value}' schedule (Integration: '{self.integration} ({self.integration.id})', Configuration {self.pk})",
+                "task": "integrations.tasks.run_integration",
+                "kwargs": {
+                    "integration_id": str(self.integration_id),
+                    "action_id": self.action.value,
+                    "pubsub_topic": f"{self.integration.type.value}-actions-topic"
+                }
+            }
+            # Check for custom crontab schedule
+            if self.action.crontab_schedule:
+                periodic_task_params["crontab"] = self.action.crontab_schedule
+            else:  # Use a default interval
+                schedule, created = IntervalSchedule.objects.get_or_create(
+                    every=10,
+                    period=IntervalSchedule.MINUTES,
+                )
+                periodic_task_params["interval"] = schedule
 
-            self.periodic_task = PeriodicTask.objects.create(
-                interval=schedule,
-                name=f"Action: '{self.action.value}' schedule (Integration: '{self.integration}', Configuration {self.pk})",
-                task="integrations.tasks.run_integration",
-                kwargs=json.dumps(
-                    {
-                        "integration_id": str(self.integration_id),
-                        "action_id": self.action.value,
-                        "pubsub_topic": f"{self.integration.type.value}-actions-topic"
-                    }
-                ),
-            )
+            self.periodic_task = PeriodicTask.objects.create(**periodic_task_params)
             self.save(update_fields=["periodic_task"], execute_post_save=False)
 
     def save(self, *args, **kwargs):
