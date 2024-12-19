@@ -83,6 +83,13 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         verbose_name="Integration Type"
     )
     is_periodic_action = models.BooleanField(default=False)
+    crontab_schedule = models.ForeignKey(
+        "django_celery_beat.CrontabSchedule",
+        on_delete=models.SET_NULL,
+        related_name="actions_by_crontab_schedule",
+        blank=True,
+        null=True
+    )
 
     class Meta:
         ordering = ("name",)
