@@ -16,6 +16,24 @@ def test_periodic_task_is_created_for_periodic_actions(provider_lotek_panthera, 
     assert task_parameters.get("action_id") == lotek_action_pull_positions.value
 
 
+def test_periodic_task_is_created_for_periodic_action_with_crontab_schedule(
+        provider_ats, ats_action_pull_observations, ats_action_process_observations
+):
+    # ATS uses custom crontab schedules in pull_observations and process_observations
+    periodic_tasks = PeriodicTask.objects.filter(task="integrations.tasks.run_integration")
+    # Two tasks should be created, for the pull_observations and process_observations actions
+    assert periodic_tasks.count() == 2
+    # Check that the crontab schedule is set correctly
+    for task in periodic_tasks:
+        task_parameters = json.loads(task.kwargs)
+        if task_parameters.get("action_id") == ats_action_pull_observations.value:
+            assert task.crontab == ats_action_pull_observations.crontab_schedule
+        elif task_parameters.get("action_id") == ats_action_process_observations.value:
+            assert task.crontab == ats_action_process_observations.crontab_schedule
+        else:
+            pytest.fail("Unexpected task found")
+
+
 def test_disable_periodic_task_on_integration_disabled(provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions):
     provider_lotek_panthera.enabled = False
     provider_lotek_panthera.save()

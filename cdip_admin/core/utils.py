@@ -4,6 +4,9 @@ from enum import Enum
 import requests
 import time
 import rest_framework.request
+from django_celery_beat.models import CrontabSchedule
+from pytz import timezone
+
 from cdip_admin import settings
 
 logger = logging.getLogger(__name__)
@@ -63,3 +66,31 @@ class AutoNameEnum(Enum):
     def _generate_next_value_(name, start, count, last_values):
         return name
 
+
+def timezone_from_offset(utc_offset):
+    """
+    Create a pytz.timezone object from an integer UTC offset in hours.
+
+    Args:
+        utc_offset (int): The UTC offset in hours (e.g., -3, 5, etc.).
+
+    Returns:
+        pytz.timezone: A timezone object with the specified offset.
+    """
+    # Note: The sign is reversed for Etc/GMT timezones
+    tz_name = f"Etc/GMT{-utc_offset:+d}"
+    return timezone(tz_name)
+
+
+def parse_crontab_schedule_from_dict(value):
+    tz_offset = value.get("tz_offset", 0)
+    timezone = timezone_from_offset(tz_offset)
+    crontab_schedule, _ = CrontabSchedule.objects.get_or_create(
+        minute=value.get("minute", "*"),
+        hour=value.get("hour", "*"),
+        day_of_week=value.get("day_of_week", "*"),
+        day_of_month=value.get("day_of_month", "*"),
+        month_of_year=value.get("month_of_year", "*"),
+        timezone=timezone
+    )
+    return crontab_schedule
