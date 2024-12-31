@@ -357,6 +357,7 @@ OBSERVATION_DUPLICATE_CHECK_SECONDS = env.int("OBSERVATION_DUPLICATE_CHECK_SECON
 # Used in OTel traces/spans to set the 'environment' attribute, used on metrics calculation
 TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 TRACING_ENABLED = env.bool("TRACING_ENABLED", True)
+PUBSUB_ENABLED = env.bool("PUBSUB_ENABLED", True)
 
 # Subscriptions to read system events from pub/sub topics
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
@@ -369,4 +370,6 @@ DISPATCHER_DEFAULTS_SECRET_WPSWATCH = env.str("DISPATCHER_DEFAULTS_SECRET_WPSWAT
 MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC", "movebank-dispatcher-topic-prod")
 
 # Sensors API to Routing
-RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-dev")
+RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-prod")
+# Events on configuration changes (for integrations, routing, etc..)
+CONFIGURATION_EVENTS_TOPIC = env.str("CONFIGURATION_EVENTS_TOPIC", "configuration-events-prod")

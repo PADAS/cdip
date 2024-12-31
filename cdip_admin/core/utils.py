@@ -1,13 +1,18 @@
+import json
 import logging
 from enum import Enum
-
+import backoff
 import requests
 import time
 import rest_framework.request
+
 from django_celery_beat.models import CrontabSchedule
 from pytz import timezone
+from google.api_core.exceptions import GoogleAPICallError
+from google.cloud import pubsub_v1
+from cdip_connector.core.publisher import NullPublisher, Publisher
 
-from cdip_admin import settings
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +99,36 @@ def parse_crontab_schedule_from_dict(value):
         timezone=timezone
     )
     return crontab_schedule
+
+
+class GooglePublisher(Publisher):
+
+    def __init__(self):
+        self.pubsub_client = pubsub_v1.PublisherClient(
+            publisher_options=pubsub_v1.types.PublisherOptions(
+                enable_message_ordering=True,
+            )
+        )
+
+    @backoff.on_exception(
+        backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
+    )
+    def publish(self, topic: str, data: dict, ordering_key="", extra: dict = None):
+        extra = extra or {}
+        # Specify the topic path
+        topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
+        publish_future = self.pubsub_client.publish(
+            topic=topic_path,
+            data=json.dumps(data, default=str).encode("utf-8"),
+            ordering_key=ordering_key,
+            **extra
+        )
+        result = publish_future.result()
+        return result
+
+
+def get_publisher():
+    if settings.PUBSUB_ENABLED:
+        return GooglePublisher()
+    else:
+        return NullPublisher()

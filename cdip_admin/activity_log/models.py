@@ -4,7 +4,9 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.apps import apps
 from core.models import UUIDAbstractModel, TimestampedModel
+import gundi_core.events as system_events
 from .core import ActivityActions
+from .tasks import publish_configuration_event
 
 
 User = get_user_model()
@@ -14,6 +16,55 @@ class ActivityLogManager(models.Manager):
     def get_queryset(self):
         # Avoid scanning future partitions when querying activity logs
         return super().get_queryset().filter(created_at__lte=datetime.datetime.now(datetime.timezone.utc))
+
+
+system_events_by_log = {
+    "integration_created": {
+        "event_model": system_events.IntegrationCreated,
+        "payload_model": system_events.IntegrationSummary,
+    },
+    "integration_updated": {
+        "event_model": system_events.IntegrationUpdated,
+        "payload_model": system_events.ConfigChanges,
+        "exclude_fields": ["created_at", "updated_at"]
+    },
+    "integration_deleted": {
+        "event_model": system_events.IntegrationDeleted,
+        "payload_model": system_events.IntegrationSummary,
+    },
+    "integrationconfiguration_created": {
+        "event_model": system_events.ActionConfigCreated,
+        "payload_model": system_events.IntegrationActionConfiguration,
+    },
+    "integrationconfiguration_updated": {
+        "event_model": system_events.ActionConfigUpdated,
+        "payload_model": system_events.ConfigChanges,
+        "exclude_fields": ["created_at", "updated_at", "periodic_task_id"]
+    },
+    "integrationconfiguration_deleted": {
+        "event_model": system_events.ActionConfigDeleted,
+        "payload_model": system_events.IntegrationActionConfiguration,
+    }
+}
+
+
+def should_publish_event(log):
+    if log.log_type == log.LogTypes.DATA_CHANGE and log.value in system_events_by_log:
+        if log.value not in system_events_by_log[log.value].get("exclude_fields", []):
+            return True
+    return False
+
+
+def build_event_from_log(log):
+    if system_event := system_events_by_log.get(log.value):
+        # ToDo: Handle parse errors
+        data = log.details.get("changes", {})
+        payload = system_event["payload_model"](**data)
+        event = system_event["event_model"](
+            payload=payload
+        )
+        return event
+    return None
 
 
 class ActivityLog(UUIDAbstractModel, TimestampedModel):
@@ -108,3 +159,16 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
             for field, value in original_values.items():
                 setattr(instance, field, value)
             instance.save()
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        if should_publish_event(log=self) and (event := build_event_from_log(log=self)):
+            # Publish events to notify other services about the config changes
+            publish_configuration_event.delay(event_data=event.dict())
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
