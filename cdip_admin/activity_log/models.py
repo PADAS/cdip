@@ -141,6 +141,12 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
             models.Index(fields=["integration", "-created_at"]),
         ]
 
+    @property
+    def integration_type_value(self):
+        if self.integration:
+            return self.integration.type.value
+        return None
+
     def __str__(self):
         return f"[{self.created_at}] {self.title}"
 
@@ -166,7 +172,14 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         if should_publish_event(log=self) and (event := build_event_from_log(log=self)):
             # Publish events to notify other services about the config changes
-            publish_configuration_event.delay(event_data=event.dict())
+            publish_configuration_event.delay(
+                event_data=event.dict(),
+                attributes={  # Attributes can be used for filtering in subscriptions
+                    "gundi_version": "v2",
+                    "event_type": event.event_type,
+                    "integration_type": self.integration_type_value,
+                },
+            )
 
     def save(self, *args, **kwargs):
         self._pre_save(self, *args, **kwargs)

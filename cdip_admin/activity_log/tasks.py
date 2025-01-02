@@ -27,14 +27,11 @@ def run_partitions_maintenance():
             logger.info("partman.run_maintenance_proc() completed.")
 
 
-@shared_task(autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={'max_retries': 5})
-def publish_configuration_event(event_data: dict, topic: str = settings.CONFIGURATION_EVENTS_TOPIC):
+@shared_task
+def publish_configuration_event(event_data: dict, topic: str = settings.CONFIGURATION_EVENTS_TOPIC, attributes: dict = None):
     publisher.publish(
         topic=topic,
         data=event_data,
         ordering_key="config-event",  # Data changes must be processed in order
-        extra={
-            "gundi_version": "v2",
-            "event_type": event_data["event_type"],  # Used for filtering in subscriptions
-        },
+        extra=attributes
     )
