@@ -34,6 +34,8 @@ def _test_activity_logs_on_instance_updated(activity_log, instance, user, expect
     assert activity_log.log_level == ActivityLog.LogLevels.INFO
     assert activity_log.origin == ActivityLog.Origin.PORTAL
     expected_title = f"{model} {ActivityActions.UPDATED.value}"
+    if alt_id := activity_log.details.get("alt_id"):
+        expected_title += f" ({alt_id})"
     if user and not user.is_anonymous:
         expected_title += f" by {user}"
     assert activity_log.title == expected_title
