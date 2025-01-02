@@ -1,10 +1,14 @@
 import datetime
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.apps import apps
 from core.models import UUIDAbstractModel, TimestampedModel
-import gundi_core.events as system_events
+import gundi_core.events as gundi_core_events
+import gundi_core.schemas.v2 as gundi_core_schemas
+
+
 from .core import ActivityActions
 from .tasks import publish_configuration_event
 
@@ -19,51 +23,102 @@ class ActivityLogManager(models.Manager):
 
 
 system_events_by_log = {
-    "integration_created": {
-        "event_model": system_events.IntegrationCreated,
-        "payload_model": system_events.IntegrationSummary,
-    },
-    "integration_updated": {
-        "event_model": system_events.IntegrationUpdated,
-        "payload_model": system_events.ConfigChanges,
-        "exclude_fields": ["created_at", "updated_at"]
-    },
-    "integration_deleted": {
-        "event_model": system_events.IntegrationDeleted,
-        "payload_model": system_events.IntegrationSummary,
-    },
-    "integrationconfiguration_created": {
-        "event_model": system_events.ActionConfigCreated,
-        "payload_model": system_events.IntegrationActionConfiguration,
-    },
-    "integrationconfiguration_updated": {
-        "event_model": system_events.ActionConfigUpdated,
-        "payload_model": system_events.ConfigChanges,
-        "exclude_fields": ["created_at", "updated_at", "periodic_task_id"]
-    },
-    "integrationconfiguration_deleted": {
-        "event_model": system_events.ActionConfigDeleted,
-        "payload_model": system_events.IntegrationActionConfiguration,
-    }
+    "integration_created": gundi_core_events.IntegrationCreated,
+    "integration_updated": gundi_core_events.IntegrationUpdated,
+    "integration_deleted": gundi_core_events.IntegrationDeleted,
+    "integrationconfiguration_created": gundi_core_events.ActionConfigCreated,
+    "integrationconfiguration_updated": gundi_core_events.ActionConfigUpdated,
+    "integrationconfiguration_deleted": gundi_core_events.ActionConfigDeleted,
 }
 
 
-def should_publish_event(log):
-    if log.log_type == log.LogTypes.DATA_CHANGE and log.value in system_events_by_log:
-        if log.value not in system_events_by_log[log.value].get("exclude_fields", []):
-            return True
-    return False
-
-
 def build_event_from_log(log):
-    if system_event := system_events_by_log.get(log.value):
-        # ToDo: Handle parse errors
-        data = log.details.get("changes", {})
-        payload = system_event["payload_model"](**data)
-        event = system_event["event_model"](
-            payload=payload
-        )
-        return event
+    # ToDo. Finish implementation for deletions
+    if log.log_type != log.LogTypes.DATA_CHANGE:
+        return None
+    log_slug = log.value
+    if SystemEvent := system_events_by_log.get(log_slug):
+        config_changes = log.details.get("changes", {})
+        integration_type = log.integration_type
+        # Build the payload accordingly to each event type
+        if log_slug in ["integration_created",]:  # ToDo: "integration_deleted"]:
+            integration = log.integration
+            integration_summary_type = gundi_core_schemas.IntegrationType(
+                id=str(integration_type.id),
+                name=integration_type.name,
+                value=integration_type.value,
+                description=integration_type.description,
+                actions=[
+                    gundi_core_schemas.IntegrationAction(
+                        id=str(action.id),
+                        type=str(action.type),
+                        name=action.name,
+                        value=str(action.value),
+                        description=action.description,
+                        schema=action.schema,
+                        ui_schema=action.ui_schema,
+                    )
+                    for action in integration_type.actions.all()
+                ],
+            )
+            try:  # Add webhook configs if any
+                webhook = integration_type.webhook
+            except ObjectDoesNotExist:
+                pass
+            else:
+                integration_summary_type.webhook = gundi_core_schemas.IntegrationWebhook(
+                    id=str(webhook.id),
+                    name=webhook.name,
+                    value=webhook.value,
+                    description=webhook.description,
+                    webhook_schema=webhook.schema,
+                    ui_schema=webhook.ui_schema,
+                )
+            # Build the event payload
+            payload = gundi_core_events.IntegrationSummary(
+                id=config_changes.get("id"),
+                name=config_changes.get("name"),
+                type=integration_summary_type,
+                base_url=integration.base_url,
+                enabled=integration.enabled,
+                owner=gundi_core_schemas.Organization(
+                    id=str(integration.owner.id),
+                    name=integration.owner.name,
+                    description=integration.owner.description
+                ),
+                default_route=gundi_core_schemas.ConnectionRoute(
+                    id=str(integration.default_route.id),
+                    name=integration.default_route.name,
+                ) if integration.default_route else None,
+                additional=integration.additional
+            )
+        elif log_slug in ["integrationconfiguration_created", ]:   # ToDo: "integrationconfiguration_deleted"]:
+            action_id = config_changes.get("action_id")
+            action = integration_type.actions.get(id=action_id)
+            payload = gundi_core_events.IntegrationActionConfiguration(
+                id=config_changes.get("id"),
+                integration=config_changes.get("integration_id"),
+                action=gundi_core_schemas.IntegrationActionSummary(
+                    id=action_id,
+                    type=str(action.type),
+                    name=action.name,
+                    value=str(action.value),
+                ),
+                data=config_changes.get("data", {})
+            )
+        elif log_slug in ["integration_updated", "integrationconfiguration_updated"]:
+            # Skip publishing events in some cases
+            data_changes = config_changes.get("data", {})
+            if not data_changes or (len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at", "updated_at"]):
+                return None
+            instance_id = log.details.get("instance_pk")
+            payload = gundi_core_schemas.ConfigChanges(
+                id=instance_id,
+                changes=config_changes
+            )
+        else:  # The log doesn't produce any system event
+            return None
+        return SystemEvent(payload=payload)
     return None
 
 
@@ -142,9 +197,9 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         ]
 
     @property
-    def integration_type_value(self):
+    def integration_type(self):
         if self.integration:
-            return self.integration.type.value
+            return self.integration.type
         return None
 
     def __str__(self):
@@ -170,14 +225,14 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         pass
 
     def _post_save(self, *args, **kwargs):
-        if should_publish_event(log=self) and (event := build_event_from_log(log=self)):
-            # Publish events to notify other services about the config changes
+        # Publish events to notify other services about the config changes as needed
+        if event := build_event_from_log(log=self):
             publish_configuration_event.delay(
                 event_data=event.dict(),
                 attributes={  # Attributes can be used for filtering in subscriptions
                     "gundi_version": "v2",
                     "event_type": event.event_type,
-                    "integration_type": self.integration_type_value,
+                    "integration_type": self.integration_type.value,
                 },
             )
 
