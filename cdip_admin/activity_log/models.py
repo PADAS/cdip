@@ -8,7 +8,6 @@ from core.models import UUIDAbstractModel, TimestampedModel
 import gundi_core.events as gundi_core_events
 import gundi_core.schemas.v2 as gundi_core_schemas
 
-
 from .core import ActivityActions
 from .tasks import publish_configuration_event
 
@@ -33,7 +32,6 @@ system_events_by_log = {
 
 
 def build_event_from_log(log):
-    # ToDo. Finish implementation for deletions
     if log.log_type != log.LogTypes.DATA_CHANGE:
         return None
     log_slug = log.value
@@ -41,7 +39,7 @@ def build_event_from_log(log):
         config_changes = log.details.get("changes", {})
         integration_type = log.integration_type
         # Build the payload accordingly to each event type
-        if log_slug in ["integration_created",]:  # ToDo: "integration_deleted"]:
+        if log_slug == "integration_created":
             integration = log.integration
             integration_summary_type = gundi_core_schemas.IntegrationType(
                 id=str(integration_type.id),
@@ -92,7 +90,7 @@ def build_event_from_log(log):
                 ) if integration.default_route else None,
                 additional=integration.additional
             )
-        elif log_slug in ["integrationconfiguration_created", ]:   # ToDo: "integrationconfiguration_deleted"]:
+        elif log_slug == "integrationconfiguration_created":
             action_id = config_changes.get("action_id")
             action = integration_type.actions.get(id=action_id)
             payload = gundi_core_events.IntegrationActionConfiguration(
@@ -107,16 +105,24 @@ def build_event_from_log(log):
                 data=config_changes.get("data", {})
             )
         elif log_slug in ["integration_updated", "integrationconfiguration_updated"]:
+            from integrations.models import IntegrationConfiguration
+
             # Skip publishing events in some cases
             data_changes = config_changes.get("data", {})
-            if not data_changes or (len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at", "updated_at"]):
+            if not data_changes or (
+                    len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at", "updated_at"]):
                 return None
-            instance_id = log.details.get("instance_pk")
             payload = gundi_core_schemas.ConfigChanges(
-                id=instance_id,
+                id=log.details.get("instance_pk"),
+                alt_id=log.details.get("alt_id"),
                 changes=config_changes
             )
-        else:  # The log doesn't produce any system event
+        elif log_slug in ["integration_deleted", "integrationconfiguration_deleted"]:
+            payload = gundi_core_schemas.DeletionDetails(
+                id=log.details.get("instance_pk"),
+                alt_id=log.details.get("alt_id"),
+            )
+        else:  # Other logs won't produce any system event
             return None
         return SystemEvent(payload=payload)
     return None
