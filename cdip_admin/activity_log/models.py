@@ -107,9 +107,9 @@ def build_event_from_log(log):
         elif log_slug in ["integration_updated", "integrationconfiguration_updated"]:
             from integrations.models import IntegrationConfiguration
 
-            # Skip publishing events in some cases
+            # Skip publishing events when nothing meaningful for other services has changed
             data_changes = config_changes.get("data", {})
-            if not data_changes or (
+            if (not config_changes and not data_changes) or (
                     len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at", "updated_at"]):
                 return None
             payload = gundi_core_schemas.ConfigChanges(
