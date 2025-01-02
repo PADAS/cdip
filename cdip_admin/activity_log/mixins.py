@@ -81,6 +81,7 @@ class ChangeLogMixin:
             details={
                 "model_name": model_name,
                 "instance_pk": str(self.pk),
+                "alt_id": id_display,
                 "action": action,
                 "changes": changes
             },
