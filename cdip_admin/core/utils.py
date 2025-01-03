@@ -1,13 +1,19 @@
+import json
 import logging
 from enum import Enum
-
+import backoff
 import requests
 import time
 import rest_framework.request
-from django_celery_beat.models import CrontabSchedule
-from pytz import timezone
 
-from cdip_admin import settings
+from abc import ABC, abstractmethod
+from django_celery_beat.models import CrontabSchedule
+from google.cloud.pubsub_v1.publisher.exceptions import PublishToPausedOrderingKeyException
+from pytz import timezone
+from google.api_core.exceptions import GoogleAPICallError
+from google.cloud import pubsub_v1
+
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +100,56 @@ def parse_crontab_schedule_from_dict(value):
         timezone=timezone
     )
     return crontab_schedule
+
+
+class Publisher(ABC):
+    @abstractmethod
+    def publish(self, topic: str, data: dict, extra: dict = None):
+        ...
+
+
+class NullPublisher(Publisher):
+    def publish(self, topic: str, data: dict, extra: dict = None):
+        pass
+
+
+class GooglePublisher(Publisher):
+
+    def __init__(self):
+        self.pubsub_client = pubsub_v1.PublisherClient(
+            publisher_options=pubsub_v1.types.PublisherOptions(
+                enable_message_ordering=True,
+            )
+        )
+
+    @backoff.on_exception(
+        backoff.expo, (GoogleAPICallError, PublishToPausedOrderingKeyException,),
+        max_tries=5,
+        jitter=backoff.full_jitter
+    )
+    def publish(self, topic: str, data: dict, ordering_key="", extra: dict = None):
+        extra = extra or {}
+        # Specify the topic path
+        topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
+        try:
+            publish_future = self.pubsub_client.publish(
+                topic=topic_path,
+                data=json.dumps(data, default=str).encode("utf-8"),
+                ordering_key=ordering_key,
+                **extra
+            )
+            result = publish_future.result()
+        except PublishToPausedOrderingKeyException as e:
+            logger.warning(f"Publish failed due to paused ordering key: {e}")
+            self.pubsub_client.resume_publish(topic_path, ordering_key)
+            logger.warning(f"Ordering key '{ordering_key}' resumed. Retrying message...")
+            raise e  # Raise so it's retried
+        else:
+            return result
+
+
+def get_publisher():
+    if settings.PUBSUB_ENABLED:
+        return GooglePublisher()
+    else:
+        return NullPublisher()

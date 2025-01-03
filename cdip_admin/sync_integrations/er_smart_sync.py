@@ -32,7 +32,7 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
-from api.v2.utils import get_publisher
+from core.utils import get_publisher
 from .utils import unicode_to_ascii
 
 logger = logging.getLogger(__name__)

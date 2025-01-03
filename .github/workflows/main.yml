@@ -4,7 +4,11 @@ on:
     branches:
       - main
       - 'release-**'
-
+      - 'gundi-2981-publish-config-events'
+env:
+  TRACING_ENABLED: ${{secrets.TRACING_ENABLED}}
+  PUBSUB_ENABLED: ${{secrets.PUBSUB_ENABLED}}
+  CELERY_TASK_ALWAYS_EAGER: ${{secrets.CELERY_TASK_ALWAYS_EAGER}}
 jobs:
   vars:
     runs-on: ubuntu-latest
@@ -28,7 +32,7 @@ jobs:
 
   deploy_dev:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
-    if: startsWith(github.ref, 'refs/heads/main')
+    if: startsWith(github.ref, 'refs/heads/gundi-2981-publish-config-events')
     needs: [vars, build]
     with:
       environment: dev
