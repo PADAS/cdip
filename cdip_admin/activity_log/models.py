@@ -35,6 +35,7 @@ def build_event_from_log(log):
     if log.log_type != log.LogTypes.DATA_CHANGE:
         return None
     log_slug = log.value
+    integration_id = str(log.integration.id)
     if SystemEvent := system_events_by_log.get(log_slug):
         config_changes = log.details.get("changes", {})
         integration_type = log.integration_type
@@ -124,16 +125,22 @@ def build_event_from_log(log):
                     len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at",
                                                                           "updated_at"]):
                 return None
-            integration_id = str(log.integration.id)
+
             payload = gundi_core_schemas.ActionConfigChanges(
                 id=log.details.get("instance_pk"),
                 integration_id=integration_id,
                 alt_id=log.details.get("alt_id"),
                 changes=config_changes
             )
-        elif log_slug in ["integration_deleted", "integrationconfiguration_deleted"]:
-            payload = gundi_core_schemas.DeletionDetails(
+        elif log_slug == "integration_deleted":
+            payload = gundi_core_schemas.IntegrationDeletionDetails(
                 id=log.details.get("instance_pk"),
+                alt_id=log.details.get("alt_id"),
+            )
+        elif log_slug == "integrationconfiguration_deleted":
+            payload = gundi_core_schemas.ActionConfigDeletionDetails(
+                id=log.details.get("instance_pk"),
+                integration_id=integration_id,
                 alt_id=log.details.get("alt_id"),
             )
         else:  # Other logs won't produce any system event
