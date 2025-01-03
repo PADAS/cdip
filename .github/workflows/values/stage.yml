@@ -35,6 +35,7 @@ admin_portal:
     RAW_OBSERVATIONS_TOPIC: raw-observations-stage
     DISPATCHER_DEFAULTS_SECRET_WPSWATCH: wps-dispatcher-defaults-stage
     PORTAL_BASE_URL: "https://stage.gundiservice.org"
+    CONFIGURATION_EVENTS_TOPIC: "configuration-events-stage"
 kongplugin:
   cors:
     - https://stage.gundiservice.org
