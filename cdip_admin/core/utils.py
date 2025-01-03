@@ -8,6 +8,7 @@ import rest_framework.request
 
 from abc import ABC, abstractmethod
 from django_celery_beat.models import CrontabSchedule
+from google.cloud.pubsub_v1.publisher.exceptions import PublishToPausedOrderingKeyException
 from pytz import timezone
 from google.api_core.exceptions import GoogleAPICallError
 from google.cloud import pubsub_v1
@@ -122,20 +123,29 @@ class GooglePublisher(Publisher):
         )
 
     @backoff.on_exception(
-        backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
+        backoff.expo, (GoogleAPICallError, PublishToPausedOrderingKeyException,),
+        max_tries=5,
+        jitter=backoff.full_jitter
     )
     def publish(self, topic: str, data: dict, ordering_key="", extra: dict = None):
         extra = extra or {}
         # Specify the topic path
         topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
-        publish_future = self.pubsub_client.publish(
-            topic=topic_path,
-            data=json.dumps(data, default=str).encode("utf-8"),
-            ordering_key=ordering_key,
-            **extra
-        )
-        result = publish_future.result()
-        return result
+        try:
+            publish_future = self.pubsub_client.publish(
+                topic=topic_path,
+                data=json.dumps(data, default=str).encode("utf-8"),
+                ordering_key=ordering_key,
+                **extra
+            )
+            result = publish_future.result()
+        except PublishToPausedOrderingKeyException as e:
+            logger.warning(f"Publish failed due to paused ordering key: {e}")
+            self.pubsub_client.resume_publish(topic_path, ordering_key)
+            logger.warning(f"Ordering key '{ordering_key}' resumed. Retrying message...")
+            raise e  # Raise so it's retried
+        else:
+            return result
 
 
 def get_publisher():
