@@ -104,16 +104,30 @@ def build_event_from_log(log):
                 ),
                 data=config_changes.get("data", {})
             )
-        elif log_slug in ["integration_updated", "integrationconfiguration_updated"]:
+        elif log_slug == "integration_updated":
             from integrations.models import IntegrationConfiguration
 
             # Skip publishing events when nothing meaningful for other services has changed
             data_changes = config_changes.get("data", {})
             if (not config_changes and not data_changes) or (
-                    len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at", "updated_at"]):
+                    len(data_changes) == 1 and data_changes.keys()[0] in ["created_at", "updated_at"]):
                 return None
-            payload = gundi_core_schemas.ConfigChanges(
+            payload = gundi_core_schemas.IntegrationConfigChanges(
                 id=log.details.get("instance_pk"),
+                alt_id=log.details.get("alt_id"),
+                changes=config_changes
+            )
+        elif log_slug == "integrationconfiguration_updated":
+            # Skip publishing events when nothing meaningful for other services has changed
+            data_changes = config_changes.get("data", {})
+            if (not config_changes and not data_changes) or (
+                    len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at",
+                                                                          "updated_at"]):
+                return None
+            integration_id = str(log.integration.id)
+            payload = gundi_core_schemas.ActionConfigChanges(
+                id=log.details.get("instance_pk"),
+                integration_id=integration_id,
                 alt_id=log.details.get("alt_id"),
                 changes=config_changes
             )
