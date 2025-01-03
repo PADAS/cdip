@@ -6,11 +6,11 @@ import requests
 import time
 import rest_framework.request
 
+from abc import ABC, abstractmethod
 from django_celery_beat.models import CrontabSchedule
 from pytz import timezone
 from google.api_core.exceptions import GoogleAPICallError
 from google.cloud import pubsub_v1
-from cdip_connector.core.publisher import NullPublisher, Publisher
 
 from django.conf import settings
 
@@ -99,6 +99,17 @@ def parse_crontab_schedule_from_dict(value):
         timezone=timezone
     )
     return crontab_schedule
+
+
+class Publisher(ABC):
+    @abstractmethod
+    def publish(self, topic: str, data: dict, extra: dict = None):
+        ...
+
+
+class NullPublisher(Publisher):
+    def publish(self, topic: str, data: dict, extra: dict = None):
+        pass
 
 
 class GooglePublisher(Publisher):
