@@ -47,9 +47,9 @@ ADD ./swagger-fix/index.html /usr/local/lib/python3.8/dist-packages/rest_framewo
 
 EXPOSE 8000
 
-ENV LC_ALL C.UTF-8
-ENV LANG C.UTF-8
-ENV LANGUAGE C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
 
 ENV BUILT_VERSION=${built_version}
 
