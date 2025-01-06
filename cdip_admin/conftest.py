@@ -746,6 +746,21 @@ def provider_ats(
 
 
 @pytest.fixture
+def integration_ats_no_configs(
+        get_random_id,
+        organization,
+        integration_type_ats,
+):
+    provider, _ = Integration.objects.get_or_create(
+        type=integration_type_ats,
+        name=f"ATS Integration {get_random_id()}",
+        owner=organization,
+        base_url=f"https://api.test.ats.org",
+    )
+    return provider
+
+
+@pytest.fixture
 def provider_movebank_ewt(
         get_random_id,
         other_organization,
