@@ -747,10 +747,12 @@ def provider_ats(
 
 @pytest.fixture
 def integration_ats_no_configs(
+        mocker,
         get_random_id,
         organization,
         integration_type_ats,
 ):
+    mocker.patch("activity_log.models.publish_configuration_event", mocker.MagicMock())
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_ats,
         name=f"ATS Integration {get_random_id()}",
@@ -758,6 +760,187 @@ def integration_ats_no_configs(
         base_url=f"https://api.test.ats.org",
     )
     return provider
+
+
+@pytest.fixture
+def data_change_activity_log(
+    request,
+    mocker,
+    mock_pubsub_publisher,
+    integration_ats_no_configs,
+    ats_action_pull_observations
+):
+    # Patch the real publish function
+
+    mocker.patch("activity_log.models.publish_configuration_event", mock_pubsub_publisher)
+    integration_id = str(integration_ats_no_configs.pk)
+    if request.param == "integration_created":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integration_created",
+            title="Integration created",
+            created_by=None,
+            details={
+                "model_name": "Integration",
+                "instance_pk": integration_id,
+                "alt_id": None,
+                "action": "CREATED",
+                "changes": {
+                    "id": integration_id,
+                    "name": "ATS Site",
+                    "base_url":
+                        "https://ats-site.test.ats.org"
+                }
+            },
+            is_reversible=True,
+            revert_data={}
+        )
+    if request.param == "integration_updated":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integration_updated",
+            title="Integration updated",
+            created_by=None,
+            details={
+                "model_name": "Integration",
+                "instance_pk": integration_id,
+                "alt_id": None,
+                "action": "UPDATED",
+                "changes": {
+                    "name": "ATS Site Edited",
+                    "base_url": "https://ats-site-new.test.ats.org"
+                }
+            },
+            is_reversible=True,
+            revert_data={
+                "name": "ATS Site",
+                "base_url": "https://ats-site.test.ats.org"
+            }
+        )
+    if request.param == "integration_deleted":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integration_deleted",
+            title="Integration deleted",
+            created_by=None,
+            details = {
+                "action": "DELETED",
+                "alt_id": None,
+                "changes": {
+                    "id": integration_id,
+                    "name": "ATS Site",
+                    "enabled": True,
+                    "type_id": "5bf3f0c1-9ef4-48e2-8616-0c1117a116e4",
+                    "base_url": "https://ats-site.test.ats.org",
+                    "owner_id": "45018398-7a2a-4f48-8971-39a2710d5dbd",
+                    "additional": {},
+                    "default_route_id": "0adbb25f-8e0e-4115-a4b4-fbeef822743a"
+                },
+                "model_name": "Integration",
+                "instance_pk": integration_id
+            },
+            is_reversible=False,
+            revert_data={}
+        )
+    if request.param == "integrationconfiguration_created":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integrationconfiguration_created",
+            title="Integration Configuration created",
+            created_by=None,
+            details={
+                "action": "CREATED",
+                "alt_id": "pull_observations",
+                "changes": {
+                    "id": "81344345-f691-4230-8fab-6d2464729085",
+                    "data": {
+                        "data_endpoint": "http://12.34.56.7/Service1.svc/GetPointsAtsIri/1",
+                        "transmissions_endpoint": "http://12.34.56.7/Service1.svc/GetAllTransmission/1"
+                    },
+                    "action_id": str(ats_action_pull_observations.pk),
+                    "integration_id": integration_id,
+                    "periodic_task_id": None
+                },
+                "model_name": "IntegrationConfiguration",
+                "instance_pk": "81344345-f691-4230-8fab-6d2464729085"
+            },
+            is_reversible=True,
+            revert_data={
+                "model_name": "IntegrationConfiguration",
+                "instance_pk": "81344345-f691-4230-8fab-6d2464729085"
+            }
+        )
+    if request.param == "integrationconfiguration_updated":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integrationconfiguration_updated",
+            title="Integration Configuration updated",
+            created_by=None,
+            details={
+                "action": "UPDATED",
+                "alt_id": "pull_observations",
+                "changes": {
+                    "data": {
+                        "data_endpoint": "http://98.76.54.3/Service1.svc/GetPointsAtsIri/2",
+                    }
+                },
+                "model_name": "IntegrationConfiguration",
+                "instance_pk": "81344345-f691-4230-8fab-6d2464729085"
+            },
+            is_reversible=True,
+            revert_data={
+                "model_name": "IntegrationConfiguration",
+                "instance_pk": "81344345-f691-4230-8fab-6d2464729085",
+                "original_values": {
+                    "data": {
+                        "data_endpoint": "http://12.34.56.7/Service1.svc/GetPointsAtsIri/1",
+                    }
+                }
+            }
+        )
+    if request.param == "integrationconfiguration_deleted":
+        return ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.DATA_CHANGE,
+            origin=ActivityLog.Origin.PORTAL,
+            integration=integration_ats_no_configs,
+            value="integrationconfiguration_deleted",
+            title="Integration Configuration deleted",
+            created_by=None,
+            details={
+                "action": "DELETED",
+                "alt_id": "pull_observations",
+                "changes": {
+                    "id": "81344345-f691-4230-8fab-6d2464729085",
+                    "data": {
+                        "data_endpoint": "http://12.34.56.7/Service1.svc/GetPointsAtsIri/1",
+                        "transmissions_endpoint": "http://12.34.56.7/Service1.svc/GetAllTransmission/1"
+                    },
+                    "action_id": str(ats_action_pull_observations.pk),
+                    "integration_id": integration_id,
+                    "periodic_task_id": 23203
+                },
+                "model_name": "IntegrationConfiguration",
+                "instance_pk": "81344345-f691-4230-8fab-6d2464729085"
+            },
+        )
+
+    return None
 
 
 @pytest.fixture

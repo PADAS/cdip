@@ -113,3 +113,16 @@ def test_build_event_from_log_configuration_deleted(provider_ats, ats_action_pul
     assert str(event.payload.integration_id) == str(integration.id)
     assert str(event.payload.id) == action_config_id
     assert event.payload.alt_id == action_config.action_value
+
+
+@pytest.mark.parametrize(
+    "data_change_activity_log",
+    [
+        "integration_created", "integration_updated", "integration_deleted",
+        "integrationconfiguration_created", "integrationconfiguration_updated", "integrationconfiguration_deleted",
+    ],
+    indirect=["data_change_activity_log"])
+def test_publish_events_from_activity_logs(mocker, data_change_activity_log, mock_pubsub_publisher):
+    # Test that event are published when certain activity logs are created
+    assert mock_pubsub_publisher.delay.called
+    assert mock_pubsub_publisher.delay.call_count == 1
