@@ -281,6 +281,7 @@ CELERY_TASK_QUEUES = (
     Queue("deployments", Exchange("deployments"), routing_key="deployments"),
     Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
     Queue("healthchecks", Exchange("healthchecks"), routing_key="healthchecks"),
+    Queue("systemevents", Exchange("systemevents"), routing_key="systemevents"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -304,6 +305,9 @@ CELERY_TASK_ROUTES = {
     },
     "integrations.tasks.send_unhealthy_connections_email": {
         "queue": "healthchecks", "routing_key": "healthchecks"
+    },
+    "activity_log.tasks.publish_configuration_event": {
+        "queue": "systemevents", "routing_key": "systemevents"
     }
 }
 
