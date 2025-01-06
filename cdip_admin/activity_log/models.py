@@ -111,7 +111,7 @@ def build_event_from_log(log):
             # Skip publishing events when nothing meaningful for other services has changed
             data_changes = config_changes.get("data", {})
             if (not config_changes and not data_changes) or (
-                    len(data_changes) == 1 and data_changes.keys()[0] in ["created_at", "updated_at"]):
+                    len(config_changes) == 1 and next(iter(config_changes)) in ["created_at", "updated_at"]):
                 return None
             payload = gundi_core_schemas.IntegrationConfigChanges(
                 id=log.details.get("instance_pk"),
@@ -122,7 +122,7 @@ def build_event_from_log(log):
             # Skip publishing events when nothing meaningful for other services has changed
             data_changes = config_changes.get("data", {})
             if (not config_changes and not data_changes) or (
-                    len(data_changes) == 1 and data_changes.keys()[0] in ["periodic_task_id", "created_at",
+                    len(config_changes) == 1 and next(iter(config_changes)) in ["periodic_task_id", "created_at",
                                                                           "updated_at"]):
                 return None
 
