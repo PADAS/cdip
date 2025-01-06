@@ -32,10 +32,10 @@ system_events_by_log = {
 
 
 def build_event_from_log(log):
-    if log.log_type != log.LogTypes.DATA_CHANGE:
+    if not log or log.log_type != log.LogTypes.DATA_CHANGE:
         return None
     log_slug = log.value
-    integration_id = str(log.integration.id)
+    integration_id = str(log.integration.id) if log.integration else None
     if SystemEvent := system_events_by_log.get(log_slug):
         config_changes = log.details.get("changes", {})
         integration_type = log.integration_type
