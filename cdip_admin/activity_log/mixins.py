@@ -36,7 +36,7 @@ class ChangeLogMixin:
             k for k, v in self.__dict__.items()
             if not k.startswith("_") and not k.startswith("objects") and
                not callable(v) and not isinstance(v, models.Manager) and not isinstance(v, models.QuerySet) and
-               not isinstance(v, property)
+               not isinstance(getattr(self.__class__, k, None), property)
         ]
 
     def _get_original_values(self):
@@ -167,7 +167,7 @@ class ChangeLogMixin:
                 'model_name': self.__class__.__name__,
                 'instance_pk': str(self.pk),
                 'original_values': {
-                    field: self._original_values[field]
+                    field: self._original_values.get(field)
                     for field in fields
                 },
             }
