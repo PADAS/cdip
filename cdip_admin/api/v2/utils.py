@@ -1,19 +1,17 @@
 import json
 import logging
-from hashlib import md5
 
-import backoff
-from google.api_core.exceptions import GoogleAPICallError
-from google.cloud import pubsub_v1
-from cdip_connector.core import cdip_settings
+from hashlib import md5
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
-from cdip_connector.core.publisher import NullPublisher, Publisher
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation, EventUpdate
 from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, AttachmentReceived
+
 from core import tracing, cache
 from opentelemetry import trace
+
+from core.utils import get_publisher
 from integrations.models import GundiTrace
 
 
@@ -68,39 +66,6 @@ def is_duplicate_attachment(data: dict):
     )
     deduplication_db.delete(hash_v1)
     return is_duplicate
-
-
-class GooglePublisher(Publisher):
-
-    def __init__(self):
-        self.pubsub_client = pubsub_v1.PublisherClient(
-            publisher_options=pubsub_v1.types.PublisherOptions(
-                enable_message_ordering=True,
-            )
-        )
-
-    @backoff.on_exception(
-        backoff.expo, (GoogleAPICallError,), max_tries=5, jitter=backoff.full_jitter
-    )
-    def publish(self, topic: str, data: dict, ordering_key="", extra: dict = None):
-        extra = extra or {}
-        # Specify the topic path
-        topic_path = self.pubsub_client.topic_path(settings.GCP_PROJECT_ID, topic)
-        publish_future = self.pubsub_client.publish(
-            topic=topic_path,
-            data=json.dumps(data, default=str).encode("utf-8"),
-            ordering_key=ordering_key,
-            **extra
-        )
-        result = publish_future.result()
-        return result
-
-
-def get_publisher():
-    if cdip_settings.PUBSUB_ENABLED:
-        return GooglePublisher()
-    else:
-        return NullPublisher()
 
 
 publisher = get_publisher()

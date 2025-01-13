@@ -4,7 +4,10 @@ on:
     branches:
       - main
       - 'release-**'
-
+env:
+  TRACING_ENABLED: ${{secrets.TRACING_ENABLED}}
+  PUBSUB_ENABLED: ${{secrets.PUBSUB_ENABLED}}
+  CELERY_TASK_ALWAYS_EAGER: ${{secrets.CELERY_TASK_ALWAYS_EAGER}}
 jobs:
   vars:
     runs-on: ubuntu-latest

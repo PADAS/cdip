@@ -344,6 +344,8 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
         null=True
     )
 
+    logs_id_field = "action_value"
+
     tracker = FieldTracker()
 
     class Meta:
@@ -351,6 +353,10 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
     def __str__(self):
         return f"{self.data}"
+
+    @cached_property
+    def action_value(self):
+        return self.action.value
 
     def _pre_save(self, *args, **kwargs):
         pass

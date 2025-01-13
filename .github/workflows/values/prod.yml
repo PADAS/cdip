@@ -40,6 +40,7 @@ admin_portal:
     RAW_OBSERVATIONS_TOPIC: raw-observations-prod
     DISPATCHER_DEFAULTS_SECRET_WPSWATCH: wps-dispatcher-defaults-prod
     PORTAL_BASE_URL: "https://gundiservice.org"
+    CONFIGURATION_EVENTS_TOPIC: "configuration-events-prod"
 kongplugin:
   cors:
     - https://gundiservice.org
