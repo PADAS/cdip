@@ -307,8 +307,7 @@ CELERY_TASK_ROUTES = {
         "queue": "healthchecks", "routing_key": "healthchecks"
     },
     "activity_log.tasks.publish_configuration_event": {
-        #"queue": "systemevents", "routing_key": "systemevents"
-        "queue": "healthchecks", "routing_key": "healthchecks"
+        "queue": "systemevents", "routing_key": "systemevents"
     }
 }
 
