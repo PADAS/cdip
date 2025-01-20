@@ -82,7 +82,7 @@ def handle_observation_delivered_event(event_dict: dict):
         extra={"event": event_dict}
     )
     data_type = data_type_str_map.get(trace.object_type, "Data")
-    title = f"{data_type} Delivered to '{trace.destination.base_url}'"
+    title = f"{data_type} {trace.object_id} Delivered to '{trace.destination.base_url}'"
     log_data = {
         **event_dict["payload"],
         "source_external_id": str(trace.source.external_id) if trace.source else None,
