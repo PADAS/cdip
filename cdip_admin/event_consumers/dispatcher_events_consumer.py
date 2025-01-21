@@ -99,56 +99,71 @@ def handle_observation_delivered_event(event_dict: dict):
     )
 
 
+def build_delivery_failed_event_v2_from_v1_data(event_dict: dict) -> system_events.ObservationDeliveryFailed:
+    v1_payload = event_dict.get("payload")
+    return system_events.ObservationDeliveryFailed(
+        payload=system_events.DeliveryErrorDetails(
+            error="Delivery Failed at the Dispatcher. Check the server logs for more details.",
+            observation=system_events.DispatchedObservation.parse_obj(v1_payload)
+        )
+    )
+
+
 def handle_observation_delivery_failed_event(event_dict: dict):
-    event = system_events.ObservationDeliveryFailed.parse_obj(event_dict)
+    schema_version = event_dict.get("schema_version")
+    if schema_version == "v1":
+        event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+    else:
+        event = system_events.ObservationDeliveryFailed.parse_obj(event_dict)
     # Update the status and save the external id
     event_data = event.payload
+    observation = event_data.observation
     logger.warning(
-        f"Observation Delivery Failed. gundi_id: {event_data.gundi_id}",
+        f"Observation Delivery Failed. gundi_id: {observation.gundi_id}",
         extra={"event": event_dict}
     )
     # Look for traces in the database
-    traces = GundiTrace.objects.filter(object_id=event_data.gundi_id)
+    traces = GundiTrace.objects.filter(object_id=observation.gundi_id)
     if not traces.exists():  # This shouldn't happen
-        logger.warning(f"Unknown Observation with id {event_data.gundi_id}. Event Ignored.")
+        logger.warning(f"Unknown Observation with id {observation.gundi_id}. Event Ignored.")
         return
     # Update the db with the event data
     trace = traces.first()
     if not trace.destination:  # First destination
         logger.debug(
-            f"Updating trace with error for gundi_id {event_data.gundi_id}, destination_id: {event_data.destination_id}",
+            f"Updating trace with error for gundi_id {observation.gundi_id}, destination_id: {observation.destination_id}",
             extra={"event": event_dict}
         )
-        trace.destination_id = event_data.destination_id
+        trace.destination_id = observation.destination_id
         trace.has_error = True
         trace.error = "Delivery Failed at the Dispatcher."
         trace.save()
-    elif str(event_data.destination_id) != str(trace.destination.id):  # Multiple destinations
+    elif str(observation.destination_id) != str(trace.destination.id):  # Multiple destinations
         logger.debug(
-            f"Creating trace with error for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+            f"Creating trace with error for gundi_id {observation.gundi_id}, new destination_id: {observation.destination_id}",
             extra={"event": event_dict}
         )
         GundiTrace.objects.create(
             object_id=trace.object_id,
             object_type=trace.object_type,
             source=trace.source,
-            related_to=event_data.related_to or None,  # Empy string to None
+            related_to=observation.related_to or None,  # Empy string to None
             created_by=trace.created_by,
             data_provider=trace.data_provider,
-            destination_id=event_data.destination_id,
-            delivered_at=event_data.delivered_at,
-            external_id=event_data.external_id,
+            destination_id=observation.destination_id,
+            delivered_at=observation.delivered_at,
+            external_id=observation.external_id,
             has_error=True,
             error="Delivery Failed at the Dispatcher."
         )
     else:
         logger.warning(
-            f"Trace was not updated due to possible duplicated event. gundi_id: {event_data.gundi_id}",
+            f"Trace was not updated due to possible duplicated event. gundi_id: {observation.gundi_id}",
             extra={"event": event_dict}
         )
 
     logger.debug(
-        f"Recording delivery error event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
+        f"Recording delivery error event in the activity log for gundi_id {observation.gundi_id}, new destination_id: {observation.destination_id}",
         extra={"event": event_dict}
     )
     data_type = data_type_str_map.get(trace.object_type, "Data")
@@ -211,11 +226,26 @@ def handle_observation_updated_event(event_dict: dict):
     )
 
 
+def build_update_failed_event_v2_from_v1_data(event_dict: dict) -> system_events.ObservationUpdateFailed:
+    v1_payload = event_dict.get("payload")
+    return system_events.ObservationUpdateFailed(
+        payload=system_events.UpdateErrorDetails(
+            error="Update Failed at the Dispatcher. Check the server logs for more details.",
+            observation=system_events.UpdatedObservation.parse_obj(v1_payload)
+        )
+    )
+
+
 def handle_observation_update_failed_event(event_dict: dict):
-    event = system_events.ObservationUpdateFailed.parse_obj(event_dict)
+    schema_version = event_dict.get("schema_version")
+    if schema_version == "v1":
+        event = build_update_failed_event_v2_from_v1_data(event_dict)
+    else:
+        event = system_events.ObservationUpdateFailed.parse_obj(event_dict)
     event_data = event.payload
-    gundi_id = str(event_data.gundi_id)
-    destination_id = str(event_data.destination_id)
+    observation = event_data.observation
+    gundi_id = str(observation.gundi_id)
+    destination_id = str(observation.destination_id)
     logger.warning(
         f"Observation Update Failed. gundi_id: {gundi_id}, destination_id: {destination_id}",
         extra={"event": event_dict}
@@ -306,7 +336,7 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
         logger.debug(f"Event Details", extra={"event": event_dict})
         event_type = event_dict.get("event_type")
         schema_version = event_dict.get("schema_version")
-        if schema_version != "v1":
+        if schema_version not in ["v1", "v2"]:
             logger.warning(f"Schema version '{schema_version}' is not supported. Message discarded.")
             message.ack()
             return
