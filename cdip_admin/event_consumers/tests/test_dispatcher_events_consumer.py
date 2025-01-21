@@ -27,7 +27,7 @@ def test_process_observation_delivered_event_with_er_destination(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trap_tagger_event_trace.destination.base_url}'"
+    assert activity_log.title == f"Event {trap_tagger_event_trace.object_id} Delivered to '{trap_tagger_event_trace.destination.base_url}'"
     assert activity_log.details == event_data
 
 
@@ -49,7 +49,7 @@ def test_process_observation_delivered_event_with_smart_destination(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trap_tagger_event_trace.destination.base_url}'"
+    assert activity_log.title == f"Event {trap_tagger_event_trace.object_id} Delivered to '{trap_tagger_event_trace.destination.base_url}'"
     assert activity_log.details == event_data
 
 
@@ -76,7 +76,7 @@ def test_process_observation_delivered_event_with_two_er_destinations(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trace_one.destination.base_url}'"
+    assert activity_log.title == f"Event {trace_one.object_id} Delivered to '{trace_one.destination.base_url}'"
     assert activity_log.details == event_data
 
     process_event(trap_tagger_observation_delivered_event_two)  # A second event for the other destination
@@ -96,7 +96,7 @@ def test_process_observation_delivered_event_with_two_er_destinations(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trace_two.destination.base_url}'"
+    assert activity_log.title == f"Event {trace_two.object_id} Delivered to '{trace_two.destination.base_url}'"
     assert activity_log.details == event_data
 
 
@@ -123,7 +123,7 @@ def test_process_observation_delivered_event_with_er_and_smart_destinations(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trace_one.destination.base_url}'"
+    assert activity_log.title == f"Event {trace_one.object_id} Delivered to '{trace_one.destination.base_url}'"
     assert activity_log.details == event_data
 
     process_event(trap_tagger_to_smart_observation_delivered_event)  # A second event for the other destination
@@ -143,7 +143,7 @@ def test_process_observation_delivered_event_with_er_and_smart_destinations(
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trace_two.destination.base_url}'"
+    assert activity_log.title == f"Event {trace_two.object_id} Delivered to '{trace_two.destination.base_url}'"
     assert activity_log.details == event_data
 
 
@@ -225,7 +225,7 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
-    assert activity_log.title == f"Event Delivered to '{trap_tagger_event_trace.destination.base_url}'"
+    assert activity_log.title == f"Event {trap_tagger_event_trace.object_id} Delivered to '{trap_tagger_event_trace.destination.base_url}'"
     assert activity_log.details == event_data
 
 
@@ -344,4 +344,4 @@ def test_show_stream_type_in_activity_log_title_on_observation_delivery(
     event_data = json.loads(delivery_event.data)["payload"]
     # Check that the event was recorded with hte right title in the activity logs
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
-    assert activity_log.title == f"{stream_type} Delivered to '{trace.destination.base_url}'"
+    assert activity_log.title == f"{stream_type} {trace.object_id} Delivered to '{trace.destination.base_url}'"
