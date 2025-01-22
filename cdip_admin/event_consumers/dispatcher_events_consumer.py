@@ -113,6 +113,10 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     schema_version = event_dict.get("schema_version")
     if schema_version == "v1":
         event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+        destination_id = event.payload.observation.destination_id
+        logger.warning(
+            f"Event schema version v1 is deprecated. Please update the dispatcher of destination {destination_id}."
+        )
     else:
         event = system_events.ObservationDeliveryFailed.parse_obj(event_dict)
     # Update the status and save the external id
@@ -240,6 +244,10 @@ def handle_observation_update_failed_event(event_dict: dict):
     schema_version = event_dict.get("schema_version")
     if schema_version == "v1":
         event = build_update_failed_event_v2_from_v1_data(event_dict)
+        destination_id = event.payload.observation.destination_id
+        logger.warning(
+            f"Event schema version v1 is deprecated. Please update the dispatcher of destination {destination_id}."
+        )
     else:
         event = system_events.ObservationUpdateFailed.parse_obj(event_dict)
     event_data = event.payload
