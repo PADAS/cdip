@@ -2,7 +2,8 @@ import pytest
 import json
 
 from activity_log.models import ActivityLog
-from event_consumers.dispatcher_events_consumer import process_event, data_type_str_map
+from event_consumers.dispatcher_events_consumer import process_event, data_type_str_map, \
+    build_delivery_failed_event_v2_from_v1_data, build_update_failed_event_v2_from_v1_data
 from integrations.models import GundiTrace
 
 
@@ -153,8 +154,9 @@ def test_process_observation_delivery_failed_event(
     # Test the case when an observation fails to get delivered and we receive the event notification
     process_event(trap_tagger_observation_delivery_failed_event)
     trap_tagger_event_trace.refresh_from_db()
-    event_data = json.loads(trap_tagger_observation_delivery_failed_event.data)["payload"]
-    event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+    event_dict = json.loads(trap_tagger_observation_delivery_failed_event.data)
+    event_dict["payload"]["source_external_id"] = trap_tagger_event_trace.source.external_id
+    event_data = event_dict["payload"]
     # Check that the error is recorded
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
@@ -170,7 +172,11 @@ def test_process_observation_delivery_failed_event(
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_failed"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.details == event_data
+    assert activity_log.details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
+    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
+    v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+    expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
+    assert activity_log.details.get("observation") == expected_data.get("observation")
 
 
 def test_process_observation_delivered_event_without_external_id(
@@ -197,8 +203,9 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
     # Check that the event was recorded in the activity log
-    event_data = json.loads(trap_tagger_observation_delivery_failed_event.data)["payload"]
-    event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+    event_dict = json.loads(trap_tagger_observation_delivery_failed_event.data)
+    event_dict["payload"]["source_external_id"] = trap_tagger_event_trace.source.external_id
+    event_data = event_dict["payload"]
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
@@ -206,7 +213,12 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_failed"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.details == event_data
+    assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
+    assert activity_log.details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
+    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
+    v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+    expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
+    assert activity_log.details.get("observation") == expected_data.get("observation")
 
     # Process the second event. The observation was delivered with success now
     process_event(trap_tagger_to_er_observation_delivered_event)
@@ -295,8 +307,9 @@ def test_process_observation_update_failed_event(
 ):
     # Test the case when an observation is updated in a destination successfully
     process_event(trap_tagger_observation_update_failed_event)
-    event_data = json.loads(trap_tagger_observation_update_failed_event.data)["payload"]
-    event_data["source_external_id"] = trap_tagger_event_update_trace.source.external_id
+    event_dict = json.loads(trap_tagger_observation_update_failed_event.data)
+    event_dict["payload"]["source_external_id"] = trap_tagger_event_update_trace.source.external_id
+    event_data = event_dict["payload"]
     trap_tagger_event_update_trace.refresh_from_db()
     assert trap_tagger_event_update_trace.last_update_delivered_at is None
     assert trap_tagger_event_update_trace.has_error
@@ -309,7 +322,11 @@ def test_process_observation_update_failed_event(
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_update_failed"
     assert activity_log.title == f"Error Updating Event {trap_tagger_event_update_trace.object_id} in '{trap_tagger_event_update_trace.destination.base_url}'"
-    assert activity_log.details == event_data
+    assert activity_log.details.get("error") == "Update Failed at the Dispatcher. Please update this dispatcher to see more details here."
+    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
+    v2_event_update = build_update_failed_event_v2_from_v1_data(event_dict)
+    expected_data = json.loads(json.dumps(v2_event_update.payload.dict(), default=str))
+    assert activity_log.details.get("observation") == expected_data.get("observation")
 
 
 def test_process_dispatcher_log_event(
