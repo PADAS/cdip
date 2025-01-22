@@ -143,7 +143,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
             f"Creating trace with error for gundi_id {observation.gundi_id}, new destination_id: {observation.destination_id}",
             extra={"event": event_dict}
         )
-        GundiTrace.objects.create(
+        trace = GundiTrace.objects.create(
             object_id=trace.object_id,
             object_type=trace.object_type,
             source=trace.source,
