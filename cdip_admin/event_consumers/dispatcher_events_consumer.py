@@ -103,7 +103,7 @@ def build_delivery_failed_event_v2_from_v1_data(event_dict: dict) -> system_even
     v1_payload = event_dict.get("payload")
     return system_events.ObservationDeliveryFailed(
         payload=system_events.DeliveryErrorDetails(
-            error="Delivery Failed at the Dispatcher. Check the server logs for more details.",
+            error="Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here.",
             observation=system_events.DispatchedObservation.parse_obj(v1_payload)
         )
     )
@@ -173,7 +173,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     data_type = data_type_str_map.get(trace.object_type, "Data")
     title = f"Error Delivering {data_type} {trace.object_id} to '{trace.destination.base_url}'"
     log_data = {
-        **event_dict["payload"],
+        **event.payload.dict(),
         "source_external_id": str(trace.source.external_id) if trace.source else None,
     }
     ActivityLog.objects.create(
@@ -234,7 +234,7 @@ def build_update_failed_event_v2_from_v1_data(event_dict: dict) -> system_events
     v1_payload = event_dict.get("payload")
     return system_events.ObservationUpdateFailed(
         payload=system_events.UpdateErrorDetails(
-            error="Update Failed at the Dispatcher. Check the server logs for more details.",
+            error="Update Failed at the Dispatcher. Please update this dispatcher to see more details here.",
             observation=system_events.UpdatedObservation.parse_obj(v1_payload)
         )
     )
@@ -276,7 +276,7 @@ def handle_observation_update_failed_event(event_dict: dict):
     data_type = data_type_str_map.get(trace.object_type, "Data")
     title = f"Error Updating {data_type} {gundi_id} in '{trace.destination.base_url}'"
     log_data = {
-        **event_dict["payload"],
+        **event.payload.dict(),
         "source_external_id": str(trace.source.external_id) if trace.source else None,
     }
     ActivityLog.objects.create(
