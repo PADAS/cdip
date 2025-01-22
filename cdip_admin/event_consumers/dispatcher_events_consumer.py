@@ -176,6 +176,8 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         **event.payload.dict(),
         "source_external_id": str(trace.source.external_id) if trace.source else None,
     }
+    # Workaround to serialize complex types until upgrading to pydantic v2
+    log_data_cleaned = json.loads(json.dumps(log_data, default=str)),
     ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -183,7 +185,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_delivery_failed",
         title=title,
-        details=log_data,
+        details=log_data_cleaned,
         is_reversible=False
     )
 
@@ -279,6 +281,8 @@ def handle_observation_update_failed_event(event_dict: dict):
         **event.payload.dict(),
         "source_external_id": str(trace.source.external_id) if trace.source else None,
     }
+    # Workaround to serialize complex types until upgrading to pydantic v2
+    log_data_cleaned = json.loads(json.dumps(log_data, default=str)),
     ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.ERROR,
         log_type=ActivityLog.LogTypes.EVENT,
@@ -286,7 +290,7 @@ def handle_observation_update_failed_event(event_dict: dict):
         integration=trace.data_provider,
         value="observation_update_failed",
         title=title,
-        details=log_data,
+        details=log_data_cleaned,
         is_reversible=False
     )
 
