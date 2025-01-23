@@ -147,16 +147,21 @@ def test_process_observation_delivered_event_with_er_and_smart_destinations(
     assert activity_log.title == f"Event {trace_two.object_id} Delivered to '{trace_two.destination.base_url}'"
     assert activity_log.details == event_data
 
-
+@pytest.mark.parametrize(
+    "observation_delivery_failed_event",
+    ["schema_v1", "schema_v2"],
+    indirect=["observation_delivery_failed_event"])
 def test_process_observation_delivery_failed_event(
-        trap_tagger_event_trace, trap_tagger_observation_delivery_failed_event
+        request, trap_tagger_event_trace, observation_delivery_failed_event
 ):
     # Test the case when an observation fails to get delivered and we receive the event notification
-    process_event(trap_tagger_observation_delivery_failed_event)
+    process_event(observation_delivery_failed_event)
     trap_tagger_event_trace.refresh_from_db()
-    event_dict = json.loads(trap_tagger_observation_delivery_failed_event.data)
-    event_dict["payload"]["source_external_id"] = trap_tagger_event_trace.source.external_id
-    event_data = event_dict["payload"]
+    event_dict = json.loads(observation_delivery_failed_event.data)
+    schema_version = event_dict.get("schema_version")
+    observation_data = event_dict["payload"] if schema_version == "v1" else event_dict["payload"]["observation"]
+    observation_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+
     # Check that the error is recorded
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
@@ -165,18 +170,26 @@ def test_process_observation_delivery_failed_event(
     assert not trap_tagger_event_trace.external_id
     assert not trap_tagger_event_trace.delivered_at
     # Check that the event was recorded in the activity log
-    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
     assert activity_log.log_level == ActivityLog.LogLevels.ERROR
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_failed"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
-    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
-    v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
-    expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
-    assert activity_log.details.get("observation") == expected_data.get("observation")
+    log_details = activity_log.details
+    if schema_version == "v1":
+        assert log_details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
+        v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+        expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
+        assert log_details.get("observation") == expected_data.get("observation")
+    else:
+        event_payload = event_dict["payload"]
+        assert log_details.get("error") == event_payload.get("error")
+        assert log_details.get("server_response_status") == event_payload.get("server_response_status")
+        assert log_details.get("server_response_body") == event_payload.get("server_response_body")
+    assert activity_log.details.get("source_external_id") == observation_data["source_external_id"]
+
 
 
 def test_process_observation_delivered_event_without_external_id(
@@ -192,21 +205,27 @@ def test_process_observation_delivered_event_without_external_id(
     assert str(trap_tagger_to_movebank_observation_trace.delivered_at) == str(event_data["delivered_at"])
 
 
+@pytest.mark.parametrize(
+    "observation_delivery_failed_event",
+    ["schema_v1", "schema_v2"],
+    indirect=["observation_delivery_failed_event"])
 def test_process_observation_delivered_event_after_retry_with_single_destination(
-        trap_tagger_event_trace, trap_tagger_observation_delivery_failed_event,
+        trap_tagger_event_trace, observation_delivery_failed_event,
         trap_tagger_to_er_observation_delivered_event
 ):
     # Test the case when an observation fails to get delivered the first time
     # and succeeds on a second try.
-    process_event(trap_tagger_observation_delivery_failed_event)
+    process_event(observation_delivery_failed_event)
     trap_tagger_event_trace.refresh_from_db()
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
     # Check that the event was recorded in the activity log
-    event_dict = json.loads(trap_tagger_observation_delivery_failed_event.data)
-    event_dict["payload"]["source_external_id"] = trap_tagger_event_trace.source.external_id
-    event_data = event_dict["payload"]
-    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    event_dict = json.loads(observation_delivery_failed_event.data)
+    schema_version = event_dict.get("schema_version")
+    observation_data = event_dict["payload"] if schema_version == "v1" else event_dict["payload"]["observation"]
+    observation_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+
+    activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
     assert activity_log.log_level == ActivityLog.LogLevels.ERROR
@@ -214,47 +233,54 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert activity_log.value == "observation_delivery_failed"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
-    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
-    v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
-    expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
-    assert activity_log.details.get("observation") == expected_data.get("observation")
+    log_details = activity_log.details
+    if schema_version == "v1":
+        assert log_details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
+        v2_event = build_delivery_failed_event_v2_from_v1_data(event_dict)
+        expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
+        assert log_details.get("observation") == expected_data.get("observation")
+    else:
+        event_payload = event_dict["payload"]
+        assert log_details.get("error") == event_payload.get("error")
+        assert log_details.get("server_response_status") == event_payload.get("server_response_status")
+        assert log_details.get("server_response_body") == event_payload.get("server_response_body")
+    assert activity_log.details.get("source_external_id") == observation_data["source_external_id"]
 
     # Process the second event. The observation was delivered with success now
     process_event(trap_tagger_to_er_observation_delivered_event)
-    event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
+    observation_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
     trap_tagger_event_trace.refresh_from_db()
-    event_data["source_external_id"] = trap_tagger_event_trace.source.external_id
+    observation_data["source_external_id"] = trap_tagger_event_trace.source.external_id
     assert not trap_tagger_event_trace.has_error
     assert not trap_tagger_event_trace.error
-    assert str(trap_tagger_event_trace.destination.id) == str(event_data["destination_id"])
-    assert str(trap_tagger_event_trace.external_id) == str(event_data["external_id"])
-    assert str(trap_tagger_event_trace.delivered_at) == str(event_data["delivered_at"])
+    assert str(trap_tagger_event_trace.destination.id) == str(observation_data["destination_id"])
+    assert str(trap_tagger_event_trace.external_id) == str(observation_data["external_id"])
+    assert str(trap_tagger_event_trace.delivered_at) == str(observation_data["delivered_at"])
     # Check that the event was recorded in the activity log
-    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
     assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_succeeded"
     assert activity_log.title == f"Event {trap_tagger_event_trace.object_id} Delivered to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.details == event_data
+    assert activity_log.details == observation_data
 
 
 def test_process_observation_delivered_event_after_retry_with_two_destinations(
         trap_tagger_event_trace,
-        trap_tagger_observation_delivery_failed_event,
-        trap_tagger_observation_delivery_failed_event_two,
+        trap_tagger_observation_delivery_failed_schema_v1_event_one,
+        trap_tagger_observation_delivery_failed_schema_v1_event_two,
         trap_tagger_to_er_observation_delivered_event,
         trap_tagger_observation_delivered_event_two
 ):
     # Test the case when an observation fails to get delivered the first time to two destinations
     # and succeeds on a second try for both destinations
-    process_event(trap_tagger_observation_delivery_failed_event)
+    process_event(trap_tagger_observation_delivery_failed_schema_v1_event_one)
     trap_tagger_event_trace.refresh_from_db()
     assert trap_tagger_event_trace.has_error
     assert trap_tagger_event_trace.error == "Delivery Failed at the Dispatcher."
-    process_event(trap_tagger_observation_delivery_failed_event_two)
+    process_event(trap_tagger_observation_delivery_failed_schema_v1_event_two)
     event_2_data = json.loads(trap_tagger_observation_delivered_event_two.data)["payload"]
     trap_tagger_event_trace_2 = GundiTrace.objects.get(
         object_id=trap_tagger_event_trace.object_id,
@@ -303,11 +329,11 @@ def test_process_observation_updated_event(
 
 
 def test_process_observation_update_failed_event(
-        trap_tagger_event_update_trace, trap_tagger_observation_update_failed_event
+        trap_tagger_event_update_trace, trap_tagger_observation_update_failed_schema_v1_event
 ):
     # Test the case when an observation is updated in a destination successfully
-    process_event(trap_tagger_observation_update_failed_event)
-    event_dict = json.loads(trap_tagger_observation_update_failed_event.data)
+    process_event(trap_tagger_observation_update_failed_schema_v1_event)
+    event_dict = json.loads(trap_tagger_observation_update_failed_schema_v1_event.data)
     event_dict["payload"]["source_external_id"] = trap_tagger_event_update_trace.source.external_id
     event_data = event_dict["payload"]
     trap_tagger_event_update_trace.refresh_from_db()
