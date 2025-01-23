@@ -232,7 +232,6 @@ def test_process_observation_delivered_event_after_retry_with_single_destination
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_delivery_failed"
     assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
-    assert activity_log.title == f"Error Delivering Event {trap_tagger_event_trace.object_id} to '{trap_tagger_event_trace.destination.base_url}'"
     log_details = activity_log.details
     if schema_version == "v1":
         assert log_details.get("error") == "Delivery Failed at the Dispatcher. Please update this dispatcher to see more details here."
@@ -328,31 +327,44 @@ def test_process_observation_updated_event(
     assert activity_log.details == event_data
 
 
+@pytest.mark.parametrize(
+    "observation_update_failed_event",
+    ["schema_v1", "schema_v2"],
+    indirect=["observation_update_failed_event"])
 def test_process_observation_update_failed_event(
-        trap_tagger_event_update_trace, trap_tagger_observation_update_failed_schema_v1_event
+        trap_tagger_event_update_trace, observation_update_failed_event
 ):
     # Test the case when an observation is updated in a destination successfully
-    process_event(trap_tagger_observation_update_failed_schema_v1_event)
-    event_dict = json.loads(trap_tagger_observation_update_failed_schema_v1_event.data)
-    event_dict["payload"]["source_external_id"] = trap_tagger_event_update_trace.source.external_id
-    event_data = event_dict["payload"]
+    process_event(observation_update_failed_event)
+    event_dict = json.loads(observation_update_failed_event.data)
+    schema_version = event_dict.get("schema_version")
+    observation_data = event_dict["payload"] if schema_version == "v1" else event_dict["payload"]["observation"]
+    observation_data["source_external_id"] = trap_tagger_event_update_trace.source.external_id
+
     trap_tagger_event_update_trace.refresh_from_db()
     assert trap_tagger_event_update_trace.last_update_delivered_at is None
     assert trap_tagger_event_update_trace.has_error
     assert trap_tagger_event_update_trace.error == "Update Failed at the Dispatcher."
     # Check that the error was recorded in the activity logs
-    activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
+    activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
     assert activity_log.log_level == ActivityLog.LogLevels.ERROR
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_update_failed"
     assert activity_log.title == f"Error Updating Event {trap_tagger_event_update_trace.object_id} in '{trap_tagger_event_update_trace.destination.base_url}'"
-    assert activity_log.details.get("error") == "Update Failed at the Dispatcher. Please update this dispatcher to see more details here."
-    assert activity_log.details.get("source_external_id") == event_data["source_external_id"]
-    v2_event_update = build_update_failed_event_v2_from_v1_data(event_dict)
-    expected_data = json.loads(json.dumps(v2_event_update.payload.dict(), default=str))
-    assert activity_log.details.get("observation") == expected_data.get("observation")
+    log_details = activity_log.details
+    if schema_version == "v1":
+        assert log_details.get("error") == "Update Failed at the Dispatcher. Please update this dispatcher to see more details here."
+        v2_event = build_update_failed_event_v2_from_v1_data(event_dict)
+        expected_data = json.loads(json.dumps(v2_event.payload.dict(), default=str))
+        assert log_details.get("observation") == expected_data.get("observation")
+    else:
+        event_payload = event_dict["payload"]
+        assert log_details.get("error") == event_payload.get("error")
+        assert log_details.get("server_response_status") == event_payload.get("server_response_status")
+        assert log_details.get("server_response_body") == event_payload.get("server_response_body")
+    assert activity_log.details.get("source_external_id") == observation_data["source_external_id"]
 
 
 def test_process_dispatcher_log_event(

@@ -2398,7 +2398,10 @@ def trap_tagger_observation_update_failed_schema_v2_event(
         "schema_version": "v2",
         "event_type": "ObservationUpdateFailed",
         "payload": {
-            # ToDo: get a real example
+            "error": "Event 69afe55f-24a5-40c6-8320-24c244bc4e4e wasn't delivered yet. Will retry later.",
+            "error_traceback": "",
+            "server_response_status": None,
+            "server_response_body": "",
             "observation": {
                 "gundi_id": str(trap_tagger_event_update_trace.object_id),
                 "related_to": None,
@@ -2424,6 +2427,16 @@ def observation_delivery_failed_event(
     else:  # Default to the latest version
         return trap_tagger_observation_delivery_failed_schema_v2_event_one
 
+@pytest.fixture
+def observation_update_failed_event(
+        request,
+        trap_tagger_observation_update_failed_schema_v1_event,
+        trap_tagger_observation_update_failed_schema_v2_event
+):
+    if request.param == "schema_v1":
+        return trap_tagger_observation_update_failed_schema_v1_event
+    else:
+        return trap_tagger_observation_update_failed_schema_v2_event
 
 @pytest.fixture
 def wpswatch_dispatcher_log_event(
