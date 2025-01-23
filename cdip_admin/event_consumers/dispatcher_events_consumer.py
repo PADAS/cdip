@@ -201,14 +201,15 @@ def handle_observation_updated_event(event_dict: dict):
         extra={"event": event_dict}
     )
     # Look the related trace in the database
-    try:
-        trace = GundiTrace.objects.get(object_id=gundi_id, destination__id=destination_id)
-    except GundiTrace.DoesNotExist:
+    traces = GundiTrace.objects.filter(object_id=gundi_id, destination__id=destination_id)
+    if not traces.exists():
         logger.warning(f"Unknown Observation with id {gundi_id} for destination {destination_id}. Event Ignored.")
         return
+    if traces.count() > 1:
+        logger.warning(f"Multiple traces found for gundi_id {gundi_id}, destination_id: {destination_id}.")
     # Save the time when it was updated in the destination system
-    trace.last_update_delivered_at = event_data.updated_at
-    trace.save()
+    traces.update(last_update_delivered_at=event_data.updated_at)
+    trace = traces.first()
     # Generate Activity log to be seen in the portal
     logger.debug(
         f"Recording update event in the activity log for gundi_id {event_data.gundi_id}, new destination_id: {event_data.destination_id}",
@@ -261,15 +262,15 @@ def handle_observation_update_failed_event(event_dict: dict):
         extra={"event": event_dict}
     )
     # Look the related trace in the database
-    try:
-        trace = GundiTrace.objects.get(object_id=gundi_id, destination__id=destination_id)
-    except GundiTrace.DoesNotExist:
+    traces = GundiTrace.objects.filter(object_id=gundi_id, destination__id=destination_id)
+    if not traces.exists():
         logger.warning(f"Unknown Observation with id {gundi_id} for destination {destination_id}. Event Ignored.")
         return
-    # Update the trace with the error
-    trace.has_error = True
-    trace.error = "Update Failed at the Dispatcher."
-    trace.save()
+    if traces.count() > 1:
+        logger.warning(f"Multiple traces found for gundi_id {gundi_id}, destination_id: {destination_id}.")
+    # Update the traces with the error
+    traces.update(has_error=True, error="Update Failed at the Dispatcher.")
+    trace = traces.first()
     # Generate Activity log to be seen in the portal
     logger.debug(
         f"Recording update error event in the activity log for gundi_id {gundi_id}, destination_id: {destination_id}",
