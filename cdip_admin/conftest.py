@@ -2290,7 +2290,7 @@ def trap_tagger_observation_delivered_event_two(
 
 
 @pytest.fixture
-def trap_tagger_observation_delivery_failed_event(
+def trap_tagger_observation_delivery_failed_schema_v1_event_one(
         mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
@@ -2313,7 +2313,36 @@ def trap_tagger_observation_delivery_failed_event(
 
 
 @pytest.fixture
-def trap_tagger_observation_delivery_failed_event_two(
+def trap_tagger_observation_delivery_failed_schema_v2_event_one(
+        mocker, trap_tagger_event_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v2",
+        "event_type": "ObservationDeliveryFailed",
+        "payload": {
+            'error': 'ERClientBadRequest: ER Bad Request ON POST https://fake-site.pamdas.org/api/v1.0/sensors/generic/1234/status (status_code=400) (response_body={"data": [[{"event_type": {"event_type": "Value \'animal_detection_alert_rep\' does not exist."}}]], "status": {"code": 400, "message": "Bad Request"}})',
+            'error_traceback': 'Traceback (most recent call last):\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/event_handlers.py", line 124, in dispatch_transformed_observation_v2\n    result = await dispatcher.send(observation, **kwargs)\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/dispatchers.py", line 214, in send\n    raise ex\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/dispatchers.py", line 209, in send\n    return await client.post_report(\n  File "/usr/lib/python3.8/unittest/mock.py", line 1081, in __call__\n    return self._mock_call(*args, **kwargs)\n  File "/usr/lib/python3.8/unittest/mock.py", line 1085, in _mock_call\n    return self._execute_mock_call(*args, **kwargs)\n  File "/usr/lib/python3.8/unittest/mock.py", line 1140, in _execute_mock_call\n    raise effect\nerclient.er_errors.ERClientBadRequest: ER Bad Request ON POST https://fake-site.pamdas.org/api/v1.0/sensors/generic/1234/status (status_code=400) (response_body={"data": [[{"event_type": {"event_type": "Value \'detection_alert_rep\' does not exist."}}]], "status": {"code": 400, "message": "Bad Request"}})\n',
+            'server_response_status': 400,
+            'server_response_body': '{"data": [[{"event_type": {"event_type": "Value \'animal_detection_alert_rep\' does not exist."}}]], "status": {"code": 400, "message": "Bad Request"}}',
+            'observation': {
+                "gundi_id": str(trap_tagger_event_trace.object_id),
+                "related_to": None,
+                "data_provider_id": str(trap_tagger_event_trace.data_provider.id),
+                "destination_id": str(integrations_list_er[0].id),
+                "delivered_at": "2025-01-23 16:54:19.215015+00:00",
+            },
+        }
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def trap_tagger_observation_delivery_failed_schema_v1_event_two(
         mocker, trap_tagger_event_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
@@ -2336,7 +2365,7 @@ def trap_tagger_observation_delivery_failed_event_two(
 
 
 @pytest.fixture
-def trap_tagger_observation_update_failed_event(
+def trap_tagger_observation_update_failed_schema_v1_event(
         mocker, trap_tagger_event_update_trace, integrations_list_er
 ):
     message = mocker.MagicMock()
@@ -2356,6 +2385,58 @@ def trap_tagger_observation_update_failed_event(
     data_bytes = json.dumps(event_dict).encode("utf-8")
     message.data = data_bytes
     return message
+
+
+@pytest.fixture
+def trap_tagger_observation_update_failed_schema_v2_event(
+        mocker, trap_tagger_event_update_trace, integrations_list_er
+):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v2",
+        "event_type": "ObservationUpdateFailed",
+        "payload": {
+            "error": "Event 69afe55f-24a5-40c6-8320-24c244bc4e4e wasn't delivered yet. Will retry later.",
+            "error_traceback": "",
+            "server_response_status": None,
+            "server_response_body": "",
+            "observation": {
+                "gundi_id": str(trap_tagger_event_update_trace.object_id),
+                "related_to": None,
+                "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+                "destination_id": str(integrations_list_er[0].id),
+                "updated_at": "2024-07-25 12:25:44.442696+00:00",
+            }
+        },
+    }
+    data_bytes = json.dumps(event_dict).encode("utf-8")
+    message.data = data_bytes
+    return message
+
+
+@pytest.fixture
+def observation_delivery_failed_event(
+        request,
+        trap_tagger_observation_delivery_failed_schema_v1_event_one,
+        trap_tagger_observation_delivery_failed_schema_v2_event_one
+):
+    if request.param == "schema_v1":
+        return trap_tagger_observation_delivery_failed_schema_v1_event_one
+    else:  # Default to the latest version
+        return trap_tagger_observation_delivery_failed_schema_v2_event_one
+
+@pytest.fixture
+def observation_update_failed_event(
+        request,
+        trap_tagger_observation_update_failed_schema_v1_event,
+        trap_tagger_observation_update_failed_schema_v2_event
+):
+    if request.param == "schema_v1":
+        return trap_tagger_observation_update_failed_schema_v1_event
+    else:
+        return trap_tagger_observation_update_failed_schema_v2_event
 
 @pytest.fixture
 def wpswatch_dispatcher_log_event(
