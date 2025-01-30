@@ -66,7 +66,7 @@ def handle_integration_action_failed_event(event_dict: dict):
     action_id = event_data.action_id
     integration_id = event_data.integration_id
     integration = Integration.objects.get(id=integration_id)
-    error = event_data.payload.error
+    error = event_data.error
     message = f"Error running action '{action_id}': {error}"
     logger.info(message, extra={"event": event_dict})
     # Workaround to serialize complex types until upgrading to pydantic v2
