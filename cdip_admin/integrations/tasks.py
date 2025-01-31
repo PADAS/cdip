@@ -367,8 +367,9 @@ def calculate_integration_statuses_in_batches(batch_size=20):
 
 
 @shared_task
-def send_unhealthy_connections_email(include_disabled=settings.EMAIL_ALERT_INCLUDE_DISABLED):
+def send_unhealthy_connections_email(include_disabled=None):
     logger.info("Checking for unhealthy integrations to send email notification...")
+    include_disabled = include_disabled or settings.EMAIL_ALERT_INCLUDE_DISABLED
     from integrations.models.v2 import Integration, ConnectionStatus, filter_connections_by_status
     providers = Integration.providers.all()
     unhealthy_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.UNHEALTHY.value)
