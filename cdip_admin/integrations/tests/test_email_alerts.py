@@ -68,6 +68,23 @@ def test_unhealthy_connections_email_not_sent_if_only_disabled(
     assert not mock_email.send.called
 
 
+def test_unhealthy_connections_email_excludes_disabled_by_default(
+        mocker,
+        connection_with_disabled_provider,
+):
+    mock_email_backend = mocker.MagicMock()
+    mocker.patch("integrations.tasks.EmailMultiAlternatives", mock_email_backend)
+    mock_email_render = mocker.MagicMock()
+    mocker.patch("integrations.tasks.render_to_string", mock_email_render)
+
+    calculate_integration_statuses([connection_with_disabled_provider.id,])
+
+    send_unhealthy_connections_email()
+
+    mock_email = mock_email_backend.return_value
+    assert not mock_email.send.called
+
+
 @pytest.mark.parametrize("include_disabled", [True, False])
 def test_unhealthy_connections_email_not_sent_if_not_unhealthy_connections(
         mocker, include_disabled, connection_with_healthy_provider_and_destination
