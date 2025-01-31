@@ -3320,6 +3320,12 @@ def pull_observations_action_failed_event(mocker, provider_lotek_panthera):
             "action_id": "pull_observations",
             "config_data": {"start_date": "2024-02-05"},
             "error": "Error connecting to provider.",
+            "request_url": "https://fake-api.lotek.com/observations",
+            "request_data": str(json.dumps({"start_date": "2024-02-05"})),
+            "request_verb": "POST",
+            "error_traceback": 'Traceback (most recent call last):\n  File "/code/path/file.py ..."',
+            "server_response_body": str(json.dumps({"status": "500", "error": "something went wrong"})),
+            "server_response_status": 500
         },
         "event_type": "IntegrationActionFailed",
     }
