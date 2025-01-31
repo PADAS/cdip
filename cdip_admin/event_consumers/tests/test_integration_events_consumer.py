@@ -53,6 +53,10 @@ def test_process_action_failed_event(
     assert activity_log.origin == ActivityLog.Origin.INTEGRATION
     assert activity_log.value == "integration_action_failed"
     assert activity_log.is_reversible is False
+    # Check that error details have been recorded
+    event_error_details = json.loads(pull_observations_action_failed_event.data)["payload"]
+    log_details = activity_log.details
+    assert log_details == event_error_details
 
 
 def test_process_custom_activity_log_event(
