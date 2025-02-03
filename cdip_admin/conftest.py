@@ -262,6 +262,7 @@ def integration_type_lotek():
         name="Lotek",
         value="lotek",
         description="Standard inbound integration type for pulling data from Lotek API.",
+        docs_url="https://support.earthranger.com/en_US/earthranger"
     )
 
 
@@ -375,6 +376,7 @@ def integration_type_er():
         name="EarthRanger",
         value="earth_ranger",
         description="Standard type for distributing data to EarthRanger sites.",
+        docs_url="https://support.earthranger.com/en_US/earthranger",
     )
     return integration_type
 
