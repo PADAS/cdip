@@ -367,15 +367,16 @@ def calculate_integration_statuses_in_batches(batch_size=20):
 
 
 @shared_task
-def send_unhealthy_connections_email():
+def send_unhealthy_connections_email(include_disabled=None):
     logger.info("Checking for unhealthy integrations to send email notification...")
+    include_disabled = include_disabled or settings.EMAIL_ALERT_INCLUDE_DISABLED
     from integrations.models.v2 import Integration, ConnectionStatus, filter_connections_by_status
     providers = Integration.providers.all()
     unhealthy_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.UNHEALTHY.value)
     review_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.NEEDS_REVIEW.value)
     disabled_connections = filter_connections_by_status(queryset=providers, status=ConnectionStatus.DISABLED.value)
 
-    if not unhealthy_connections.exists() and not review_connections.exists() and not disabled_connections.exists():
+    if not unhealthy_connections.exists() and not review_connections.exists() and (not include_disabled or not disabled_connections.exists()):
         logger.info("No connections needing attention found. Skipping email notification.")
         return
 
@@ -384,7 +385,8 @@ def send_unhealthy_connections_email():
         "unhealthy_connections": unhealthy_connections,
         "review_connections": review_connections,
         "disabled_connections": disabled_connections,
-        "portal_base_url": settings.PORTAL_BASE_URL
+        "portal_base_url": settings.PORTAL_BASE_URL,
+        "include_disabled": include_disabled
     }
     html_content = render_to_string("unhealthy_connections_email.html", context)
     email = EmailMultiAlternatives(

@@ -332,6 +332,7 @@ EMAIL_FROM_DISPLAY_DEFAULT = env.str("EMAIL_FROM_DISPLAY_DEFAULT", "Gundi Notifi
 EMAIL_REPLY_DEFAULT = env.str("EMAIL_REPLY_DEFAULT", "noreply@tempuri.org")
 EMAIL_INVITE_REDIRECT_URL = env.str("EMAIL_INVITE_REDIRECT_URL", "https://cdip-prod01.pamdas.org")
 EMAIL_ALERT_RECIPIENTS = env.list("EMAIL_ALERT_RECIPIENTS", default=["support@earthranger.com", "gundi@earthranger.com"])
+EMAIL_ALERT_INCLUDE_DISABLED = env.bool("EMAIL_ALERT_INCLUDE_DISABLED", False)
 PORTAL_BASE_URL = env.str("PORTAL_BASE_URL", "https://gundiservice.org")  # to render links to the portal in emails
 
 # Used for storing files such as report attachments

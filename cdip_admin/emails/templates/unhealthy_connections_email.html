@@ -83,15 +83,17 @@
                     <td>{{ connection.id }}</td>
                 </tr>
                 {% endfor %}
-                {% for connection in disabled_connections %}
-                <tr>
-                    <td class="status-disabled">disabled</td>
-                    <td>
-                        <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
-                    </td>
-                    <td>{{ connection.id }}</td>
-                </tr>
-                {% endfor %}
+                {% if include_disabled %}
+                    {% for connection in disabled_connections %}
+                    <tr>
+                        <td class="status-disabled">disabled</td>
+                        <td>
+                            <a href="{{ portal_base_url }}/connections/{{ connection.id }}/logs" class="connection-link">{{ connection.name }}</a>
+                        </td>
+                        <td>{{ connection.id }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
