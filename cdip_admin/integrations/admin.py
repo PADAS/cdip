@@ -244,7 +244,7 @@ class IntegrationTypeAdmin(admin.ModelAdmin):
         "value",
         "description",
         "service_url",
-        "docs_url",
+        "help_center_url",
     )
 
 

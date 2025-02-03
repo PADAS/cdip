@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='integrationtype',
-            name='docs_url',
+            name='help_center_url',
             field=models.URLField(blank=True, default='', null=True),
         ),
     ]

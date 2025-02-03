@@ -186,7 +186,7 @@ class IntegrationTypeSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IntegrationType
-        fields = ["id", "name", "value", "docs_url",]
+        fields = ["id", "name", "value", "help_center_url", ]
 
 
 class OwnerSummarySerializer(serializers.ModelSerializer):
@@ -293,7 +293,7 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
             "description",
             "actions",
             "webhook",
-            "docs_url",
+            "help_center_url",
         )
 
 

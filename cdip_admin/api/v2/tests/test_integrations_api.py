@@ -43,7 +43,7 @@ def _test_list_integrations(api_client, user, organization):
         assert "id" in integration_type
         assert "name" in integration_type
         assert "value" in integration_type
-        assert "docs_url" in integration_type
+        assert "help_center_url" in integration_type
         owner = integration.get("owner")
         assert owner
         assert "id" in owner
@@ -823,7 +823,7 @@ def _test_filter_integration_types(api_client, user, filters, expected_integrati
         assert "value" in type
         assert "description" in type
         assert "actions" in type
-        assert "docs_url" in type
+        assert "help_center_url" in type
 
 
 def test_filter_integrations_types_by_action_type_as_superuser(
@@ -1571,7 +1571,7 @@ def _test_get_integration_details(api_client, user, organization, integration_id
     assert "enabled" in integration
     assert "type" in integration
     integration_type = integration.get("type", {})
-    assert "docs_url" in integration_type
+    assert "help_center_url" in integration_type
     webhook = integration.get("type", {}).get("webhook")
     assert webhook
     assert "name" in webhook
