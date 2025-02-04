@@ -37,6 +37,7 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
     )
     description = models.TextField(blank=True)
     service_url = models.URLField(blank=True, null=True, default="")
+    help_center_url = models.URLField(blank=True, null=True, default="")
 
     class Meta:
         ordering = ("name",)
