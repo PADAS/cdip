@@ -751,3 +751,18 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.object_id}"
+
+
+class IntegrationMetrics(UUIDAbstractModel, TimestampedModel):
+    integration = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="metrics"
+    )
+    data_frequency_minutes = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("-created_at", )
+
+    def __str__(self):
+        return f"{self.integration.name} - Data Frequency: {self.data_frequency_minutes} minutes"
