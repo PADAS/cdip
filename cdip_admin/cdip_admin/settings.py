@@ -303,6 +303,12 @@ CELERY_TASK_ROUTES = {
     "integrations.tasks.calculate_integration_statuses_in_batches": {
         "queue": "healthchecks", "routing_key": "healthchecks"
     },
+    "integrations.tasks.calculate_integration_metrics": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    },
+    "integrations.tasks.calculate_integration_metrics_in_batches": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    },
     "integrations.tasks.send_unhealthy_connections_email": {
         "queue": "healthchecks", "routing_key": "healthchecks"
     },
