@@ -405,11 +405,14 @@ def calculate_integration_metrics(integration_ids: list):
     for integration_id in integration_ids:
         try:
             logger.info(f"Calculating metrics for integration {integration_id}")
-            data_frequency = calculate_data_frequency(data_provider_id=integration_id)
-            if data_frequency:
+            results = calculate_data_frequency(data_provider_id=integration_id)
+            if all(results):
+                f_min, f_max, f_p95 = results
                 integration_metrics = IntegrationMetrics.objects.create(
                     integration_id=integration_id,
-                    data_frequency_minutes=data_frequency
+                    data_frequency_minutes_min=f_min,
+                    data_frequency_minutes_max=f_max,
+                    data_frequency_minutes=f_p95
                 )
             else:
                 integration_metrics = None
