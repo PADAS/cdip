@@ -354,6 +354,8 @@ class IntegrationMetricsAdmin(admin.ModelAdmin):
     list_display = (
         "integration",
         "integration_id",
+        "data_frequency_minutes_min",
+        "data_frequency_minutes_max",
         "data_frequency_minutes",
         "created_at",
     )
