@@ -1,12 +1,13 @@
 import asyncio
 import base64
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from unittest.mock import PropertyMock
 import pytest
 import random
 from typing import NamedTuple, Any
 from django.contrib.auth.models import User, Group
 from django_celery_beat.models import CrontabSchedule
+from freezegun import freeze_time
 from rest_framework.utils import json
 from rest_framework.test import APIClient
 from gundi_core.schemas import v2 as gundi_schemas_v2
@@ -2127,6 +2128,36 @@ def trap_tagger_to_movebank_observation_trace(provider_trap_tagger):
     )
     trace.save()
     return trace
+
+
+@pytest.fixture
+def observation_traces_spikes(provider_lotek_panthera, request):
+    # Parametrize with a list of tuples (time_value, time_unit)
+    time_deltas = request.param
+    trace_objs = []
+
+    for value, unit in time_deltas:
+        # Determine the timedelta based on the unit (either 'hours' or 'minutes')
+        if unit == 'hours':
+            time_delta = timedelta(hours=value)
+        elif unit == 'minutes':
+            time_delta = timedelta(minutes=value)
+        else:
+            raise ValueError("Unsupported time unit. Use 'hours' or 'minutes'.")
+
+        # Calculate the timestamp for each spike
+        timestamp = datetime.now(timezone.utc) - time_delta
+        with freeze_time(timestamp):
+            for _ in range(10):  # Simulate 10 traces per spike
+                trace = GundiTrace(
+                    data_provider=provider_lotek_panthera,
+                    object_type="obv",
+                )
+                trace.save()
+                trace_objs.append(trace)
+                timestamp += timedelta(seconds=1)
+
+    return trace_objs
 
 
 @pytest.fixture

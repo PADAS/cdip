@@ -210,6 +210,8 @@ execnet==2.0.2
     # via pytest-xdist
 filelock==3.12.3
     # via virtualenv
+freezegun==1.5.1
+    # via -r requirements-dev.in
 gevent==21.12.0
     # via -r requirements.in
 google-api-core[grpc]==2.11.1
@@ -504,6 +506,7 @@ python-dateutil==2.8.1
     #   cdip-connector
     #   croniter
     #   dateparser
+    #   freezegun
     #   python-crontab
 python-dotenv==0.13.0
     # via

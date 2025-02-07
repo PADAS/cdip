@@ -15,7 +15,8 @@ from .models import (
     SourceState,
     GundiTrace,
     IntegrationWebhook,
-    WebhookConfiguration
+    WebhookConfiguration,
+    IntegrationMetrics,
 )
 from .services import *
 from .source_filters import *
