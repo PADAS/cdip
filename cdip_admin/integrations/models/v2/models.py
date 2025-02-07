@@ -760,6 +760,9 @@ class IntegrationMetrics(UUIDAbstractModel, TimestampedModel):
         related_name="metrics"
     )
     data_frequency_minutes = models.PositiveIntegerField(default=0)
+    data_frequency_minutes_min = models.PositiveIntegerField(default=0)
+    data_frequency_minutes_max = models.PositiveIntegerField(default=0)
+
 
     class Meta:
         ordering = ("-created_at", )
