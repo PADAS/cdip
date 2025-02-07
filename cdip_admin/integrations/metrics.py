@@ -44,23 +44,23 @@ def calculate_data_frequency(data_provider_id, exclude_duplicates=True, time_win
             FROM spikes
             GROUP BY data_provider_id, spike_group
         ),
-        intervals AS (
+        intervals AS (  -- Intervals rounded to nearest 10 minutes
             SELECT 
                 data_provider_id,
                 spike_start,
                 LEAD(spike_start) OVER (PARTITION BY data_provider_id ORDER BY spike_start) AS next_spike_start,
-                EXTRACT(EPOCH FROM (LEAD(spike_start) OVER (PARTITION BY data_provider_id ORDER BY spike_start) - spike_start)) / 60 AS interval_minutes
+                ROUND(EXTRACT(EPOCH FROM (LEAD(spike_start) OVER (PARTITION BY data_provider_id ORDER BY spike_start) - spike_start)) / 60 / 10) * 10 AS rounded_interval_minutes  -- Round to nearest 10 minutes
             FROM grouped_spikes
         )
         SELECT 
-            ROUND(MIN(interval_minutes)) AS min_gap_minutes,  -- Smallest gap between spikes
-            ROUND(MAX(interval_minutes)) AS max_gap_minutes,  -- Biggest gap in the last 24 hours
-            ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY interval_minutes)) AS typical_interval_p95_minutes
+            MIN(rounded_interval_minutes) AS min_gap_minutes,  
+            MAX(rounded_interval_minutes) AS max_gap_minutes,  
+            mode() WITHIN GROUP (ORDER BY rounded_interval_minutes) AS typical_interval_minutes  
         FROM intervals;
     """
 
     with connection.cursor() as cursor:
         cursor.execute(query, [str(data_provider_id)])
         result = cursor.fetchone()
-    f_min, f_max, f_p95 = result if result else (None, None, None)
-    return f_min, f_max, f_p95
+    f_min, f_max, f_typ = result if result else (None, None, None)
+    return f_min, f_max, f_typ
