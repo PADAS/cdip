@@ -396,3 +396,37 @@ def send_unhealthy_connections_email(include_disabled=None):
     )
     email.attach_alternative(html_content, "text/html")
     email.send()
+
+
+@shared_task
+def calculate_integration_metrics(integration_ids: list):
+    from integrations.models.v2 import IntegrationMetrics
+    from integrations.metrics import calculate_data_frequency
+    for integration_id in integration_ids:
+        try:
+            logger.info(f"Calculating metrics for integration {integration_id}")
+            results = calculate_data_frequency(data_provider_id=integration_id)
+            if all(results):
+                f_min, f_max, f_p95 = results
+                integration_metrics = IntegrationMetrics.objects.create(
+                    integration_id=integration_id,
+                    data_frequency_minutes_min=f_min,
+                    data_frequency_minutes_max=f_max,
+                    data_frequency_minutes=f_p95
+                )
+            else:
+                integration_metrics = None
+        except Exception as e:
+            logger.exception(f"Error calculating metrics for integration {integration_id}: {e}")
+            continue
+        else:
+            logger.info(f"Metrics calculated for integration {integration_id}: {integration_metrics}")
+
+
+@shared_task
+def calculate_integration_metrics_in_batches(batch_size=20):
+    Integration = apps.get_model("integrations", "Integration")
+    integration_ids = Integration.objects.values_list("id", flat=True)
+    for i in range(0, len(integration_ids), batch_size):
+        batch = integration_ids[i:i + batch_size]
+        calculate_integration_metrics.delay(integration_ids=batch)
