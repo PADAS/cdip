@@ -2021,19 +2021,21 @@ def route_2(
 def integration_type_trap_tagger():
     # Create an integration type for Trap Tagger
     integration_type = IntegrationType.objects.create(
-        name="TrapTagger(Push)",
+        name="TrapTagger",
         value="trap_tagger",
-        description="Standard type Trap Tagger Integration",
+        description="Standard type for Trap Tagger Integration",
     )
     return integration_type
 
 
 @pytest.fixture
 def provider_trap_tagger(
+        settings,
         get_random_id,
         other_organization,
         integration_type_trap_tagger,
 ):
+    settings.GCP_ENVIRONMENT_ENABLED = False
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_trap_tagger,
         name=f"Trap Tagger Provider {get_random_id()}",
