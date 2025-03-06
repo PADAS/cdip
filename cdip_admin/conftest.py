@@ -1482,6 +1482,46 @@ def integrations_list_wpswatch(
 
 
 @pytest.fixture
+def integrations_list_traptagger_dest(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch,
+        organization,
+        integration_type_trap_tagger,
+        get_random_id,
+        traptagger_action_push_events
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+    integrations = []
+    for i in range(5):
+        # Create the integration
+        site_url = f"{get_random_id()}.wpswatch.fakewps.org"
+        integration, _ = Integration.objects.get_or_create(
+            type=integration_type_trap_tagger,
+            name=f"WPS Watch Site Test {i}",
+            owner=organization,
+            base_url=site_url,
+        )
+        IntegrationConfiguration.objects.create(
+            integration=integration, action=traptagger_action_push_events
+        )
+        integrations.append(integration)
+        ensure_default_route(integration=integration)
+    return integrations
+
+@pytest.fixture
 def er_destination_healthy(
         mocker,
         settings,
@@ -2027,6 +2067,16 @@ def integration_type_trap_tagger():
     )
     return integration_type
 
+
+@pytest.fixture
+def traptagger_action_push_events(integration_type_trap_tagger):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_trap_tagger,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Events",
+        value="push_events",
+        description="Push Event data to TrapTagger API",
+    )
 
 @pytest.fixture
 def provider_trap_tagger(

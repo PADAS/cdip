@@ -47,8 +47,10 @@ def test_automatic_dispatcher_deployments_v1(
 
 
 @pytest.mark.parametrize("integration_type", [
-    ("integration_type_er"),
-    ("integration_type_smart"),
+    "integration_type_er",
+    "integration_type_smart",
+    "integration_type_wpswatch",
+    "integration_type_trap_tagger",
 ])
 @override_settings(GCP_ENVIRONMENT_ENABLED=True)
 def test_automatic_dispatcher_deployments_v2(
