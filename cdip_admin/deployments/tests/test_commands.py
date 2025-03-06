@@ -322,7 +322,8 @@ def test_call_dispatchers_command_recreate_by_type_with_max_v1(
 @pytest.mark.parametrize("integration_type", [
     "earth_ranger",
     "smart_connect",
-    "wps_watch"
+    "wps_watch",
+    "trap_tagger"
 ])
 @override_settings(GCP_ENVIRONMENT_ENABLED=True)
 def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1(
@@ -335,14 +336,20 @@ def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1
     dispatcher_source_release_1,
     dispatcher_source_release_2
 ):
+    if integration_type == "trap_tagger" and gundi_version == "v1":
+        pytest.skip("Trap Tagger is not supported in v1")
+
     if gundi_version == "v1":
         integrations_er = request.getfixturevalue("outbound_integrations_list_er")
         integrations_smart = request.getfixturevalue("outbound_integrations_list_smart")
         integrations_wps = request.getfixturevalue("outbound_integrations_list_wpswatch")
+        integrations_list_traptagger_dest = []
     else:
         integrations_er = request.getfixturevalue("integrations_list_er")
         integrations_smart = request.getfixturevalue("integrations_list_smart")
         integrations_wps = request.getfixturevalue("integrations_list_wpswatch")
+        integrations_list_traptagger_dest = request.getfixturevalue("integrations_list_traptagger_dest")
+
     # Mock the celery task doing the actual deployment
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
     mock_deploy_serverless_dispatcher = mocker.MagicMock()
@@ -365,8 +372,10 @@ def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1
         integrations_list = integrations_er
     elif integration_type == "smart_connect":
         integrations_list = integrations_smart
-    else:
+    elif integration_type == "wps_watch":
         integrations_list = integrations_wps
+    elif integration_type == "trap_tagger":
+        integrations_list = integrations_list_traptagger_dest
     sorted_integrations = sorted(integrations_list, key=lambda i: i.name)
     # Check that the deployment task is triggered for each integration
     assert mock_deploy_serverless_dispatcher.delay.call_count == 2

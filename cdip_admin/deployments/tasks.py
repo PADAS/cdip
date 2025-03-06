@@ -28,6 +28,9 @@ if settings.GCP_ENVIRONMENT_ENABLED:
     DISPATCHER_DEFAULT_SETTINGS_WPSWATCH = utils.get_dispatcher_defaults_from_gcp_secrets(
         secret_id=settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
     )
+    DISPATCHER_DEFAULT_SETTINGS_TRAPTAGGER = utils.get_dispatcher_defaults_from_gcp_secrets(
+        secret_id=settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
+    )
 else:
     pubsub_client = utils.PubSubDummyClient()
     subscriptions_client = utils.SubscriberDummyClient()
@@ -36,6 +39,8 @@ else:
     eventarc_client = utils.EventarcDummyClient()
     DISPATCHER_DEFAULT_SETTINGS_ER = {}
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
+    DISPATCHER_DEFAULT_SETTINGS_WPSWATCH = {}
+    DISPATCHER_DEFAULT_SETTINGS_TRAPTAGGER = {}
 
 
 def get_function_subscription_request(function, topic_path, configuration):
@@ -161,7 +166,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
             # Create a subscription to the topic
             subscription = get_function_subscription_request(function_response, topic_path, configuration)
             create_subscription(request=subscription)
-        elif integration.is_smart_site or integration.is_wpswatch_site:  # Deploy a Cloud Run Service
+        elif integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site:  # Deploy a Cloud Run Service
 
             if force_recreate:
                 try:

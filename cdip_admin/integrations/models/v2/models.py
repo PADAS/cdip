@@ -219,7 +219,9 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def _pre_save(self, *args, **kwargs):
         # Setup topic and broker for destination sites
-        if self._state.adding and any([self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site]):
+        if self._state.adding and any(
+                [self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site, self.is_traptagger_site]
+        ):
             if "topic" not in self.additional:
                 self.additional.update({"topic": get_dispatcher_topic_default_name(integration=self)})
             self.additional.setdefault('broker', 'gcp_pubsub')
@@ -242,11 +244,15 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             calculate_integration_statuses([str(self.id)])
         if created:
             # Deploy serverless dispatchers for destinations
-            if settings.GCP_ENVIRONMENT_ENABLED and any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site]):
+            if settings.GCP_ENVIRONMENT_ENABLED and any(
+                    [self.is_er_site, self.is_smart_site, self.is_wpswatch_site, self.is_traptagger_site]
+            ):
                 if self.is_smart_site:
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
                 elif self.is_wpswatch_site:
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+                elif self.is_traptagger_site:
+                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
                 else:
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET
                 DispatcherDeployment.objects.create(
@@ -310,6 +316,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def is_wpswatch_site(self):
         return self.type.value.lower().strip().replace("_", "") == "wpswatch"
+
+    @property
+    def is_traptagger_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "traptagger"
 
     def create_missing_configurations(self):
         for action in self.type.actions.all():

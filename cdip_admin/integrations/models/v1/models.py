@@ -218,6 +218,10 @@ class OutboundIntegrationConfiguration(TimestampedModel):
     def is_wpswatch_site(self):
         return self.type.slug.lower().strip().replace("_", "") == "wpswatch"
 
+    @property
+    def is_traptagger_site(self):
+        return False  # TrapTagger is only supported in Gundi v2
+
     class Meta:
         ordering = ("owner", "name")
 

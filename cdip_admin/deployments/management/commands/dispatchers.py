@@ -191,10 +191,10 @@ class Command(BaseCommand):
     def deploy_dispatchers(self, integrations):
         for integration in integrations:
             try:
-                # Skip if the integration is not an ER, SMART site, or WPS Watch Site
-                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site):
+                # Skip if the integration is not an ER, SMART, WPS Watch or TrapTagger site
+                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site):
                     self.stdout.write(
-                        f"Integration {integration.name} is not an ER, SMART or WPS Watch site. Skipped"
+                        f"Integration {integration.name} is not an ER, SMART, WPS Watch or TrapTagger site. Skipped"
                     )
                     continue
 
@@ -212,6 +212,8 @@ class Command(BaseCommand):
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
                 elif integration.is_wpswatch_site:
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+                elif integration.is_traptagger_site:
+                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
                 else:
                     secret_id = settings.DISPATCHER_DEFAULTS_SECRET
                 if isinstance(integration, OutboundIntegrationConfiguration):
@@ -270,8 +272,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Updating dispatchers for {len(integrations)} integrations..."))
         for integration in integrations:
             try:
-                # Skip if the integration is not an ER, SMART site, or WPS Watch Site
-                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site):
+                # Skip if the integration is not an ER, SMART, WPS Watch or TrapTagger site
+                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site):
                     self.stdout.write(
                         f"Integration {integration.name} is not an ER, SMART or WPS Watch site. Skipped"
                     )
@@ -319,8 +321,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Re-creating dispatchers for {len(integrations)} integrations..."))
         for integration in integrations:
             try:
-                # Skip if the integration is not an ER, SMART site, or WPS Watch Site
-                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site):
+                # Skip if the integration is not an ER, SMART, WPS Watch, or TrapTagger site
+                if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site):
                     self.stdout.write(
                         f"Integration {integration.name} is not an ER, SMART or WPS Watch site. Skipped"
                     )
