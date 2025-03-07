@@ -28,12 +28,13 @@ admin_portal:
     REDIS_HOST: "10.243.180.36"
     GS_BUCKET_NAME: "cdip-files-stage"
     BUCKET_NAME: "cdip-files-stage"
-    DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"
+    DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"  # pragma: allowlist secret
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
-    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"  # pragma: allowlist secret
+    DISPATCHER_DEFAULTS_SECRET_WPSWATCH: "wps-dispatcher-defaults-stage"  # pragma: allowlist secret
+    DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER: "tt-dispatcher-defaults-stage"  # pragma: allowlist secret
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-stage
     RAW_OBSERVATIONS_TOPIC: raw-observations-stage
-    DISPATCHER_DEFAULTS_SECRET_WPSWATCH: wps-dispatcher-defaults-stage
     PORTAL_BASE_URL: "https://stage.gundiservice.org"
     CONFIGURATION_EVENTS_TOPIC: "configuration-events-stage"
 kongplugin:
