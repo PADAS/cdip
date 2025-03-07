@@ -28,12 +28,13 @@ admin_portal:
     REDIS_HOST: "10.3.176.132"
     GS_BUCKET_NAME: "cdip-files-dev"
     BUCKET_NAME: "cdip-files-dev"
-    DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-dev"
+    DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-dev"  # pragma: allowlist secret
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-dev"
-    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-dev"
+    DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-dev"  # pragma: allowlist secret
+    DISPATCHER_DEFAULTS_SECRET_WPSWATCH: "wps-dispatcher-defaults-dev"  # pragma: allowlist secret
+    DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER: "tt-dispatcher-defaults-dev"  # pragma: allowlist secret
     INTEGRATION_EVENTS_SUB_ID: cdip-integration-events-sub-dev
     RAW_OBSERVATIONS_TOPIC: raw-observations-dev
-    DISPATCHER_DEFAULTS_SECRET_WPSWATCH: wps-dispatcher-defaults-dev
     PORTAL_BASE_URL: "https://dev.gundiservice.org"
     CONFIGURATION_EVENTS_TOPIC: "configuration-events-dev"
 kongplugin:
