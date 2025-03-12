@@ -1,5 +1,8 @@
+import django_celery_beat
 from django.contrib import admin
 from django.forms import ModelForm
+from django_celery_beat.admin import PeriodicTaskAdmin
+from django_celery_beat.models import PeriodicTask
 from simple_history.admin import SimpleHistoryAdmin
 from django.contrib import messages
 from core.admin import CustomDateFilter
@@ -552,3 +555,20 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "data_provider__type",
         "destination__type",
     )
+
+
+# Override the PeriodicTaskAdmin to allow searching and filtering by integration fields
+class GundiPeriodicTaskAdmin(PeriodicTaskAdmin):
+    search_fields = (
+        "name",
+        "configurations_by_periodic_task__integration__id",
+        "configurations_by_periodic_task__integration__name",
+    )
+    list_filter = (
+        "enabled",
+        "configurations_by_periodic_task__integration__type",
+        "configurations_by_periodic_task__integration__owner",
+        "task",
+    )
+admin.site.unregister(PeriodicTask)
+admin.site.register(PeriodicTask, GundiPeriodicTaskAdmin)
