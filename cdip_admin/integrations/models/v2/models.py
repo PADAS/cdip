@@ -380,8 +380,9 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             )
 
         if self.action.is_periodic_action and not self.periodic_task:
+            task_name = f"Run '{self.action.name}' on '{self.integration.name}'"[:200]
             periodic_task_params = {
-                "name": f"Run '{self.action.value}' of Integration: '{self.integration} ({self.integration.id})')",
+                "name": task_name,
                 "task": "integrations.tasks.run_integration",
                 "kwargs": json.dumps({
                     "integration_id": str(self.integration_id),
