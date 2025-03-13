@@ -1613,3 +1613,27 @@ def test_get_integration_with_webhook_config(
         organization=organization,
         integration_id=str(provider_liquidtech_with_webhook_config.id)
     )
+
+
+@pytest.mark.parametrize("user", [
+    "superuser",
+    "org_admin_user",
+    "org_viewer_user",
+])
+@pytest.mark.parametrize("is_used_as_provider", [True, False])
+def test_filter_integrations_by_is_used_as_provider(
+        request, is_used_as_provider, user, api_client, organization, other_organization,
+        provider_lotek_panthera, provider_ats, provider_trap_tagger,
+        integrations_list_traptagger_dest, integrations_list_wpswatch
+):
+    user = request.getfixturevalue(user)
+    providers = [provider_lotek_panthera, provider_ats, provider_trap_tagger]
+    destinations = integrations_list_traptagger_dest + integrations_list_wpswatch
+    _test_filter_integrations(
+        api_client=api_client,
+        user=user,
+        filters={
+            "is_used_as_provider": is_used_as_provider
+        },
+        expected_integrations=providers if is_used_as_provider else destinations
+    )

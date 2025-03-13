@@ -1477,7 +1477,6 @@ def integrations_list_wpswatch(
             integration=integration, action=wpswatch_action_push_events
         )
         integrations.append(integration)
-        ensure_default_route(integration=integration)
     return integrations
 
 
@@ -1507,10 +1506,10 @@ def integrations_list_traptagger_dest(
     integrations = []
     for i in range(5):
         # Create the integration
-        site_url = f"{get_random_id()}.wpswatch.fakewps.org"
+        site_url = f"{get_random_id()}.fake-traptagger.org"
         integration, _ = Integration.objects.get_or_create(
             type=integration_type_trap_tagger,
-            name=f"WPS Watch Site Test {i}",
+            name=f"TrapTagger Test site {i}",
             owner=organization,
             base_url=site_url,
         )
@@ -1518,7 +1517,6 @@ def integrations_list_traptagger_dest(
             integration=integration, action=traptagger_action_push_events
         )
         integrations.append(integration)
-        ensure_default_route(integration=integration)
     return integrations
 
 @pytest.fixture
@@ -2082,14 +2080,14 @@ def traptagger_action_push_events(integration_type_trap_tagger):
 def provider_trap_tagger(
         settings,
         get_random_id,
-        other_organization,
+        organization,
         integration_type_trap_tagger,
 ):
     settings.GCP_ENVIRONMENT_ENABLED = False
     provider, _ = Integration.objects.get_or_create(
         type=integration_type_trap_tagger,
         name=f"Trap Tagger Provider {get_random_id()}",
-        owner=other_organization,
+        owner=organization,
         base_url=f"https://api.test.traptagger.com",
     )
     ensure_default_route(integration=provider)
