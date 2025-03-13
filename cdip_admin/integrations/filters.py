@@ -361,6 +361,7 @@ class IntegrationFilter(django_filters_rest.FilterSet):
     action__in = CharInFilter(field_name="type__actions__value", lookup_expr="in", )
     status = django_filters_rest.CharFilter(field_name="status__status", lookup_expr="iexact", )
     status__in = CharInFilter(field_name="status__status", lookup_expr="in", )
+    is_used_as_provider = django_filters_rest.BooleanFilter(method="filter_is_used_as_provider")
 
     class Meta:
         model = Integration
@@ -371,6 +372,10 @@ class IntegrationFilter(django_filters_rest.FilterSet):
             'type': ['exact', 'in'],
             'owner': ['exact', 'in'],
         }
+
+    def filter_is_used_as_provider(self, queryset, name, value):
+        # Get integrations set as provider in any route
+        return queryset.filter(routing_rules_by_provider__isnull=(not value))
 
 
 class ConnectionFilter(django_filters_rest.FilterSet):
