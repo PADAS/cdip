@@ -330,15 +330,6 @@ class IntegrationAdmin(admin.ModelAdmin):
 
         try:  # Delete the integration
             super().delete_model(request, obj)
-        except IntegrityError as e:  # handle detached partitions referencing the integration
-            cause = getattr(e, "__cause__", None)
-            if not cause:
-                messages.add_message(request, messages.WARNING, message=f"Couldn't determine the cause of the error: __cause__: {cause}")
-            if isinstance(cause, psycopg2.errors.ForeignKeyViolation):
-                error_message = str(e)
-                if "activity_log_activitylog" in error_message:
-                    # ToDo: Handle specific FK violation from activity_log_activitylog tables
-                    messages.add_message(request, messages.INFO, message=f"Activity log references found for integration {obj.pk}")
         except Exception as e:
             messages.add_message(request, messages.ERROR, message=f"Error deleting integration {obj.pk}: {type(e).__name__}: {e}")
 

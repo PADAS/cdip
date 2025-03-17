@@ -1,14 +1,16 @@
 import json
+import logging
 import uuid
 
 from functools import cached_property
 import jsonschema
+import psycopg2
 import requests
 import google.oauth2.id_token
 from urllib.parse import urljoin, urlparse
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
-from django.db import models, transaction
+from django.db import models, transaction, IntegrityError
 from django.db.models import Subquery
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,6 +25,9 @@ from integrations.tasks import (
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 from activity_log.mixins import ChangeLogMixin
+
+
+logger = logging.getLogger(__name__)
 
 
 User = get_user_model()
@@ -279,6 +284,21 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             super().save(*args, **kwargs)
             kwargs["created"] = created
             self._post_save(self, *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        try:  # Delete the integration
+            super().delete(*args, **kwargs)
+        except IntegrityError as e:  # handle detached partitions referencing the integration
+            cause = getattr(e, "__cause__", None)
+            if not cause:
+                logger.warning(f"Couldn't determine the cause of the error: __cause__: {cause}")
+            if isinstance(cause, psycopg2.errors.ForeignKeyViolation):
+                error_message = str(e)
+                if "activity_log_activitylog" in error_message:
+                    logger.debug(f"Cleaning activity log references found found detached partitions")
+                    # ToDo: Clean activity log references
+                    # Try again
+                    super().delete(*args, **kwargs)
 
     @property
     def configurations(self):
