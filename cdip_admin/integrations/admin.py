@@ -1,5 +1,7 @@
 import django_celery_beat
+import psycopg2
 from django.contrib import admin
+from django.db import IntegrityError
 from django.forms import ModelForm
 from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
@@ -328,6 +330,13 @@ class IntegrationAdmin(admin.ModelAdmin):
 
         try:  # Delete the integration
             super().delete_model(request, obj)
+        except IntegrityError as e:  # handle detached partitions referencing the integration
+            cause = getattr(e, "__cause__", None)
+            if isinstance(cause, psycopg2.errors.ForeignKeyViolation):
+                error_message = str(e)
+                if "activity_log_activitylog" in error_message:
+                    # ToDo: Handle specific FK violation from activity_log_activitylog tables
+                    pass
         except Exception as e:
             messages.add_message(request, messages.ERROR, message=f"Error deleting integration {obj.pk}: {type(e).__name__}: {e}")
 
