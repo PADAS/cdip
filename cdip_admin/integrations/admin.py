@@ -325,8 +325,11 @@ class IntegrationAdmin(admin.ModelAdmin):
                 messages.add_message(request, messages.WARNING, message=msg)
             else:  # It's safe to delete it
                 deployment.delete()
-        # Delete the integration
-        super().delete_model(request, obj)
+
+        try:  # Delete the integration
+            super().delete_model(request, obj)
+        except Exception as e:
+            messages.add_message(request, messages.ERROR, message=f"Error deleting integration {obj.pk}: {type(e).__name__}: {e}")
 
     def delete_queryset(self, request, queryset):
         # Overwritten to call deployment.delete() in bulk deletion
