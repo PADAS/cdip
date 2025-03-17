@@ -293,13 +293,14 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             if not cause:
                 logger.warning(f"Couldn't determine the cause of the IntegrityError deleting integration {self.id}: __cause__: {cause}")
                 raise e
-            if isinstance(cause, psycopg2.errors.ForeignKeyViolation):
-                if "activity_log_activitylog" in str(e):
-                    logger.debug(f"Cleaning activity log references found found detached partitions")
-                    # Clean activity log references
-                    self._clean_detached_activity_log_references()
-                    # Try again
-                    super().delete(*args, **kwargs)
+            if isinstance(cause, psycopg2.errors.ForeignKeyViolation) and "activity_log_activitylog" in str(e):
+                logger.debug(f"Cleaning activity log references found found detached partitions")
+                # Clean activity log references
+                self._clean_detached_activity_log_references()
+                # Try again
+                super().delete(*args, **kwargs)
+            else:
+                raise e
 
     @property
     def configurations(self):
