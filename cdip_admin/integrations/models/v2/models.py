@@ -296,7 +296,8 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
                 error_message = str(e)
                 if "activity_log_activitylog" in error_message:
                     logger.debug(f"Cleaning activity log references found found detached partitions")
-                    # ToDo: Clean activity log references
+                    # Clean activity log references
+                    self._clean_detached_activity_log_references()
                     # Try again
                     super().delete(*args, **kwargs)
 
@@ -349,6 +350,34 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
                     action=action,
                     data={}  # Empty configuration by default
                 )
+
+    def _clean_detached_activity_log_references(self):
+        from django.db import connection
+
+        # Set FKs in detached partitions to NULL
+        get_subpartitions_sql = """
+            SELECT relname
+            FROM pg_class
+            WHERE relname LIKE 'activity_log_activitylog_ev_p%' 
+              AND relkind = 'r';
+        """
+
+        with connection.cursor() as cursor:
+            # Clean references in the backup table
+            self._set_fk_references_null(cursor, table_name="activity_log_activitylog_original")
+            # Clean references in the detached subpartitions partitions
+            cursor.execute(get_subpartitions_sql)
+            sub_partitions = [row[0] for row in cursor.fetchall()]
+            for partition in sub_partitions:
+                self._set_fk_references_null(cursor=cursor, table_name=partition)
+
+    def _set_fk_references_null(self, cursor, table_name):
+        update_sql = f"""
+            UPDATE {table_name}
+            SET integration_id = NULL
+            WHERE integration_id = '{str(self.id)}';
+        """
+        cursor.execute(update_sql)
 
 
 class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
