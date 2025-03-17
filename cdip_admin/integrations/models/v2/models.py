@@ -291,10 +291,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         except IntegrityError as e:  # handle detached partitions referencing the integration
             cause = getattr(e, "__cause__", None)
             if not cause:
-                logger.warning(f"Couldn't determine the cause of the error: __cause__: {cause}")
+                logger.warning(f"Couldn't determine the cause of the IntegrityError deleting integration {self.id}: __cause__: {cause}")
+                raise e
             if isinstance(cause, psycopg2.errors.ForeignKeyViolation):
-                error_message = str(e)
-                if "activity_log_activitylog" in error_message:
+                if "activity_log_activitylog" in str(e):
                     logger.debug(f"Cleaning activity log references found found detached partitions")
                     # Clean activity log references
                     self._clean_detached_activity_log_references()
@@ -354,18 +354,16 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def _clean_detached_activity_log_references(self):
         from django.db import connection
 
-        # Set FKs in detached partitions to NULL
-        get_subpartitions_sql = """
-            SELECT relname
-            FROM pg_class
-            WHERE relname LIKE 'activity_log_activitylog_ev_p%' 
-              AND relkind = 'r';
-        """
-
         with connection.cursor() as cursor:
             # Clean references in the backup table
             self._set_fk_references_null(cursor, table_name="activity_log_activitylog_original")
             # Clean references in the detached subpartitions partitions
+            get_subpartitions_sql = """
+                SELECT relname
+                FROM pg_class
+                WHERE relname LIKE 'activity_log_activitylog_ev_p%' 
+                  AND relkind = 'r';
+            """
             cursor.execute(get_subpartitions_sql)
             sub_partitions = [row[0] for row in cursor.fetchall()]
             for partition in sub_partitions:
