@@ -1,5 +1,7 @@
 import django_celery_beat
+import psycopg2
 from django.contrib import admin
+from django.db import IntegrityError
 from django.forms import ModelForm
 from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
@@ -325,8 +327,11 @@ class IntegrationAdmin(admin.ModelAdmin):
                 messages.add_message(request, messages.WARNING, message=msg)
             else:  # It's safe to delete it
                 deployment.delete()
-        # Delete the integration
-        super().delete_model(request, obj)
+
+        try:  # Delete the integration
+            super().delete_model(request, obj)
+        except Exception as e:
+            messages.add_message(request, messages.ERROR, message=f"Error deleting integration {obj.pk}: {type(e).__name__}: {e}")
 
     def delete_queryset(self, request, queryset):
         # Overwritten to call deployment.delete() in bulk deletion

@@ -1,14 +1,16 @@
 import json
+import logging
 import uuid
 
 from functools import cached_property
 import jsonschema
+import psycopg2
 import requests
 import google.oauth2.id_token
 from urllib.parse import urljoin, urlparse
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
-from django.db import models, transaction
+from django.db import models, transaction, IntegrityError
 from django.db.models import Subquery
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,6 +25,9 @@ from integrations.tasks import (
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
 from activity_log.mixins import ChangeLogMixin
+
+
+logger = logging.getLogger(__name__)
 
 
 User = get_user_model()
@@ -280,6 +285,23 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             kwargs["created"] = created
             self._post_save(self, *args, **kwargs)
 
+    def delete(self, *args, **kwargs):
+        try:  # Delete the integration
+            super().delete(*args, **kwargs)
+        except IntegrityError as e:  # handle detached partitions referencing the integration
+            cause = getattr(e, "__cause__", None)
+            if not cause:
+                logger.warning(f"Couldn't determine the cause of the IntegrityError deleting integration {self.id}: __cause__: {cause}")
+                raise e
+            if isinstance(cause, psycopg2.errors.ForeignKeyViolation) and "activity_log_activitylog" in str(e):
+                logger.debug(f"Cleaning activity log references found found detached partitions")
+                # Clean activity log references
+                self._clean_detached_activity_log_references()
+                # Try again
+                super().delete(*args, **kwargs)
+            else:
+                raise e
+
     @property
     def configurations(self):
         return self.configurations_by_integration.all()
@@ -329,6 +351,32 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
                     action=action,
                     data={}  # Empty configuration by default
                 )
+
+    def _clean_detached_activity_log_references(self):
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            # Clean references in the backup table
+            self._set_fk_references_null(cursor, table_name="activity_log_activitylog_original")
+            # Clean references in the detached subpartitions partitions
+            get_subpartitions_sql = """
+                SELECT relname
+                FROM pg_class
+                WHERE relname LIKE 'activity_log_activitylog_ev_p%' 
+                  AND relkind = 'r';
+            """
+            cursor.execute(get_subpartitions_sql)
+            sub_partitions = [row[0] for row in cursor.fetchall()]
+            for partition in sub_partitions:
+                self._set_fk_references_null(cursor=cursor, table_name=partition)
+
+    def _set_fk_references_null(self, cursor, table_name):
+        update_sql = f"""
+            UPDATE {table_name}
+            SET integration_id = NULL
+            WHERE integration_id = '{str(self.id)}';
+        """
+        cursor.execute(update_sql)
 
 
 class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
