@@ -302,9 +302,11 @@ class IntegrationAdmin(admin.ModelAdmin):
         "created_at",
     )
     search_fields = (
-        "integration__id",
-        "integration__owner__name",
-        "integration__name",
+        "id",
+        "name",
+        "owner__name",
+        "type__name",
+        "type__value",
     )
     inlines = [
         DispatcherDeploymentInline,
