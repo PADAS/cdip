@@ -189,8 +189,8 @@ class IntegrationsView(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Superusers can see all
-        if self.request.user.is_superuser:
-            return Integration.objects.all()
+        # if self.request.user.is_superuser:
+        return Integration.objects.all()
         # Return the list of connections that the user is allowed to see
         return get_user_integrations_qs(user=self.request.user)
 

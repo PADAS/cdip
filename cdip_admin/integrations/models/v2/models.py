@@ -72,6 +72,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
     description = models.TextField(
         blank=True,
     )
+    order_number = models.PositiveIntegerField(default=0, blank=True)
     schema = models.JSONField(
         blank=True,
         default=dict,
@@ -81,6 +82,12 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         blank=True,
         default=dict,
         verbose_name="UI Schema"
+    )
+    tags = models.JSONField(
+        blank=True,
+        default=list,
+        verbose_name="Tags",
+        help_text="JSON list of tags for the action"
     )
     integration_type = models.ForeignKey(
         "integrations.IntegrationType",
@@ -98,10 +105,25 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
     )
 
     class Meta:
-        ordering = ("name",)
+        ordering = ("order_number", "name",)
 
     def __str__(self):
-        return f"{self.integration_type} - {self.name}"
+        tags_str = ", ".join(self.tags)
+        return f"{self.integration_type} - {self.name} ({tags_str})"
+
+    def _pre_save(self, *args, **kwargs):
+        if self._state.adding and not self.order_number:
+            max_order_number = IntegrationAction.objects.aggregate(models.Max('order_number'))['order_number__max']
+            self.order_number = (max_order_number or 0) + 1
+
+    def save(self, *args, **kwargs):
+        self._pre_save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+    def add_tag(self, new_tag):
+        if new_tag not in self.tags:
+            self.tags.append(new_tag)
+            self.save(update_fields=["tags"])
 
     def validate_configuration(self, configuration: dict):
         # Helper method to validate a configuration against the Action's schema

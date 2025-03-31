@@ -224,7 +224,8 @@ class IntegrationActionFullSerializer(serializers.ModelSerializer):
             "value",
             "description",
             "schema",
-            "ui_schema"
+            "ui_schema",
+            "tags"
         )
 
 
@@ -281,7 +282,7 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class IntegrationTypeFullSerializer(serializers.ModelSerializer):
-    actions = IntegrationActionFullSerializer(many=True, read_only=True)
+    actions = serializers.SerializerMethodField()
     webhook = IntegrationWebhookFullSerializer(read_only=True)
 
     class Meta:
@@ -295,6 +296,16 @@ class IntegrationTypeFullSerializer(serializers.ModelSerializer):
             "webhook",
             "help_center_url",
         )
+
+    def get_actions(self, obj):
+        actions = IntegrationActionFullSerializer(obj.actions.all(), many=True).data
+        grouped_actions = {}
+        for action in actions:
+            for tag in action.get("tags", []):
+                if tag not in grouped_actions:
+                    grouped_actions[tag] = []
+                grouped_actions[tag].append(action)
+        return dict(sorted(grouped_actions.items()))
 
 
 class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
