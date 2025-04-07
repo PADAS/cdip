@@ -5,7 +5,7 @@ from accounts.utils import get_password_reset_link
 
 
 def send_invite_email(user, organization, is_new_user):
-    subject = f"Gundi - You has been invited to {organization.name}"
+    subject = f"Gundi - You have been invited to {organization.name}"
     context = {
         "name": user.first_name,
         "organization": organization.name,
