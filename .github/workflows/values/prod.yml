@@ -42,7 +42,6 @@ admin_portal:
     RAW_OBSERVATIONS_TOPIC: raw-observations-prod
     PORTAL_BASE_URL: "https://gundiservice.org"
     CONFIGURATION_EVENTS_TOPIC: "configuration-events-prod"
-    EMAIL_INVITE_REDIRECT_URL: "https://gundiservice.org"
 kongplugin:
   cors:
     - https://gundiservice.org
