@@ -22,7 +22,7 @@ database:
 admin_portal:
   env:
     TRACE_ENVIRONMENT: "dev"
-    BROKER_URL: "redis://10.3.176.132:6379"
+    CELERY_BROKER_URL: "redis://10.3.176.132:6379"
     GCP_PROJECT_ID: cdip-dev-78ca
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-dev
     REDIS_HOST: "10.3.176.132"
