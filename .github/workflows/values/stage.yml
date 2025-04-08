@@ -22,7 +22,7 @@ admin_portal:
   env:
     LOGGING_LEVEL: "INFO"
     TRACE_ENVIRONMENT: "stage"
-    BROKER_URL: "redis://10.243.180.36:6379"
+    CELERY_BROKER_URL: "redis://10.243.180.36:6379"
     GCP_PROJECT_ID: cdip-stage-78ca
     DISPATCHER_EVENTS_SUB_ID: cdip-dispatcher-events-sub-stage
     REDIS_HOST: "10.243.180.36"
@@ -37,6 +37,7 @@ admin_portal:
     RAW_OBSERVATIONS_TOPIC: raw-observations-stage
     PORTAL_BASE_URL: "https://stage.gundiservice.org"
     CONFIGURATION_EVENTS_TOPIC: "configuration-events-stage"
+    EMAIL_INVITE_REDIRECT_URL: "https://stage.gundiservice.org"
 kongplugin:
   cors:
     - https://stage.gundiservice.org
