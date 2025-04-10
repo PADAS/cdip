@@ -14,7 +14,7 @@ https://support.earthranger.com/start-here/gundi-introduction
 
 Supported Technologies
 See the integrations available:
-https://support.earthranger.com/en_US/gundi-integrations
+https://support.earthranger.com/gundi-integrations/complete-catalog
 
 If you weren’t expecting this invitation, feel free to ignore this email.
 
