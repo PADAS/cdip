@@ -1,8 +1,24 @@
 Welcome {{name}}
 
-You have been invited to collaborate with {{organization}} in Gundi.
+You’ve been invited to join {{organization}} in Gundi, the free and open-source integration platform developed by the EarthRanger program in collaboration with WCS and WPS that helps you create and manage connections between physical and virtual sensors with conservation tools.
+
+Get Started
+Visit the Gundi Portal:
+{{action_url}}
 {% if is_new_user %}
-    You will need to reset your password clicking in "Forgot Password?".
+    When prompted for credentials, click “Forgot Password?” to receive an email with instructions to set up your password.
 {% endif %}
-Please click the following link to continue
-{{login_url}}
+
+Explore Gundi:
+https://support.earthranger.com/start-here/gundi-introduction
+
+Supported Technologies
+See the integrations available:
+https://support.earthranger.com/gundi-integrations/complete-catalog
+
+If you weren’t expecting this invitation, feel free to ignore this email.
+
+Need help? Visit our Help Center: https://support.earthranger.com/gundi
+or contact support@earthranger.com
+
+Welcome to Gundi. We’re excited to have you on board!
