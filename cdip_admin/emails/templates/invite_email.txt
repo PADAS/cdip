@@ -1,6 +1,6 @@
 Welcome {{name}}
 
-You’ve been invited to join {{organization}} in Gundithe free and open-source integration platform for conservation. It's developed by EarthRanger in collaboration with Wildlife Conservation Society and Wildlife Protection Solutions to help you connect your data to your conservation platform and tools.
+You’ve been invited to join {{organization}} in Gundi the free and open-source integration platform for conservation. It's developed by EarthRanger in collaboration with Wildlife Conservation Society and Wildlife Protection Solutions to help you connect your data to your conservation platform and tools.
 
 Get Started
 Visit the Gundi Portal:
