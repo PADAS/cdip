@@ -29,7 +29,11 @@ class ConsumerCreationError(Exception):
 
 
 def create_api_consumer(integration):
-    json_blob = {"integration_ids": [str(integration.id)]}
+    integration_type_obj = integration.type
+    json_blob = {
+        "integration_ids": [str(integration.id)],
+        "integration_type": getattr(integration_type_obj, "value", getattr(integration_type_obj, "slug", None)),
+    }
     json_blob = json.dumps(json_blob)
     json_blob = json_blob.encode("utf-8")
     custom_id = base64.b64encode(json_blob)
