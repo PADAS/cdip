@@ -78,7 +78,7 @@ class Command(BaseCommand):
 
         # Apply operations
         if options["set_integration_type"]:
-            self.add_integration_type(
+            self.set_integration_type(
                 integrations=integrations,
                 dry_run=options["dry_run"]
             )
@@ -88,7 +88,7 @@ class Command(BaseCommand):
                 include_apikey=options["get_key"],
             )
 
-    def add_integration_type(self, integrations, dry_run=False):
+    def set_integration_type(self, integrations, dry_run=False):
         self.stdout.write(f"Updating consumer info for {integrations.count()} integrations...")
         updated = 0
         for integration in integrations:
