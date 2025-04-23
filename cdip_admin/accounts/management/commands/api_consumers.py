@@ -131,20 +131,26 @@ class Command(BaseCommand):
     def describe_consumers(self, integrations, include_apikey=False):
         self.stdout.write(f"Describing consumers for {integrations.count()} integrations...")
         for integration in integrations:
-            self.stdout.write(f"Reading consumer info for integration {integration} ({integration.id})...")
-            current_consumer_info = get_api_consumer_info(integration)
-            self.stdout.write(f"Consumer info: {current_consumer_info}")
-            consumer_custom_id = current_consumer_info["custom_id"]
-            decoded_data = json.loads(base64.b64decode(consumer_custom_id).decode("utf-8").strip())
-            self.stdout.write(f"Decoded data: {decoded_data}")
-            if include_apikey:
-                self.stdout.write(f"Getting API key...")
-                try:
-                    api_key = get_api_key(integration)
-                except Exception as e:
-                    self.stderr.write(
-                        f"Error getting API key for integration {integration}: {type(e).__name__}: {e}"
-                    )
-                    continue
-                else:
-                    self.stdout.write(f"API key: {api_key}")
+            try:
+                self.stdout.write(f"Reading consumer info for integration {integration} ({integration.id})...")
+                current_consumer_info = get_api_consumer_info(integration)
+                self.stdout.write(f"Consumer info: {current_consumer_info}")
+                consumer_custom_id = current_consumer_info["custom_id"]
+                decoded_data = json.loads(base64.b64decode(consumer_custom_id).decode("utf-8").strip())
+                self.stdout.write(f"Decoded data: {decoded_data}")
+                if include_apikey:
+                    self.stdout.write(f"Getting API key...")
+                    try:
+                        api_key = get_api_key(integration)
+                    except Exception as e:
+                        self.stderr.write(
+                            f"Error getting API key for integration {integration}: {type(e).__name__}: {e}"
+                        )
+                        continue
+                    else:
+                        self.stdout.write(f"API key: {api_key}")
+            except Exception as e:
+                self.stderr.write(
+                    f"Error reading consumer info for integration {integration}: {type(e).__name__}: {e}"
+                )
+                continue
