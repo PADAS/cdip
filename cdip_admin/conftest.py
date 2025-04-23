@@ -2589,6 +2589,17 @@ def mock_get_api_key():
 
 
 @pytest.fixture
+def mock_api_consumer_info(mocker):
+    return {
+        'created_at': 1745347123,
+        'custom_id': 'eyJpbnRlZ3JhdGlvbl9pZHMiOiBbIjVlMzkxNGJmLTZlM2ItNGY5Zi1hNmY5LTE2NGNiYTVkYmYyMSJdfQ==',
+        'id': 'b1a8f782-c4bd-44fd-8ff7-eb7ec0010d77',
+        'tags': None,
+        'username': 'integration:5e3914bf-6e3b-4f9f-a6f9-164cba5dbf21'
+    }
+
+
+@pytest.fixture
 def species_update_request_data():
     return {
         "event_details": {
@@ -3087,6 +3098,15 @@ def legacy_inbound_integration_type_earthranger():
 
 
 @pytest.fixture
+def legacy_inbound_integration_type_awt():
+    return InboundIntegrationType.objects.create(
+        name="Africa Wildlife Tracking (AWT)",
+        slug="awt",
+        description="Default integration type for AWS Animal Collar inbounds",
+    )
+
+
+@pytest.fixture
 def legacy_integration_type_smart():
     return OutboundIntegrationType.objects.create(
         name="SMART",
@@ -3109,6 +3129,15 @@ def inbound_integration_er(legacy_inbound_integration_type_earthranger, organiza
     return InboundIntegrationConfiguration.objects.create(
         name="EarthRanger Integration v1",
         type=legacy_inbound_integration_type_earthranger,
+        owner=organization
+    )
+
+
+@pytest.fixture
+def inbound_integration_awt(legacy_inbound_integration_type_awt, organization):
+    return InboundIntegrationConfiguration.objects.create(
+        name="EarthRanger Integration v1",
+        type=legacy_inbound_integration_type_awt,
         owner=organization
     )
 
