@@ -32,7 +32,7 @@ def create_api_consumer(integration):
     integration_type_obj = integration.type
     json_blob = {
         "integration_ids": [str(integration.id)],
-        "integration_type": getattr(integration_type_obj, "value", getattr(integration_type_obj, "slug", None)),
+        "integration_type": getattr(integration_type_obj, "value", getattr(integration_type_obj, "slug", "unknown")),
     }
     json_blob = json.dumps(json_blob)
     json_blob = json_blob.encode("utf-8")
@@ -49,6 +49,21 @@ def create_api_consumer(integration):
         raise ConsumerCreationError
 
     return True
+
+
+def get_api_consumer_info(integration):
+    response = requests.get(
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}"
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def patch_api_consumer_info(integration, data):
+    patch_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}"
+    response = requests.patch(patch_url, data=data)
+    response.raise_for_status()
+    return response
 
 
 def create_api_key(integration):
