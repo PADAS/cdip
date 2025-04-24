@@ -8,7 +8,27 @@ from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api
 pytestmark = pytest.mark.django_db
 
 
-def test_create_api_consumer(mocker, provider_ats, mock_kong_consumers_api_requests):
+def test_create_api_consumer_for_v1_integration(mocker, inbound_integration_awt, mock_kong_consumers_api_requests):
+
+    mocker.patch("integrations.utils.requests", mock_kong_consumers_api_requests)
+
+    result = create_api_consumer(inbound_integration_awt)
+
+    assert result is True
+    expected_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}"
+    expected_json_blob = json.dumps({
+        "integration_ids": [str(inbound_integration_awt.id)],
+        "integration_type": inbound_integration_awt.type.slug,
+    }).encode("utf-8")
+    expected_custom_id = base64.b64encode(expected_json_blob)
+    expected_data = {
+        "username": f"integration:{inbound_integration_awt.id}",
+        "custom_id": expected_custom_id,
+    }
+    mock_kong_consumers_api_requests.post.assert_called_once_with(expected_url, data=expected_data)
+
+
+def test_create_api_consumer_for_v2_integration(mocker, provider_ats, mock_kong_consumers_api_requests):
 
     mocker.patch("integrations.utils.requests", mock_kong_consumers_api_requests)
 
