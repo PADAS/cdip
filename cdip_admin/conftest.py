@@ -2600,6 +2600,18 @@ def mock_api_consumer_info():
 
 
 @pytest.fixture
+def mock_kong_consumers_api_requests(mocker, mock_api_consumer_info):
+    mock_kong_requests = mocker.MagicMock()
+    mock_kong_requests.post.return_value.ok = True
+    mock_kong_requests.post.return_value.status_code = 201
+    mock_kong_requests.patch.return_value.ok = True
+    mock_kong_requests.patch.return_value.status_code = 200
+    mock_kong_requests.get.return_value.ok = True
+    mock_kong_requests.get.return_value.status_code = 200
+    mock_kong_requests.get.return_value.json.return_value = mock_api_consumer_info
+    return mock_kong_requests
+
+@pytest.fixture
 def species_update_request_data():
     return {
         "event_details": {
