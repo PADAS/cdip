@@ -2589,7 +2589,7 @@ def mock_get_api_key():
 
 
 @pytest.fixture
-def mock_api_consumer_info(mocker):
+def mock_api_consumer_info():
     return {
         'created_at': 1745347123,
         'custom_id': 'eyJpbnRlZ3JhdGlvbl9pZHMiOiBbIjVlMzkxNGJmLTZlM2ItNGY5Zi1hNmY5LTE2NGNiYTVkYmYyMSJdfQ==',
