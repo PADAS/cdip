@@ -1,6 +1,5 @@
 import base64
 import json
-from unittest.mock import MagicMock
 
 import pytest
 
