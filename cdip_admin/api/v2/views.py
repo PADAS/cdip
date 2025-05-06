@@ -486,7 +486,6 @@ class ActivityLogsViewSet(
     An endpoint retrieving and revert activity logs.
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
-    serializer_class = v2_serializers.ActivityLogRetrieveSerializer
     filter_backends = [
         drf_filters.OrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
@@ -501,12 +500,20 @@ class ActivityLogsViewSet(
     ]
 
     def get_queryset(self):
+        queryset = ActivityLog.objects.all()
+        if self.action == "list":
+            queryset = queryset.defer("details")  # Exclude details field from the DB queries
         # Superusers can see all
         if self.request.user.is_superuser:
-            return ActivityLog.objects.all()
+            return queryset
         # Returns a list with the logs of integrations that the user is allowed to see
         user_integrations = get_user_integrations_qs(user=self.request.user)
-        return ActivityLog.objects.filter(integration__in=Subquery(user_integrations.values("id")))
+        return queryset.filter(integration__in=Subquery(user_integrations.values("id")))
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return v2_serializers.ActivityLogBaseSerializer
+        return v2_serializers.ActivityLogDetailsSerializer
 
     @action(detail=True, methods=["post", "put"])
     def revert(self, request, pk=None):
