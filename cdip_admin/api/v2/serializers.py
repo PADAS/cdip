@@ -1159,7 +1159,7 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
     has_error = serializers.BooleanField(read_only=True)
 
 
-class ActivityLogRetrieveSerializer(serializers.Serializer):
+class ActivityLogBaseSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     log_level = serializers.IntegerField(read_only=True)
@@ -1169,9 +1169,12 @@ class ActivityLogRetrieveSerializer(serializers.Serializer):
     value = serializers.CharField(read_only=True)
     title = serializers.CharField(read_only=True)
     created_by = UserDetailsRetrieveSerializer(read_only=True)
-    details = serializers.JSONField(read_only=True)
     is_reversible = serializers.BooleanField(read_only=True)
     revert_data = serializers.JSONField(read_only=True)
+
+
+class ActivityLogDetailsSerializer(ActivityLogBaseSerializer):
+    details = serializers.JSONField(read_only=True)
 
 
 class ActionTriggerSerializer(serializers.Serializer):
