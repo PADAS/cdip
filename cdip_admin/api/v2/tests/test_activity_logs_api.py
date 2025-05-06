@@ -31,6 +31,7 @@ def _test_list_activity_logs(api_client, user, expected_logs, params=None):
         assert log.get("value") == expected.value
         assert log.get("title") == expected.title
         assert log.get("created_by") == (expected.created_by.username if expected.created_by else None)
+        assert "details" not in log
 
 
 def test_list_logs_as_superuser(
@@ -457,3 +458,31 @@ def test_cannot_revert_activity_log_as_org_viewer(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_get_activity_log_details(
+        api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
+        destination_movebank, smart_integration, integrations_list_er,
+        observation_delivery_succeeded_activity_log, observation_delivery_succeeded_activity_log_2,
+        observation_delivery_to_movebank_failed_activity_log, observation_delivery_failed_activity_log_2
+):
+    api_client.force_authenticate(superuser)
+    log = observation_delivery_to_movebank_failed_activity_log
+
+    response = api_client.get(
+        reverse("logs-detail", kwargs={"pk": str(log.id)}),
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    assert response_data.get("id") == str(log.id)
+    assert response_data.get("created_at") == log.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    assert response_data.get("log_level") == log.log_level
+    assert response_data.get("log_type") == str(log.log_type)
+    assert response_data.get("origin") == str(log.origin)
+    integration = response_data.get("integration", {})
+    assert integration.get("id") == str(log.integration.id)
+    assert response_data.get("value") == log.value
+    assert response_data.get("title") == log.title
+    # Check details are retrieved too
+    assert response_data.get("details") == log.details
