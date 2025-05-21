@@ -408,7 +408,8 @@ def send_observations_to_routing(observations, gundi_ids):
 def log_data_received(data: GundiBaseModel, integration_type, **kwargs):
     # Log info for traffic anomaly detection
     try:
-        log_message = f"gundi_api.v2.data_received:{integration_type}.{data.integration_id}.{data.device_id}"
+        external_source_id = getattr(data, "external_source_id", None)
+        log_message = f"gundi_api.v2.data_received:{integration_type}.{data.data_provider_id}.{external_source_id}"
         recorded_at_iso = data.recorded_at.isoformat() if getattr(data, "recorded_at", None) else None
         logger.info(
             log_message,
@@ -416,7 +417,7 @@ def log_data_received(data: GundiBaseModel, integration_type, **kwargs):
                 "integration_type": integration_type,
                 "data_provider_id": getattr(data, "data_provider_id", None),
                 "source_id": getattr(data, "source_id", None),
-                "external_source_id": getattr(data, "external_source_id", None),
+                "external_source_id": external_source_id,
                 "related_to": getattr(data, "related_to", None),
                 "recorded_at": recorded_at_iso,
                 "data_type": type(data).__name__,
