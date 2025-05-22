@@ -123,7 +123,7 @@ def send_events_to_routing(events, gundi_ids):
                 status=event.get("status")
             )
             # Log info for traffic anomaly detection.
-            log_data_received(data=event, integration_type=integration_type)
+            log_data_received(data=event_obj, integration_type=integration_type)
 
             # Check for duplicates
             is_duplicate = is_duplicate_data(data=event, expiration_time=settings.GEOEVENT_DUPLICATE_CHECK_SECONDS)
