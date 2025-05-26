@@ -301,3 +301,57 @@ def test_update_event(api_client, mocker, request, request_data, trap_tagger_eve
     assert mock_publisher.publish.call_args.kwargs["ordering_key"] == gundi_id
     assert extra_arg.get("gundi_version") == "v2"
     assert extra_arg.get("observation_type") == StreamPrefixEnum.event_update.value
+
+
+def test_event_with_invalid_lat_returns_400(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = {
+        "source": "camera123",
+        "title": "Animal Detected",
+        "event_type": "animals",
+        "recorded_at": "2024-08-22 13:01:26-0300",
+        "location": {
+            "lat": -91.104423,  # Invalid latitude
+            "lon": -109.239682,
+        },
+        "event_details": {
+            "species": "lion"
+        }
+    }
+    response = api_client.post(
+        reverse("events-list"),
+        data=data,
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert not mock_publisher.called
+
+
+def test_event_with_invalid_lon_returns_400(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = {
+        "source": "camera123",
+        "title": "Animal Detected",
+        "event_type": "animals",
+        "recorded_at": "2024-08-22 13:01:26-0300",
+        "location": {
+            "lat": -27.104423,
+            "lon": 181.239682,  # Invalid longitude
+        },
+        "event_details": {
+            "species": "lion"
+        }
+    }
+    response = api_client.post(
+        reverse("events-list"),
+        data=data,
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert not mock_publisher.called
