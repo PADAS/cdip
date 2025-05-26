@@ -931,6 +931,8 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         # I must contain lat and lon and other extra fields are accepted
         if "lat" not in value or "lon" not in value:
             raise drf_exceptions.ValidationError(detail=f"'location' requires 'lat' and 'lon'.")
+        if not are_valid_coordinates(value["lat"], value["lon"]):
+            raise drf_exceptions.ValidationError(detail=f"'location' requires valid 'lat' and 'lon' coordinates.")
         return value
 
     def validate_geometry(self, value):
@@ -1024,6 +1026,8 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # I must contain lat and lon and other extra fields are accepted
         if "lat" not in value or "lon" not in value:
             raise drf_exceptions.ValidationError(detail=f"'location' requires 'lat' and 'lon'.")
+        if not are_valid_coordinates(value["lat"], value["lon"]):
+            raise drf_exceptions.ValidationError(detail=f"'location' requires valid 'lat' and 'lon' coordinates.")
         return value
 
     def create(self, validated_data):
@@ -1230,3 +1234,24 @@ class EULARetrieveSerializer(serializers.ModelSerializer):
             return False
         else:
             return agreement.accept
+
+
+def are_valid_coordinates(latitude: float, longitude: float) -> bool:
+    """
+    Validates if the given latitude and longitude coordinates are within valid ranges.
+
+    Args:
+        latitude (float): Latitude value in degrees (-90 to 90)
+        longitude (float): Longitude value in degrees (-180 to 180)
+
+    Returns:
+        bool: True if coordinates are valid, False otherwise
+    """
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+        if (-90 <= lat <= 90) and (-180 <= lon <= 180):
+            return True
+        return False
+    except (ValueError, TypeError):
+        return False
