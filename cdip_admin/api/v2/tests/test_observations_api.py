@@ -204,3 +204,70 @@ def test_override_observation_source_name_with_existent_source(
     assert final_message.get("location", {}).get("lat") == observation_data["location"]["lat"]
     assert final_message.get("location", {}).get("lon") == observation_data["location"]["lon"]
     assert final_message.get("additional") == observation_data["additional"]
+
+
+def test_observation_with_invalid_lat_returns_400(
+        api_client, mocker, mock_publisher, mock_deduplication,
+        provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = {
+        "source": "ABC123",
+        "type": "tracking-device",
+        "subject_type": "giraffe",
+        "recorded_at": "2023-08-24 12:02:02-0700",
+        "location": {
+            "lat": -91.0,  # Invalid latitude
+            "lon": -72.704435
+        },
+        "additional": {
+            "speed_kmph": 5
+        },
+        "annotations": {
+            "priority": "high"
+        }
+    }
+    response = api_client.post(
+        reverse("observations-list"),
+        data=data,
+        format='json',
+        **keyauth_headers_lotek
+    )
+    # Check the request response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert not mock_publisher.publish.called
+
+def test_observation_with_invalid_lon_returns_400(
+        api_client, mocker, mock_publisher, mock_deduplication,
+        provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = {
+        "source": "ABC123",
+        "type": "tracking-device",
+        "subject_type": "giraffe",
+        "recorded_at": "2023-08-24 12:02:02-0700",
+        "location": {
+            "lat": -51.688650,
+            "lon": 181.0  # Invalid longitude
+        },
+        "additional": {
+            "speed_kmph": 5
+        },
+        "annotations": {
+            "priority": "high"
+        }
+    }
+    response = api_client.post(
+        reverse("observations-list"),
+        data=data,
+        format='json',
+        **keyauth_headers_lotek
+    )
+    # Check the request response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert not mock_publisher.publish.called
