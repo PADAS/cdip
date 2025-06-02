@@ -440,11 +440,11 @@ def send_text_messages_to_routing(text_messages, gundi_ids):
             tracing.instrumentation.enrich_span_with_environment(
                 span=current_span
             )
-            observation_type = StreamPrefixEnum.observation.value
-            integration = text_messages.get("integration")
-            source = text_messages.get("source")
+            observation_type = StreamPrefixEnum.text_message.value
+            integration = text_message.get("integration")
+            source = text_message.get("source")
             source_id = source.external_id if source else None
-            location = text_messages.get("location", {})
+            location = text_message.get("location", {})
             current_span.set_attribute("gundi_id", gundi_id)
             integration_type = integration.type.value
             sender = text_message.get("sender")

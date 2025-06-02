@@ -1231,6 +1231,30 @@ class TextMessageSerializer(GundiTraceSerializer):
             )
         return instance
 
+    def validate(self, data):
+        data = super().validate(data)
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=data["integration"],
+            external_id=data.get("source", "default-source"),
+            defaults={
+                "name": data.get("source_name", "")
+            }
+        )
+        data["source"] = source
+        return data
+
+    def validate_location(self, value):
+        # If provided, location must contain latitude and longitude with valid values
+        if "latitude" not in value or "longitude" not in value:
+            raise drf_exceptions.ValidationError(detail=f"'location' requires 'latitude' and 'longitude'.")
+        if not are_valid_coordinates(value["latitude"], value["longitude"]):
+            raise drf_exceptions.ValidationError(detail=f"'location' requires valid 'latitude' and 'longitude' coordinates.")
+        return value
+
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement if we decide to support updating tracking data
+
 
 class GundiTraceRetrieveSerializer(serializers.Serializer):
     object_id = serializers.UUIDField(read_only=True)
