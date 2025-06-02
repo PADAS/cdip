@@ -461,6 +461,19 @@ class AttachmentViewSet(
         return Response(serializer.data, headers=headers)
 
 
+class MessagesView(
+    SingleOrBulkCreateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    An endpoint for sending text messages
+    """
+    authentication_classes = []  # Authentication is handled by Keycloak
+    permission_classes = []
+    serializer_class = v2_serializers.TextMessageSerializer
+    queryset = GundiTrace.objects.all()
+
+
 class GundiTraceViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet

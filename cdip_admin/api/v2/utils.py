@@ -6,8 +6,9 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation, EventUpdate, \
-    GundiBaseModel
-from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, AttachmentReceived
+    GundiBaseModel, TextMessage
+from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, AttachmentReceived, \
+    TextMessageReceived
 
 from core import tracing, cache
 from opentelemetry import trace
@@ -428,3 +429,96 @@ def log_data_received(data: GundiBaseModel, integration_type, **kwargs):
         logger.exception(f"Failed to log data received: {e}")
         logger.debug(f"Integration Type: {integration_type}")
         logger.debug(f"kwargs: {kwargs}")
+
+
+def send_text_messages_to_routing(text_messages, gundi_ids):
+    for text_message, gundi_id in zip(text_messages, gundi_ids):
+        # Trace observations with Open Telemetry
+        with tracing.tracer.start_as_current_span(
+                f"gundi_api.process_text_message", kind=trace.SpanKind.PRODUCER
+        ) as current_span:
+            tracing.instrumentation.enrich_span_with_environment(
+                span=current_span
+            )
+            observation_type = StreamPrefixEnum.observation.value
+            integration = text_messages.get("integration")
+            source = text_messages.get("source")
+            source_id = source.external_id if source else None
+            location = text_messages.get("location", {})
+            current_span.set_attribute("gundi_id", gundi_id)
+            integration_type = integration.type.value
+            sender = text_message.get("sender")
+            recipients = text_message.get("recipients", [])
+            current_span.set_attribute("observation_type", observation_type)
+            current_span.set_attribute("integration_type", integration_type)
+            current_span.set_attribute("integration_id", str(integration.id))
+            current_span.set_attribute("integration_name", integration.name)
+            current_span.set_attribute("external_source_id", str(source_id)),
+            current_span.set_attribute("device_id", str(source_id))  # For backward compatibility
+            current_span.set_attribute("location", str(location))
+            current_span.set_attribute("sender", str(sender))
+            current_span.set_attribute("recipients", str(recipients))
+
+            text_message_obj = TextMessage(
+                gundi_id=str(gundi_id),
+                related_to=text_message.get("related_to"),
+                owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                data_provider_id=str(integration.id),
+                source_id=str(source.id),
+                external_source_id=str(source.external_id),
+                sender=sender,
+                recipients=recipients,
+                text=text_message.get("text"),
+                created_at=text_message.get("recorded_at"),
+                location=Location(
+                    lon=location.get("longitude"),  # Longitude
+                    lat=location.get("latitude"),  # Latitude
+                    alt=location.get("altitude", 0.0),  # Altitude
+                    hdop=location.get("hdop"),
+                    vdop=location.get("vdop")
+                ),
+                additional=text_message.get("additional", {}),
+                observation_type=StreamPrefixEnum.text_message.value
+            )
+
+            # Check for duplicates
+            is_duplicate = is_duplicate_data(
+                data=text_message,
+                expiration_time=settings.TEXT_MESSAGE_DUPLICATE_CHECK_SECONDS
+            )
+            if is_duplicate:
+                current_span.set_attribute("is_duplicate", True)
+                current_span.add_event(
+                    name=f"gundi_api.duplicate.text_message_discarded"
+                )
+                # Mark traces for this text message as duplicates and discard the text message
+                GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
+                continue
+
+            with tracing.tracer.start_as_current_span(
+                    f"gundi_api.send_text_message_to_routing", kind=trace.SpanKind.PRODUCER
+            ) as current_span:
+                # Convert the event to the schema supported by routing
+                msg_for_routing = TextMessageReceived(payload=text_message_obj)
+                tracing.instrumentation.enrich_span_from_text_message(
+                    span=current_span, text_message=msg_for_routing.payload, gundi_version="v2"
+                )
+                tracing_context = json.dumps(
+                    tracing.instrumentation.build_context_headers(),
+                    default=str,
+                )
+                # Send message to routing services
+                observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+                logger.debug(
+                    f"Publishing TextMessageReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+                )
+                publisher.publish(
+                    topic=observations_topic,
+                    data=msg_for_routing.dict(exclude_none=True),
+                    extra={
+                        "observation_type": StreamPrefixEnum.text_message.value,
+                        "gundi_version": "v2",  # Add the version so routing knows how to handle it
+                        "gundi_id": str(gundi_id),
+                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                    },
+                )

@@ -24,6 +24,7 @@ events_router.register(r'attachments', views.AttachmentViewSet, basename='attach
 default_router.register('traces', views.GundiTraceViewSet, basename="traces")
 default_router.register('logs', views.ActivityLogsViewSet, basename="logs")
 default_router.register('eula', views.EULAView, basename="eula")
+default_router.register('messages', views.MessagesView, basename="messages")
 
 schema_view = get_swagger_view(title="CDIP ADMIN API V2")
 

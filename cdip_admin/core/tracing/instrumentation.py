@@ -80,6 +80,18 @@ def enrich_span_from_attachment(span, attachment, **kwargs):
     _enrich_span_from_kwargs(span, **kwargs)
 
 
+def enrich_span_from_text_message(span, text_message, **kwargs):
+    span.set_attribute("gundi_id", str(text_message.gundi_id))
+    span.set_attribute("integration_id", str(text_message.data_provider_id))
+    span.set_attribute("observation_type", str(text_message.observation_type))
+    span.set_attribute("source_id", str(text_message.source_id))
+    span.set_attribute("external_source_id", str(text_message.external_source_id))
+    span.set_attribute("location", str(text_message.location.dict()) if text_message.location else "no-location")
+    span.set_attribute("sender", str(text_message.sender))
+    span.set_attribute("recipients", str(text_message.recipients))
+    _enrich_span_from_kwargs(span, **kwargs)
+
+
 def build_context_headers():
     headers = {}
     propagate.inject(headers)
