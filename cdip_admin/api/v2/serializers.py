@@ -1176,7 +1176,7 @@ class TextMessageSerializer(GundiTraceSerializer):
         write_only=True,
         required=True,
     )
-    recipients = serializers.ListField(
+    recipients = serializers.ListField(  # ToDo: support alias device_ids
         write_only=True,
         required=True,
         child=serializers.CharField()
