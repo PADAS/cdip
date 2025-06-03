@@ -476,7 +476,7 @@ def send_text_messages_to_routing(text_messages, gundi_ids):
                     alt=location.get("altitude", 0.0),  # Altitude
                     hdop=location.get("hdop"),
                     vdop=location.get("vdop")
-                ),
+                ) if location else None,
                 additional=text_message.get("additional", {}),
                 observation_type=StreamPrefixEnum.text_message.value
             )

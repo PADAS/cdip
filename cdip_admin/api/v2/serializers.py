@@ -1249,6 +1249,8 @@ class TextMessageSerializer(GundiTraceSerializer):
 
     def validate_location(self, value):
         # If provided, location must contain latitude and longitude with valid values
+        if not value:
+            return value
         if "latitude" not in value or "longitude" not in value:
             raise drf_exceptions.ValidationError(detail=f"'location' requires 'latitude' and 'longitude'.")
         if not are_valid_coordinates(value["latitude"], value["longitude"]):
@@ -1259,6 +1261,9 @@ class TextMessageSerializer(GundiTraceSerializer):
         # Support alias device_ids for recipients, for backwards compatibility
         if "device_ids" in data:
             data["recipients"] = data.pop("device_ids")
+        # Support alias created_at for recorded_at, for backwards compatibility
+        if "created_at" in data:
+            data["recorded_at"] = data.pop("created_at")
         # Proceed with default validation
         return super().to_internal_value(data)
 
