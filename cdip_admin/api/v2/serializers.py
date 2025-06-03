@@ -1231,6 +1231,9 @@ class TextMessageSerializer(GundiTraceSerializer):
             )
         return instance
 
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement if we decide to support updating tracking data
+
     def validate(self, data):
         data = super().validate(data)
         # Get or create sources as they are discovered
@@ -1252,8 +1255,12 @@ class TextMessageSerializer(GundiTraceSerializer):
             raise drf_exceptions.ValidationError(detail=f"'location' requires valid 'latitude' and 'longitude' coordinates.")
         return value
 
-    def update(self, instance, validated_data):
-        pass  # ToDo: Implement if we decide to support updating tracking data
+    def to_internal_value(self, data):
+        # Support alias device_ids for recipients, for backwards compatibility
+        if "device_ids" in data:
+            data["recipients"] = data.pop("device_ids")
+        # Proceed with default validation
+        return super().to_internal_value(data)
 
 
 class GundiTraceRetrieveSerializer(serializers.Serializer):
