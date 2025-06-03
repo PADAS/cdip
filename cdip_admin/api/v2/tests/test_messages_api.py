@@ -63,7 +63,7 @@ def test_send_single_message_from_inreach_to_er(
         integration=inreach_connection,
         headers={"HTTP_X_CONSUMER_USERNAME": f"integration:{inreach_connection.id}"},
         data={
-            "sender": "+1234567890",
+            "sender": "2075752244",
             "recipients": ["admin@sitex.pamdas.org"],
             "text": "Help! I need assistance.",
             "recorded_at": "2025-06-03 09:54:10-0300",
@@ -91,7 +91,7 @@ def test_send_multiple_messages_from_inreach_to_er(
         headers={"HTTP_X_CONSUMER_USERNAME": f"integration:{inreach_connection.id}"},
         data=[
             {
-                "sender": "+1234567890",
+                "sender": "2075752244",
                 "recipients": ["admin@sitex.pamdas.org"],
                 "text": "Help! I need assistance.",
                 "recorded_at": "2025-06-03 09:54:10-0300",
@@ -109,7 +109,7 @@ def test_send_multiple_messages_from_inreach_to_er(
                 }
             },
             {
-                "sender": "+0987654321",
+                "sender": "2075752244",
                 "recipients": ["user@sitex.pamdas.org"],
                 "text": "FYI my battery is low.",
                 "recorded_at": "2025-06-03 10:00:00-0300",
