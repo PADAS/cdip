@@ -1215,13 +1215,13 @@ def integration_type_inreach():
 
 
 @pytest.fixture
-def inreach_webhook(integration_type_liquidtech):
+def inreach_webhook(integration_type_inreach):
     return IntegrationWebhook.objects.create(
-        name="Liquidtech Webhook",
-        value="liquidtech_webhook",
-        description="Liquidtech Webhook",
-        integration_type=integration_type_liquidtech,
-        schema={}  # ToDo: Define the schema for the webhook if needed
+        name="InReach Webhook",
+        value="inreach_webhook",
+        description="InReach Webhook",
+        integration_type=integration_type_inreach,
+        schema={}
     )
 
 
