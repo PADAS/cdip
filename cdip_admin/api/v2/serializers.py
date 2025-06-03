@@ -1232,7 +1232,7 @@ class TextMessageSerializer(GundiTraceSerializer):
         return instance
 
     def update(self, instance, validated_data):
-        pass  # ToDo: Implement if we decide to support updating tracking data
+        pass  # ToDo: Implement if we decide to support updating messages
 
     def validate(self, data):
         data = super().validate(data)
