@@ -429,6 +429,17 @@ def er_action_push_events(integration_type_er):
 
 
 @pytest.fixture
+def er_action_push_messages(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Messages",
+        value="push_messages",
+        description="Push text messages to Earth Ranger API",
+    )
+
+
+@pytest.fixture
 def er_action_pull_positions(integration_type_er):
     return IntegrationAction.objects.create(
         integration_type=integration_type_er,
@@ -448,6 +459,39 @@ def er_action_pull_events(integration_type_er):
         value="pull_events",
         description="Pull Event data from Earth Ranger API",
     )
+
+
+@pytest.fixture
+def earthranger_conection(
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_push_messages
+):
+    connection, _ = Integration.objects.get_or_create(
+        type=integration_type_er,
+        name=f"Earthranger connection {get_random_id()}",
+        owner=organization,
+        base_url=f"sitex.pamdas.org",
+    )
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=connection,
+        action=er_action_auth,
+        data={
+            "token": f"testtoken{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=connection,
+        action=er_action_push_messages,
+        data={},
+    )
+    ensure_default_route(integration=connection)
+    return connection
+
 
 
 @pytest.fixture
@@ -1159,6 +1203,59 @@ def provider_liquidtech_with_webhook_config(
         }
     )
     return provider
+
+
+@pytest.fixture
+def integration_type_inreach():
+    return IntegrationType.objects.create(
+        name="InReach Integration",
+        value="inreach",
+        description="Standard Integration type for InReach.",
+    )
+
+
+@pytest.fixture
+def inreach_webhook(integration_type_inreach):
+    return IntegrationWebhook.objects.create(
+        name="InReach Webhook",
+        value="inreach_webhook",
+        description="InReach Webhook",
+        integration_type=integration_type_inreach,
+        schema={}
+    )
+
+
+@pytest.fixture
+def inreach_push_messages(integration_type_inreach):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_inreach,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Messages",
+        value="push_messages",
+        description="Push text messages to InReach API",
+    )
+
+@pytest.fixture
+def inreach_connection(
+        get_random_id,
+        organization,
+        integration_type_inreach,
+        inreach_webhook,
+        inreach_push_messages,
+):
+    connection = Integration.objects.create(
+        type=integration_type_inreach,
+        name=f"InReach Webhooks",
+        owner=organization,
+        base_url=f"https://api.test.inreach.com",
+    )
+    # Configure webhook
+    WebhookConfiguration.objects.create(
+        integration=connection,
+        webhook=inreach_webhook,
+        data={}
+    )
+    return connection
 
 
 @pytest.fixture

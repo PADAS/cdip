@@ -20,7 +20,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django_celery_beat.models import CrontabSchedule
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
-    send_event_update_to_routing
+    send_event_update_to_routing, send_text_messages_to_routing
 
 User = get_user_model()
 
@@ -1142,6 +1142,130 @@ class EventAttachmentSerializer(GundiTraceSerializer):
             ).first().object_id
         # ToDo: Get source from id from the related event?
         return data
+
+
+class TextMessageBulkCreateSerializer(serializers.ListSerializer):
+    """
+    Custom Serializer to support bulk creation of text messages
+    """
+
+    def create(self, validated_data):
+        messages = [
+            self.child.create(data) for data in validated_data
+        ]
+
+        try:  # Write to the database
+            messages = GundiTrace.objects.bulk_create(messages)
+        except IntegrityError as e:
+            raise drf_exceptions.ValidationError(e)
+        else:
+            message_ids = [str(msg.object_id) for msg in messages]
+            # Publish messages to a topic to be processed by routing services
+            send_text_messages_to_routing(
+                text_messages=validated_data,
+                gundi_ids=message_ids
+            )
+            return messages
+
+    def update(self, instance, validated_data):
+        pass
+
+
+class TextMessageSerializer(GundiTraceSerializer):
+    sender = serializers.CharField(
+        write_only=True,
+        required=True,
+    )
+    recipients = serializers.ListField(  # ToDo: support alias device_ids
+        write_only=True,
+        required=True,
+        child=serializers.CharField()
+    )
+    text = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        default=""  # Default to empty string
+    )
+    recorded_at = serializers.DateTimeField(
+        write_only=True,
+        required=True,
+    )
+    location = serializers.JSONField(
+        write_only=True,
+        required=False,
+        default=dict  # Default to an empty dict
+    )
+    additional = serializers.JSONField(
+        write_only=True,
+        required=False,
+        default=dict  # Default to an empty dict
+    )
+    integration = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        required=False,
+        queryset=Integration.objects.all()
+    )
+
+    class Meta:
+        list_serializer_class = TextMessageBulkCreateSerializer
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        created_by = user if user and not user.is_anonymous else None
+        # Don't save to teh DB if it's a bulk create
+        instance = GundiTrace(
+            # We save only IDs, no sensitive data is saved
+            data_provider=validated_data.get("integration"),
+            object_type=StreamPrefixEnum.text_message.value,
+            created_by=created_by
+            # Other fields are filled in later by the routing services
+        )
+        # Save if it's a single object create request
+        if isinstance(self._kwargs["data"], dict):
+            instance.save()
+            send_text_messages_to_routing(
+                text_messages=[validated_data],
+                gundi_ids=[str(instance.object_id)]
+            )
+        return instance
+
+    def update(self, instance, validated_data):
+        pass  # ToDo: Implement if we decide to support updating messages
+
+    def validate(self, data):
+        data = super().validate(data)
+        # Get or create sources as they are discovered
+        source, created = Source.objects.get_or_create(
+            integration=data["integration"],
+            external_id=data.get("source", "default-source"),
+            defaults={
+                "name": data.get("source_name", "")
+            }
+        )
+        data["source"] = source
+        return data
+
+    def validate_location(self, value):
+        # If provided, location must contain latitude and longitude with valid values
+        if not value:
+            return value
+        if "latitude" not in value or "longitude" not in value:
+            raise drf_exceptions.ValidationError(detail=f"'location' requires 'latitude' and 'longitude'.")
+        if not are_valid_coordinates(value["latitude"], value["longitude"]):
+            raise drf_exceptions.ValidationError(detail=f"'location' requires valid 'latitude' and 'longitude' coordinates.")
+        return value
+
+    def to_internal_value(self, data):
+        # Support alias device_ids for recipients, for backwards compatibility
+        if "device_ids" in data:
+            data["recipients"] = data.pop("device_ids")
+        # Support alias created_at for recorded_at, for backwards compatibility
+        if "created_at" in data:
+            data["recorded_at"] = data.pop("created_at")
+        # Proceed with default validation
+        return super().to_internal_value(data)
 
 
 class GundiTraceRetrieveSerializer(serializers.Serializer):
