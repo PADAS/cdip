@@ -143,7 +143,7 @@ def test_send_single_message_from_er_to_inreach(
         headers={"HTTP_X_CONSUMER_USERNAME": f"integration:{earthranger_conection.id}"},
         data={
             "sender": "admin@sitex.pamdas.org",
-            "device_ids": ["+1234567890"],  # test recipients alias
+            "device_ids": ["2075752244"],  # test recipients alias
             "text": "Help is on the way!",
             "created_at": "2025-06-03 11:54:10-0300"
         }
@@ -164,13 +164,13 @@ def test_send_multiple_messages_from_er_to_inreach(
         data=[
             {
                 "sender": "admin@sitex.pamdas.org",
-                "device_ids": ["+1234567890", "+0987654321"],
+                "device_ids": ["2075752244", "1275752245"],
                 "text": "Help is on the way!",
                 "recorded_at": "2025-06-03 12:54:10-0300"
             },
             {
                 "sender": "admin@sitex.pamdas.org",
-                "recipients": ["+1234567890"],
+                "recipients": ["2075752244"],
                 "text": "We are close to your location.",
                 "location": {
                     "latitude": -51.675,
