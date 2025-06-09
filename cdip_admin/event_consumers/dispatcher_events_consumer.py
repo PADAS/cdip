@@ -178,8 +178,13 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
+    # Flag the error as a warning if ER returns a 409 conflict error. Those are retried.
+    if "pamdas.org" in event.payload.error and event.payload.server_response_status == 409:
+        level = ActivityLog.LogLevels.WARNING
+    else:
+        level = ActivityLog.LogLevels.ERROR
     ActivityLog.objects.create(
-        log_level=ActivityLog.LogLevels.ERROR,
+        log_level=level,
         log_type=ActivityLog.LogTypes.EVENT,
         origin=ActivityLog.Origin.DISPATCHER,
         integration=trace.data_provider,
