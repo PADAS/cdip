@@ -403,15 +403,15 @@ def test_show_stream_type_in_activity_log_title_on_observation_delivery(
 
 
 def test_409_delivery_errors_are_logged_as_warnings(
-        lotek_observation_trace, er_observation_delivery_failed_schema_v2,
+        lotek_observation_trace, er_observation_delivery_failed_with_conflict,
 ):
     # Test that delivery failures where ER responds with 409 status are logged as warnings
-    process_event(er_observation_delivery_failed_schema_v2)
+    process_event(er_observation_delivery_failed_with_conflict)
     lotek_observation_trace.refresh_from_db()
     assert lotek_observation_trace.has_error
     assert lotek_observation_trace.error == "Delivery Failed at the Dispatcher."
     # Check that the event was recorded in the activity log
-    event_dict = json.loads(er_observation_delivery_failed_schema_v2.data)
+    event_dict = json.loads(er_observation_delivery_failed_with_conflict.data)
     observation_data = event_dict["payload"]["observation"]
     observation_data["source_external_id"] = lotek_observation_trace.source.external_id
 
