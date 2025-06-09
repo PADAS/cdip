@@ -400,3 +400,31 @@ def test_show_stream_type_in_activity_log_title_on_observation_delivery(
     # Check that the event was recorded with hte right title in the activity logs
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
     assert activity_log.title == f"{stream_type} {trace.object_id} Delivered to '{trace.destination.base_url}'"
+
+
+def test_409_delivery_errors_are_logged_as_warnings(
+        lotek_observation_trace, er_observation_delivery_failed_schema_v2,
+):
+    # Test that delivery failures where ER responds with 409 status are logged as warnings
+    process_event(er_observation_delivery_failed_schema_v2)
+    lotek_observation_trace.refresh_from_db()
+    assert lotek_observation_trace.has_error
+    assert lotek_observation_trace.error == "Delivery Failed at the Dispatcher."
+    # Check that the event was recorded in the activity log
+    event_dict = json.loads(er_observation_delivery_failed_schema_v2.data)
+    observation_data = event_dict["payload"]["observation"]
+    observation_data["source_external_id"] = lotek_observation_trace.source.external_id
+
+    activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
+    assert activity_log
+    assert activity_log.log_type == ActivityLog.LogTypes.EVENT
+    assert activity_log.log_level == ActivityLog.LogLevels.WARNING
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.value == "observation_delivery_failed"
+    assert activity_log.title == f"Error Delivering Observation {lotek_observation_trace.object_id} to '{lotek_observation_trace.destination.base_url}'"
+    log_details = activity_log.details
+    event_payload = event_dict["payload"]
+    assert log_details.get("error") == event_payload.get("error")
+    assert log_details.get("server_response_status") == event_payload.get("server_response_status")
+    assert log_details.get("server_response_body") == event_payload.get("server_response_body")
+    assert activity_log.details.get("source_external_id") == observation_data["source_external_id"]
