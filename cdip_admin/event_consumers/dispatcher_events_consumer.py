@@ -178,8 +178,9 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
+    level = ActivityLog.LogLevels.WARNING if event.payload.server_response_status == 409 else ActivityLog.LogLevels.ERROR
     ActivityLog.objects.create(
-        log_level=ActivityLog.LogLevels.ERROR,
+        log_level=level,
         log_type=ActivityLog.LogTypes.EVENT,
         origin=ActivityLog.Origin.DISPATCHER,
         integration=trace.data_provider,
