@@ -2605,7 +2605,7 @@ def er_observation_delivery_failed_with_conflict(
         "schema_version": "v2",
         "event_type": "ObservationDeliveryFailed",
         "payload": {
-            'error': 'ERClientBadRequest: ER Conflict ON POST https://fake-site.pamdas.org/api/v1.0//sensors/generic/gundi_hytera_smartdispatchplus_68a5b4b3-04e1-4516-b7c1-09ce80c4330b/status.',
+            'error': 'ERClientRateLimitExceeded: ER Conflict ON POST https://fake-site.pamdas.org/api/v1.0//sensors/generic/gundi_hytera_smartdispatchplus_68a5b4b3-04e1-4516-b7c1-09ce80c4330b/status.',
             'error_traceback': 'Traceback (most recent call last):\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/event_handlers.py", line 124, in dispatch_transformed_observation_v2\n    result = await dispatcher.send(observation, **kwargs)\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/dispatchers.py", line 214, in send\n    raise ex\n  File "/home/dev/earthranger/gundi-dispatcher-er/core/dispatchers.py", line 209, in send\n    return await client.post_report(\n  File "/usr/lib/python3.8/unittest/mock.py", line 1081, in __call__\n    return self._mock_call(*args, **kwargs)\n  File "/usr/lib/python3.8/unittest/mock.py", line 1085, in _mock_call\n    return self._execute_mock_call(*args, **kwargs)\n  File "/usr/lib/python3.8/unittest/mock.py", line 1140, in _execute_mock_call\n    raise effect\nerclient.er_errors.ERClientRateLimitExceeded: ER COnflict ON POST https://fake-site.pamdas.org/api/v1.0/sensors/generic/1234/status (status_code=409) (response_body={"data": [], "status": {"code": 409, "message": "Conflict"}})\n',
             'server_response_status': 409,
             'server_response_body': '{"data": [], "status": {"code": 409, "message": "Conflict"}}',
