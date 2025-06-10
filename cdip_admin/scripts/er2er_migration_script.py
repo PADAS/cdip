@@ -1,5 +1,6 @@
 import os
 import django
+from typing import Dict, Any
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
 
@@ -15,30 +16,45 @@ from integrations.models import (
 
 
 SETTINGS_DIR = 'das2das_zappa-settings'
+REQUIRED_VARS = ['DAS_DEST', 'DAS_SRC', 'DAS_SRC_AUTH_TOKEN']
 
+
+def print_error(msg: str, filename: str):
+    print(f"ERROR: '{msg}' in '{filename}'. Skipping...")
+
+def extract_env_vars(file_path: str, filename: str) -> Dict[str, Any]:
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+        exec_globals = {}
+        exec(content, exec_globals)
+        return exec_globals.get('ENVIRONMENT_VARIABLES', {})
+    except Exception as e:
+        print_error(f"Failed to extract ENVIRONMENT_VARIABLES: {e}", filename)
+        return {}
+
+def get_provider_key(env_vars: dict) -> str:
+    if 'PROVIDER_KEY' in env_vars:
+        return env_vars['PROVIDER_KEY']
+    das_src = env_vars.get('DAS_SRC', '')
+    return das_src.split('://', 1)[-1].split('.', 1)[0] if das_src else ''
 
 def create_inbounds_from_files():
     """
     Reads settings files from the specified directory and creates inbound objects based on the content.
     Each file should contain environment variables and other necessary configurations.
     """
-    total_files = 0
-    files_skipped = 0
-    inbounds_created = 0
-    device_groups_created = 0
-    files_with_error = 0
+    total_files = files_skipped = inbounds_created = device_groups_created = files_with_error = 0
 
     print("\n -- ER2ER Subject Sharing Migration Script -- ")
 
-    inbound_type = InboundIntegrationType.objects.get(slug="er2er_subject_sharing")
+    inbound_type = InboundIntegrationType.objects.filter(slug="er2er_subject_sharing").first()
     if not inbound_type:
         print("ERROR: Inbound Integration Type 'er2er_subject_sharing' not found. Exiting...")
         return
 
     # Get all the ER outbounds available
-    earthranger_outbounds = OutboundIntegrationConfiguration.objects.filter(
-        type__slug="earth_ranger"
-    ).all()
+    earthranger_outbounds = list(OutboundIntegrationConfiguration.objects.filter(type__slug="earth_ranger"))
 
     # This is the ORG to use in PROD for this migrations
     organization, _ = Organization.objects.get_or_create(
@@ -50,27 +66,15 @@ def create_inbounds_from_files():
         print(f"\n - Processing file: '{filename}'\n")
         total_files += 1
         file_path = os.path.join(SETTINGS_DIR, filename)
-        with open(file_path, 'r') as f:
-            content = f.read()
-        try:
-            exec_globals = {}
-            exec(content, exec_globals)
-            env_vars = exec_globals.get('ENVIRONMENT_VARIABLES', {})
-        except Exception as e:
-            print(f"ERROR: Failed to extract ENVIRONMENT_VARIABLES from '{filename}': {e}")
-            files_with_error += 1
-            continue
-
+        env_vars = extract_env_vars(file_path, filename)
         if not env_vars:
-            print(f"ERROR: ENVIRONMENT_VARIABLES not found in '{filename}'. Skipping...")
+            print_error(f"ENVIRONMENT_VARIABLES not found or empty in '{filename}'", filename)
             files_with_error += 1
             continue
 
-        # Check if env_vars includes required variables and if not, log a warning and skip
-        required_vars = ['DAS_DEST', 'DAS_SRC', 'DAS_SRC_AUTH_TOKEN']
-        missing_vars = [var for var in required_vars if var not in env_vars]
+        missing_vars = [var for var in REQUIRED_VARS if var not in env_vars]
         if missing_vars:
-            print(f"ERROR: ENVIRONMENT_VARIABLES inside '{filename}' is missing required variables: {', '.join(missing_vars)}. Skipping Inbound creation...")
+            print_error(f"ENVIRONMENT_VARIABLES missing required variables: {', '.join(missing_vars)}", filename)
             files_with_error += 1
             continue
 
@@ -83,13 +87,10 @@ def create_inbounds_from_files():
             owner=organization
         )
         if created:
-            matching_outbound = next(
-                (outbound for outbound in earthranger_outbounds if
-                 env_vars['DAS_DEST'] in outbound.endpoint),
-                None
-            )
+            das_dest = env_vars['DAS_DEST']
+            matching_outbound = next((o for o in earthranger_outbounds if das_dest in o.endpoint), None)
             if not matching_outbound:
-                print(f"ERROR: DAS_DEST ({env_vars['DAS_DEST']}) inside ENVIRONMENT_VARIABLES from '{filename}' does not exist. Skipping Inbound creation...")
+                print_error(f"DAS_DEST ({das_dest}) outbound not found.", filename)
                 device_group.delete()
                 files_with_error += 1
                 continue
@@ -100,15 +101,19 @@ def create_inbounds_from_files():
         else:
             print(f"Device Group already exists with the name: {device_group.name}.")
 
+        das_dest_key = env_vars['DAS_DEST'].split('://', 1)[-1].split('.', 1)[0]
+        provider = f"er2er_subjects_to_{das_dest_key}"
+        endpoint = f"{env_vars['DAS_SRC']}/api/v1.0"
+
         # Create the inbound configuration
         inbound, created = InboundIntegrationConfiguration.objects.get_or_create(
             name=f"ER2ER Subjects - {inbound_name}",
             owner=organization,
             type=inbound_type,
-            provider=f"er2er_subjects_to_{env_vars.get('DAS_DEST').split('://', 1)[-1].split('.', 1)[0]}",
+            provider=provider,
             enabled=False, # Set to False by default, can be enabled later
             default_devicegroup=device_group,
-            endpoint=f"{env_vars['DAS_SRC']}/api/v1.0"
+            endpoint=endpoint
         )
 
         if created:
@@ -117,13 +122,9 @@ def create_inbounds_from_files():
                 "batch_size": env_vars.get('BATCH_SIZE', 1024),
                 "feature_groups": env_vars.get('FEATURE_GROUPS', []),
                 "look_back_window_hours": env_vars.get('LOOK_BACK_WINDOW_HOURS', 12),
-                "provider_key": env_vars.get(
-                    'PROVIDER_KEY',
-                    f"er2er_subjects_from_{env_vars.get('DAS_SRC').split('://', 1)[-1].split('.', 1)[0]}",
-                ),
+                "provider_key": get_provider_key(env_vars),
                 "schedule_interval_minutes": env_vars.get('SCHEDULE_INTERVAL_MINUTES', 5),
                 "subject_additional": True,
-                "subject_group": "ER2ER - From CSL"
             }
             if env_vars.get('SUBJECT_GROUP'):
                 state['subject_group'] = env_vars.get('SUBJECT_GROUP')
