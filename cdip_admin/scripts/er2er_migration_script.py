@@ -1,0 +1,148 @@
+import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cdip_admin.settings')
+
+django.setup()
+
+from integrations.models import (
+    DeviceGroup,
+    InboundIntegrationConfiguration,
+    InboundIntegrationType,
+    Organization,
+    OutboundIntegrationConfiguration
+)
+
+
+SETTINGS_DIR = 'das2das_zappa-settings'
+
+
+def create_inbounds_from_files():
+    """
+    Reads settings files from the specified directory and creates inbound objects based on the content.
+    Each file should contain environment variables and other necessary configurations.
+    """
+    total_files = 0
+    files_skipped = 0
+    inbounds_created = 0
+    device_groups_created = 0
+    files_with_error = 0
+
+    print("\n -- ER2ER Subject Sharing Migration Script -- ")
+
+    inbound_type = InboundIntegrationType.objects.get(slug="er2er_subject_sharing")
+    if not inbound_type:
+        print("ERROR: Inbound Integration Type 'er2er_subject_sharing' not found. Exiting...")
+        return
+
+    # Get all the ER outbounds available
+    earthranger_outbounds = OutboundIntegrationConfiguration.objects.filter(
+        type__slug="earth_ranger"
+    ).all()
+
+    # This is the ORG to use in PROD for this migrations
+    organization, _ = Organization.objects.get_or_create(
+        name="ER2ER Subject Sharing Migrated Lambda",
+        description="ER2ER Subject Sharing Migrated Lambda organization",
+    )
+
+    for filename in os.listdir(SETTINGS_DIR):
+        print(f"\n - Processing file: '{filename}'\n")
+        total_files += 1
+        file_path = os.path.join(SETTINGS_DIR, filename)
+        with open(file_path, 'r') as f:
+            content = f.read()
+        try:
+            exec_globals = {}
+            exec(content, exec_globals)
+            env_vars = exec_globals.get('ENVIRONMENT_VARIABLES', {})
+        except Exception as e:
+            print(f"ERROR: Failed to extract ENVIRONMENT_VARIABLES from '{filename}': {e}")
+            files_with_error += 1
+            continue
+
+        if not env_vars:
+            print(f"ERROR: ENVIRONMENT_VARIABLES not found in '{filename}'. Skipping...")
+            files_with_error += 1
+            continue
+
+        # Check if env_vars includes required variables and if not, log a warning and skip
+        required_vars = ['DAS_DEST', 'DAS_SRC', 'DAS_SRC_AUTH_TOKEN']
+        missing_vars = [var for var in required_vars if var not in env_vars]
+        if missing_vars:
+            print(f"ERROR: ENVIRONMENT_VARIABLES inside '{filename}' is missing required variables: {', '.join(missing_vars)}. Skipping Inbound creation...")
+            files_with_error += 1
+            continue
+
+        # First, we get or create a device_group for the new inbound
+        inbound_name = '-'.join(filename.split('-')[1:-1])
+        device_group_name = f"ER2ER Subjects: {inbound_name} - Default Group"
+
+        device_group, created = DeviceGroup.objects.get_or_create(
+            name=device_group_name,
+            owner=organization
+        )
+        if created:
+            matching_outbound = next(
+                (outbound for outbound in earthranger_outbounds if
+                 env_vars['DAS_DEST'] in outbound.endpoint),
+                None
+            )
+            if not matching_outbound:
+                print(f"ERROR: DAS_DEST ({env_vars['DAS_DEST']}) inside ENVIRONMENT_VARIABLES from '{filename}' does not exist. Skipping Inbound creation...")
+                device_group.delete()
+                files_with_error += 1
+                continue
+            device_group.destinations.set([matching_outbound])
+            device_group.save()
+            print(f"Created Device Group: {device_group_name} for zappa_setting '{filename}'")
+            device_groups_created += 1
+        else:
+            print(f"Device Group already exists with the name: {device_group.name}.")
+
+        # Create the inbound configuration
+        inbound, created = InboundIntegrationConfiguration.objects.get_or_create(
+            name=f"ER2ER Subjects - {inbound_name}",
+            owner=organization,
+            type=inbound_type,
+            provider=f"er2er_subjects_to_{env_vars.get('DAS_DEST').split('://', 1)[-1].split('.', 1)[0]}",
+            enabled=False, # Set to False by default, can be enabled later
+            default_devicegroup=device_group,
+            endpoint=f"{env_vars['DAS_SRC']}/api/v1.0"
+        )
+
+        if created:
+            inbound.token = env_vars.get('DAS_SRC_AUTH_TOKEN')
+            state = {
+                "batch_size": env_vars.get('BATCH_SIZE', 1024),
+                "feature_groups": env_vars.get('FEATURE_GROUPS', []),
+                "look_back_window_hours": env_vars.get('LOOK_BACK_WINDOW_HOURS', 12),
+                "provider_key": env_vars.get(
+                    'PROVIDER_KEY',
+                    f"er2er_subjects_from_{env_vars.get('DAS_SRC').split('://', 1)[-1].split('.', 1)[0]}",
+                ),
+                "schedule_interval_minutes": env_vars.get('SCHEDULE_INTERVAL_MINUTES', 5),
+                "subject_additional": True,
+                "subject_group": "ER2ER - From CSL"
+            }
+            if env_vars.get('SUBJECT_GROUP'):
+                state['subject_group'] = env_vars.get('SUBJECT_GROUP')
+
+            inbound.state = state
+            inbound.save()
+            print(f"Created Inbound Integration Configuration: {inbound.name} for zappa_setting '{filename}'")
+            inbounds_created += 1
+        else:
+            files_skipped += 1
+            print(f"Inbound Integration Configuration: {inbound.name} already exists for zappa_setting '{filename}', skipping creation.")
+
+    print(f"\n -- Summary: -- \n")
+    print(f"Total files processed: {total_files}")
+    print(f"Files skipped: {files_skipped}")
+    print(f"Inbounds created: {inbounds_created}")
+    print(f"Device groups created: {device_groups_created}")
+    print(f"Files with error: {files_with_error}")
+
+
+if __name__ == '__main__':
+    create_inbounds_from_files()
