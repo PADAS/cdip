@@ -11,7 +11,8 @@ from integrations.models import (
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     Organization,
-    OutboundIntegrationConfiguration
+    OutboundIntegrationConfiguration,
+    OutboundIntegrationType
 )
 
 
@@ -44,7 +45,7 @@ def create_inbounds_from_files():
     Reads settings files from the specified directory and creates inbound objects based on the content.
     Each file should contain environment variables and other necessary configurations.
     """
-    total_files = files_skipped = inbounds_created = device_groups_created = files_with_error = 0
+    total_files = files_skipped = inbounds_created = outbounds_created = device_groups_created = files_with_error = 0
 
     print("\n -- ER2ER Subject Sharing Migration Script -- ")
 
@@ -52,9 +53,6 @@ def create_inbounds_from_files():
     if not inbound_type:
         print("ERROR: Inbound Integration Type 'er2er_subject_sharing' not found. Exiting...")
         return
-
-    # Get all the ER outbounds available
-    earthranger_outbounds = list(OutboundIntegrationConfiguration.objects.filter(type__slug="earth_ranger"))
 
     # This is the ORG to use in PROD for this migrations
     organization, _ = Organization.objects.get_or_create(
@@ -88,13 +86,19 @@ def create_inbounds_from_files():
         )
         if created:
             das_dest = env_vars['DAS_DEST']
-            matching_outbound = next((o for o in earthranger_outbounds if das_dest in o.endpoint), None)
-            if not matching_outbound:
-                print_error(f"DAS_DEST ({das_dest}) outbound not found.", filename)
-                device_group.delete()
-                files_with_error += 1
-                continue
-            device_group.destinations.set([matching_outbound])
+            outbound, created = OutboundIntegrationConfiguration.objects.get_or_create(
+                type=OutboundIntegrationType.objects.get(slug="earth_ranger"),
+                owner=organization,
+                name=f"{das_dest} ER Outbound [TO USE BY MIGRATED LAMBDA]",
+                endpoint=f"{das_dest}/api/v1.0",
+            )
+            if created:
+                outbound.token = env_vars.get('DAS_DEST_AUTH_TOKEN')
+                outbound.save()
+                print(f"Created Outbound Integration Configuration: '{outbound.name}' for zappa_setting '{filename}'")
+                outbounds_created += 1
+
+            device_group.destinations.set([outbound])
             device_group.save()
             print(f"Created Device Group: {device_group_name} for zappa_setting '{filename}'")
             device_groups_created += 1
@@ -141,6 +145,7 @@ def create_inbounds_from_files():
     print(f"Total files processed: {total_files}")
     print(f"Files skipped: {files_skipped}")
     print(f"Inbounds created: {inbounds_created}")
+    print(f"Outbounds created: {outbounds_created}")
     print(f"Device groups created: {device_groups_created}")
     print(f"Files with error: {files_with_error}")
 
