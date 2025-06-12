@@ -89,8 +89,8 @@ def create_inbounds_from_files():
             outbound, created = OutboundIntegrationConfiguration.objects.get_or_create(
                 type=OutboundIntegrationType.objects.get(slug="earth_ranger"),
                 owner=organization,
-                name=f"{das_dest} ER Outbound [TO USE BY MIGRATED LAMBDA]",
-                endpoint=f"{das_dest}/api/v1.0",
+                name=f"{das_dest} ER Outbound [LAMBDA: {inbound_name}]",
+                endpoint=f"{das_dest}/"
             )
             if created:
                 outbound.token = env_vars.get('DAS_DEST_AUTH_TOKEN')
