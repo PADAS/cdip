@@ -115,12 +115,12 @@ def create_inbounds_from_files():
             owner=organization,
             type=inbound_type,
             provider=provider,
-            enabled=False, # Set to False by default, can be enabled later
             default_devicegroup=device_group,
             endpoint=endpoint
         )
 
         if created:
+            inbound.enabled = False # Set to False by default, can be enabled later
             inbound.token = env_vars.get('DAS_SRC_AUTH_TOKEN')
             state = {
                 "batch_size": env_vars.get('BATCH_SIZE', 1024),
