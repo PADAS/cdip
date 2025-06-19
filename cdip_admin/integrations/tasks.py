@@ -81,107 +81,89 @@ def recreate_and_send_movebank_permissions_csv_file(**kwargs):
     v1_configs = 0
     v2_configs = 0
 
-    # V1 configs
     OutboundIntegrationConfiguration = apps.get_model("integrations", "OutboundIntegrationConfiguration")
+    IntegrationConfiguration = apps.get_model("integrations", "IntegrationConfiguration")
+
+    def process_permissions(configs_qs, get_permissions, save_permissions, version):
+        count = 0
+        for config in configs_qs:
+            try:
+                permissions = MBPermissionsActionConfig.parse_obj(get_permissions(config))
+            except pydantic.ValidationError:
+                logger.exception(
+                    f'Error parsing MBPermissionsActionConfig model ({version})',
+                    extra={'id': str(config.id), 'attention_needed': True}
+                )
+                continue
+
+            if not permissions.permissions:
+                if permissions.default_movebank_usernames:
+                    permissions.permissions = create_and_save_permissions_json(
+                        config, permissions.default_movebank_usernames, version
+                    )
+                else:
+                    permissions.permissions = []
+            else:
+                current_users = set(p.username for p in permissions.permissions)
+                if set(permissions.default_movebank_usernames) != current_users:
+                    permissions.permissions = update_and_save_permissions_json(
+                        config, permissions.default_movebank_usernames, version
+                    )
+
+            count += len(permissions.permissions)
+            configs.extend(permissions.permissions)
+        return count
+
+    # V1
     movebank_configs_v1 = OutboundIntegrationConfiguration.objects.filter(
         type__slug=DestinationTypes.Movebank.value,
         additional__has_key="permissions"
     )
+    v1_configs = process_permissions(
+        movebank_configs_v1,
+        lambda c: c.additional["permissions"],
+        lambda c, p: c.save(execute_post_save=False),
+        "v1"
+    )
 
-    for mb_config in movebank_configs_v1:
-        try:
-            permissions = MBPermissionsActionConfig.parse_obj(mb_config.additional["permissions"])
-        except pydantic.ValidationError:
-            logger.exception(
-                'Error parsing MBPermissionsActionConfig model (v1)',
-                extra={
-                    'outbound_integration_id': str(mb_config.id),
-                    'attention_needed': True
-                }
-            )
-            continue
-        else:
-            if not permissions.permissions:  # if parsing went ok but no permissions
-                if not permissions.default_movebank_usernames:  # config does not have usernames set
-                    permissions.permissions = []
-                else:
-                    # create and save preliminary permissions JSON into additional
-                    logger.info(' -- No "permissions" set in outbound "additional", creating... --')
-                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
-                    permissions.permissions = create_and_save_permissions_json(
-                        mb_config,
-                        permissions.default_movebank_usernames,
-                        "v1"
-                    )
-                    continue
-            v1_configs += len(permissions.permissions)
-            for config in permissions.permissions:
-                configs.append(config)
-
-    # V2 configs
-    IntegrationConfiguration = apps.get_model("integrations", "IntegrationConfiguration")
+    # V2
     movebank_configs_v2 = IntegrationConfiguration.objects.filter(
         integration__type__value=DestinationTypes.Movebank.value,
         action__value=MovebankActions.PERMISSIONS.value
     )
-
-    for mb_config in movebank_configs_v2:
-        try:
-            permissions = MBPermissionsActionConfig.parse_obj(mb_config.data)
-        except pydantic.ValidationError:
-            logger.exception(
-                'Error parsing MBPermissionsActionConfig model (v2)',
-                extra={
-                    'integration_configuration_id': str(mb_config.id),
-                    'attention_needed': True
-                }
-            )
-            continue
-        else:
-            if not permissions.permissions:  # if parsing went ok but no permissions
-                if not permissions.default_movebank_usernames:  # config does not have usernames set
-                    permissions.permissions = []
-                else:
-                    # create and save preliminary permissions JSON into additional
-                    logger.info(' -- No "permissions" set in config "data", creating... --')
-                    logger.info(f' -- Usernames to assign: {permissions.default_movebank_usernames} --')
-                    permissions.permissions = create_and_save_permissions_json(
-                        mb_config,
-                        permissions.default_movebank_usernames,
-                        "v2"
-                    )
-                    continue
-            v2_configs += len(permissions.permissions)
-            for config in permissions.permissions:
-                configs.append(config)
+    v2_configs = process_permissions(
+        movebank_configs_v2,
+        lambda c: c.data,
+        lambda c, p: c.save(execute_post_save=False),
+        "v2"
+    )
 
     logger.info(f' -- Got {len(configs)} user/tag rows (v1: {v1_configs}, v2: {v2_configs}) --')
 
-    if len(configs) >= 1:
+    if configs:
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=MBUserPermission.schema().get("required"))
             writer.writeheader()
             for config in configs:
                 writer.writerow(config.dict(by_alias=True))
+            temp_name = csvfile.name
 
         logger.info(f' -- CSV temp file created successfully. --')
         logger.info(f' -- Sending CSV file to Movebank... --')
 
-        send_permissions_to_movebank(csvfile.name, **kwargs)
-
-        logger.info(f' -- CSV file uploaded to Movebank successfully --')
-
-        # Permissions file upload was successful, removing CSV file...
-        csvfile.close()
-        os.unlink(csvfile.name)
+        try:
+            send_permissions_to_movebank(temp_name, **kwargs)
+            logger.info(f' -- CSV file uploaded to Movebank successfully --')
+        finally:
+            os.unlink(temp_name)
     else:
         logger.info(' -- No configs available to send --')
 
 
-def create_and_save_permissions_json(config, usernames, gundi_version):
+def build_and_save_permissions_json(config, usernames, gundi_version, mode="update"):
     permissions_dict = []
     if gundi_version == "v1":
-        logger.info(f' -- Creating v1 permissions set for outbound ID {str(config.id)}... --')
+        logger.info(f' -- {mode.capitalize()} v1 permissions set for outbound ID {str(config.id)}... --')
         Device = apps.get_model("integrations", "Device")
         devices = Device.objects.filter(
             devicegroup__destinations__id=config.id
@@ -198,13 +180,13 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                 )
 
         if not permissions_dict:
-            logger.info(f' -- No permissions created for outbound ID {str(config.id)}... --')
+            logger.info(f' -- No permissions {mode}d for outbound ID {str(config.id)}... --')
         else:
             config.additional.get("permissions")["permissions"] = [d.dict() for d in permissions_dict]
             config.save(execute_post_save=False)
-            logger.info(f' -- Created {len(permissions_dict)} permissions for outbound ID {str(config.id)}... --')
+            logger.info(f' -- {mode.capitalize()}d {len(permissions_dict)} permissions for outbound ID {str(config.id)}... --')
     else:
-        logger.info(f' -- Creating v2 permissions set for config ID {str(config.id)}... --')
+        logger.info(f' -- {mode.capitalize()} v2 permissions set for config ID {str(config.id)}... --')
         Source = apps.get_model("integrations", "Source")
         sources = Source.objects.filter(
             integration__routing_rules_by_provider__destinations__id=config.integration.id
@@ -222,14 +204,19 @@ def create_and_save_permissions_json(config, usernames, gundi_version):
                 )
 
         if not permissions_dict:
-            logger.info(f' -- No permissions created for config ID {str(config.id)}... --')
+            logger.info(f' -- No permissions {mode}d for config ID {str(config.id)}... --')
         else:
             config.data["permissions"] = [d.dict() for d in permissions_dict]
             config.save(execute_post_save=False)
-            logger.info(f' -- Created {len(permissions_dict)} permissions for config ID {str(config.id)}... --')
+            logger.info(f' -- {mode.capitalize()}d {len(permissions_dict)} permissions for config ID {str(config.id)}... --')
 
     return permissions_dict
 
+def create_and_save_permissions_json(config, usernames, gundi_version):
+    return build_and_save_permissions_json(config, usernames, gundi_version, mode="create")
+
+def update_and_save_permissions_json(config, usernames, gundi_version):
+    return build_and_save_permissions_json(config, usernames, gundi_version, mode="update")
 
 @shared_task
 def update_mb_permissions_for_group(instance_pk, gundi_version):

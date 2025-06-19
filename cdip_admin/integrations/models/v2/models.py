@@ -582,6 +582,21 @@ class RouteDestination(ChangeLogMixin, models.Model):
     integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
     route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
 
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        if self.integration.is_mb_site:
+            # Movebank permissions file needs to be recreated
+            transaction.on_commit(
+                lambda: recreate_and_send_movebank_permissions_csv_file.delay()
+            )
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
+
 
 class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
