@@ -32,6 +32,18 @@ def test_create_movebank_destination_v2_with_default_settings(other_organization
     assert integration.additional.get("topic") == settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
 
 
+def test_create_inreach_destination_v2_with_default_settings(other_organization, integration_type_inreach):
+    integration = Integration.objects.create(
+        type=integration_type_inreach,
+        name=f"Inreach API",
+        owner=other_organization,
+        # base_url # URL is set/known by the connector
+        # additional  # Not set, let it use defaults
+    )
+    assert integration.additional.get("topic") == settings.INREACH_PUSH_DATA_TOPIC
+    assert integration.additional.get("broker") == "gcp_pubsub"
+
+
 def test_delete_integration_with_default_route(provider_lotek_panthera):
     provider_lotek_panthera.delete()
 

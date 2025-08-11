@@ -144,7 +144,7 @@ def get_dispatcher_topic_default_name(integration, gundi_version="v2"):
         return get_default_topic_name(integration, gundi_version=gundi_version)
     if integration.is_mb_site:
         return settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
-    if integration.is_inreach_site:
+    if gundi_version == "v2" and integration.is_inreach_site:
         return settings.INREACH_PUSH_DATA_TOPIC
     # Fallback to legacy kafka dispatchers topic
     return f"sintegrate.observations.transformed"
