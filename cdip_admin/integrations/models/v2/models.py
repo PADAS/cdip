@@ -332,6 +332,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
     @property
+    def is_inreach_site(self):
+        return self.type.value.lower().strip().replace("_", "") == "inreach"
+
+    @property
     def is_smart_site(self):
         return self.type.value.lower().strip().replace("_", "") == "smartconnect"
 
