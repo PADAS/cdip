@@ -224,7 +224,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def _pre_save(self, *args, **kwargs):
         # Setup topic and broker for destination sites
-        if self._state.adding and self.support_push_actions:
+        if self._state.adding and self.has_push_data_support:
             if "topic" not in self.additional:
                 self.additional.update(
                     {"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v2")}
@@ -332,10 +332,6 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return self.type.value.lower().strip().replace("_", "") == "movebank"
 
     @property
-    def is_inreach_site(self):
-        return self.type.value.lower().strip().replace("_", "") == "inreach"
-
-    @property
     def is_smart_site(self):
         return self.type.value.lower().strip().replace("_", "") == "smartconnect"
 
@@ -348,7 +344,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return self.type.value.lower().strip().replace("_", "") == "traptagger"
 
     @property
-    def support_push_actions(self):
+    def has_push_data_support(self):
         return self.type.actions.filter(type=IntegrationAction.ActionTypes.PUSH_DATA).exists()
 
     def create_missing_configurations(self):
