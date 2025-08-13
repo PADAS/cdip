@@ -147,7 +147,7 @@ def get_dispatcher_topic_default_name(integration, gundi_version="v2"):
         return settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
     # Newer Connectors v2 with push data capabilities follow a naming convention
     if gundi_version == "v2":
-        integration_type_prefix = integration.type.lower().strip().replace("_", "")
+        integration_type_prefix = integration.type.value.lower().strip().replace("_", "")
         return f"{integration_type_prefix}-push-data-topic"
     # Fallback to legacy kafka dispatchers topic
     return f"sintegrate.observations.transformed"
