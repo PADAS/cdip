@@ -140,12 +140,14 @@ def send_message_to_gcp_pubsub(message, topic):
 
 
 def get_dispatcher_topic_default_name(integration, gundi_version="v2"):
+
     if integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site:
         return get_default_topic_name(integration, gundi_version=gundi_version)
     if integration.is_mb_site:
         return settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
-    if gundi_version == "v2" and integration.is_inreach_site:
-        return settings.INREACH_PUSH_DATA_TOPIC
+    # Newer Connectors v2 with push data capabilities follow a naming convention
+    if gundi_version == "v2":
+        return f"{integration.type.value}-push-data-topic"
     # Fallback to legacy kafka dispatchers topic
     return f"sintegrate.observations.transformed"
 

@@ -20,7 +20,9 @@ def test_create_movebank_destination_v1_with_default_settings(other_organization
     assert integration.additional.get("topic") == settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
 
 
-def test_create_movebank_destination_v2_with_default_settings(other_organization, integration_type_movebank):
+def test_create_movebank_destination_v2_with_default_settings(
+        other_organization, integration_type_movebank, mb_action_push_positions
+):
     integration = Integration.objects.create(
         type=integration_type_movebank,
         name=f"Movebank Site",
@@ -32,7 +34,9 @@ def test_create_movebank_destination_v2_with_default_settings(other_organization
     assert integration.additional.get("topic") == settings.MOVEBANK_DISPATCHER_DEFAULT_TOPIC
 
 
-def test_create_inreach_destination_v2_with_default_settings(other_organization, integration_type_inreach):
+def test_create_inreach_destination_v2_with_default_settings(
+        other_organization, integration_type_inreach, inreach_push_messages
+):
     integration = Integration.objects.create(
         type=integration_type_inreach,
         name=f"Inreach API",
@@ -40,7 +44,7 @@ def test_create_inreach_destination_v2_with_default_settings(other_organization,
         # base_url # URL is set/known by the connector
         # additional  # Not set, let it use defaults
     )
-    assert integration.additional.get("topic") == settings.INREACH_PUSH_DATA_TOPIC
+    assert integration.additional.get("topic") == f"{integration_type_inreach.value}-push-data-topic"
     assert integration.additional.get("broker") == "gcp_pubsub"
 
 

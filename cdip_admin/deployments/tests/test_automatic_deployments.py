@@ -54,7 +54,8 @@ def test_automatic_dispatcher_deployments_v1(
 ])
 @override_settings(GCP_ENVIRONMENT_ENABLED=True)
 def test_automatic_dispatcher_deployments_v2(
-        mocker, request, organization, integration_type, mock_get_dispatcher_defaults_from_gcp_secrets
+        mocker, request, organization, integration_type, mock_get_dispatcher_defaults_from_gcp_secrets,
+        er_action_push_positions, smart_action_push_events, wpswatch_action_push_events, traptagger_action_push_events
 ):
     # Mock the task to trigger the dispatcher deployment
     mocked_deployment_task = mocker.MagicMock()

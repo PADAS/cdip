@@ -224,13 +224,11 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def _pre_save(self, *args, **kwargs):
         # Setup topic and broker for destination sites
-        if self._state.adding and any(
-                [self.is_er_site, self.is_smart_site, self.is_mb_site, self.is_wpswatch_site, self.is_traptagger_site,
-                 self.is_inreach_site]
-        ):
+        if self._state.adding and self.support_push_actions:
             if "topic" not in self.additional:
                 self.additional.update(
-                    {"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v2")})
+                    {"topic": get_dispatcher_topic_default_name(integration=self, gundi_version="v2")}
+                )
             self.additional.setdefault('broker', 'gcp_pubsub')
 
         if self.is_er_site:
@@ -348,6 +346,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def is_traptagger_site(self):
         return self.type.value.lower().strip().replace("_", "") == "traptagger"
+
+    @property
+    def support_push_actions(self):
+        return self.type.actions.filter(type=IntegrationAction.ActionTypes.PUSH_DATA).exists()
 
     def create_missing_configurations(self):
         for action in self.type.actions.all():

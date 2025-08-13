@@ -361,6 +361,18 @@ def mb_action_pull_positions(integration_type_movebank):
 
 
 @pytest.fixture
+def mb_action_push_positions(integration_type_movebank):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_movebank,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Push Observations	",
+        value="push_observations",
+        description="Send Tracking data to Move Bank API",
+        schema={},
+    )
+
+
+@pytest.fixture
 def mb_action_permissions(integration_type_movebank):
     return IntegrationAction.objects.create(
         type=IntegrationAction.ActionTypes.AUTHENTICATION,
