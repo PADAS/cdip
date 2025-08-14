@@ -1,11 +1,5 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.conf import settings
-from deployments.models import DispatcherDeployment
-from deployments.utils import (
-    get_dispatcher_defaults_from_gcp_secrets,
-    get_default_dispatcher_name,
-)
 from integrations.models import (
     Organization,
     Integration,
@@ -13,6 +7,7 @@ from integrations.models import (
     IntegrationAction,
     IntegrationConfiguration,
     Route,
+    RouteConfiguration,
     InboundIntegrationType,
     InboundIntegrationConfiguration
 )
@@ -85,6 +80,7 @@ ER_DESTINATION_JSON_SCHEMA = {
 }
 
 ER_DESTINATION_UI_SCHEMA = {"ui:order": ["authentication_type", "token", "username", "password"]}
+DEFAULT_FIELD_MAPPING = {"default": "awt", "destination_field": "provider_key"}
 
 
 class Command(BaseCommand):
@@ -170,6 +166,12 @@ class Command(BaseCommand):
                             integration.default_route = routing_rule
                             integration.default_route.data_providers.add(integration)
 
+                            field_mappings = {
+                                str(integration.id): {
+                                    "obv": {}
+                                }
+                            }
+
                             # Read inbound destinations and create integration for each
                             for destination in inbound.destinations.all():
                                 if not destination.is_er_site:
@@ -200,9 +202,9 @@ class Command(BaseCommand):
                                 destination_integration, created = Integration.objects.get_or_create(
                                     type=destination_integration_type,
                                     owner=destination_owner,
+                                    base_url=destination.endpoint,
                                     defaults={
-                                        "name": destination.name,
-                                        "base_url": destination.endpoint
+                                        "name": destination.name
                                     }
                                 )
                                 if created:
@@ -234,6 +236,19 @@ class Command(BaseCommand):
 
                                 integration.default_route.destinations.add(destination_integration)
 
+                                field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = DEFAULT_FIELD_MAPPING
+
+                            field_mappings_result = {
+                                "field_mappings": field_mappings
+                            }
+                            route_config, _ = RouteConfiguration.objects.get_or_create(
+                                name=integration.default_route.name + " - Default Configuration",
+                                defaults={
+                                    "data": field_mappings_result
+                                }
+                            )
+                            integration.default_route.configuration = route_config
+                            integration.default_route.save()
                             integration.save()
                         else:
                             self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n")
