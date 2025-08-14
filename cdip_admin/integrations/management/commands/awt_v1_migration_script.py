@@ -1,13 +1,11 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import Q
 from django.conf import settings
 from deployments.models import DispatcherDeployment
 from deployments.utils import (
     get_dispatcher_defaults_from_gcp_secrets,
     get_default_dispatcher_name,
 )
-from deployments.tasks import deploy_serverless_dispatcher
 from integrations.models import (
     Organization,
     Integration,
@@ -16,10 +14,77 @@ from integrations.models import (
     IntegrationConfiguration,
     Route,
     InboundIntegrationType,
-    InboundIntegrationConfiguration,
-    OutboundIntegrationConfiguration
+    InboundIntegrationConfiguration
 )
 from integrations.utils import get_dispatcher_topic_default_name
+
+
+ER_DESTINATION_JSON_SCHEMA = {
+	"if": {
+		"properties": {
+			"authentication_type": {
+				"const": "token"
+			}
+		}
+	},
+	"else": {
+		"required": ["username", "password"],
+		"properties": {
+			"password": {
+				"type": "string",
+				"title": "Password",
+				"format": "password",
+				"default": "",
+				"example": "mypasswd1234abc",
+				"writeOnly": True,
+				"description": "Password used to authenticate against Earth Ranger API"
+			},
+			"username": {
+				"type": "string",
+				"title": "Username",
+				"default": "",
+				"example": "myuser",
+				"description": "Username used to authenticate against Earth Ranger API"
+			}
+		}
+	},
+	"then": {
+		"required": ["token"],
+		"properties": {
+			"token": {
+				"type": "string",
+				"title": "Token",
+				"format": "password",
+				"default": "",
+				"example": "1b4c1e9c-5ee0-44db-c7f1-177ede2f854a",
+				"writeOnly": True,
+				"description": "Token used to authenticate against Earth Ranger API"
+			}
+		}
+	},
+	"type": "object",
+	"title": "AuthenticateConfig",
+	"properties": {
+		"authentication_type": {
+			"allOf": [{
+				"$ref": "#/definitions/ERAuthenticationType"
+			}],
+			"default": "token",
+			"description": "Type of authentication to use."
+		}
+	},
+	"definitions": {
+		"ERAuthenticationType": {
+			"enum": ["token", "username_password"],
+			"type": "string",
+			"title": "ERAuthenticationType",
+			"description": "An enumeration."
+		}
+	},
+	"is_executable": True
+}
+
+ER_DESTINATION_UI_SCHEMA = {"ui:order": ["authentication_type", "token", "username", "password"]}
 
 
 class Command(BaseCommand):
@@ -105,6 +170,10 @@ class Command(BaseCommand):
 
                             # Read inbound destinations and create integration for each
                             for destination in inbound.destinations.all():
+                                if not destination.is_er_site:
+                                    self.stdout.write(f" -- Skipping destination {destination.name} (ID: {destination.id}) as it is not an ER site -- ")
+                                    continue
+
                                 # Check if outbound type exists as integration type
                                 destination_integration_type, created = IntegrationType.objects.get_or_create(
                                     value=destination.type.slug
@@ -121,11 +190,10 @@ class Command(BaseCommand):
                                     destination_owners_created += 1
                                     self.stdout.write(f" -- Created new organization: {destination_owner.name} for destination: {destination.name} (ID: {destination.id})")
 
-                                # if outbound is an ER site, remove the /api/v1.0 part from the base URL
-                                if destination.is_er_site:
-                                    destination.endpoint = destination.endpoint.replace(
-                                        "/api/v1.0", ""
-                                    )
+                                # Remove the /api/v1.0 part from the base URL
+                                destination.endpoint = destination.endpoint.replace(
+                                    "/api/v1.0", ""
+                                )
 
                                 destination_integration, created = Integration.objects.get_or_create(
                                     type=destination_integration_type,
@@ -137,6 +205,28 @@ class Command(BaseCommand):
                                     destination_integration.name = destination.name
                                     destination_integration.save()
 
+                                    # Create AUTH action config for the destination integration (ER)
+                                    er_auth_action, created = IntegrationAction.objects.get_or_create(
+                                        type=IntegrationAction.ActionTypes.AUTHENTICATION,
+                                        name="Auth",
+                                        value="auth",
+                                        description="Earth Ranger Auth action",
+                                        integration_type=destination_integration_type
+                                    )
+                                    if created:
+                                        er_auth_action.schema = ER_DESTINATION_JSON_SCHEMA
+                                        er_auth_action.ui_schema = ER_DESTINATION_UI_SCHEMA
+                                        er_auth_action.save()
+                                        self.stdout.write(f" -- Created new action: {er_auth_action.name} for destination integration type: {destination_integration_type.value} -- ")
+
+                                    er_auth_config, created = IntegrationConfiguration.objects.get_or_create(
+                                        integration=destination_integration,
+                                        action=er_auth_action,
+                                        data={"token": destination.token, "authentication_type": "token"}
+                                    )
+                                    if created:
+                                        self.stdout.write(f" -- Created new configuration for action '{er_auth_action.name}' for destination integration: {destination_integration.name} (ID: {destination_integration.id})")
+
                                     self.stdout.write(f" -- Created new integration: {destination_integration.name} (ID: {destination_integration.id}) for destination: {destination.name} (ID: {destination.id})")
 
                                     self.deploy_dispatcher(integration=destination_integration)
@@ -144,6 +234,8 @@ class Command(BaseCommand):
                                 integration.default_route.destinations.add(destination_integration)
 
                             integration.save()
+                        else:
+                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n")
 
                 except Exception as e:
                     self.stderr.write(f" -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e}")
