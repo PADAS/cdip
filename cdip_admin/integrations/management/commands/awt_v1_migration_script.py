@@ -115,7 +115,7 @@ class Command(BaseCommand):
             destination_owners_created = 0
             destination_integration_created = 0
 
-            self.stdout.write(f" -- Found {len(inbounds_to_migrate)} AWT inbounds to migrate -- \n")
+            self.stdout.write(f" -- Got {len(inbounds_to_migrate)} AWT inbounds to migrate -- \n")
 
             # Get or create AWT PUSH integration type
             awt_integration_type, _ = IntegrationType.objects.get_or_create(
@@ -124,7 +124,7 @@ class Command(BaseCommand):
             )
             # Get or create AWT PUSH action
             awt_push_action, _ = IntegrationAction.objects.get_or_create(
-                type=IntegrationAction.ActionTypes.PUSH_DATA,
+                type=IntegrationAction.ActionTypes.PULL_DATA,
                 name="AWT Push",
                 value="awt_push_action",
                 integration_type=awt_integration_type
@@ -140,13 +140,15 @@ class Command(BaseCommand):
                             type=awt_integration_type,
                             name=f"[AWT DATA PUSH] - {inbound.name}",
                             owner=inbound_owner,
+                            defaults={
+                                "base_url": inbound.endpoint,
+                                "enabled": False,  # disabled by default for validation purposes
+                            }
                         )
                         if created:
                             # New integration created
                             awt_integrations_created += 1
                             self.stdout.write(f" -- Created new integration: {integration.name} (ID: {integration.id}) from v1 inbound -- ")
-
-                            integration.enabled = False # enabled by default for validation purposes
 
                             # Get or create the AWT_PUSH action config for this integration
                             action_config, created = IntegrationConfiguration.objects.get_or_create(
@@ -198,12 +200,13 @@ class Command(BaseCommand):
                                 destination_integration, created = Integration.objects.get_or_create(
                                     type=destination_integration_type,
                                     owner=destination_owner,
-                                    base_url=destination.endpoint,
+                                    defaults={
+                                        "name": destination.name,
+                                        "base_url": destination.endpoint
+                                    }
                                 )
                                 if created:
                                     destination_integration_created += 1
-                                    destination_integration.name = destination.name
-                                    destination_integration.save()
 
                                     # Create AUTH action config for the destination integration (ER)
                                     er_auth_action, created = IntegrationAction.objects.get_or_create(
@@ -229,8 +232,6 @@ class Command(BaseCommand):
 
                                     self.stdout.write(f" -- Created new integration: {destination_integration.name} (ID: {destination_integration.id}) for destination: {destination.name} (ID: {destination.id})")
 
-                                    self.deploy_dispatcher(integration=destination_integration)
-
                                 integration.default_route.destinations.add(destination_integration)
 
                             integration.save()
@@ -247,60 +248,16 @@ class Command(BaseCommand):
             self.stdout.write(f" -- Destination Integration Owners created: {destination_owners_created} -- ")
             self.stdout.write(f" -- Destination Integrations created: {destination_integration_created} -- ")
 
-    def deploy_dispatcher(self, integration):
-        try:
-            # Skip if the integration is not an ER, SMART, WPS Watch or TrapTagger site
-            if not (integration.is_er_site or integration.is_smart_site or integration.is_wpswatch_site or integration.is_traptagger_site):
-                self.stdout.write(
-                    f" -- Integration {integration.name} is not an ER, SMART, WPS Watch or TrapTagger site. Skipped... -- "
-                )
-                return
-
-            self.stdout.write(f" -- Deploying dispatcher for {integration.name}... -- ")
-
-            # Create the topic and the dispatcher
-            if integration.is_smart_site:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
-            elif integration.is_wpswatch_site:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
-            elif integration.is_traptagger_site:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
-            else:
-                secret_id = settings.DISPATCHER_DEFAULTS_SECRET
-
-            version = "v2"
-            with transaction.atomic():  # Update the integration and create the dispatcher, both or none
-                topic_name = get_dispatcher_topic_default_name(
-                    integration=integration, gundi_version=version
-                )
-                integration.additional.update(
-                    {"topic": topic_name, "broker": "gcp_pubsub"}
-                )
-                integration.save()
-                DispatcherDeployment.objects.create(
-                    name=get_default_dispatcher_name(
-                        integration=integration, gundi_version=version
-                    ),
-                    integration=integration,
-                    configuration=get_dispatcher_defaults_from_gcp_secrets(
-                        secret_id=secret_id
-                    ),
-                )
-        except Exception as e:
-            self.stdout.write(
-                f" -- Error deploying dispatcher for {integration.name}: {e} -- "
-            )
-        else:
-            self.stdout.write(
-                f" -- Deployment triggered for {integration.name} ({version}) -- "
-            )
-
     def _get_awt_inbounds(self, options):
-        awt_inbound_type, _ = InboundIntegrationType.objects.get_or_create(
-            name="Africa Wildlife Tracking (AWT)",
-            description="Animal Collar	Hadrien Haupt	hadrien@awt.co.za",
-            slug="awt"
-        )
+        try:
+            awt_inbound_type = InboundIntegrationType.objects.get(
+                name="Africa Wildlife Tracking (AWT)",
+                description="Animal Collar	Hadrien Haupt	hadrien@awt.co.za",
+                slug="awt"
+            )
+        except InboundIntegrationType.DoesNotExist:
+            self.stdout.write(" -- ERROR: AWT Inbound Integration Type not found -- \n")
+            return []
 
         inbounds = InboundIntegrationConfiguration.objects.filter(type=awt_inbound_type, enabled=True).all()
 
