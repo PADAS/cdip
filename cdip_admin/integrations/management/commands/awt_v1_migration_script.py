@@ -103,15 +103,17 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(" -- Starting AWT v1 migration script -- \n")
+        self.stdout.write(" -- Starting AWT v1 migration script -- \n\n")
         if inbounds_to_migrate := self._get_awt_inbounds(options=options):
             awt_integrations_created = 0
+            awt_integrations_skipped = 0
+            awt_integrations_with_error = 0
             awt_integration_configs_created = 0
             destination_integration_types_created = 0
             destination_owners_created = 0
             destination_integration_created = 0
 
-            self.stdout.write(f" -- Got {len(inbounds_to_migrate)} AWT inbounds to migrate -- \n")
+            self.stdout.write(f" -- Got {len(inbounds_to_migrate)} AWT inbounds to migrate -- \n\n")
 
             # Get or create AWT PUSH integration type
             awt_integration_type, _ = IntegrationType.objects.get_or_create(
@@ -251,14 +253,18 @@ class Command(BaseCommand):
                             integration.default_route.save()
                             integration.save()
                         else:
+                            awt_integrations_skipped += 1
                             self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n")
 
                 except Exception as e:
+                    awt_integrations_with_error += 1
                     self.stderr.write(f" -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e}")
 
-            self.stdout.write(f"\n -- Summary -- \n")
+            self.stdout.write(f"\n -- Summary -- \n\n")
+            self.stdout.write(f" -- AWT Integrations with error: {awt_integrations_with_error} -- ")
+            self.stdout.write(f" -- AWT Integrations skipped: {awt_integrations_skipped} -- ")
             self.stdout.write(f" -- AWT Integrations created: {awt_integrations_created} -- ")
-            self.stdout.write(f" -- AWT Integration Configurations created: {awt_integration_configs_created} -- ")
+            self.stdout.write(f" -- AWT Integration Configurations created: {awt_integration_configs_created} -- \n\n")
             self.stdout.write(f" -- Destination Integration Types created: {destination_integration_types_created} -- ")
             self.stdout.write(f" -- Destination Integration Owners created: {destination_owners_created} -- ")
             self.stdout.write(f" -- Destination Integrations created: {destination_integration_created} -- ")
