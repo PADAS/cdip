@@ -11,7 +11,6 @@ from integrations.models import (
     InboundIntegrationType,
     InboundIntegrationConfiguration
 )
-from integrations.utils import get_dispatcher_topic_default_name
 
 
 ER_DESTINATION_JSON_SCHEMA = {
@@ -104,6 +103,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self.stdout.write(" -- Starting AWT v1 migration script -- \n")
         if inbounds_to_migrate := self._get_awt_inbounds(options=options):
             awt_integrations_created = 0
             awt_integration_configs_created = 0
