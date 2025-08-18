@@ -4,4 +4,4 @@
 
 WORKERS=2
 
-celery -A cdip_admin worker -l info -c $WORKERS -Q actiontriggers -n actiontriggers@%h 2>&1
+celery -A cdip_admin worker -l info -c $WORKERS -Q actiontriggers -n actiontriggers@%h --time-limit=600 --soft-time-limit=300 2>&1
