@@ -1,3 +1,5 @@
+import copy
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from integrations.models import (
@@ -101,6 +103,12 @@ class Command(BaseCommand):
             required=False,
             help="Specify the maximum number of inbounds to migrate",
         )
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            default=False,
+            help="If present, migrate all AWT inbounds regardless of the other option"
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(" -- Starting AWT v1 migration script -- \n\n")
@@ -139,8 +147,7 @@ class Command(BaseCommand):
                             name=f"[AWT DATA PUSH] - {inbound.name}",
                             owner=inbound_owner,
                             defaults={
-                                "base_url": inbound.endpoint,
-                                "enabled": False,  # disabled by default for validation purposes
+                                "base_url": inbound.endpoint
                             }
                         )
                         if created:
@@ -238,7 +245,11 @@ class Command(BaseCommand):
 
                                 integration.default_route.destinations.add(destination_integration)
 
-                                field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = DEFAULT_FIELD_MAPPING
+                                # add legacy provider_key field mapping
+                                inbound_field_mapping = copy.deepcopy(DEFAULT_FIELD_MAPPING)
+                                inbound_field_mapping["default"] = inbound.provider
+
+                                field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
 
                             field_mappings_result = {
                                 "field_mappings": field_mappings
@@ -283,6 +294,10 @@ class Command(BaseCommand):
         inbounds = InboundIntegrationConfiguration.objects.filter(type=awt_inbound_type, enabled=True).all()
 
         self.stdout.write(f" -- Found {inbounds.count()} AWT inbounds -- ")
+
+        if options["all"]:
+            self.stdout.write(" -- Migrating ALL AWT inbounds as per --all option -- ")
+            return inbounds
 
         if options['inbounds']:
             self.stdout.write(f" -- Filtering AWT inbounds by IDs: {options['inbounds']} -- ")
