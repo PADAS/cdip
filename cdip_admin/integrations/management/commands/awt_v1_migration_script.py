@@ -144,7 +144,7 @@ class Command(BaseCommand):
                         )
                         integration, created = Integration.objects.get_or_create(
                             type=awt_integration_type,
-                            name=f"[AWT DATA PUSH] - {inbound.name}",
+                            name=f"[V1 to V2] - {inbound.name} ({inbound.login})",
                             owner=inbound_owner,
                             defaults={
                                 "base_url": inbound.endpoint
@@ -212,9 +212,7 @@ class Command(BaseCommand):
                                     type=destination_integration_type,
                                     owner=destination_owner,
                                     base_url=destination.endpoint,
-                                    defaults={
-                                        "name": destination.name
-                                    }
+                                    name=destination.name
                                 )
                                 if created:
                                     destination_integration_created += 1
@@ -291,7 +289,7 @@ class Command(BaseCommand):
             self.stdout.write(" -- ERROR: AWT Inbound Integration Type not found -- \n")
             return []
 
-        inbounds = InboundIntegrationConfiguration.objects.filter(type=awt_inbound_type, enabled=True).all()
+        inbounds = InboundIntegrationConfiguration.objects.filter(type=awt_inbound_type).all()
 
         self.stdout.write(f" -- Found {inbounds.count()} AWT inbounds -- ")
 
