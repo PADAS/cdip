@@ -283,6 +283,7 @@ CELERY_TASK_QUEUES = (
     Queue("healthchecks", Exchange("healthchecks"), routing_key="healthchecks"),
     Queue("systemevents", Exchange("systemevents"), routing_key="systemevents"),
     Queue("actiontriggers", Exchange("actiontriggers"), routing_key="actiontriggers"),
+    Queue("smartsyncs", Exchange("smartsyncs"), routing_key="smartsyncs"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -318,7 +319,28 @@ CELERY_TASK_ROUTES = {
     },
     "integrations.tasks.run_integration": {
         "queue": "actiontriggers", "routing_key": "actiontriggers"
-    }
+    },
+    "sync_integrations.tasks.synchronize_smart_datamodels": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.run_sync_integrations": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.handle_outboundintegration_save": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.run_er_smart_sync_integrations": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.maintain_smart_integrations": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks._maintain_smart_integration": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.run_er_smart_sync_integration": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
 }
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
