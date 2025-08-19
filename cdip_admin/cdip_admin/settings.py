@@ -282,6 +282,7 @@ CELERY_TASK_QUEUES = (
     Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
     Queue("healthchecks", Exchange("healthchecks"), routing_key="healthchecks"),
     Queue("systemevents", Exchange("systemevents"), routing_key="systemevents"),
+    Queue("actiontriggers", Exchange("actiontriggers"), routing_key="actiontriggers"),
 )
 
 CELERY_TASK_ROUTES = {
@@ -314,6 +315,9 @@ CELERY_TASK_ROUTES = {
     },
     "activity_log.tasks.publish_configuration_event": {
         "queue": "systemevents", "routing_key": "systemevents"
+    },
+    "integrations.tasks.run_integration": {
+        "queue": "actiontriggers", "routing_key": "actiontriggers"
     }
 }
 
