@@ -885,8 +885,20 @@ class GundiTraceSerializer(serializers.Serializer):
         # Check the integration id
         request = self.context["request"]
         if integration := data.get("integration"):
-            if not request.integration_id or request.integration_id != str(integration.id):
-                raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+            # Handle both string ID and object cases
+            if isinstance(integration, str):
+                # Convert string ID to Integration object
+                try:
+                    integration_obj = Integration.objects.get(id=integration)
+                    data["integration"] = integration_obj
+                    if not request.integration_id or request.integration_id != str(integration_obj.id):
+                        raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+                except (ValueError, Integration.DoesNotExist):
+                    raise drf_exceptions.ValidationError(detail=f"Invalid integration ID: {integration}")
+            else:
+                # Integration is already an object
+                if not request.integration_id or request.integration_id != str(integration.id):
+                    raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
         elif request.integration_id:
             try:
                 data["integration"] = Integration.objects.get(id=request.integration_id)
