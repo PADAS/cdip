@@ -854,20 +854,28 @@ class KeyRelatedField(serializers.RelatedField):
 
 
 class GundiTraceSerializer(serializers.Serializer):
+
+    def get_fields(self):
+        fields = super().get_fields()
+
+        # Reduce foreign key fields to just the ID
+        # TODO: determine if we can provide a queryset for these fields that honors a user's permissions
+        fields['integration'] = serializers.CharField(
+            write_only=True,
+            required=False,
+            help_text="Integration ID (UUID)"
+        )
+        fields['related_to'] = serializers.CharField(
+            write_only=True,
+            required=False,
+            help_text="Related GundiTrace ID (UUID)"
+        )
+
+        return fields
+
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
-    related_to = KeyRelatedField(
-        key_field="object_id",
-        write_only=True,
-        required=False,
-        queryset=GundiTrace.objects.all()
-    )
-    integration = serializers.PrimaryKeyRelatedField(
-        write_only=True,
-        required=False,
-        queryset=Integration.objects.all()
-    )
     source = serializers.CharField(
         write_only=True,
         default="default-source"
