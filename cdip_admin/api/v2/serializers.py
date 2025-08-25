@@ -854,20 +854,28 @@ class KeyRelatedField(serializers.RelatedField):
 
 
 class GundiTraceSerializer(serializers.Serializer):
+
+    def get_fields(self):
+        fields = super().get_fields()
+
+        # Reduce foreign key fields to just the ID
+        # TODO: determine if we can provide a queryset for these fields that honors a user's permissions
+        fields['integration'] = serializers.CharField(
+            write_only=True,
+            required=False,
+            help_text="Integration ID (UUID)"
+        )
+        fields['related_to'] = serializers.CharField(
+            write_only=True,
+            required=False,
+            help_text="Related GundiTrace ID (UUID)"
+        )
+
+        return fields
+
     object_id = serializers.UUIDField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
-    related_to = KeyRelatedField(
-        key_field="object_id",
-        write_only=True,
-        required=False,
-        queryset=GundiTrace.objects.all()
-    )
-    integration = serializers.PrimaryKeyRelatedField(
-        write_only=True,
-        required=False,
-        queryset=Integration.objects.all()
-    )
     source = serializers.CharField(
         write_only=True,
         default="default-source"
@@ -877,8 +885,20 @@ class GundiTraceSerializer(serializers.Serializer):
         # Check the integration id
         request = self.context["request"]
         if integration := data.get("integration"):
-            if not request.integration_id or request.integration_id != str(integration.id):
-                raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+            # Handle both string ID and object cases
+            if isinstance(integration, str):
+                # Convert string ID to Integration object
+                try:
+                    integration_obj = Integration.objects.get(id=integration)
+                    data["integration"] = integration_obj
+                    if not request.integration_id or request.integration_id != str(integration_obj.id):
+                        raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
+                except (ValueError, Integration.DoesNotExist):
+                    raise drf_exceptions.ValidationError(detail=f"Invalid integration ID: {integration}")
+            else:
+                # Integration is already an object
+                if not request.integration_id or request.integration_id != str(integration.id):
+                    raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
         elif request.integration_id:
             try:
                 data["integration"] = Integration.objects.get(id=request.integration_id)
