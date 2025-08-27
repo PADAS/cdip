@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - 'release-**'
+      - 'gundi-4650-fix-config-events'
 env:
   TRACING_ENABLED: ${{secrets.TRACING_ENABLED}}
   PUBSUB_ENABLED: ${{secrets.PUBSUB_ENABLED}}
@@ -43,7 +44,7 @@ jobs:
 
   deploy_stage:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
-    if: startsWith(github.ref, 'refs/heads/release')
+    if: startsWith(github.ref, 'refs/heads/gundi-4650-fix-config-events')
     needs: [vars, build]
     with:
       environment: stage
