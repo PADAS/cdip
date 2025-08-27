@@ -254,12 +254,14 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
     def _post_save(self, *args, **kwargs):
         # Publish events to notify other services about the config changes as needed
         if event := build_event_from_log(log=self):
+            # Cleanup to match subscription filters: earth_ranger -> earthranger
+            integration_type_filter = self.integration_type.value.replace("_", "").strip()
             publish_configuration_event.delay(
                 event_data=event.dict(),
                 attributes={  # Attributes can be used for filtering in subscriptions
                     "gundi_version": "v2",
                     "event_type": event.event_type,
-                    "integration_type": self.integration_type.value,
+                    "integration_type": integration_type_filter,
                 },
             )
 
