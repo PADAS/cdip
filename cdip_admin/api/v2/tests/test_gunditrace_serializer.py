@@ -151,8 +151,8 @@ class TestGundiTraceSerializerValidation:
         # Create another integration
         other_integration = Integration.objects.create(
             name="Other Integration",
-            integration_type=provider_trap_tagger.integration_type,
-            organization=provider_trap_tagger.organization
+            type=provider_trap_tagger.type,
+            owner=provider_trap_tagger.owner
         )
         
         data = {
@@ -165,6 +165,7 @@ class TestGundiTraceSerializerValidation:
         
         assert "Your API Key is not authorized for the integration_id" in str(exc_info.value)
 
+    # FixMe: This test is failing
     def test_validate_invalid_integration_id_raises_error(self):
         """Test validation fails when integration ID is invalid"""
         factory = APIRequestFactory()
@@ -202,6 +203,7 @@ class TestGundiTraceSerializerValidation:
         
         assert "This API Key isn't associated with an integration" in str(exc_info.value)
 
+    # FixMe: This test is failing
     def test_validate_invalid_request_integration_id_raises_error(self):
         """Test validation fails when request.integration_id is invalid"""
         factory = APIRequestFactory()
