@@ -114,23 +114,5 @@ class Command(BaseCommand):
             else:
                 total_updated += 1
                 self.stdout.write(f"Updated config for action '{action_slug_id}' on integration '{integration.name}' ({integration.id})")
-            # try:
-            #     action_config = IntegrationConfiguration.objects.get(
-            #         integration=integration,
-            #         action=action
-            #     )
-            # except IntegrationConfiguration.DoesNotExist:
-            #     action_config = IntegrationConfiguration(
-            #         integration=integration,
-            #         action=action,
-            #         data=config_data
-            #     )
-            #     action_config.save()
-            #     total_created += 1
-            #     self.stdout.write(f"Created new config for action '{action_slug_id}' on integration '{integration.name}' ({integration.id})")
-            # else:
-            #     action_config.data = config_data
-            #     action_config.save()
-            #     total_updated += 1
-            #     self.stdout.write(f"Updated config for action '{action_slug_id}' on integration '{integration.name}' ({integration.id})")
+
         self.stdout.write(f"Total created: {total_created}, Total updated: {total_updated}")
