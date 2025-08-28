@@ -118,6 +118,7 @@ def test_movebank_permissions_set_is_updated_on_device_addition_v2(
     assert mocked_csv_task.delay.called
 
 
+# FixMe: This test is failing
 @pytest.mark.django_db
 def test_movebank_permissions_file_upload_task_creates_permissions_json(
         mocker,
@@ -178,6 +179,7 @@ def test_movebank_permissions_file_upload_task_no_configs(mocker, caplog, mock_m
     assert log_to_test in [r.message for r in caplog.records]
 
 
+# FixMe: This test is failing
 @pytest.mark.django_db
 def test_movebank_permissions_file_upload_task_with_configs(
         mocker,
@@ -245,6 +247,7 @@ def test_movebank_permissions_file_upload_task_with_configs(
         assert log in logs
 
 
+# FixMe: This test is failing
 @pytest.mark.django_db
 def test_movebank_permissions_file_upload_task_with_bad_configs(
         mocker,

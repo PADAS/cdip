@@ -474,6 +474,31 @@ def er_action_pull_events(integration_type_er):
 
 
 @pytest.fixture
+def er_action_show_permissions(integration_type_er):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.GENERIC,
+        name="Show Permissions",
+        value="show_permissions",
+        description="Show permissions of an ER user/token",
+        schema={
+            "type": "object",
+            "title": "ShowPermissionsConfig",
+            "properties": {
+                "include_subjects_from_subgroups_in_parent": {
+                    "type": "boolean",
+                    "title": "Include Subjects from Subgroups in Parent Group",
+                    "default": True,
+                    "description": "When showing subjects from a group, include subjects from its subgroups as well."
+                }
+            },
+            "definitions": {},
+            "is_executable": True
+        }
+    )
+
+
+@pytest.fixture
 def earthranger_conection(
         organization,
         other_organization,
@@ -1628,6 +1653,7 @@ def integrations_list_traptagger_dest(
         integrations.append(integration)
     return integrations
 
+
 @pytest.fixture
 def er_destination_healthy(
         mocker,
@@ -1685,6 +1711,71 @@ def er_destination_healthy(
     IntegrationConfiguration.objects.create(
         integration=integration, action=er_action_push_events
     )
+    return integration
+
+
+@pytest.fixture
+def er_destination_without_show_permissions_config(
+        mocker,
+        settings,
+        mock_get_dispatcher_defaults_from_gcp_secrets,
+        organization,
+        other_organization,
+        integration_type_er,
+        get_random_id,
+        er_action_auth,
+        er_action_show_permissions,
+        er_action_pull_positions,
+        er_action_pull_events,
+        er_action_push_positions,
+        er_action_push_events,
+        er_action_push_messages,
+):
+    # Override settings so a DispatcherDeployment is created
+    settings.GCP_ENVIRONMENT_ENABLED = True
+    # Mock the task to trigger the dispatcher deployment
+    mocked_deployment_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
+    )
+    # Mock calls to external services
+    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+                 mock_get_dispatcher_defaults_from_gcp_secrets)
+    # Patch on_commit to execute the function immediately
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
+
+    # Create the integration
+    site_url = f"{get_random_id()}.pamdas.org"
+    integration, _ = Integration.objects.get_or_create(
+        type=integration_type_er,
+        name=f"ER Site HEALTHY {get_random_id()}",
+        owner=organization,
+        base_url=site_url,
+    )
+    integration.status.status = IntegrationStatus.Status.HEALTHY
+    integration.status.save()
+    # Configure actions
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_auth,
+        data={
+            "username": f"eruser-{get_random_id()}",
+            "password": f"passwd-{get_random_id()}",
+        },
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration,
+        action=er_action_push_positions,
+        data={"sensor_type": "collar"},
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration, action=er_action_push_events
+    )
+    IntegrationConfiguration.objects.create(
+        integration=integration, action=er_action_push_messages
+    )
+    # No config creatd for er_action_show_permissions
     return integration
 
 
