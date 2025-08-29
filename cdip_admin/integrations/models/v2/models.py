@@ -433,7 +433,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
         if self.action.is_periodic_action and not self.periodic_task:
             task_name = f"Run '{self.action.name}' on '{self.integration.name}'"[:200]
-            topic_name = f"{self.integration.type.value.replace('_', '').replace('-', '').strip()}-actions-topic"
+            topic_name = f"{self.integration.type.value.lower().replace('_', '').replace('-', '').strip()}-actions-topic"
             periodic_task_params = {
                 "name": task_name,
                 "task": "integrations.tasks.run_integration",
