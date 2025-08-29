@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api_consumer_info, patch_api_consumer_info
+from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api_consumer_info, patch_api_consumer_info, \
+    get_prefix_from_integration_type
 
 pytestmark = pytest.mark.django_db
 
@@ -67,3 +68,14 @@ def test_patch_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_r
     assert result == mock_kong_consumers_api_requests.patch.return_value
     expected_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(provider_ats.id)}"
     mock_kong_consumers_api_requests.patch.assert_called_once_with(expected_url, data=data)
+
+
+@pytest.mark.parametrize("integration_type, expected_prefix", [
+    ("earth_ranger", "earthranger"),
+    ("MoveBank", "movebank"),
+    ("mella-tracking", "mellatracking"),
+    ("ats ", "ats"),
+    ("un_conventional-VAlue ", "unconventionalvalue"),
+])
+def test_get_topic_prefix_from_integration_type(integration_type, expected_prefix):
+    assert get_prefix_from_integration_type(integration_type) == expected_prefix

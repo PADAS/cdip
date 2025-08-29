@@ -12,7 +12,7 @@ from integrations.models import (
     IntegrationAction,
     IntegrationConfiguration, IntegrationType, IntegrationStatus,
 )
-from integrations.utils import get_topic_prefix_from_integration_type
+from integrations.utils import get_prefix_from_integration_type
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
 
@@ -152,7 +152,7 @@ def _test_create_integration(
             assert task_kwargs.get("integration_id") == str(integration.id)
             assert task_kwargs.get("action_id") == str(configuration.action.value)
             # Check that the pubsub topic name is correct, without hyphens and underscores
-            prefix = get_topic_prefix_from_integration_type(integration.type.value)
+            prefix = get_prefix_from_integration_type(integration.type.value)
             expected_topic_name = f"{prefix}-actions-topic"
             assert task_kwargs.get("pubsub_topic") == expected_topic_name
 

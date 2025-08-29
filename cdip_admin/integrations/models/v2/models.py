@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from integrations.utils import get_api_key, does_movebank_permissions_config_changed, get_dispatcher_topic_default_name, \
-    get_topic_prefix_from_integration_type
+    get_prefix_from_integration_type
 from model_utils import FieldTracker
 from integrations.tasks import (
     update_mb_permissions_for_group,
@@ -434,7 +434,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
         if self.action.is_periodic_action and not self.periodic_task:
             task_name = f"Run '{self.action.name}' on '{self.integration.name}'"[:200]
-            integration_type_prefix = get_topic_prefix_from_integration_type(value=self.integration.type.value)
+            integration_type_prefix = get_prefix_from_integration_type(value=self.integration.type.value)
             topic_name = f"{integration_type_prefix}-actions-topic"
             periodic_task_params = {
                 "name": task_name,
