@@ -151,7 +151,7 @@ def _test_create_integration(
             assert task_kwargs.get("integration_id") == str(integration.id)
             assert task_kwargs.get("action_id") == str(configuration.action.value)
             # Check that the pubsub topic name is correct, without hyphens and underscores
-            expected_topic_name = f"{integration.type.value.replace('_', '').replace('-', '').strip()}-actions-topic"
+            expected_topic_name = f"{integration.type.value.lower().replace('_', '').replace('-', '').strip()}-actions-topic"
             assert task_kwargs.get("pubsub_topic") == expected_topic_name
 
         # Check activity logs for each configuration
