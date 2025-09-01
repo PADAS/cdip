@@ -1,5 +1,7 @@
 import base64
 import logging
+import re
+
 import requests as requests
 from django.conf import settings
 from google.cloud import pubsub_v1
@@ -142,6 +144,16 @@ def send_message_to_gcp_pubsub(message, topic):
 def get_prefix_from_integration_type(value: str):
     # e.g. stevens_connect -> stevensconnect
     return value.lower().replace("_", "").replace("-", "").strip()
+
+
+def convert_legacy_topic_name(pubsub_topic: str):
+    # Clean topic names following an older naming convention:
+    # e.g. stevens-connect-actions-topic or earth_ranger-actions-topic
+    pubsub_topic_name_parts = re.split('[_-]', pubsub_topic)
+    if len(pubsub_topic_name_parts) > 3:  # Bad topic name
+        clean_prefix = "".join(pubsub_topic_name_parts[:-2]).lower().strip()  # stevens-connect -> stevensconnect
+        return f"{clean_prefix}-{'-'.join(pubsub_topic_name_parts[-2:])}"
+    return pubsub_topic
 
 
 def get_dispatcher_topic_default_name(integration, gundi_version="v2"):

@@ -1,6 +1,7 @@
 import csv
 import logging
 import json
+
 import aiofiles
 import pydantic
 import tempfile
@@ -13,7 +14,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 
-from integrations.utils import build_mb_tag_id, send_message_to_gcp_pubsub
+from integrations.utils import build_mb_tag_id, send_message_to_gcp_pubsub, convert_legacy_topic_name
 from activity_log.models import ActivityLog
 
 from movebank_client import MovebankClient, MBClientError, PermissionOperations
@@ -41,12 +42,13 @@ def run_integration(integration_id=None, action_id=None, pubsub_topic=None):
         )
         return
 
+    pubsub_topic_clean = convert_legacy_topic_name(pubsub_topic)
     data = {
         "integration_id": integration_id,
         "action_id": action_id
     }
     # Send pubsub message to GCP
-    send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic)
+    send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic_clean)
 
     try:  # Log the event
         integration = apps.get_model("integrations", "Integration").objects.get(id=integration_id)
@@ -67,7 +69,7 @@ def run_integration(integration_id=None, action_id=None, pubsub_topic=None):
             extra={
                 "integration_id": integration_id,
                 "action": action_id,
-                "pubsub_topic": pubsub_topic,
+                "pubsub_topic": pubsub_topic_clean,
                 'attention_needed': True
             }
         )
