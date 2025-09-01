@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError, transaction
-from django.core.exceptions import ObjectDoesNotExist
+from django.core import exceptions as django_exceptions
 from django_celery_beat.models import CrontabSchedule
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
@@ -893,7 +893,7 @@ class GundiTraceSerializer(serializers.Serializer):
                     data["integration"] = integration_obj
                     if not request.integration_id or request.integration_id != str(integration_obj.id):
                         raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
-                except (ValueError, Integration.DoesNotExist):
+                except (ValueError, Integration.DoesNotExist, django_exceptions.ValidationError):
                     raise drf_exceptions.ValidationError(detail=f"Invalid integration ID: {integration}")
             else:
                 # Integration is already an object
