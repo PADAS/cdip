@@ -459,6 +459,7 @@ def er_action_pull_positions(integration_type_er):
         name="Pull Positions",
         value="pull_positions",
         description="Pull Tracking data from Earth Ranger API",
+        is_periodic_action=True,
     )
 
 
@@ -470,6 +471,7 @@ def er_action_pull_events(integration_type_er):
         name="Pull Events",
         value="pull_events",
         description="Pull Event data from Earth Ranger API",
+        is_periodic_action=True,
     )
 
 

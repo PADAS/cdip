@@ -8,6 +8,7 @@ from core.models import UUIDAbstractModel, TimestampedModel
 import gundi_core.events as gundi_core_events
 import gundi_core.schemas.v2 as gundi_core_schemas
 
+from integrations.utils import get_prefix_from_integration_type
 from .core import ActivityActions
 from .tasks import publish_configuration_event
 
@@ -255,7 +256,7 @@ class ActivityLog(UUIDAbstractModel, TimestampedModel):
         # Publish events to notify other services about the config changes as needed
         if event := build_event_from_log(log=self):
             # Cleanup to match subscription filters: earth_ranger -> earthranger
-            integration_type_filter = self.integration_type.value.replace("_", "").strip()
+            integration_type_filter = get_prefix_from_integration_type(self.integration_type.value)
             publish_configuration_event.delay(
                 event_data=event.dict(),
                 attributes={  # Attributes can be used for filtering in subscriptions

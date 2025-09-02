@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from django.urls import reverse
 from django_celery_beat.models import PeriodicTask
@@ -10,6 +12,7 @@ from integrations.models import (
     IntegrationAction,
     IntegrationConfiguration, IntegrationType, IntegrationStatus,
 )
+from integrations.utils import get_prefix_from_integration_type
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
 
@@ -139,6 +142,20 @@ def _test_create_integration(
             assert configuration.data == next(c for c in configurations if c["action"] == str(configuration.action.id))["data"]
         elif str(configuration.action.id) in missing_configurations and create_configurations:
             assert configuration.data == {}  # Configuration was created automatically
+        if configuration.action.is_periodic_action:
+            # Check that a periodic task was created for periodic actions
+            assert configuration.periodic_task is not None
+            periodic_task = configuration.periodic_task
+            assert periodic_task.enabled is True
+            assert periodic_task.task == "integrations.tasks.run_integration"
+            task_kwargs = json.loads(periodic_task.kwargs)
+            assert task_kwargs.get("integration_id") == str(integration.id)
+            assert task_kwargs.get("action_id") == str(configuration.action.value)
+            # Check that the pubsub topic name is correct, without hyphens and underscores
+            prefix = get_prefix_from_integration_type(integration.type.value)
+            expected_topic_name = f"{prefix}-actions-topic"
+            assert task_kwargs.get("pubsub_topic") == expected_topic_name
+
         # Check activity logs for each configuration
         activity_log = activity_logs[i]
         _test_activity_logs_on_instance_created(
@@ -172,7 +189,8 @@ def _test_create_integration(
 
 def test_create_er_integration_as_superuser(
         api_client, superuser, organization, integration_type_er, get_random_id, er_action_auth,
-        er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions
+        er_action_push_events, er_action_push_positions, er_action_push_messages,
+        er_action_pull_events, er_action_pull_positions, er_action_show_permissions
 ):
     _test_create_integration(
         api_client=api_client,
