@@ -31,7 +31,8 @@ def ensure_default_route(integration):
         integration.save()
     # Add the integration a provider in its default routing rule
     if not integration.default_route.data_providers.filter(id=integration.id).exists():
-        integration.default_route.data_providers.add(integration)
+        RouteProvider = apps.get_model('integrations', 'RouteProvider')
+        RouteProvider.objects.create(integration=integration, route=integration.default_route)
 
 
 def get_user_integrations_qs(user):
