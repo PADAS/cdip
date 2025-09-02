@@ -146,8 +146,11 @@ def _test_create_integration(
             # Check that a periodic task was created for periodic actions
             assert configuration.periodic_task is not None
             periodic_task = configuration.periodic_task
-            assert periodic_task.enabled is True
             assert periodic_task.task == "integrations.tasks.run_integration"
+            if integration.is_used_as_provider:
+                assert periodic_task.enabled is True
+            else:
+                assert periodic_task.enabled is False
             task_kwargs = json.loads(periodic_task.kwargs)
             assert task_kwargs.get("integration_id") == str(integration.id)
             assert task_kwargs.get("action_id") == str(configuration.action.value)
