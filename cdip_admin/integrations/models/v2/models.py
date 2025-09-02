@@ -272,11 +272,12 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
-                # Disable/Enable related periodic tasks for pull actions
-                for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA):
-                    if config.action.is_periodic_action and config.periodic_task:
-                        config.periodic_task.enabled = self.enabled
-                        config.periodic_task.save()
+                if self.is_used_as_provider:
+                    # Disable/Enable related periodic tasks for pull actions
+                    for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA, action__is_periodic_action=True):
+                        if config.periodic_task:
+                            config.periodic_task.enabled = self.enabled
+                            config.periodic_task.save()
 
     def save(self, *args, **kwargs):
         with self.tracker:
@@ -308,12 +309,27 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         return self.configurations_by_integration.all()
 
     @property
+    def periodic_pull_action_configurations(self):
+        return self.configurations.filter(
+            action__type=IntegrationAction.ActionTypes.PULL_DATA,
+            action__is_periodic_action=True
+        )
+
+    @property
     def webhook_configuration(self):
         return self.webhook_config_by_integration
 
     @property
     def routing_rules(self):
         return self.routing_rules_by_provider.all()
+
+    @property
+    def is_used_as_provider(self):
+        return self.routing_rules_by_provider.exists()
+
+    @property
+    def is_used_as_destination(self):
+        return self.routing_rules_by_destination.exists()
 
     @property
     def destinations(self):
@@ -439,10 +455,11 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             periodic_task_params = {
                 "name": task_name,
                 "task": "integrations.tasks.run_integration",
+                "enabled": self.integration.is_used_as_provider,  # Disable pull action trigger until used as provider
                 "kwargs": json.dumps({
                     "integration_id": str(self.integration_id),
                     "action_id": self.action.value,
-                    "pubsub_topic": topic_name
+                    "pubsub_topic": topic_name,
                 })
             }
             # Check for custom crontab schedule
@@ -583,6 +600,21 @@ class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 class RouteProvider(ChangeLogMixin, models.Model):
     integration = models.ForeignKey("integrations.Integration", on_delete=models.CASCADE)
     route = models.ForeignKey("integrations.Route", on_delete=models.CASCADE)
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        # Enable periodic tasks for pull actions (if integration is enabled)
+        for config in self.integration.periodic_pull_action_configurations:
+            if config.periodic_task:
+                config.periodic_task.enabled = self.integration.enabled
+                config.periodic_task.save()
+
+    def save(self, *args, **kwargs):
+        self._pre_save(self, *args, **kwargs)
+        super().save(*args, **kwargs)
+        self._post_save(self, *args, **kwargs)
 
 
 class RouteDestination(ChangeLogMixin, models.Model):
