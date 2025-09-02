@@ -274,7 +274,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             if self.tracker.has_changed("enabled"):
                 if self.is_used_as_provider:
                     # Disable/Enable related periodic tasks for pull actions
-                    for config in self.configurations.filter(action__type=IntegrationAction.ActionTypes.PULL_DATA, action__is_periodic_action=True):
+                    for config in self.periodic_pull_action_configurations:
                         if config.periodic_task:
                             config.periodic_task.enabled = self.enabled
                             config.periodic_task.save()
