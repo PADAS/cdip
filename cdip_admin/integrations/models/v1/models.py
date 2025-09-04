@@ -261,7 +261,7 @@ class OutboundIntegrationConfiguration(TimestampedModel):
                 legacy_integration=self,
                 configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
             )
-        if does_movebank_permissions_config_changed(self, "v1"):
+        if does_movebank_permissions_config_changed(self, "v1", is_created=created):
             # Movebank permissions file needs to be recreated
             transaction.on_commit(
                 lambda: recreate_and_send_movebank_permissions_csv_file.delay()

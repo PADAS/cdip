@@ -104,7 +104,7 @@ def get_api_key(integration):
     return create_api_key(integration)
 
 
-def does_movebank_permissions_config_changed(integration_config, gundi_version):
+def does_movebank_permissions_config_changed(integration_config, gundi_version, is_created=False):
     if gundi_version == "v2":
         # is Movebank?
         if integration_config.integration.type.value != DestinationTypes.Movebank.value:
@@ -112,17 +112,25 @@ def does_movebank_permissions_config_changed(integration_config, gundi_version):
         # is PERMISSIONS action?
         if integration_config.action.value != MovebankActions.PERMISSIONS.value:
             return False
-        # JSON config changed?
-        if not integration_config.tracker.has_changed("data"):
+        # JSON config or base_url changed?
+        if not integration_config.tracker.has_changed("data") \
+                and not integration_config.tracker.has_changed("base_url"):
             return False
         return True
     else:
         # is Movebank?
         if integration_config.type.slug != DestinationTypes.Movebank.value:
             return False
-        # JSON config changed?
+        # "permissions" key in additional?
+        if "permissions" not in integration_config.additional.keys():
+            return False
+
+        # New MB outbounds must recreate the permissions
+        if is_created:
+            return True
+        # JSON config or endpoint changed?
         if not integration_config.tracker.has_changed("additional") \
-                or "permissions" not in integration_config.additional.keys():
+                and not integration_config.tracker.has_changed("endpoint"):
             return False
         return True
 
