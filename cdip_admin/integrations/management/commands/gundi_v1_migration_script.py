@@ -81,20 +81,38 @@ ER_DESTINATION_JSON_SCHEMA = {
 }
 
 ER_DESTINATION_UI_SCHEMA = {"ui:order": ["authentication_type", "token", "username", "password"]}
-DEFAULT_FIELD_MAPPING = {"default": "awt", "destination_field": "provider_key"}
+DEFAULT_FIELD_MAPPING = {"default": "", "destination_field": "provider_key"}
 
 
 class Command(BaseCommand):
 
-    help = "AWT v1 integrations migration script (to Gundi v2)"
+    help = "Gundi v1 integrations migration script (to Gundi v2)"
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            "--inbound-type",
+            type=str,
+            required=True,
+            help="Specify the inbound type to migrate [REQUIRED]",
+        )
+        parser.add_argument(
+            "--v2-integration-type",
+            type=str,
+            required=True,
+            help="Specify the Gundi V2 integration type to create [REQUIRED]",
+        )
+        parser.add_argument(
+            "--v2-action",
+            type=str,
+            required=True,
+            help="Specify the Gundi V2 action to create [REQUIRED]",
+        )
         parser.add_argument(
             '--inbounds',
             nargs='+',
             type=str,
             required=False,
-            help='List of AWT integration inbounds IDs to migrate'
+            help='List of Gundi v1 integration inbounds IDs to migrate'
         )
         parser.add_argument(
             "--max",
@@ -107,34 +125,43 @@ class Command(BaseCommand):
             "--all",
             action="store_true",
             default=False,
-            help="If present, migrate all AWT inbounds regardless of the other option"
+            help="If present, migrate all the selected Gundi v1 inbounds, regardless of the other option"
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(" -- Starting AWT v1 migration script -- \n\n")
-        if inbounds_to_migrate := self._get_awt_inbounds(options=options):
-            awt_integrations_created = 0
-            awt_integrations_skipped = 0
-            awt_integrations_with_error = 0
-            awt_integration_configs_created = 0
+        inbound_type = options["inbound_type"].capitalize()
+        self.stdout.write(f" -- Starting {inbound_type} v1 migration script -- \n\n")
+        if inbounds_to_migrate := self._get_v1_inbounds(options=options):
+            # Get selected integration type
+            integration_type = options["v2_integration_type"]
+            try:
+                v2_integration_type = IntegrationType.objects.get(
+                    value=integration_type
+                )
+            except IntegrationType.DoesNotExist:
+                self.stdout.write(f" -- Selected integration type {integration_type} does not exist in Gundi v2 -- ")
+                return
+
+            # Get v2 action
+            action_value = options["v2_action"]
+            try:
+                v2_action = IntegrationAction.objects.get(
+                    value=action_value,
+                    integration_type=v2_integration_type
+                )
+            except IntegrationAction.DoesNotExist:
+                self.stdout.write(f" -- Selected action {action_value} does not exist in Gundi v2 -- ")
+                return
+
+            v2_integrations_created = 0
+            v2_integrations_skipped = 0
+            v2_integrations_with_error = 0
+            v2_integration_configs_created = 0
             destination_integration_types_created = 0
             destination_owners_created = 0
             destination_integration_created = 0
 
-            self.stdout.write(f" -- Got {len(inbounds_to_migrate)} AWT inbounds to migrate -- \n\n")
-
-            # Get or create AWT PUSH integration type
-            awt_integration_type, _ = IntegrationType.objects.get_or_create(
-                name="Africa Wildlife Tracking (Animal Tracker)  [Data Push]",
-                value="awt_push_v2"
-            )
-            # Get or create AWT PUSH action
-            awt_push_action, _ = IntegrationAction.objects.get_or_create(
-                type=IntegrationAction.ActionTypes.PULL_DATA,
-                name="AWT Push",
-                value="awt_push_action",
-                integration_type=awt_integration_type
-            )
+            self.stdout.write(f" -- Got {len(inbounds_to_migrate)} {inbound_type} inbounds to migrate -- \n\n")
 
             for inbound in inbounds_to_migrate:
                 try:
@@ -143,7 +170,7 @@ class Command(BaseCommand):
                             name=inbound.owner.name
                         )
                         integration, created = Integration.objects.get_or_create(
-                            type=awt_integration_type,
+                            type=v2_integration_type,
                             name=f"[V1 to V2] - {inbound.name} ({inbound.login})",
                             owner=inbound_owner,
                             defaults={
@@ -152,17 +179,17 @@ class Command(BaseCommand):
                         )
                         if created:
                             # New integration created
-                            awt_integrations_created += 1
+                            v2_integrations_created += 1
                             self.stdout.write(f" -- Created new integration: {integration.name} (ID: {integration.id}) from v1 inbound -- ")
 
                             # Get or create the AWT_PUSH action config for this integration
                             action_config, created = IntegrationConfiguration.objects.get_or_create(
                                 integration=integration,
-                                action=awt_push_action
+                                action=v2_action
                             )
                             if created:
-                                awt_integration_configs_created += 1
-                                self.stdout.write(f" -- Created new configuration for action '{awt_push_action.name}' for integration: {integration.name} (ID: {integration.id})")
+                                v2_integration_configs_created += 1
+                                self.stdout.write(f" -- Created new configuration for action '{v2_action.name}' for integration: {integration.name} (ID: {integration.id})")
 
                             # Get or create integration route
                             route_name = f"{integration.name} - Default Route"
@@ -182,7 +209,7 @@ class Command(BaseCommand):
                             }
 
                             # Read inbound destinations and create integration for each
-                            for destination in inbound.destinations.all():
+                            for destination in inbound.default_devicegroup.destinations.all():
                                 if not destination.is_er_site:
                                     self.stdout.write(f" -- Skipping destination {destination.name} (ID: {destination.id}) as it is not an ER site -- ")
                                     continue
@@ -261,52 +288,53 @@ class Command(BaseCommand):
                             integration.default_route.configuration = route_config
                             integration.default_route.save()
                             integration.save()
+
+                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n")
                         else:
-                            awt_integrations_skipped += 1
+                            v2_integrations_skipped += 1
                             self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n")
 
                 except Exception as e:
-                    awt_integrations_with_error += 1
+                    v2_integrations_with_error += 1
                     self.stderr.write(f" -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e}")
 
             self.stdout.write(f"\n -- Summary -- \n\n")
-            self.stdout.write(f" -- AWT Integrations with error: {awt_integrations_with_error} -- ")
-            self.stdout.write(f" -- AWT Integrations skipped: {awt_integrations_skipped} -- ")
-            self.stdout.write(f" -- AWT Integrations created: {awt_integrations_created} -- ")
-            self.stdout.write(f" -- AWT Integration Configurations created: {awt_integration_configs_created} -- \n\n")
+            self.stdout.write(f" -- {integration_type} Integrations with error: {v2_integrations_with_error} -- ")
+            self.stdout.write(f" -- {integration_type} Integrations skipped: {v2_integrations_skipped} -- ")
+            self.stdout.write(f" -- {integration_type} Integrations created: {v2_integrations_created} -- ")
+            self.stdout.write(f" -- {integration_type} Integration Configurations created: {v2_integration_configs_created} -- \n\n")
             self.stdout.write(f" -- Destination Integration Types created: {destination_integration_types_created} -- ")
             self.stdout.write(f" -- Destination Integration Owners created: {destination_owners_created} -- ")
             self.stdout.write(f" -- Destination Integrations created: {destination_integration_created} -- ")
 
-    def _get_awt_inbounds(self, options):
+    def _get_v1_inbounds(self, options):
+        inbound_slug = options["inbound_type"]
         try:
-            awt_inbound_type = InboundIntegrationType.objects.get(
-                name="Africa Wildlife Tracking (AWT)",
-                description="Animal Collar	Hadrien Haupt	hadrien@awt.co.za",
-                slug="awt"
+            inbound_type = InboundIntegrationType.objects.get(
+                slug=inbound_slug
             )
         except InboundIntegrationType.DoesNotExist:
-            self.stdout.write(" -- ERROR: AWT Inbound Integration Type not found -- \n")
+            self.stdout.write(f" -- ERROR: {inbound_slug.capitalize()} Inbound Integration Type not found -- \n")
             return []
 
-        inbounds = InboundIntegrationConfiguration.objects.filter(type=awt_inbound_type).all()
+        inbounds = InboundIntegrationConfiguration.objects.filter(type=inbound_type).all()
 
-        self.stdout.write(f" -- Found {inbounds.count()} AWT inbounds -- ")
+        self.stdout.write(f" -- Found {inbounds.count()} {inbound_slug.capitalize()} inbounds -- ")
 
         if options["all"]:
-            self.stdout.write(" -- Migrating ALL AWT inbounds as per --all option -- ")
+            self.stdout.write(f" -- Migrating ALL {inbound_slug.capitalize()} inbounds as per --all option -- ")
             return inbounds
 
         if options['inbounds']:
-            self.stdout.write(f" -- Filtering AWT inbounds by IDs: {options['inbounds']} -- ")
+            self.stdout.write(f" -- Filtering {inbound_slug.capitalize()} inbounds by IDs: {options['inbounds']} -- ")
             inbounds = inbounds.filter(id__in=options['inbounds'])
 
         if not inbounds:
-            self.stdout.write(f" -- ERROR: AWT Integrations with IDs {options['inbounds']} not found -- \n")
+            self.stdout.write(f" -- ERROR: {inbound_slug.capitalize()} Integrations with IDs {options['inbounds']} not found -- \n")
             return []
 
         if options['max']:
-            self.stdout.write(f" -- Limiting to {options['max']} AWT inbounds as per --max option -- ")
+            self.stdout.write(f" -- Limiting to {options['max']} {inbound_slug.capitalize()} inbounds as per --max option -- ")
             inbounds = inbounds[:options['max']]
 
         return inbounds
