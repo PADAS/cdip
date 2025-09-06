@@ -209,72 +209,75 @@ class Command(BaseCommand):
                             }
 
                             # Read inbound destinations and create integration for each
-                            for destination in inbound.default_devicegroup.destinations.all():
-                                if not destination.is_er_site:
-                                    self.stdout.write(f" -- Skipping destination {destination.name} (ID: {destination.id}) as it is not an ER site -- ")
-                                    continue
+                            if v1_destinations := inbound.default_devicegroup.destinations.all():
+                                for destination in v1_destinations:
+                                    if not destination.is_er_site:
+                                        self.stdout.write(f" -- Skipping destination {destination.name} (ID: {destination.id}) as it is not an ER site -- ")
+                                        continue
 
-                                # Check if outbound type exists as integration type
-                                destination_integration_type, created = IntegrationType.objects.get_or_create(
-                                    value=destination.type.slug
-                                )
-                                if created:
-                                    destination_integration_types_created += 1
-                                    self.stdout.write(f" -- Created new integration type: {destination_integration_type.value} for destination: {destination.name} (ID: {destination.id})")
-
-                                # Check if outbound owner exists as organization
-                                destination_owner, created = Organization.objects.get_or_create(
-                                    name=destination.owner.name
-                                )
-                                if created:
-                                    destination_owners_created += 1
-                                    self.stdout.write(f" -- Created new organization: {destination_owner.name} for destination: {destination.name} (ID: {destination.id})")
-
-                                # Remove the /api/v1.0 part from the base URL
-                                destination.endpoint = destination.endpoint.replace(
-                                    "/api/v1.0", ""
-                                )
-
-                                destination_integration, created = Integration.objects.get_or_create(
-                                    type=destination_integration_type,
-                                    owner=destination_owner,
-                                    base_url=destination.endpoint,
-                                    name=destination.name
-                                )
-                                if created:
-                                    destination_integration_created += 1
-
-                                    # Create AUTH action config for the destination integration (ER)
-                                    er_auth_action, created = IntegrationAction.objects.get_or_create(
-                                        type=IntegrationAction.ActionTypes.AUTHENTICATION,
-                                        name="Auth",
-                                        value="auth",
-                                        description="Earth Ranger Auth action",
-                                        integration_type=destination_integration_type
+                                    # Check if outbound type exists as integration type
+                                    destination_integration_type, created = IntegrationType.objects.get_or_create(
+                                        value=destination.type.slug
                                     )
                                     if created:
-                                        er_auth_action.schema = ER_DESTINATION_JSON_SCHEMA
-                                        er_auth_action.ui_schema = ER_DESTINATION_UI_SCHEMA
-                                        er_auth_action.save()
-                                        self.stdout.write(f" -- Created new action: {er_auth_action.name} for destination integration type: {destination_integration_type.value} -- ")
+                                        destination_integration_types_created += 1
+                                        self.stdout.write(f" -- Created new integration type: {destination_integration_type.value} for destination: {destination.name} (ID: {destination.id})")
 
-                                    er_auth_config, created = IntegrationConfiguration.objects.get_or_create(
-                                        integration=destination_integration,
-                                        action=er_auth_action,
-                                        data={"token": destination.token, "authentication_type": "token"}
+                                    # Check if outbound owner exists as organization
+                                    destination_owner, created = Organization.objects.get_or_create(
+                                        name=destination.owner.name
                                     )
                                     if created:
-                                        self.stdout.write(f" -- Created new configuration for action '{er_auth_action.name}' for destination integration: {destination_integration.name} (ID: {destination_integration.id})")
+                                        destination_owners_created += 1
+                                        self.stdout.write(f" -- Created new organization: {destination_owner.name} for destination: {destination.name} (ID: {destination.id})")
 
-                                    self.stdout.write(f" -- Created new integration: {destination_integration.name} (ID: {destination_integration.id}) for destination: {destination.name} (ID: {destination.id})")
+                                    # Remove the /api/v1.0 part from the base URL
+                                    destination.endpoint = destination.endpoint.replace(
+                                        "/api/v1.0", ""
+                                    )
 
-                                integration.default_route.destinations.add(destination_integration)
+                                    destination_integration, created = Integration.objects.get_or_create(
+                                        type=destination_integration_type,
+                                        owner=destination_owner,
+                                        base_url=destination.endpoint,
+                                        name=destination.name
+                                    )
+                                    if created:
+                                        destination_integration_created += 1
 
-                                # add legacy provider_key field mapping
-                                inbound_field_mapping = copy.deepcopy(DEFAULT_FIELD_MAPPING)
-                                inbound_field_mapping["default"] = inbound.provider
+                                        # Create AUTH action config for the destination integration (ER)
+                                        er_auth_action, created = IntegrationAction.objects.get_or_create(
+                                            type=IntegrationAction.ActionTypes.AUTHENTICATION,
+                                            name="Auth",
+                                            value="auth",
+                                            description="Earth Ranger Auth action",
+                                            integration_type=destination_integration_type
+                                        )
+                                        if created:
+                                            er_auth_action.schema = ER_DESTINATION_JSON_SCHEMA
+                                            er_auth_action.ui_schema = ER_DESTINATION_UI_SCHEMA
+                                            er_auth_action.save()
+                                            self.stdout.write(f" -- Created new action: {er_auth_action.name} for destination integration type: {destination_integration_type.value} -- ")
 
-                                field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
+                                        er_auth_config, created = IntegrationConfiguration.objects.get_or_create(
+                                            integration=destination_integration,
+                                            action=er_auth_action,
+                                            data={"token": destination.token, "authentication_type": "token"}
+                                        )
+                                        if created:
+                                            self.stdout.write(f" -- Created new configuration for action '{er_auth_action.name}' for destination integration: {destination_integration.name} (ID: {destination_integration.id})")
+
+                                        self.stdout.write(f" -- Created new integration: {destination_integration.name} (ID: {destination_integration.id}) for destination: {destination.name} (ID: {destination.id})")
+
+                                    integration.default_route.destinations.add(destination_integration)
+
+                                    # add legacy provider_key field mapping
+                                    inbound_field_mapping = copy.deepcopy(DEFAULT_FIELD_MAPPING)
+                                    inbound_field_mapping["default"] = inbound.provider
+
+                                    field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
+                            else:
+                                self.stdout.write(f" -- No destinations found for inbound {inbound.name} (ID: {inbound.id}) -- \n")
 
                             field_mappings_result = {
                                 "field_mappings": field_mappings
