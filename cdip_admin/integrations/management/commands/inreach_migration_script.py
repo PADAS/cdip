@@ -2,7 +2,6 @@ import copy
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from shapely.speedups import enabled
 
 from integrations.models import (
     Organization,
