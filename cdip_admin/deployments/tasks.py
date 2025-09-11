@@ -301,7 +301,7 @@ def get_function_request(configuration, function_name, topic_path):
     )
     build_config = functions_v2.types.BuildConfig(
         entry_point="main",
-        runtime="python38",
+        runtime="python311",
         source=source
     )
 
