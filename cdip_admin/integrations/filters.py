@@ -1,5 +1,5 @@
 from django.db.models import Subquery
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 import django_filters
 from django_filters import rest_framework as django_filters_rest
 
