@@ -14,7 +14,7 @@ import os
 import environ
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
-from kombu import Exchange, Queue
+
 
 env = environ.Env()
 # reading .env file
@@ -276,15 +276,37 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_DEFAULT_EXCHANGE = "default"
 CELERY_TASK_DEFAULT_ROUTING_KEY = "default"
 
-CELERY_TASK_QUEUES = (
-    Queue("default", Exchange("default"), routing_key="default"),
-    Queue("deployments", Exchange("deployments"), routing_key="deployments"),
-    Queue("mb_permissions", Exchange("mb_permissions"), routing_key="mb_permissions"),
-    Queue("healthchecks", Exchange("healthchecks"), routing_key="healthchecks"),
-    Queue("systemevents", Exchange("systemevents"), routing_key="systemevents"),
-    Queue("actiontriggers", Exchange("actiontriggers"), routing_key="actiontriggers"),
-    Queue("smartsyncs", Exchange("smartsyncs"), routing_key="smartsyncs"),
-)
+# Celery 5.5+ uses a simpler queue configuration
+CELERY_TASK_QUEUES = {
+    "default": {
+        "exchange": "default",
+        "routing_key": "default",
+    },
+    "deployments": {
+        "exchange": "deployments", 
+        "routing_key": "deployments",
+    },
+    "mb_permissions": {
+        "exchange": "mb_permissions",
+        "routing_key": "mb_permissions",
+    },
+    "healthchecks": {
+        "exchange": "healthchecks",
+        "routing_key": "healthchecks",
+    },
+    "systemevents": {
+        "exchange": "systemevents",
+        "routing_key": "systemevents",
+    },
+    "actiontriggers": {
+        "exchange": "actiontriggers",
+        "routing_key": "actiontriggers",
+    },
+    "smartsyncs": {
+        "exchange": "smartsyncs",
+        "routing_key": "smartsyncs",
+    },
+}
 
 CELERY_TASK_ROUTES = {
     "deployments.tasks.deploy_serverless_dispatcher": {

@@ -1,7 +1,7 @@
 aiofiles==23.2.1
 https://github.com/PADAS/movebank-client/releases/download/v1.2.0-alpha/movebank_client-1.2.0-py3-none-any.whl
 #movebank-client==1.0.0
-celery==5.2.3
+celery==5.5
 celery-once==1.2.0
 Django~=4.2.24
 PyJWT==1.7.1
@@ -13,11 +13,12 @@ chardet==3.0.4
 croniter==0.3.32
 cryptography==2.9.2
 django-bootstrap4==24.3
-django-fernet-fields==0.6
+git+https://github.com/nick-amplify/django-fernet-fields.git
+#django-fernet-fields==0.6
 django-htmx==1.12.0
 django-jsonform==2.12.0
 django-extensions==3.2.0
-djangorestframework==3.11.0
+djangorestframework
 django-cors-headers~=3.1.1
 django-crispy-forms==1.9.1
 django-environ==0.4.5
@@ -40,7 +41,7 @@ oauthlib==3.1.0
 psycopg2-binary==2.9.10
 pyasn1==0.4.8
 pycparser==2.20
-python-dateutil==2.8.1
+python-dateutil>=2.8.2
 python-dotenv==0.13.0
 python-jose==3.1.0
 python3-openid==3.2.0

@@ -30,7 +30,7 @@ beautifulsoup4==4.9.1
     # via
     #   -r dependencies/requirements.in
     #   django-bootstrap4
-billiard==3.6.4.0
+billiard==4.2.1
     # via celery
 cached-property==1.5.1
     # via -r dependencies/requirements.in
@@ -38,7 +38,7 @@ cachetools==5.5.2
     # via google-auth
 cdip-connector @ https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.6.0-rc/cdip_connector-1.6.0-py3-none-any.whl
     # via -r dependencies/requirements.in
-celery==5.2.3
+celery==5.5.0
     # via
     #   -r dependencies/requirements.in
     #   celery-once
@@ -138,7 +138,7 @@ django-environ==0.4.5
     # via -r dependencies/requirements.in
 django-extensions==3.2.0
     # via -r dependencies/requirements.in
-django-fernet-fields==0.6
+django-fernet-fields @ git+https://github.com/nick-amplify/django-fernet-fields.git
     # via -r dependencies/requirements.in
 django-filter==2.3.0
     # via -r dependencies/requirements.in
@@ -168,7 +168,7 @@ django-tables2==2.3.1
     # via -r dependencies/requirements.in
 django-timezone-field==7.1
     # via django-celery-beat
-djangorestframework==3.11.0
+djangorestframework==3.16.1
     # via
     #   -r dependencies/requirements.in
     #   django-rest-swagger
@@ -444,10 +444,11 @@ pyrsistent==0.20.0
     # via jsonschema
 python-crontab==3.3.0
     # via django-celery-beat
-python-dateutil==2.8.1
+python-dateutil==2.9.0.post0
     # via
     #   -r dependencies/requirements.in
     #   cdip-connector
+    #   celery
     #   croniter
     #   dateparser
 python-dotenv==0.13.0
@@ -472,7 +473,6 @@ pytz==2025.2
     # via
     #   -r dependencies/requirements.in
     #   babel
-    #   celery
     #   dateparser
     #   smartconnect-client
 redis==6.4.0
@@ -585,7 +585,7 @@ zipp==3.1.0
     # via
     #   -r dependencies/requirements.in
     #   importlib-metadata
-zope-event==5.1
+zope-event==6.0
     # via gevent
 zope-interface==8.0
     # via gevent
