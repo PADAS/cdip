@@ -1,5 +1,7 @@
 from django.urls import path, include, re_path
-from rest_framework_swagger.views import get_swagger_view
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+from rest_framework import permissions
 from . import views
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested.routers import NestedSimpleRouter
@@ -25,7 +27,15 @@ default_router.register('logs', views.ActivityLogsViewSet, basename="logs")
 default_router.register('eula', views.EULAView, basename="eula")
 default_router.register('messages', views.MessagesView, basename="messages")
 
-schema_view = get_swagger_view(title="CDIP ADMIN API V2")
+schema_view = get_schema_view(
+    openapi.Info(
+        title="CDIP ADMIN API V2",
+        default_version='v2',
+        description="CDIP Admin API V2 Documentation",
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
 
 urlpatterns = [
     re_path(r"^docs/", schema_view),

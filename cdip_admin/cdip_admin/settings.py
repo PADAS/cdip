@@ -85,7 +85,7 @@ INSTALLED_APPS = [
     "clients",
     "phonenumber_field",
     "rest_framework",
-    "rest_framework_swagger",
+    "drf_yasg",
     "sync_integrations",
     "bootstrap4",
     "cdip_admin",
@@ -210,6 +210,21 @@ SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "in": "header", "name": "access_token"}
     },
+    "USE_SESSION_AUTH": False,
+    "JSON_EDITOR": True,
+    "SUPPORTED_SUBMIT_METHODS": [
+        'get',
+        'post',
+        'put',
+        'delete',
+        'patch'
+    ],
+    "OPERATIONS_SORTER": "alpha",
+    "TAGS_SORTER": "alpha",
+    "DOC_EXPANSION": "list",
+    "DEEP_LINKING": True,
+    "SHOW_EXTENSIONS": True,
+    "SHOW_COMMON_EXTENSIONS": True,
 }
 
 # Password validation

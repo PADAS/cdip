@@ -27,8 +27,7 @@ django-keycloak==0.1.1
 django-rbac==0.9
 django-simple-history==3.1.1
 gevent==23.9.1
-git+https://github.com/PADAS/django-rest-swagger.git@0d933ed7410648e9ba634ae2ac70430cc4cc590f#egg=django-rest-swagger
-django-rest-swagger==2.2.0
+drf-yasg==1.21.7
 django-scopes==1.2.0
 django-tables2==2.3.1
 drf-jwt~=1.13.3

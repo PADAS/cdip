@@ -1,8 +1,18 @@
 from django.urls import path, include, re_path
-from rest_framework_swagger.views import get_swagger_view
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+from rest_framework import permissions
 from api.views import *
 
-schema_view = get_swagger_view(title="CDIP ADMIN API")
+schema_view = get_schema_view(
+    openapi.Info(
+        title="CDIP ADMIN API",
+        default_version='v1',
+        description="CDIP Admin API V1 Documentation",
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
 
 urlpatterns = [
     path("v1.0/public", public),
