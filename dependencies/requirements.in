@@ -59,7 +59,7 @@ babel==2.8.0
 django-phonenumber-field>=8.0.0
 phonenumbers==8.12.6
 whitenoise==5.2.0
-packaging==20.9
+packaging>=21.0
 django-extensions==3.2.0
 drf-nested-routers==0.93.4
 drf-proxy-pagination==0.2.0
