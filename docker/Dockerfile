@@ -79,9 +79,9 @@ WORKDIR /var/www/app
 
 RUN mkdir -p /var/www/static
 
-    # Collect static files (using a stub database) - temporarily disabled due to django-fernet-fields Django 4.x compatibility issue
-    ENV DJANGO_SILK_ENABLED=True
-    # RUN python3.11 manage.py collectstatic --noinput --settings=cdip_admin.local_settings_nodb
-    ENV DJANGO_SILK_ENABLED=False
+# Collect static files (using a stub database)
+ENV DJANGO_SILK_ENABLED=True
+RUN python3.11 manage.py collectstatic --noinput --settings=cdip_admin.local_settings_nodb
+ENV DJANGO_SILK_ENABLED=False
 
 CMD ["/var/www/app/start_scripts/start.sh"]
