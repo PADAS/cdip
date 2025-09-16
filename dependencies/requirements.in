@@ -66,7 +66,7 @@ drf-proxy-pagination==0.2.0
 jsonschema==4.17.3
 django-celery-beat==2.5.0
 django-storages==1.13.2
-walrus==0.8.1
+walrus==0.9.5
 gundi-core==1.11.0
 https://github.com/PADAS/gundi-client/releases/download/v1.1.0/gundi_client-1.1.0-py3-none-any.whl
 #gundi-client==1.0.4
