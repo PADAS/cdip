@@ -13,12 +13,12 @@ chardet==3.0.4
 croniter==0.3.32
 cryptography==2.9.2
 django-bootstrap4==24.3
-git+https://github.com/nick-amplify/django-fernet-fields.git
+djfernet>=0.1.0
 #django-fernet-fields==0.6
 django-htmx==1.12.0
 django-jsonform==2.12.0
 django-extensions==3.2.0
-djangorestframework
+djangorestframework>=3.15.2,<3.16.0
 django-cors-headers~=3.1.1
 django-crispy-forms==1.9.1
 django-environ==0.4.5
@@ -57,7 +57,7 @@ sqlparse==0.3.1
 urllib3==1.25.9
 zipp==3.1.0
 babel==2.8.0
-django-phonenumber-field==4.0.0
+django-phonenumber-field>=8.0.0
 phonenumbers==8.12.6
 whitenoise==5.2.0
 packaging==20.9
