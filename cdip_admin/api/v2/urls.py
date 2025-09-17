@@ -38,7 +38,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    re_path(r"^docs/", schema_view),
+    re_path(r"^docs/", schema_view.as_view()),
     # User details for any kind of user
     path(
         'users/me/',

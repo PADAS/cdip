@@ -96,5 +96,5 @@ urlpatterns = [
         BridgeIntegrationView.as_view(),
         name="bridge-integration-view",
     ),
-    re_path(r"^docs/", schema_view)
+    re_path(r"^docs/", schema_view.as_view())
 ]
