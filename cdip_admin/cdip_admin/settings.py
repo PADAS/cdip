@@ -298,7 +298,7 @@ CELERY_TASK_QUEUES = {
         "routing_key": "default",
     },
     "deployments": {
-        "exchange": "deployments", 
+        "exchange": "deployments",
         "routing_key": "deployments",
     },
     "mb_permissions": {
