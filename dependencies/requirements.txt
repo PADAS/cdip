@@ -248,11 +248,11 @@ grpcio-status==1.62.3
     # via
     #   google-api-core
     #   google-cloud-pubsub
-gundi-client @ https://github.com/PADAS/gundi-client/releases/download/v1.1.0/gundi_client-1.1.0-py3-none-any.whl
+gundi-client==1.1.0
     # via
     #   -r dependencies/requirements.in
     #   cdip-connector
-gundi-client-v2 @ https://github.com/PADAS/gundi-client/releases/download/v2.4.1/gundi_client_v2-2.4.1-py3-none-any.whl
+gundi-client-v2==2.4.1
     # via -r dependencies/requirements.in
 gundi-core==1.11.0
     # via
@@ -293,7 +293,7 @@ marshmallow==3.26.1
     # via
     #   environs
     #   smartconnect-client
-movebank-client @ https://github.com/PADAS/movebank-client/releases/download/v1.2.0-alpha/movebank_client-1.2.0-py3-none-any.whl
+movebank-client==1.2.0
     # via -r dependencies/requirements.in
 natsort==7.0.1
     # via
