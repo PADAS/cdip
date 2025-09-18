@@ -8,6 +8,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
         fields = ["id", "name", "description"]
+        ref_name = "OrganizationV1"
 
 
 class InboundIntegrationTypeSerializer(serializers.ModelSerializer):

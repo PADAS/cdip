@@ -1,6 +1,7 @@
-from django.conf.urls import url
-from django.urls import path, include
-from rest_framework_swagger.views import get_swagger_view
+from django.urls import path, include, re_path
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+from rest_framework import permissions
 from . import views
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested.routers import NestedSimpleRouter
@@ -26,10 +27,20 @@ default_router.register('logs', views.ActivityLogsViewSet, basename="logs")
 default_router.register('eula', views.EULAView, basename="eula")
 default_router.register('messages', views.MessagesView, basename="messages")
 
-schema_view = get_swagger_view(title="CDIP ADMIN API V2")
+schema_view = get_schema_view(
+    openapi.Info(
+        title="CDIP ADMIN API V2",
+        default_version='v2',
+        description="CDIP Admin API V2 Documentation",
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
 
 urlpatterns = [
-    url(r"^docs/", schema_view),
+    re_path(r"^docs/", schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    re_path(r"^redoc/", schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    re_path(r"^swagger(?P<format>\.json|\.yaml)$", schema_view.without_ui(cache_timeout=0), name='schema-json'),
     # User details for any kind of user
     path(
         'users/me/',

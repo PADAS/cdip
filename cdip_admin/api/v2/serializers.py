@@ -58,6 +58,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
         fields = ["id", "name", "description", "role"]
+        ref_name = "OrganizationV2"
 
     def get_role(self, obj):
         user = self.context.get("request").user
