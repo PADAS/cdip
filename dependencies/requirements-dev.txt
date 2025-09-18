@@ -277,7 +277,7 @@ gundi-core==1.11.0
     #   cdip-connector
     #   gundi-client
     #   gundi-client-v2
-gunicorn==19.9.0
+gunicorn==21.2.0
     # via -r dependencies/requirements.in
 h11==0.16.0
     # via httpcore
@@ -386,6 +386,7 @@ packaging==25.0
     # via
     #   -r dependencies/requirements.in
     #   drf-yasg
+    #   gunicorn
     #   kombu
     #   marshmallow
     #   pytest
