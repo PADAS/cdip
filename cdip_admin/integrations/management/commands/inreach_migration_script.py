@@ -92,7 +92,7 @@ class Command(BaseCommand):
             inreach_er_destination_integration_created = 0
 
             # Step 2: ER to InReach
-            er_integration_type = "test_type" # API PUSH
+            er_integration_type = "api_push" # API PUSH
             try:
                 er_v2_integration_type = IntegrationType.objects.get(
                     value=er_integration_type
@@ -102,7 +102,7 @@ class Command(BaseCommand):
                 return
 
             # Get PULL v2 action
-            er_pull_action_value = "kim_camera_pull"
+            er_pull_action_value = "receive_data"
             try:
                 er_v2_pull_action = IntegrationAction.objects.get(
                     value=er_pull_action_value,
@@ -128,12 +128,11 @@ class Command(BaseCommand):
                             name=inbound.owner.name
                         )
 
-                        # Step 1: Inreach to ER
+                        self.stdout.write(f" -- Step 1: Inreach to ER -- \n\n")
                         integration, created = Integration.objects.get_or_create(
                             type=inreach_v2_integration_type,
                             name=f"[V1 to V2] - {inbound.name} (InReach to ER)",
-                            owner=inbound_owner,
-                            enabled=False # By design now
+                            owner=inbound_owner
                         )
                         if created:
                             # New integration created
@@ -209,7 +208,7 @@ class Command(BaseCommand):
                                 type=destination_integration_type,
                                 owner=destination_owner,
                                 base_url=er_site,
-                                name=f"{destination_owner.name} - Earthranger ({er_site})"
+                                name=f"{destination_owner.name} - Earthranger ({er_site}) (Inbound: {inbound.name})"
                             )
                             if created:
                                 inreach_er_destination_integration_created += 1
@@ -259,23 +258,22 @@ class Command(BaseCommand):
                             integration.default_route.save()
                             integration.save()
 
-                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n")
+                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n\n")
                         else:
                             er_inreach_integrations_skipped += 1
-                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n")
+                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n\n")
 
                 except Exception as e:
                     inreach_er_integrations_with_error += 1
-                    self.stderr.write(f" -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e}")
+                    self.stderr.write(f"\n\n -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e} -- \n\n")
 
                 try:
                     with transaction.atomic():
-                        # Step 2: ER to Inreach
+                        self.stdout.write(f" -- Step 2: ER to Inreach -- \n\n")
                         integration, created = Integration.objects.get_or_create(
                             type=er_v2_integration_type,
                             name=f"[V1 to V2] - {inbound.name} (ER to InReach)",
-                            owner=inbound_owner,
-                            enabled=False  # By design now
+                            owner=inbound_owner
                         )
                         if created:
                             # New integration created
@@ -313,7 +311,7 @@ class Command(BaseCommand):
                                 type=inreach_v2_integration_type,
                                 owner=destination_owner,
                                 base_url=inreach_url,
-                                name=f"{destination_owner.name} - inReach ({inreach_url})"
+                                name=f"{destination_owner.name} - inReach ({inreach_username}) (Inbound: {inbound.name})"
                             )
                             if created:
                                 er_inreach_destination_integration_created += 1
@@ -331,17 +329,20 @@ class Command(BaseCommand):
                                     self.stdout.write(
                                         f" -- Created new configuration for action '{inreach_v2_auth_action.name}' for destination integration: {destination_integration.name} (ID: {destination_integration.id})")
 
-                                integration.default_route.destinations.add(destination_integration)
+                            integration.default_route.destinations.add(destination_integration)
 
-                                integration.default_route.save()
-                                integration.save()
+                            integration.default_route.save()
+                            integration.save()
 
-                                self.stdout.write(
-                                    f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n")
+                            self.stdout.write(
+                                f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n\n")
+                        else:
+                            inreach_er_integrations_skipped += 1
+                            self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n\n")
 
                 except Exception as e:
                     er_inreach_integrations_with_error += 1
-                    self.stderr.write(f" -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e}")
+                    self.stderr.write(f"\n\n -- ERROR migrating {inbound.name} (ID: {inbound.id}): {e} -- \n\n")
 
             self.stdout.write(f"\n -- Summary -- \n\n")
             self.stdout.write(f" -- InReach - ER Integrations with error: {inreach_er_integrations_with_error} -- ")
