@@ -64,9 +64,16 @@ class SearchableMultiSelectWidget(forms.Widget):
             choices = attrs['choices']
         elif hasattr(field, 'queryset') and field.queryset:
             try:
-                queryset = field.queryset.all()
+                queryset = field.queryset.all().select_related('owner', 'type')
                 for obj in queryset:
-                    choices.append((str(obj.pk), str(obj)))
+                    # Create choice tuple with: (id, name, owner, type, endpoint)
+                    choices.append((
+                        str(obj.pk), 
+                        obj.name or str(obj),
+                        obj.owner.name if obj.owner else 'N/A',
+                        obj.type.name if obj.type else 'N/A',
+                        obj.endpoint or 'N/A'
+                    ))
             except Exception as e:
                 print(f"Error getting queryset: {e}")
         elif hasattr(field, 'choices') and field.choices:
@@ -82,37 +89,43 @@ class SearchableMultiSelectWidget(forms.Widget):
         widget_id = attrs.get('id', f'id_{name}')
         
         html = format_html(
-            '''
-            <div class="searchable-multiselect-container" id="{widget_id}_container">
-                <div class="search-input-container mb-2">
-                    <input type="text" 
-                           class="form-control search-input" 
-                           placeholder="Search destinations..." 
-                           id="{widget_id}_search">
-                </div>
-                
-                <div class="selected-items mb-2">
-                    <label class="form-label">Selected Destinations:</label>
-                    <div class="selected-list" id="{widget_id}_selected">
-                        <!-- Selected items will be populated here -->
-                    </div>
-                </div>
-                
-                <div class="available-items">
-                    <label class="form-label">Available Destinations:</label>
-                    <div class="available-list" id="{widget_id}_available">
-                        <!-- Available items will be populated here -->
-                    </div>
-                </div>
-                
-                <!-- Hidden inputs for selected values -->
-                <div class="hidden-inputs">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-            ''',
-            widget_id=widget_id
-        )
+                   '''
+                   <div class="searchable-multiselect-container" id="{widget_id}_container">
+                       <div class="search-input-container mb-3">
+                           <input type="text" 
+                                  class="form-control search-input" 
+                                  placeholder="Search destinations..." 
+                                  id="{widget_id}_search">
+                       </div>
+                       
+                       <div class="row">
+                           <div class="col-md-6">
+                               <div class="available-items">
+                                   <h6 class="text-muted mb-3">Available Destinations</h6>
+                                   <div class="available-list" id="{widget_id}_available">
+                                       <!-- Available items will be populated here -->
+                                   </div>
+                               </div>
+                           </div>
+                           
+                           <div class="col-md-6">
+                               <div class="selected-items">
+                                   <h6 class="text-muted mb-3">Selected Destinations</h6>
+                                   <div class="selected-list" id="{widget_id}_selected">
+                                       <!-- Selected items will be populated here -->
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                       
+                       <!-- Hidden inputs for selected values -->
+                       <div class="hidden-inputs">
+                           <!-- Will be populated by JavaScript -->
+                       </div>
+                   </div>
+                   ''',
+                   widget_id=widget_id
+               )
         
         # Add JavaScript to initialize the widget
         import json
@@ -201,8 +214,11 @@ class SearchableMultiSelectWidget(forms.Widget):
         while True:
             key = f"{name}_{i}"
             if key in data:
-                values.append(data[key])
-                print(f"Found {key}: {data[key]}")
+                value = data[key]
+                # Skip empty values (they indicate clearing the selection)
+                if value and value.strip():
+                    values.append(value)
+                print(f"Found {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
                 i += 1
             else:
                 break
@@ -217,8 +233,11 @@ class SearchableMultiSelectWidget(forms.Widget):
         for key in data.keys():
             if key.startswith(f"{name}_") and key not in [f"{name}_{i}" for i in range(len(values))]:
                 # This might be a UUID-based field name
-                values.append(data[key])
-                print(f"Found UUID-based field {key}: {data[key]}")
+                value = data[key]
+                # Only add non-empty values
+                if value and value.strip():
+                    values.append(value)
+                print(f"Found UUID-based field {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
         
         print(f"Final values: {values}")
         return values

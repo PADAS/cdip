@@ -1,6 +1,7 @@
 /**
  * Searchable MultiSelect Widget
  * Provides a user-friendly interface for selecting multiple items from a searchable list
+ * Updated: Fixed empty selection bug - v1.1
  */
 
 function initSearchableMultiSelect(widgetId, options) {
@@ -27,17 +28,17 @@ function initSearchableMultiSelect(widgetId, options) {
         
         if (selectedValues.size === 0) {
             selectedList.innerHTML = '<div class="text-muted">No destinations selected</div>';
-            return;
+        } else {
+            selectedValues.forEach(value => {
+                const choice = allChoices.find(c => c[0] == value);
+                if (choice) {
+                    const item = createSelectedItem(choice[0], choice[1], choice[2], choice[3], choice[4]);
+                    selectedList.appendChild(item);
+                }
+            });
         }
         
-        selectedValues.forEach(value => {
-            const choice = allChoices.find(c => c[0] == value);
-            if (choice) {
-                const item = createSelectedItem(choice[0], choice[1]);
-                selectedList.appendChild(item);
-            }
-        });
-        
+        // Always update hidden inputs, even when no items are selected
         updateHiddenInputs();
     }
     
@@ -53,20 +54,40 @@ function initSearchableMultiSelect(widgetId, options) {
         }
         
         availableChoices.forEach(choice => {
-            const item = createAvailableItem(choice[0], choice[1]);
+            const item = createAvailableItem(choice[0], choice[1], choice[2], choice[3], choice[4]);
             availableList.appendChild(item);
         });
     }
     
-    // Create a selected item element
-    function createSelectedItem(value, label) {
+    // Create a selected item element as a card
+    function createSelectedItem(value, label, owner, type, endpoint) {
         const item = document.createElement('div');
-        item.className = 'selected-item d-flex justify-content-between align-items-center p-2 mb-1 bg-primary text-white rounded';
+        item.className = 'destination-card selected-card mb-2';
         item.innerHTML = `
-            <span>${label}</span>
-            <button type="button" class="btn btn-sm btn-outline-light remove-item" data-value="${value}">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="card border-success">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <strong>${label}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-light remove-item" data-value="${value}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="destination-info">
+                        <div class="info-row mb-1">
+                            <span class="info-label fw-bold">Owner:</span>
+                            <span class="info-value">${owner}</span>
+                        </div>
+                        <div class="info-row mb-1">
+                            <span class="info-label fw-bold">Type:</span>
+                            <span class="info-value">${type}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label fw-bold">Endpoint:</span>
+                            <span class="info-value text-break">${endpoint}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
         
         // Add remove functionality
@@ -79,17 +100,35 @@ function initSearchableMultiSelect(widgetId, options) {
         return item;
     }
     
-    // Create an available item element
-    function createAvailableItem(value, label) {
+    // Create an available item element as a card
+    function createAvailableItem(value, label, owner, type, endpoint) {
         const item = document.createElement('div');
-        item.className = 'available-item p-2 mb-1 border rounded cursor-pointer';
+        item.className = 'destination-card available-card mb-2 cursor-pointer';
         item.style.cursor = 'pointer';
         item.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <span>${label}</span>
-                <button type="button" class="btn btn-sm btn-outline-primary add-item" data-value="${value}">
-                    <i class="fas fa-plus"></i>
-                </button>
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <strong>${label}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-light add-item" data-value="${value}">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="destination-info">
+                        <div class="info-row mb-1">
+                            <span class="info-label fw-bold">Owner:</span>
+                            <span class="info-value">${owner}</span>
+                        </div>
+                        <div class="info-row mb-1">
+                            <span class="info-label fw-bold">Type:</span>
+                            <span class="info-value">${type}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label fw-bold">Endpoint:</span>
+                            <span class="info-value text-break">${endpoint}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
         
@@ -121,18 +160,32 @@ function initSearchableMultiSelect(widgetId, options) {
         
         // Convert Set to Array and use sequential indices
         const selectedArray = Array.from(selectedValues);
-        selectedArray.forEach((value, index) => {
+        
+        if (selectedArray.length === 0) {
+            // When no destinations are selected, create a single hidden input with empty value
+            // This ensures Django knows the field should be cleared
             const input = document.createElement('input');
             input.type = 'hidden';
-            input.name = `${options.name}_${index}`;
-            input.value = value;
+            input.name = `${options.name}_0`;
+            input.value = '';
             hiddenInputsContainer.appendChild(input);
-        });
+            console.log('Empty selection: created single hidden input with empty value');
+        } else {
+            // Create inputs for each selected destination
+            selectedArray.forEach((value, index) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `${options.name}_${index}`;
+                input.value = value;
+                hiddenInputsContainer.appendChild(input);
+            });
+        }
         
         // Debug: log the hidden inputs being created
         console.log('Hidden inputs created:');
-        selectedArray.forEach((value, index) => {
-            console.log(`  ${options.name}_${index} = ${value}`);
+        const allInputs = hiddenInputsContainer.querySelectorAll('input');
+        allInputs.forEach((input, index) => {
+            console.log(`  ${input.name} = ${input.value}`);
         });
     }
     
@@ -182,17 +235,17 @@ const styles = `
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
     }
     
-    .selected-item, .available-item {
+    .destination-card {
         transition: all 0.2s ease-in-out;
     }
     
-    .available-item:hover {
-        background-color: #f8f9fa;
-        border-color: #86b7fe !important;
+    .available-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     
     .selected-list, .available-list {
-        max-height: 200px;
+        max-height: 400px;
         overflow-y: auto;
         border: 1px solid #dee2e6;
         border-radius: 0.375rem;
@@ -200,10 +253,20 @@ const styles = `
         background-color: #f8f9fa;
     }
     
-    .form-label {
-        font-weight: 600;
-        margin-bottom: 0.5rem;
+    .info-label {
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin-right: 0.5rem;
+    }
+    
+    .info-value {
         color: #495057;
+        font-size: 0.875rem;
+    }
+    
+    .info-row {
+        display: flex;
+        align-items: flex-start;
     }
     
     .cursor-pointer {
@@ -214,6 +277,18 @@ const styles = `
         padding: 0.25rem 0.5rem;
         font-size: 0.875rem;
         border-radius: 0.25rem;
+    }
+    
+    .text-break {
+        word-break: break-all;
+    }
+    
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
 `;
 
