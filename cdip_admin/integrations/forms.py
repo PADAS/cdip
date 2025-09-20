@@ -22,6 +22,7 @@ from .models import (
     BridgeIntegration,
     Device
 )
+from .widgets import SearchableMultiSelectField
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -141,6 +142,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
 
 class DeviceGroupForm(forms.ModelForm):
+    # Override the destinations field to use our custom widget
+    destinations = SearchableMultiSelectField(
+        queryset=OutboundIntegrationConfiguration.objects.all(),
+        required=False,
+        label="Destinations"
+    )
+    
     class Meta:
         model = DeviceGroup
         exclude = [
@@ -179,9 +187,16 @@ class DeviceGroupForm(forms.ModelForm):
 
 
 class DeviceGroupManagementForm(forms.ModelForm):
+    # Override the destinations field to use our custom widget
+    destinations = SearchableMultiSelectField(
+        queryset=OutboundIntegrationConfiguration.objects.all(),
+        required=False,
+        label="Destinations"
+    )
+    
     class Meta:
         model = DeviceGroup
-        exclude = ["id", "name", "destinations", "owner"]
+        exclude = ["id", "name", "owner"]
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

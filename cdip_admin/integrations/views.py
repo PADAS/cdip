@@ -312,12 +312,51 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         return device_group
 
     def get(self, request, *args, **kwargs):
+        print("=== VIEW GET DEBUG ===")
         form_class = self.get_form_class()
+        print(f"Form class: {form_class}")
         self.object = self.get_object()
+        print(f"Object: {self.object}")
+        print(f"Object destinations: {list(self.object.destinations.all())}")
         form = form_class(instance=self.object)
+        print(f"Form created with instance")
+        print(f"Form fields: {list(form.fields.keys())}")
+        if 'destinations' in form.fields:
+            print(f"Destinations field type: {type(form.fields['destinations'])}")
+            print(f"Destinations field widget: {type(form.fields['destinations'].widget)}")
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return self.render_to_response(self.get_context_data(form=form))
+
+    def post(self, request, *args, **kwargs):
+        """Override post method to ensure many-to-many relationships are saved properly."""
+        self.object = self.get_object()
+        form = self.get_form()
+        
+        # Debug: Print form data
+        print("=== FORM SUBMISSION DEBUG ===")
+        print("POST data:", request.POST)
+        print("Form data keys:", [key for key in request.POST.keys() if key.startswith('destinations')])
+        
+        if form.is_valid():
+            print("Form is valid")
+            print("Cleaned destinations:", form.cleaned_data.get('destinations'))
+            
+            # Save the instance
+            instance = form.save(commit=False)
+            instance.save()
+            
+            # Explicitly save many-to-many relationships
+            form._save_m2m()
+            
+            # Debug: Check what was saved
+            instance.refresh_from_db()
+            print("Destinations after save:", list(instance.destinations.all()))
+            
+            return self.form_valid(form)
+        else:
+            print("Form is invalid:", form.errors)
+            return self.form_invalid(form)
 
     def get_success_url(self):
         return reverse(
