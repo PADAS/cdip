@@ -54,7 +54,7 @@ class EULAView(
     def get_object(self):
         return EULA.objects.get_active_eula()
 
-    # Overriden to return a single object (the active eula)
+    # Overridden to return a single object (the active eula)
     def list(self, request, *args, **kwargs):
         try:
             instance = self.get_object()

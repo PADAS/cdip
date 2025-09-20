@@ -433,7 +433,7 @@ class Device(TimestampedModel):
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        help_text="Default subject type. Can be overriden by the integration or data provider",
+        help_text="Default subject type. Can be overridden by the integration or data provider",
     )
     additional = models.JSONField(
         blank=True,
@@ -525,7 +525,7 @@ class DeviceGroup(TimestampedModel):
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        help_text="Subject type to be used unless overriden by the integration or data provider.",
+        help_text="Subject type to be used unless overridden by the integration or data provider.",
     )
     history = HistoricalRecords()
 
