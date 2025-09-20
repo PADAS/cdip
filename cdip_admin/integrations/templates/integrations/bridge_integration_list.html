@@ -19,11 +19,21 @@
     </div>
 
     {% if filter %}
-    <div class="row">
+    <div class="row mb-3">
         <div class="col-md-12">
             <form action="" method="get" class="form form-inline">
-                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+                <div class="form-group mr-3">
+                    <label for="{{ filter.form.search.id_for_label }}" class="mr-2">Search:</label>
+                    {{ filter.form.search }}
+                </div>
+                <div class="form-group mr-3">
+                    <label for="{{ filter.form.enabled.id_for_label }}" class="mr-2">Status:</label>
+                    {{ filter.form.enabled }}
+                </div>
                 {% bootstrap_button 'Filter' extra_classes='' %}
+                {% if request.GET.search or request.GET.enabled %}
+                    <a href="{% url 'bridge_integration_list' %}" class="btn btn-secondary ml-2">Clear</a>
+                {% endif %}
             </form>
         </div>
     </div>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load crispy_forms_filters %}
-
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}Add Inbound Integration Configuration{% endblock %}
 
@@ -12,4 +12,8 @@
         <div class="form-group col-lg-6 px-0 list-inline">{{form.errors}}</div>
         {% crispy form %}
      </form>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'integrations/js/integration-type-warning.js' %}"></script>
 {% endblock %}

@@ -10,6 +10,9 @@ from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -25,9 +28,11 @@ from .filters import (
 )
 from .forms import (
     InboundIntegrationConfigurationForm,
+    InboundIntegrationConfigurationAddForm,
     OutboundIntegrationConfigurationForm,
     DeviceGroupForm,
     DeviceGroupManagementForm,
+    DeviceGroupDevicesManagementForm,
     InboundIntegrationTypeForm,
     OutboundIntegrationTypeForm,
     BridgeIntegrationForm,
@@ -188,23 +193,54 @@ class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
         return qs.annotate(device_count=Count("devices"))
 
 
-class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
-    template_name = "integrations/device_group_detail.html"
+
+
+class DeviceGroupDevicesManagementView(PermissionRequiredMixin, UpdateView):
+    template_name = "integrations/device_group_devices_manage.html"
+    form_class = DeviceGroupDevicesManagementForm
     model = DeviceGroup
-    table_class = DeviceTable
-    paginate_by = default_paginate_by
-    permission_required = "integrations.view_devicegroup"
+    permission_required = "integrations.change_devicegroup"
 
     def get_object(self):
-        return get_object_or_404(DeviceGroup, pk=self.kwargs.get("module_id"))
+        device_group = get_object_or_404(
+            DeviceGroup, pk=self.kwargs.get("device_group_id")
+        )
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(
+                    self.request.user, device_group.owner
+            ):
+                raise PermissionDenied
+        return device_group
 
-    def get_table_data(self):
-        return self.get_object().devices
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(instance=self.object, request=request)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
+    def form_valid(self, form):
+        form.save()
+        return redirect("device_group", device_group_id=str(self.object.id))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse("device_list")
-        context["base_url"] = base_url
+        context["device_group"] = self.object
+        
+        # Get the inbound integration configuration that uses this device group as default
+        try:
+            inbound_integration = self.object.inbound_integration_configuration.get()
+            context["inbound_integration"] = inbound_integration
+        except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
+            context["inbound_integration"] = None
+        
         return context
 
 
@@ -251,13 +287,13 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
     permission_required = "integrations.add_devicegroup"
 
     def post(self, request, *args, **kwargs):
-        form = DeviceGroupForm(request.POST)
+        form = DeviceGroupForm(request.POST, request=request)
         if form.is_valid():
             config = form.save()
             return redirect("device_group", str(config.id))
 
     def get_form(self, form_class=None):
-        form = DeviceGroupForm()
+        form = DeviceGroupForm(request=self.request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
             if not IsOrganizationMember.filter_queryset_for_user(
@@ -269,19 +305,13 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         return form
 
 
-class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
-    template_name = "integrations/device_group_update.html"
-    form_class = DeviceGroupForm
-    model = DeviceGroup
-    permission_required = "integrations.change_devicegroup"
 
-    def get(self, request, *args, **kwargs):
-        form_class = self.get_form_class()
-        self.object = self.get_object()
-        form = form_class(instance=self.object)
-        if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form = filter_device_group_form_fields(form, self.request.user)
-        return self.render_to_response(self.get_context_data(form=form))
+
+class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = "integrations/device_group_update.html"
+    form_class = DeviceGroupManagementForm
+    model = DeviceGroup
+    permission_required = "integrations.view_devicegroup"
 
     def get_object(self):
         device_group = get_object_or_404(
@@ -294,34 +324,56 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
                 raise PermissionDenied
         return device_group
 
-    def get_success_url(self):
-        return reverse(
-            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
-        )
-
-
-class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
-    template_name = "integrations/device_group_update.html"
-    form_class = DeviceGroupManagementForm
-    model = DeviceGroup
-
-    def get_object(self):
-        device_group = get_object_or_404(
-            DeviceGroup, pk=self.kwargs.get("device_group_id")
-        )
-        return device_group
-
     def get(self, request, *args, **kwargs):
+        print(f"DEBUG: DeviceGroupManagementUpdateView.get() called")
+        print(f"DEBUG: Using template: {self.template_name}")
         form_class = self.get_form_class()
         self.object = self.get_object()
-        form = form_class(instance=self.object)
+        form = form_class(instance=self.object, request=request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return self.render_to_response(self.get_context_data(form=form))
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get the inbound integration configuration that uses this device group as default
+        try:
+            inbound_integration = self.object.inbound_integration_configuration.get()
+            context["inbound_integration"] = inbound_integration
+        except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
+            context["inbound_integration"] = None
+        
+        # Add device information for display
+        context["devices"] = self.object.devices.select_related(
+            'inbound_configuration__owner', 
+            'inbound_configuration__type'
+        ).all()
+        
+        return context
+
+    def post(self, request, *args, **kwargs):
+        """Override post method to ensure many-to-many relationships are saved properly."""
+        self.object = self.get_object()
+        form = self.get_form()
+        # Pass request to form for proper initialization
+        form = self.form_class(request.POST, instance=self.object, request=request)
+        
+        if form.is_valid():
+            # Save the instance
+            instance = form.save(commit=False)
+            instance.save()
+            
+            # Explicitly save many-to-many relationships
+            form._save_m2m()
+            
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
     def get_success_url(self):
         return reverse(
-            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
+            "device_group", kwargs={"device_group_id": self.kwargs.get("device_group_id")}
         )
 
 
@@ -503,20 +555,20 @@ def inbound_integration_configuration_detail(request, id):
 
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     template_name = "integrations/inbound_integration_configuration_add.html"
-    form_class = InboundIntegrationConfigurationForm
+    form_class = InboundIntegrationConfigurationAddForm
     model = InboundIntegrationConfiguration
     permission_required = "integrations.add_inboundintegrationconfiguration"
 
     def post(self, request, *args, **kwargs):
-        form = InboundIntegrationConfigurationForm(request.POST)
+        form = InboundIntegrationConfigurationAddForm(request.POST, request=request)
         if form.is_valid():
             config: InboundIntegrationConfiguration = form.save()
             device_group = config.default_devicegroup
-            return redirect("device_group_update", device_group_id=device_group.id)
+            return redirect("device_group_management_update", device_group_id=device_group.id)
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
-        form = InboundIntegrationConfigurationForm()
+        form = InboundIntegrationConfigurationAddForm(request=self.request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form.fields[
                 "owner"
@@ -524,6 +576,84 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
                 form.fields["owner"].queryset, self.request.user, "name", True
             )
         return form
+
+    @staticmethod
+    @requires_csrf_token
+    def type_modal(request):
+        """
+        Type modal for Add Integration form.
+        Always shows warning modal when changing integration type.
+        """
+        if request.GET.get("type"):
+            integration_type = request.GET.get("type")
+            selected_type = InboundIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
+        
+        # Always show warning modal when changing integration type
+        rendered = render_to_string('integrations/type_modal.html', {
+            'selected_type': selected_type,
+            'target': '#div_id_state',
+            'proceed_button': reverse("inboundconfigurations/add_schema",
+                                    kwargs={
+                                        "integration_type": integration_type,
+                                        "update": "true"
+                                    }),
+            'cancel_button': reverse("inboundconfigurations/add_dropdown_restore")
+        })
+        return HttpResponse(rendered)
+
+    @staticmethod
+    @requires_csrf_token
+    def add_schema(request, integration_type, update):
+        """
+        Schema endpoint for Add Integration form.
+        """
+        if integration_type != "none":
+            integration_type_obj = InboundIntegrationType.objects.get(id=integration_type)
+            form = InboundIntegrationConfigurationAddForm()
+            
+            # Set the session for the integration type
+            request.session["integration_type"] = integration_type
+            
+            # Set up the state field widget based on the schema
+            if integration_type_obj.configuration_schema != {}:
+                form.fields['state'].widget = JSONFormWidget(
+                    schema=integration_type_obj.configuration_schema,
+                )
+            else:
+                form.fields['state'].widget = FormattedJsonFieldWidget()
+            
+            return HttpResponse(as_crispy_field(form["state"]))
+        return HttpResponse("")
+
+    @staticmethod
+    @requires_csrf_token
+    def add_dropdown_restore(request):
+        """
+        Dropdown restore for Add Integration form.
+        """
+        response = f"""<div id="div_id_type" class="form-group">
+                        <label for="id_type" class=" requiredField">
+                        Type
+                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                            data-toggle="tooltip" data-placement="right" 
+                            title="Integration component that can process the data." tabindex="-1">?
+                        </button>
+                        <span class="asteriskField">*</span></label> 
+                        <div class="">
+                            <select name="type" hx-trigger="change" hx-target="#div_id_state" hx-swap="outerHTML"
+                            class="select form-control"
+                            required id="id_type">
+                                <option value="" selected>-------</option>"""
+        integration_types = InboundIntegrationType.objects.values_list("id", "name", named=True)
+        for option in integration_types:
+            response += f'<option value="{option.id}">{option.name}</option>'
+        response += """</select>
+                        </div>
+                    </div>"""
+        return HttpResponse(response)
 
 
 class InboundIntegrationConfigurationUpdateView(
@@ -534,6 +664,12 @@ class InboundIntegrationConfigurationUpdateView(
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
     permission_required = "integrations.change_inboundintegrationconfiguration"
+
+    def get_form_kwargs(self):
+        """Add request to form kwargs."""
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     @staticmethod
     @requires_csrf_token
@@ -732,7 +868,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     @staticmethod
     @requires_csrf_token
     def type_modal(request, configuration_id):
-        if request.GET.get("type") is not '':
+        if request.GET.get("type"):
             integration_type = request.GET.get("type")
             selected_type = OutboundIntegrationType.objects.get(id=integration_type)
         else:
@@ -1053,3 +1189,56 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return reverse(
             "bridge_integration_view", kwargs={"module_id": self.kwargs.get("id")}
         )
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def create_subject_type_api(request):
+    """
+    API endpoint to create new subject types via AJAX.
+    """
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            
+            display_name = data.get('display_name', '').strip()
+            value = data.get('value', '').strip()
+            
+            if not display_name or not value:
+                return JsonResponse({
+                    'error': 'Both display_name and value are required'
+                }, status=400)
+            
+            # Check if value already exists
+            from integrations.models import SubjectType
+            if SubjectType.objects.filter(value=value).exists():
+                return JsonResponse({
+                    'error': f'Subject type with value "{value}" already exists'
+                }, status=400)
+            
+            # Create new subject type
+            subject_type = SubjectType.objects.create(
+                display_name=display_name,
+                value=value
+            )
+            
+            return JsonResponse({
+                'id': str(subject_type.id),
+                'display_name': subject_type.display_name,
+                'value': subject_type.value,
+                'message': 'Subject type created successfully'
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'error': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({
+        'error': 'Method not allowed'
+    }, status=405)

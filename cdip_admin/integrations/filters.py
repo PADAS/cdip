@@ -178,13 +178,50 @@ class DeviceFilter(django_filters.FilterSet):
         empty_label=_("Types"),
     )
 
+    search = django_filters.CharFilter(method='filter_search', label='Search')
+
     class Meta:
         model = Device
         fields = (
             "organization",
             "inbound_config_type",
             "external_id",
+            "search",
         )
+
+    def filter_search(self, queryset, name, value):
+        """
+        Search across inbound_configuration.name, name, external_id, owner.name, 
+        inbound_configuration.default_devicegroup.name, and inbound_configuration.type.name fields
+        """
+        if not value:
+            return queryset
+        
+        # Create a Q object for OR conditions
+        from django.db.models import Q
+        
+        # Search in inbound_configuration.name
+        config_name_q = Q(inbound_configuration__name__icontains=value)
+        
+        # Search in device name
+        name_q = Q(name__icontains=value)
+        
+        # Search in external_id
+        external_id_q = Q(external_id__icontains=value)
+        
+        # Search in owner.name
+        owner_q = Q(inbound_configuration__owner__name__icontains=value)
+        
+        # Search in inbound_configuration.default_devicegroup.name
+        devicegroup_q = Q(inbound_configuration__default_devicegroup__name__icontains=value)
+        
+        # Search in inbound_configuration.type.name
+        type_name_q = Q(inbound_configuration__type__name__icontains=value)
+        
+        # Combine all search conditions with OR
+        search_q = config_name_q | name_q | external_id_q | owner_q | devicegroup_q | type_name_q
+        
+        return queryset.filter(search_q).distinct()
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
@@ -344,10 +381,38 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+    search = django_filters.CharFilter(method='filter_search', label='Search')
 
     class Meta:
         model = BridgeIntegration
-        fields = ("enabled",)
+        fields = ("enabled", "search")
+
+    def filter_search(self, queryset, name, value):
+        """
+        Search across owner.name, name, state, and additional fields
+        """
+        if not value:
+            return queryset
+        
+        # Create a Q object for OR conditions
+        from django.db.models import Q
+        
+        # Search in owner.name
+        owner_q = Q(owner__name__icontains=value)
+        
+        # Search in name field
+        name_q = Q(name__icontains=value)
+        
+        # Search in state JSON field (as text)
+        state_q = Q(state__icontains=value)
+        
+        # Search in additional JSON field (as text)
+        additional_q = Q(additional__icontains=value)
+        
+        # Combine all search conditions with OR
+        search_q = owner_q | name_q | state_q | additional_q
+        
+        return queryset.filter(search_q).distinct()
 
 
 class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):

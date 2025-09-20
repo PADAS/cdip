@@ -18,10 +18,12 @@ from .models import (
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     DeviceGroup,
+    SubjectType,
     BridgeIntegrationType,
     BridgeIntegration,
     Device
 )
+from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField, DeviceGroupSelectWithLinkField, DeviceGroupAutoCreateField, DeviceGroupDisplayWidget
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -30,10 +32,17 @@ import json
 def tooltip_labels(text):
     return f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
     data-toggle="tooltip" data-placement="right" 
-    title="{text}">?</button>"""
+    title="{text}" tabindex="-1">?</button>"""
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
+    # Override the default_devicegroup field to use our custom widget
+    default_devicegroup = DeviceGroupSelectWithLinkField(
+        queryset=DeviceGroup.objects.all(),
+        required=False,
+        label="Default Device Group"
+    )
+    
     class Meta:
         model = InboundIntegrationConfiguration
         exclude = [
@@ -86,6 +95,22 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
+                
+                # Filter device groups based on user permissions
+                device_group_qs = DeviceGroup.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "default_devicegroup"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        device_group_qs, request.user, "owner__name"
+                    )
+                else:
+                    self.fields["default_devicegroup"].queryset = device_group_qs
+                
+                # Replace default_devicegroup field with display widget for existing integrations
+                if self.instance.pk and self.instance.default_devicegroup:  # If this is an existing integration with a default device group
+                    self.fields["default_devicegroup"].widget = DeviceGroupDisplayWidget()
+                    self.fields["default_devicegroup"].help_text = "Default Device Group cannot be changed for existing integrations."
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
@@ -98,6 +123,135 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
+
+    def save(self, commit=True):
+        """Override save to preserve default_devicegroup value when using display widget."""
+        instance = super().save(commit=False)
+        
+        # If using DeviceGroupDisplayWidget, preserve the original value
+        if self.instance.pk and isinstance(self.fields['default_devicegroup'].widget, DeviceGroupDisplayWidget):
+            instance.default_devicegroup = self.instance.default_devicegroup
+        
+        if commit:
+            instance.save()
+        return instance
+
+    helper = FormHelper()
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.form_method = "POST"
+
+    helper.layout = Layout(
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("type", css_class="form-group col-lg-3 mb-0"),
+            Column(
+                Field("provider", autocomplete="off"), css_class="form-group col-lg-3 mb-0"
+            ),
+            css_class="form-row",
+        ),
+        "enabled",
+        Row(
+            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(
+                Field("endpoint", autocomplete="off"),
+                css_class="form-group col-lg-3 mb-0",
+            ),
+            Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
+            Column(
+                Field("password", autocomplete="off"), css_class="form-group col-md-3"
+            ),
+            css_class="form-row",
+        ),
+        Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+    )
+
+
+class InboundIntegrationConfigurationAddForm(forms.ModelForm):
+    # Override the default_devicegroup field to show auto-create message
+    default_devicegroup = DeviceGroupAutoCreateField(
+        queryset=DeviceGroup.objects.none(),
+        required=False,
+        label="Default Device Group"
+    )
+    
+    class Meta:
+        model = InboundIntegrationConfiguration
+        exclude = [
+            "id",
+        ]
+        fields = ("name", "owner", "type", "provider", "enabled",
+                  "default_devicegroup", "endpoint", "token",
+                  "login", "password", "state")
+        widgets = {
+            "password": PeekabooTextInput(),
+            "token": PeekabooTextInput(),
+            # "state": FormattedJsonFieldWidget(),
+            "apikey": PeekabooTextInput(),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'id': 'id_type',
+                    'hx-trigger': 'change',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
+                }),
+            "state": JSONFormWidget(
+                schema=InboundIntegrationType.objects.configuration_schema,
+            ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_state',
+                    'hx-swap': 'outerHTML'
+                },
+            )
+        }
+
+    def __init__(self, *args, request=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance:
+            for field_name in self.fields:
+                if self.fields[field_name].help_text != "":
+                    self.fields[
+                        field_name
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
+                self.fields[field_name].help_text = None
+            if request:
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "owner"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        qs, request.user, "name", admin_only=True
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
+            # For Add Integration: Allow free type changes without warning modal
+            # The type field will trigger schema updates directly
+            if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("inboundconfigurations/schema",
+                                                                      kwargs={"integration_type": self.instance.type.id,
+                                                                              "integration_id": self.instance.id,
+                                                                              "update": "false"})
+                if hasattr(request, 'session'):
+                    request.session["integration_type"] = str(self.instance.type.id)
+                self.fields['state'].widget.instance = self.instance.type.id
+            
+            # Configure type field to use the new add_type_modal endpoint
+            self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/add_type_modal")
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -141,6 +295,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
 
 class DeviceGroupForm(forms.ModelForm):
+    # Override the destinations field to use our custom widget
+    destinations = SearchableMultiSelectField(
+        queryset=OutboundIntegrationConfiguration.objects.all(),
+        required=False,
+        label="Destinations"
+    )
+    
     class Meta:
         model = DeviceGroup
         exclude = [
@@ -179,9 +340,86 @@ class DeviceGroupForm(forms.ModelForm):
 
 
 class DeviceGroupManagementForm(forms.ModelForm):
+    # Override the destinations field to use our custom widget
+    destinations = SearchableMultiSelectField(
+        queryset=OutboundIntegrationConfiguration.objects.all(),
+        required=False,
+        label="Destinations"
+    )
+    
+    
+    # Override the default_subject_type field to use our custom widget
+    default_subject_type = SubjectTypeAutocompleteField(
+        required=False,
+        label="Default Subject Type",
+        empty_label="Select or create a subject type..."
+    )
+    
     class Meta:
         model = DeviceGroup
-        exclude = ["id", "name", "destinations", "owner"]
+        exclude = ["id", "devices"]
+
+    def __init__(self, *args, request=None, **kwargs):
+        super(DeviceGroupManagementForm, self).__init__(*args, **kwargs)
+        for field_name in self.fields:
+            if self.fields[field_name].help_text != "":
+                self.fields[
+                    field_name
+                ].label += tooltip_labels(self.fields[field_name].help_text)
+            self.fields[field_name].help_text = None
+        if self.instance and request:
+            qs = Organization.objects.all()
+            if not IsGlobalAdmin.has_permission(None, request, None):
+                self.fields[
+                    "owner"
+                ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                    qs, request.user, "name"
+                )
+            else:
+                self.fields["owner"].queryset = qs
+
+    field_order = [
+        "name",
+        "owner",
+        "default_subject_type",
+        "destinations",
+    ]
+
+    helper = FormHelper()
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.form_method = "POST"
+
+
+class DeviceGroupDevicesManagementForm(forms.ModelForm):
+    # Use a simple multiple choice field for devices
+    devices = forms.ModelMultipleChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        label="Devices",
+        widget=forms.CheckboxSelectMultiple
+    )
+    
+    class Meta:
+        model = DeviceGroup
+        fields = ["devices"]
+
+    def __init__(self, *args, request=None, **kwargs):
+        super(DeviceGroupDevicesManagementForm, self).__init__(*args, **kwargs)
+        if self.instance and request:
+            # Filter devices to only show devices from the inbound integration associated with this device group
+            try:
+                inbound_integration = self.instance.inbound_integration_configuration.first()
+                if inbound_integration:
+                    # Limit devices to only those from the associated inbound integration
+                    self.fields["devices"].queryset = Device.objects.filter(
+                        inbound_configuration=inbound_integration
+                    ).select_related('inbound_configuration__owner', 'inbound_configuration__type')
+                else:
+                    # If no inbound integration is associated, show no devices
+                    self.fields["devices"].queryset = Device.objects.none()
+            except Exception:
+                # If there's any error, show no devices
+                self.fields["devices"].queryset = Device.objects.none()
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

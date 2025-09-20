@@ -1347,7 +1347,7 @@ class UserAgreementSerializer(serializers.ModelSerializer):
         )
 
     def get_unique_together_validators(self):
-        # Overriden to disable unique together check as it's handled in the create method
+        # Overridden to disable unique together check as it's handled in the create method
         return []
 
     def create(self, validated_data):

@@ -12,21 +12,21 @@ urlpatterns = [
     path("devices", views.DeviceList.as_view(), name="device_list"),
     path("devices/add", views.DeviceAddView.as_view(), name="device_add"),
     path(
-        "devicegroups/<uuid:module_id>",
-        views.DeviceGroupDetail.as_view(),
+        "devicegroups/<uuid:device_group_id>",
+        views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group",
     ),
     path("devicegroups", views.DeviceGroupListView.as_view(), name="device_group_list"),
     path("devicegroups/add", views.DeviceGroupAddView.as_view(), name="device_group_add"),
     path(
-        "devicegroups/<uuid:device_group_id>/edit",
-        views.DeviceGroupUpdateView.as_view(),
-        name="device_group_update",
-    ),
-    path(
         "devicegroups/<uuid:device_group_id>/manage",
         views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group_management_update",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/devices/manage",
+        views.DeviceGroupDevicesManagementView.as_view(),
+        name="device_group_devices_manage",
     ),
     path("devicestates", views.DeviceStateList.as_view(), name="device_state_list"),
     path(
@@ -93,6 +93,21 @@ urlpatterns = [
         "inboundconfigurations/type_modal/<uuid:integration_id>/",
         views.InboundIntegrationConfigurationUpdateView.type_modal,
         name="inboundconfigurations/type_modal",
+    ),
+    path(
+        "inboundconfigurations/add_type_modal/",
+        views.InboundIntegrationConfigurationAddView.type_modal,
+        name="inboundconfigurations/add_type_modal",
+    ),
+    path(
+        "inboundconfigurations/add_schema/<str:integration_type>/<str:update>",
+        views.InboundIntegrationConfigurationAddView.add_schema,
+        name="inboundconfigurations/add_schema",
+    ),
+    path(
+        "inboundconfigurations/add_dropdown_restore/",
+        views.InboundIntegrationConfigurationAddView.add_dropdown_restore,
+        name="inboundconfigurations/add_dropdown_restore",
     ),
     path(
         "inboundconfigurations/schema/<str:integration_type>/<uuid:integration_id>/<str:update>",
@@ -171,5 +186,7 @@ urlpatterns = [
         "bridges/dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
         name="bridges/dropdown_restore",
-    )
+    ),
+    # API endpoints
+    path("api/create-subject-type/", views.create_subject_type_api, name="create_subject_type_api"),
 ]

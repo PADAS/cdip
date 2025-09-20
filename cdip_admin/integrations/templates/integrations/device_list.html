@@ -16,11 +16,23 @@
         </div>
     </div>
     {% if filter %}
-    <div>
-        <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-            {% bootstrap_button 'Filter' extra_classes='' %}
-        </form>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <form action="" method="get" class="form">
+                <div class="mb-3">
+                    <div style="display: inline-block; vertical-align: top;">
+                        <input type="text" name="search" value="{{ filter.form.search.value|default:'' }}" class="form-control" style="width: 350px;" placeholder="Search devices...">
+                        <small class="form-text text-muted">Search by device name, external ID, organization, inbound config name, device group name, or inbound config type</small>
+                    </div>
+                    <div style="display: inline-block; vertical-align: bottom; margin-left: 10px;">
+                        {% bootstrap_button 'Filter' extra_classes='' %}
+                        {% if request.GET.search %}
+                            <a href="{% url 'device_list' %}" class="btn btn-secondary ml-2">Clear</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
     {% endif %}
     {% render_table table %}
