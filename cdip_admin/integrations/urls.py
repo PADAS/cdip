@@ -171,5 +171,7 @@ urlpatterns = [
         "bridges/dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
         name="bridges/dropdown_restore",
-    )
+    ),
+    # API endpoints
+    path("api/create-subject-type/", views.create_subject_type_api, name="create_subject_type_api"),
 ]

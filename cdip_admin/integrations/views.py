@@ -10,6 +10,9 @@ from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -771,7 +774,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     @staticmethod
     @requires_csrf_token
     def type_modal(request, configuration_id):
-        if request.GET.get("type") is not '':
+        if request.GET.get("type") != '':
             integration_type = request.GET.get("type")
             selected_type = OutboundIntegrationType.objects.get(id=integration_type)
         else:
@@ -1092,3 +1095,56 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return reverse(
             "bridge_integration_view", kwargs={"module_id": self.kwargs.get("id")}
         )
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def create_subject_type_api(request):
+    """
+    API endpoint to create new subject types via AJAX.
+    """
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            
+            display_name = data.get('display_name', '').strip()
+            value = data.get('value', '').strip()
+            
+            if not display_name or not value:
+                return JsonResponse({
+                    'error': 'Both display_name and value are required'
+                }, status=400)
+            
+            # Check if value already exists
+            from integrations.models import SubjectType
+            if SubjectType.objects.filter(value=value).exists():
+                return JsonResponse({
+                    'error': f'Subject type with value "{value}" already exists'
+                }, status=400)
+            
+            # Create new subject type
+            subject_type = SubjectType.objects.create(
+                display_name=display_name,
+                value=value
+            )
+            
+            return JsonResponse({
+                'id': str(subject_type.id),
+                'display_name': subject_type.display_name,
+                'value': subject_type.value,
+                'message': 'Subject type created successfully'
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'error': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({
+        'error': 'Method not allowed'
+    }, status=405)

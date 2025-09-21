@@ -214,88 +214,89 @@ function initSearchableMultiSelect(widgetId, options) {
     init();
 }
 
-// CSS styles (injected dynamically)
-const styles = `
-    .searchable-multiselect-container {
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-        padding: 1rem;
-        background-color: #fff;
+// CSS styles (injected dynamically) - only inject once
+(function() {
+    if (!document.getElementById('searchable-multiselect-styles')) {
+        const styles = `
+            .searchable-multiselect-container {
+                border: 1px solid #dee2e6;
+                border-radius: 0.375rem;
+                padding: 1rem;
+                background-color: #fff;
+            }
+            
+            .search-input-container .search-input {
+                border-radius: 0.375rem;
+                border: 1px solid #ced4da;
+                padding: 0.5rem 0.75rem;
+            }
+            
+            .search-input-container .search-input:focus {
+                border-color: #86b7fe;
+                outline: 0;
+                box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+            }
+            
+            .destination-card {
+                transition: all 0.2s ease-in-out;
+            }
+            
+            .available-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            
+            .selected-list, .available-list {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #dee2e6;
+                border-radius: 0.375rem;
+                padding: 0.5rem;
+                background-color: #f8f9fa;
+            }
+            
+            .info-label {
+                color: #6c757d;
+                font-size: 0.875rem;
+                margin-right: 0.5rem;
+            }
+            
+            .info-value {
+                color: #495057;
+                font-size: 0.875rem;
+            }
+            
+            .info-row {
+                display: flex;
+                align-items: flex-start;
+            }
+            
+            .cursor-pointer {
+                cursor: pointer;
+            }
+            
+            .btn-sm {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.875rem;
+                border-radius: 0.25rem;
+            }
+            
+            .text-break {
+                word-break: break-all;
+            }
+            
+            .card {
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .card:hover {
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+        `;
+        
+        const styleSheet = document.createElement('style');
+        styleSheet.id = 'searchable-multiselect-styles';
+        styleSheet.textContent = styles;
+        document.head.appendChild(styleSheet);
     }
-    
-    .search-input-container .search-input {
-        border-radius: 0.375rem;
-        border: 1px solid #ced4da;
-        padding: 0.5rem 0.75rem;
-    }
-    
-    .search-input-container .search-input:focus {
-        border-color: #86b7fe;
-        outline: 0;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    }
-    
-    .destination-card {
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .available-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    
-    .selected-list, .available-list {
-        max-height: 400px;
-        overflow-y: auto;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-        padding: 0.5rem;
-        background-color: #f8f9fa;
-    }
-    
-    .info-label {
-        color: #6c757d;
-        font-size: 0.875rem;
-        margin-right: 0.5rem;
-    }
-    
-    .info-value {
-        color: #495057;
-        font-size: 0.875rem;
-    }
-    
-    .info-row {
-        display: flex;
-        align-items: flex-start;
-    }
-    
-    .cursor-pointer {
-        cursor: pointer;
-    }
-    
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-        border-radius: 0.25rem;
-    }
-    
-    .text-break {
-        word-break: break-all;
-    }
-    
-    .card {
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .card:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-`;
-
-// Inject styles
-if (!document.getElementById('searchable-multiselect-styles')) {
-    const styleSheet = document.createElement('style');
-    styleSheet.id = 'searchable-multiselect-styles';
-    styleSheet.textContent = styles;
-    document.head.appendChild(styleSheet);
-}
+})();

@@ -22,7 +22,7 @@ from .models import (
     BridgeIntegration,
     Device
 )
-from .widgets import SearchableMultiSelectField
+from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -192,6 +192,13 @@ class DeviceGroupManagementForm(forms.ModelForm):
         queryset=OutboundIntegrationConfiguration.objects.all(),
         required=False,
         label="Destinations"
+    )
+    
+    # Override the default_subject_type field to use our custom widget
+    default_subject_type = SubjectTypeAutocompleteField(
+        required=False,
+        label="Default Subject Type",
+        empty_label="Select or create a subject type..."
     )
     
     class Meta:

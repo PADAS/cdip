@@ -267,3 +267,227 @@ class SearchableMultiSelectField(forms.ModelMultipleChoiceField):
         attrs = super().widget_attrs(widget)
         # Don't set choices here - let the widget get them during render
         return attrs
+
+
+class SubjectTypeAutocompleteWidget(forms.Widget):
+    """
+    A widget for selecting subject types with auto-complete and the ability to create new ones.
+    """
+    template_name = 'integrations/widgets/subject_type_autocomplete.html'
+
+    def __init__(self, attrs=None):
+        default_attrs = {
+            'class': 'subject-type-autocomplete',
+            'data-toggle': 'subject-type-autocomplete',
+        }
+        if attrs:
+            default_attrs.update(attrs)
+        super().__init__(default_attrs)
+
+    def render(self, name, value, attrs=None, renderer=None):
+        print(f"=== SUBJECT TYPE WIDGET RENDER DEBUG ===")
+        print(f"Widget render called for field: {name}")
+        print(f"Value: {value}")
+        print(f"Attrs: {attrs}")
+
+        if value is None:
+            value = ''
+
+        # Get all available subject types
+        from integrations.models import SubjectType
+        subject_types = SubjectType.objects.all().order_by('display_name')
+        choices = [(str(st.id), st.display_name, st.value) for st in subject_types]
+
+        if attrs is None:
+            attrs = {}
+
+        widget_id = attrs.get('id', f'id_{name}')
+
+        html = format_html(
+            '''
+            <div class="subject-type-autocomplete-container" id="{widget_id}_container">
+                <div class="input-group">
+                    <input type="text" 
+                           class="form-control autocomplete-input" 
+                           placeholder="Type to search or create new subject type..." 
+                           id="{widget_id}_input"
+                           autocomplete="off">
+                    <input type="hidden" 
+                           name="{name}" 
+                           id="{widget_id}_hidden"
+                           value="{value}">
+                    <button type="button" 
+                            class="btn btn-outline-secondary dropdown-toggle" 
+                            id="{widget_id}_dropdown"
+                            data-bs-toggle="dropdown">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu autocomplete-dropdown" 
+                         id="{widget_id}_dropdown_menu">
+                        <!-- Options will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="selected-subject-type mt-2" id="{widget_id}_selected" style="display: none;">
+                    <div class="alert alert-info d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>Selected:</strong> <span class="selected-name"></span>
+                            <small class="text-muted">(<span class="selected-value"></span>)</small>
+                        </span>
+                        <button type="button" class="btn btn-sm btn-outline-danger clear-selection">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="create-new-section mt-2" id="{widget_id}_create_new" style="display: none;">
+                    <div class="alert alert-warning">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Create New Subject Type</strong>
+                            <button type="button" class="btn btn-sm btn-outline-secondary cancel-create">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Display Name:</label>
+                                <input type="text" 
+                                       class="form-control new-display-name" 
+                                       placeholder="e.g., Elephant">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Value (Slug):</label>
+                                <input type="text" 
+                                       class="form-control new-value" 
+                                       placeholder="e.g., elephant"
+                                       maxlength="32">
+                                <div class="validation-message invalid-feedback" style="display: none;"></div>
+                                <small class="form-text text-muted">Up to 32 characters, lowercase letters, digits, underscores, and hyphens only</small>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2 create-subject-type" disabled>
+                            <i class="fas fa-plus"></i> Create & Select
+                        </button>
+                    </div>
+                </div>
+            </div>
+            ''',
+            widget_id=widget_id,
+            name=name,
+            value=value
+        )
+
+        # Add JavaScript to initialize the widget
+        import json
+        import os
+        from django.utils.safestring import mark_safe
+        
+        # Ensure proper JSON escaping
+        choices_json = json.dumps(choices)
+        current_value = value if value else ''
+
+        # Read the JavaScript file content and include it inline
+        js_file_path = '/Users/chrisdo/padas/cdip/cdip_admin/integrations/static/integrations/js/subject-type-autocomplete.js'
+        
+        js_content = ""
+        if os.path.exists(js_file_path):
+            with open(js_file_path, 'r') as f:
+                js_content = f.read()
+                print(f"DEBUG: Read {len(js_content)} characters from JavaScript file")
+        else:
+            print(f"DEBUG: JavaScript file not found at {js_file_path}")
+            # Fallback: embed a minimal version of the JavaScript
+            js_content = """
+            function initSubjectTypeAutocomplete(widgetId, options) {
+                console.log('Subject Type Widget: Fallback initialization');
+                console.log('Subject Type Widget: allChoices =', options.choices);
+                
+                const container = document.getElementById(widgetId + '_container');
+                const input = document.getElementById(widgetId + '_input');
+                const hiddenInput = document.getElementById(widgetId + '_hidden');
+                const dropdown = document.getElementById(widgetId + '_dropdown');
+                const dropdownMenu = document.getElementById(widgetId + '_dropdown_menu');
+                
+                if (!container || !input || !hiddenInput || !dropdown || !dropdownMenu) {
+                    console.error('Subject Type Widget: Required elements not found');
+                    return;
+                }
+                
+                let allChoices = options.choices || [];
+                let currentValue = options.currentValue || '';
+                
+                // Show all choices when dropdown is clicked
+                dropdown.addEventListener('click', function() {
+                    console.log('Subject Type Widget: Dropdown clicked');
+                    dropdownMenu.innerHTML = '';
+                    
+                    if (allChoices.length === 0) {
+                        dropdownMenu.innerHTML = '<div class="dropdown-item-text text-muted">No subject types found</div>';
+                        return;
+                    }
+                    
+                    allChoices.forEach(choice => {
+                        const item = document.createElement('div');
+                        item.className = 'dropdown-item choice-item';
+                        item.innerHTML = '<div><strong>' + choice[1] + '</strong><small class="text-muted d-block">' + choice[2] + '</small></div>';
+                        item.addEventListener('click', function() {
+                            hiddenInput.value = choice[0];
+                            input.value = choice[1];
+                            dropdownMenu.style.display = 'none';
+                            console.log('Subject Type Widget: Selected', choice[1]);
+                        });
+                        dropdownMenu.appendChild(item);
+                    });
+                    
+                    dropdownMenu.style.display = 'block';
+                });
+                
+                // Hide dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!container.contains(e.target)) {
+                        dropdownMenu.style.display = 'none';
+                    }
+                });
+            }
+            """
+
+        js = format_html(
+            '''
+            <script>
+            {js_content}
+            
+            document.addEventListener('DOMContentLoaded', function() {{
+                console.log('Initializing subject type autocomplete widget...');
+                console.log('Widget ID:', '{widget_id}');
+                console.log('Choices:', {choices_json});
+                console.log('Current value:', '{current_value}');
+                
+                initSubjectTypeAutocomplete('{widget_id}', {{
+                    choices: {choices_json},
+                    currentValue: '{current_value}',
+                    name: '{name}'
+                }});
+            }});
+            </script>
+            ''',
+            js_content=mark_safe(js_content),
+            widget_id=widget_id,
+            choices_json=mark_safe(choices_json),
+            current_value=current_value,
+            name=name
+        )
+        
+        return mark_safe(html + js)
+
+
+class SubjectTypeAutocompleteField(forms.ModelChoiceField):
+    """
+    A custom field that uses the SubjectTypeAutocompleteWidget.
+    """
+    def __init__(self, *args, **kwargs):
+        from integrations.models import SubjectType
+        queryset = kwargs.get('queryset', SubjectType.objects.all())
+        kwargs['queryset'] = queryset
+        widget = SubjectTypeAutocompleteWidget()
+        kwargs['widget'] = widget
+        super().__init__(*args, **kwargs)
