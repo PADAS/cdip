@@ -94,7 +94,7 @@ class SearchableMultiSelectWidget(forms.Widget):
                        <div class="search-input-container mb-3">
                            <input type="text" 
                                   class="form-control search-input" 
-                                  placeholder="Search destinations..." 
+                                  placeholder="Search by name, owner, type, or endpoint..." 
                                   id="{widget_id}_search">
                        </div>
                        

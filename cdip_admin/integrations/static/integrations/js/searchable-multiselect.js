@@ -194,9 +194,13 @@ function initSearchableMultiSelect(widgetId, options) {
         // Search functionality
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            filteredChoices = allChoices.filter(choice => 
-                choice[1].toLowerCase().includes(searchTerm)
-            );
+            filteredChoices = allChoices.filter(choice => {
+                // Search in: name (choice[1]), owner (choice[2]), type (choice[3]), endpoint (choice[4])
+                return choice[1].toLowerCase().includes(searchTerm) ||  // name
+                       choice[2].toLowerCase().includes(searchTerm) ||  // owner
+                       choice[3].toLowerCase().includes(searchTerm) ||  // type
+                       choice[4].toLowerCase().includes(searchTerm);    // endpoint
+            });
             renderAvailableItems();
         });
         
