@@ -254,13 +254,13 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
     permission_required = "integrations.add_devicegroup"
 
     def post(self, request, *args, **kwargs):
-        form = DeviceGroupForm(request.POST)
+        form = DeviceGroupForm(request.POST, request=request)
         if form.is_valid():
             config = form.save()
             return redirect("device_group", str(config.id))
 
     def get_form(self, form_class=None):
-        form = DeviceGroupForm()
+        form = DeviceGroupForm(request=self.request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             # can only add if you are an admin of at least one organization
             if not IsOrganizationMember.filter_queryset_for_user(
@@ -272,19 +272,13 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         return form
 
 
-class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
+
+
+class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
     template_name = "integrations/device_group_update.html"
-    form_class = DeviceGroupForm
+    form_class = DeviceGroupManagementForm
     model = DeviceGroup
     permission_required = "integrations.change_devicegroup"
-
-    def get(self, request, *args, **kwargs):
-        form_class = self.get_form_class()
-        self.object = self.get_object()
-        form = form_class(instance=self.object)
-        if not IsGlobalAdmin.has_permission(None, self.request, None):
-            form = filter_device_group_form_fields(form, self.request.user)
-        return self.render_to_response(self.get_context_data(form=form))
 
     def get_object(self):
         device_group = get_object_or_404(
@@ -297,23 +291,6 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
                 raise PermissionDenied
         return device_group
 
-    def get_success_url(self):
-        return reverse(
-            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
-        )
-
-
-class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
-    template_name = "integrations/device_group_update.html"
-    form_class = DeviceGroupManagementForm
-    model = DeviceGroup
-
-    def get_object(self):
-        device_group = get_object_or_404(
-            DeviceGroup, pk=self.kwargs.get("device_group_id")
-        )
-        return device_group
-
     def get(self, request, *args, **kwargs):
         print("=== VIEW GET DEBUG ===")
         form_class = self.get_form_class()
@@ -321,7 +298,7 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         self.object = self.get_object()
         print(f"Object: {self.object}")
         print(f"Object destinations: {list(self.object.destinations.all())}")
-        form = form_class(instance=self.object)
+        form = form_class(instance=self.object, request=request)
         print(f"Form created with instance")
         print(f"Form fields: {list(form.fields.keys())}")
         if 'destinations' in form.fields:
@@ -335,6 +312,8 @@ class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
         """Override post method to ensure many-to-many relationships are saved properly."""
         self.object = self.get_object()
         form = self.get_form()
+        # Pass request to form for proper initialization
+        form = self.form_class(request.POST, instance=self.object, request=request)
         
         # Debug: Print form data
         print("=== FORM SUBMISSION DEBUG ===")

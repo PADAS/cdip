@@ -22,7 +22,7 @@ from .models import (
     BridgeIntegration,
     Device
 )
-from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField
+from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -194,6 +194,13 @@ class DeviceGroupManagementForm(forms.ModelForm):
         label="Destinations"
     )
     
+    # Override the devices field to use our custom widget
+    devices = DeviceSearchableMultiSelectField(
+        queryset=Device.objects.all(),
+        required=False,
+        label="Devices"
+    )
+    
     # Override the default_subject_type field to use our custom widget
     default_subject_type = SubjectTypeAutocompleteField(
         required=False,
@@ -203,7 +210,34 @@ class DeviceGroupManagementForm(forms.ModelForm):
     
     class Meta:
         model = DeviceGroup
-        exclude = ["id", "name", "owner"]
+        exclude = ["id"]
+
+    def __init__(self, *args, request=None, **kwargs):
+        super(DeviceGroupManagementForm, self).__init__(*args, **kwargs)
+        for field_name in self.fields:
+            if self.fields[field_name].help_text != "":
+                self.fields[
+                    field_name
+                ].label += tooltip_labels(self.fields[field_name].help_text)
+            self.fields[field_name].help_text = None
+        if self.instance and request:
+            qs = Organization.objects.all()
+            if not IsGlobalAdmin.has_permission(None, request, None):
+                self.fields[
+                    "owner"
+                ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                    qs, request.user, "name"
+                )
+            else:
+                self.fields["owner"].queryset = qs
+
+    field_order = [
+        "name",
+        "owner",
+        "default_subject_type",
+        "destinations",
+        "devices",
+    ]
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

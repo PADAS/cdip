@@ -32,8 +32,19 @@ function initSearchableMultiSelect(widgetId, options) {
             selectedValues.forEach(value => {
                 const choice = allChoices.find(c => c[0] == value);
                 if (choice) {
-                    const item = createSelectedItem(choice[0], choice[1], choice[2], choice[3], choice[4]);
-                    selectedList.appendChild(item);
+                    // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
+                    // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
+                    if (choice.length >= 6) {
+                        // Device: (value, label, owner, type, endpoint, externalId)
+                        // choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
+                        const item = createSelectedItem(choice[0], choice[1], choice[3], choice[4], choice[5], choice[2]);
+                        selectedList.appendChild(item);
+                    } else {
+                        // Destination: (value, label, owner, type, endpoint, undefined)
+                        // choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
+                        const item = createSelectedItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
+                        selectedList.appendChild(item);
+                    }
                 }
             });
         }
@@ -54,15 +65,69 @@ function initSearchableMultiSelect(widgetId, options) {
         }
         
         availableChoices.forEach(choice => {
-            const item = createAvailableItem(choice[0], choice[1], choice[2], choice[3], choice[4]);
-            availableList.appendChild(item);
+            // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
+            // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
+            if (choice.length >= 6) {
+                // Device: (value, label, owner, type, endpoint, externalId)
+                const item = createAvailableItem(choice[0], choice[1], choice[3], choice[4], choice[5], choice[2]);
+                availableList.appendChild(item);
+            } else {
+                // Destination: (value, label, owner, type, endpoint, undefined)
+                const item = createAvailableItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
+                availableList.appendChild(item);
+            }
         });
     }
     
     // Create a selected item element as a card
-    function createSelectedItem(value, label, owner, type, endpoint) {
+    function createSelectedItem(value, label, owner, type, endpoint, externalId) {
         const item = document.createElement('div');
         item.className = 'destination-card selected-card mb-2';
+        
+        // Determine if this is a device (6 elements) or destination (5 elements)
+        const isDevice = externalId !== undefined;
+        
+        let infoHtml = '';
+        if (isDevice) {
+            infoHtml = `
+                <div class="destination-info">
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">External ID:</span>
+                        <span class="info-value">${externalId}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Owner:</span>
+                        <span class="info-value">${owner}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Type:</span>
+                        <span class="info-value">${type}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label fw-bold">Configuration:</span>
+                        <span class="info-value text-break">${endpoint}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            infoHtml = `
+                <div class="destination-info">
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Owner:</span>
+                        <span class="info-value">${owner}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Type:</span>
+                        <span class="info-value">${type}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label fw-bold">Endpoint:</span>
+                        <span class="info-value text-break">${endpoint}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
         item.innerHTML = `
             <div class="card border-success">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -72,20 +137,7 @@ function initSearchableMultiSelect(widgetId, options) {
                     </button>
                 </div>
                 <div class="card-body">
-                    <div class="destination-info">
-                        <div class="info-row mb-1">
-                            <span class="info-label fw-bold">Owner:</span>
-                            <span class="info-value">${owner}</span>
-                        </div>
-                        <div class="info-row mb-1">
-                            <span class="info-label fw-bold">Type:</span>
-                            <span class="info-value">${type}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label fw-bold">Endpoint:</span>
-                            <span class="info-value text-break">${endpoint}</span>
-                        </div>
-                    </div>
+                    ${infoHtml}
                 </div>
             </div>
         `;
@@ -101,10 +153,55 @@ function initSearchableMultiSelect(widgetId, options) {
     }
     
     // Create an available item element as a card
-    function createAvailableItem(value, label, owner, type, endpoint) {
+    function createAvailableItem(value, label, owner, type, endpoint, externalId) {
         const item = document.createElement('div');
         item.className = 'destination-card available-card mb-2 cursor-pointer';
         item.style.cursor = 'pointer';
+        
+        // Determine if this is a device (6 elements) or destination (5 elements)
+        const isDevice = externalId !== undefined;
+        
+        let infoHtml = '';
+        if (isDevice) {
+            infoHtml = `
+                <div class="destination-info">
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">External ID:</span>
+                        <span class="info-value">${externalId}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Owner:</span>
+                        <span class="info-value">${owner}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Type:</span>
+                        <span class="info-value">${type}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label fw-bold">Configuration:</span>
+                        <span class="info-value text-break">${endpoint}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            infoHtml = `
+                <div class="destination-info">
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Owner:</span>
+                        <span class="info-value">${owner}</span>
+                    </div>
+                    <div class="info-row mb-1">
+                        <span class="info-label fw-bold">Type:</span>
+                        <span class="info-value">${type}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label fw-bold">Endpoint:</span>
+                        <span class="info-value text-break">${endpoint}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
         item.innerHTML = `
             <div class="card border-primary">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -114,20 +211,7 @@ function initSearchableMultiSelect(widgetId, options) {
                     </button>
                 </div>
                 <div class="card-body">
-                    <div class="destination-info">
-                        <div class="info-row mb-1">
-                            <span class="info-label fw-bold">Owner:</span>
-                            <span class="info-value">${owner}</span>
-                        </div>
-                        <div class="info-row mb-1">
-                            <span class="info-label fw-bold">Type:</span>
-                            <span class="info-value">${type}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label fw-bold">Endpoint:</span>
-                            <span class="info-value text-break">${endpoint}</span>
-                        </div>
-                    </div>
+                    ${infoHtml}
                 </div>
             </div>
         `;
@@ -195,11 +279,26 @@ function initSearchableMultiSelect(widgetId, options) {
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             filteredChoices = allChoices.filter(choice => {
-                // Search in: name (choice[1]), owner (choice[2]), type (choice[3]), endpoint (choice[4])
-                return choice[1].toLowerCase().includes(searchTerm) ||  // name
-                       choice[2].toLowerCase().includes(searchTerm) ||  // owner
-                       choice[3].toLowerCase().includes(searchTerm) ||  // type
-                       choice[4].toLowerCase().includes(searchTerm);    // endpoint
+                // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
+                // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
+                let matches = choice[1].toLowerCase().includes(searchTerm);  // name (always choice[1])
+                
+                if (choice.length >= 6) {
+                    // Device: search in external_id, owner, type, config
+                    matches = matches || 
+                             choice[2].toLowerCase().includes(searchTerm) ||  // external_id
+                             choice[3].toLowerCase().includes(searchTerm) ||  // owner
+                             choice[4].toLowerCase().includes(searchTerm) ||  // type
+                             choice[5].toLowerCase().includes(searchTerm);    // config
+                } else {
+                    // Destination: search in owner, type, endpoint
+                    matches = matches || 
+                             choice[2].toLowerCase().includes(searchTerm) ||  // owner
+                             choice[3].toLowerCase().includes(searchTerm) ||  // type
+                             choice[4].toLowerCase().includes(searchTerm);    // endpoint
+                }
+                
+                return matches;
             });
             renderAvailableItems();
         });

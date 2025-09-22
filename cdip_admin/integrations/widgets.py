@@ -269,6 +269,273 @@ class SearchableMultiSelectField(forms.ModelMultipleChoiceField):
         return attrs
 
 
+class DeviceSearchableMultiSelectWidget(forms.Widget):
+    """
+    A custom widget that provides a searchable multiselect interface
+    for Device ManyToManyField relationships.
+    """
+    
+    def __init__(self, attrs=None):
+        default_attrs = {
+            'class': 'searchable-multiselect',
+            'data-toggle': 'searchable-multiselect'
+        }
+        if attrs:
+            default_attrs.update(attrs)
+        super().__init__(default_attrs)
+    
+    def render(self, name, value, attrs=None, renderer=None):
+        print(f"=== DEVICE WIDGET RENDER DEBUG ===")
+        print(f"Widget render called for field: {name}")
+        print(f"Value: {value}")
+        print(f"Attrs: {attrs}")
+        
+        if value is None:
+            value = []
+        
+        # Convert value to list of strings if it's a QuerySet or list of objects
+        if hasattr(value, '__iter__') and not isinstance(value, str):
+            try:
+                # If it's a QuerySet or list of model instances, extract the primary keys
+                if hasattr(value, 'values_list'):
+                    # It's a QuerySet
+                    value = list(value.values_list('pk', flat=True))
+                elif value and hasattr(value[0], 'pk'):
+                    # It's a list of model instances
+                    value = [str(obj.pk) for obj in value]
+                else:
+                    # It's already a list of values
+                    value = [str(v) for v in value]
+            except (AttributeError, IndexError):
+                # Fallback to string conversion
+                value = [str(v) for v in value] if value else []
+        elif value:
+            value = [str(value)]
+        else:
+            value = []
+        
+        # Ensure attrs is a dictionary
+        if attrs is None:
+            attrs = {}
+        
+        # Get the field instance to access choices
+        field = self.attrs.get('field')
+        if not field:
+            return format_html('<div class="alert alert-warning">Field not available</div>')
+        
+        # Get all available choices
+        choices = []
+        # First try to get choices from attrs (set by widget_attrs)
+        if 'choices' in attrs:
+            choices = attrs['choices']
+        elif hasattr(field, 'queryset') and field.queryset:
+            try:
+                queryset = field.queryset.all().select_related('inbound_configuration__owner', 'inbound_configuration__type')
+                for obj in queryset:
+                    # Create choice tuple with: (id, name, external_id, owner, type, inbound_config)
+                    choices.append((
+                        str(obj.pk), 
+                        obj.name or str(obj),
+                        obj.external_id or 'N/A',
+                        obj.owner.name if obj.owner else 'N/A',
+                        obj.inbound_configuration.type.name if obj.inbound_configuration and obj.inbound_configuration.type else 'N/A',
+                        obj.inbound_configuration.name if obj.inbound_configuration else 'N/A'
+                    ))
+            except Exception as e:
+                print(f"Error getting queryset: {e}")
+        elif hasattr(field, 'choices') and field.choices:
+            choices = field.choices
+        
+        # Convert value to list of strings for comparison
+        if isinstance(value, (list, tuple)):
+            selected_values = [str(v) for v in value]
+        else:
+            selected_values = [str(value)] if value else []
+        
+        # Render the widget HTML
+        widget_id = attrs.get('id', f'id_{name}')
+        
+        html = format_html(
+                   '''
+                   <div class="searchable-multiselect-container" id="{widget_id}_container">
+                       <div class="search-input-container mb-3">
+                           <input type="text" 
+                                  class="form-control search-input" 
+                                  placeholder="Search by name, external ID, owner, type, or configuration..." 
+                                  id="{widget_id}_search">
+                       </div>
+                       
+                       <div class="row">
+                           <div class="col-md-6">
+                               <div class="available-items">
+                                   <h6 class="text-muted mb-3">Available Devices</h6>
+                                   <div class="available-list" id="{widget_id}_available">
+                                       <!-- Available items will be populated here -->
+                                   </div>
+                               </div>
+                           </div>
+                           
+                           <div class="col-md-6">
+                               <div class="selected-items">
+                                   <h6 class="text-muted mb-3">Selected Devices</h6>
+                                   <div class="selected-list" id="{widget_id}_selected">
+                                       <!-- Selected items will be populated here -->
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                       
+                       <!-- Hidden inputs for selected values -->
+                       <div class="hidden-inputs">
+                           <!-- Will be populated by JavaScript -->
+                       </div>
+                   </div>
+                   ''',
+                   widget_id=widget_id
+               )
+        
+        # Add JavaScript to initialize the widget
+        import json
+        from django.utils.safestring import mark_safe
+        
+        choices_json = mark_safe(json.dumps(choices))
+        selected_json = mark_safe(json.dumps(selected_values))
+        
+        # Read the JavaScript file content and include it inline
+        import os
+        js_file_path = os.path.join(os.path.dirname(__file__), 'static', 'integrations', 'js', 'searchable-multiselect.js')
+        
+        js_content = ""
+        if os.path.exists(js_file_path):
+            with open(js_file_path, 'r') as f:
+                js_content = f.read()
+        
+        js = format_html(
+            '''
+            <script>
+            {js_content}
+            
+            document.addEventListener('DOMContentLoaded', function() {{
+                console.log('DOM loaded, initializing device searchable multiselect...');
+                console.log('Widget ID:', '{widget_id}');
+                console.log('Choices:', {choices_json});
+                console.log('Selected:', {selected_json});
+                
+                try {{
+                    initSearchableMultiSelect('{widget_id}', {{
+                        choices: {choices_json},
+                        selected: {selected_json},
+                        name: '{name}'
+                    }});
+                    console.log('Device searchable multiselect initialized successfully');
+                }} catch (error) {{
+                    console.error('Error initializing device searchable multiselect:', error);
+                }}
+                
+                // Add debugging for form submission
+                const form = document.querySelector('form');
+                console.log('Form found:', form);
+                if (form) {{
+                    form.addEventListener('submit', function(e) {{
+                        console.log('=== FORM SUBMISSION START ===');
+                        console.log('Form submitted');
+                        const hiddenInputs = document.querySelectorAll('input[name^="{name}_"]');
+                        console.log('Hidden inputs found:', hiddenInputs.length);
+                        hiddenInputs.forEach((input, index) => {{
+                            console.log(`Hidden input ${{index}}: name=${{input.name}}, value=${{input.value}}`);
+                        }});
+                        
+                        // Also log all form data
+                        const formData = new FormData(form);
+                        console.log('All form data:');
+                        for (let [key, value] of formData.entries()) {{
+                            console.log(`  ${{key}}: ${{value}}`);
+                        }}
+                        console.log('=== FORM SUBMISSION END ===');
+                    }});
+                }} else {{
+                    console.error('No form found on page');
+                }}
+            }});
+            </script>
+            ''',
+            js_content=mark_safe(js_content),
+            widget_id=widget_id,
+            choices_json=choices_json,
+            selected_json=selected_json,
+            name=name
+        )
+        
+        return mark_safe(html + js)
+    
+    def value_from_datadict(self, data, files, name):
+        """Extract selected values from form data."""
+        print(f"=== DEVICE VALUE_FROM_DATADICT DEBUG ===")
+        print(f"Field name: {name}")
+        print(f"Data keys: {list(data.keys())}")
+        
+        values = []
+        
+        # Look for values with the pattern name_0, name_1, etc.
+        i = 0
+        while True:
+            key = f"{name}_{i}"
+            if key in data:
+                value = data[key]
+                # Skip empty values (they indicate clearing the selection)
+                if value and value.strip():
+                    values.append(value)
+                print(f"Found {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
+                i += 1
+            else:
+                break
+        
+        # Also check for a single value with the name
+        if name in data:
+            values.append(data[name])
+            print(f"Found {name}: {data[name]}")
+        
+        # Handle the case where field names might include UUIDs
+        # Look for any keys that start with the field name
+        for key in data.keys():
+            if key.startswith(f"{name}_") and key not in [f"{name}_{i}" for i in range(len(values))]:
+                # This might be a UUID-based field name
+                value = data[key]
+                # Only add non-empty values
+                if value and value.strip():
+                    values.append(value)
+                print(f"Found UUID-based field {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
+        
+        print(f"Final values: {values}")
+        return values
+
+
+class DeviceSearchableMultiSelectField(forms.ModelMultipleChoiceField):
+    """
+    A custom field that uses the DeviceSearchableMultiSelectWidget.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        # Create the widget instance first
+        widget = DeviceSearchableMultiSelectWidget()
+        kwargs['widget'] = widget
+        super().__init__(*args, **kwargs)
+        # Store the field reference in the widget after initialization
+        self.widget.attrs['field'] = self
+    
+    def bound_data(self, data, initial):
+        """Override to ensure initial values are properly handled."""
+        if initial is None:
+            initial = []
+        return super().bound_data(data, initial)
+        
+    def widget_attrs(self, widget):
+        """Override to pass choices to the widget."""
+        attrs = super().widget_attrs(widget)
+        # Don't set choices here - let the widget get them during render
+        return attrs
+
+
 class SubjectTypeAutocompleteWidget(forms.Widget):
     """
     A widget for selecting subject types with auto-complete and the ability to create new ones.
