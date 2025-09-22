@@ -90,6 +90,21 @@ urlpatterns = [
         name="inboundconfigurations/type_modal",
     ),
     path(
+        "inboundconfigurations/add_type_modal/",
+        views.InboundIntegrationConfigurationAddView.type_modal,
+        name="inboundconfigurations/add_type_modal",
+    ),
+    path(
+        "inboundconfigurations/add_schema/<str:integration_type>/<str:update>",
+        views.InboundIntegrationConfigurationAddView.add_schema,
+        name="inboundconfigurations/add_schema",
+    ),
+    path(
+        "inboundconfigurations/add_dropdown_restore/",
+        views.InboundIntegrationConfigurationAddView.add_dropdown_restore,
+        name="inboundconfigurations/add_dropdown_restore",
+    ),
+    path(
         "inboundconfigurations/schema/<str:integration_type>/<uuid:integration_id>/<str:update>",
         views.InboundIntegrationConfigurationUpdateView.schema,
         name="inboundconfigurations/schema",

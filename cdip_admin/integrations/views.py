@@ -547,6 +547,84 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
             )
         return form
 
+    @staticmethod
+    @requires_csrf_token
+    def type_modal(request):
+        """
+        Type modal for Add Integration form.
+        Always shows warning modal when changing integration type.
+        """
+        if request.GET.get("type"):
+            integration_type = request.GET.get("type")
+            selected_type = InboundIntegrationType.objects.get(id=integration_type)
+        else:
+            integration_type = "none"
+            selected_type = "None"
+        
+        # Always show warning modal when changing integration type
+        rendered = render_to_string('integrations/type_modal.html', {
+            'selected_type': selected_type,
+            'target': '#div_id_state',
+            'proceed_button': reverse("inboundconfigurations/add_schema",
+                                    kwargs={
+                                        "integration_type": integration_type,
+                                        "update": "true"
+                                    }),
+            'cancel_button': reverse("inboundconfigurations/add_dropdown_restore")
+        })
+        return HttpResponse(rendered)
+
+    @staticmethod
+    @requires_csrf_token
+    def add_schema(request, integration_type, update):
+        """
+        Schema endpoint for Add Integration form.
+        """
+        if integration_type != "none":
+            integration_type_obj = InboundIntegrationType.objects.get(id=integration_type)
+            form = InboundIntegrationConfigurationAddForm()
+            
+            # Set the session for the integration type
+            request.session["integration_type"] = integration_type
+            
+            # Set up the state field widget based on the schema
+            if integration_type_obj.configuration_schema != {}:
+                form.fields['state'].widget = JSONFormWidget(
+                    schema=integration_type_obj.configuration_schema,
+                )
+            else:
+                form.fields['state'].widget = FormattedJsonFieldWidget()
+            
+            return HttpResponse(as_crispy_field(form["state"]))
+        return HttpResponse("")
+
+    @staticmethod
+    @requires_csrf_token
+    def add_dropdown_restore(request):
+        """
+        Dropdown restore for Add Integration form.
+        """
+        response = f"""<div id="div_id_type" class="form-group">
+                        <label for="id_type" class=" requiredField">
+                        Type
+                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
+                            data-toggle="tooltip" data-placement="right" 
+                            title="Integration component that can process the data." tabindex="-1">?
+                        </button>
+                        <span class="asteriskField">*</span></label> 
+                        <div class="">
+                            <select name="type" hx-trigger="change" hx-target="#div_id_state" hx-swap="outerHTML"
+                            class="select form-control"
+                            required id="id_type">
+                                <option value="" selected>-------</option>"""
+        integration_types = InboundIntegrationType.objects.values_list("id", "name", named=True)
+        for option in integration_types:
+            response += f'<option value="{option.id}">{option.name}</option>'
+        response += """</select>
+                        </div>
+                    </div>"""
+        return HttpResponse(response)
+
 
 class InboundIntegrationConfigurationUpdateView(
     PermissionRequiredMixin,

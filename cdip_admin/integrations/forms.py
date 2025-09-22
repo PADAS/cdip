@@ -31,7 +31,7 @@ import json
 def tooltip_labels(text):
     return f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
     data-toggle="tooltip" data-placement="right" 
-    title="{text}">?</button>"""
+    title="{text}" tabindex="-1">?</button>"""
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -183,6 +183,7 @@ class InboundIntegrationConfigurationAddForm(forms.ModelForm):
             "type": forms.Select(
                 attrs={
                     'name': "type",
+                    'id': 'id_type',
                     'hx-trigger': 'change',
                     'hx-target': 'body',
                     'hx-swap': 'beforeend'
@@ -219,9 +220,8 @@ class InboundIntegrationConfigurationAddForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
-            # TODO: review how we trigger the warning modal
-            self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
-                                                                 kwargs={"integration_id": self.instance.id})
+            # For Add Integration: Allow free type changes without warning modal
+            # The type field will trigger schema updates directly
             if hasattr(self.instance, 'type'):
                 # TODO: review how we trigger the schema view
                 self.fields['owner'].widget.attrs['hx-get'] = reverse("inboundconfigurations/schema",
@@ -231,6 +231,9 @@ class InboundIntegrationConfigurationAddForm(forms.ModelForm):
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
+            
+            # Configure type field to use the new add_type_modal endpoint
+            self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/add_type_modal")
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

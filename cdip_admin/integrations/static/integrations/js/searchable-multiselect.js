@@ -27,7 +27,10 @@ function initSearchableMultiSelect(widgetId, options) {
         selectedList.innerHTML = '';
         
         if (selectedValues.size === 0) {
-            selectedList.innerHTML = '<div class="text-muted">No destinations selected</div>';
+            // Determine if this is for devices or destinations based on the first choice
+            const isDeviceWidget = allChoices.length > 0 && allChoices[0].length >= 6;
+            const emptyText = isDeviceWidget ? 'No devices selected' : 'No destinations selected';
+            selectedList.innerHTML = `<div class="text-muted">${emptyText}</div>`;
         } else {
             selectedValues.forEach(value => {
                 const choice = allChoices.find(c => c[0] == value);
@@ -60,7 +63,10 @@ function initSearchableMultiSelect(widgetId, options) {
         const availableChoices = filteredChoices.filter(choice => !selectedValues.has(choice[0]));
         
         if (availableChoices.length === 0) {
-            availableList.innerHTML = '<div class="text-muted">No destinations available</div>';
+            // Determine if this is for devices or destinations based on the first choice
+            const isDeviceWidget = allChoices.length > 0 && allChoices[0].length >= 6;
+            const emptyText = isDeviceWidget ? 'No devices available' : 'No destinations available';
+            availableList.innerHTML = `<div class="text-muted">${emptyText}</div>`;
             return;
         }
         
@@ -246,7 +252,7 @@ function initSearchableMultiSelect(widgetId, options) {
         const selectedArray = Array.from(selectedValues);
         
         if (selectedArray.length === 0) {
-            // When no destinations are selected, create a single hidden input with empty value
+            // When no items are selected, create a single hidden input with empty value
             // This ensures Django knows the field should be cleared
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -255,7 +261,7 @@ function initSearchableMultiSelect(widgetId, options) {
             hiddenInputsContainer.appendChild(input);
             console.log('Empty selection: created single hidden input with empty value');
         } else {
-            // Create inputs for each selected destination
+            // Create inputs for each selected item
             selectedArray.forEach((value, index) => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
