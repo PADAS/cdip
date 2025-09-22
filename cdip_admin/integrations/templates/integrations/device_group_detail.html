@@ -8,6 +8,22 @@
 {% block content %}
     <h3>{{object.name}}</h3>
     <p>Organization: {{object.owner.name}}</p>
+    
+    {% if inbound_integration %}
+    <div class="alert alert-info">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle me-2"></i>
+            <div>
+                <strong>Default Device Group for:</strong> 
+                <a href="{% url 'inbound_integration_configuration_update' inbound_integration.id %}" class="alert-link">
+                    {{ inbound_integration.name|default:inbound_integration.type.name }}
+                </a>
+                <br>
+                <small>This device group is used as the default for the {{ inbound_integration.type.name }} integration configuration.</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="row">
         <div class="col-md-6">

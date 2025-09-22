@@ -22,7 +22,7 @@ from .models import (
     BridgeIntegration,
     Device
 )
-from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField, DeviceGroupSelectWithLinkField, DeviceGroupAutoCreateField
+from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField, DeviceGroupSelectWithLinkField, DeviceGroupAutoCreateField, DeviceGroupDisplayWidget
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -105,6 +105,11 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["default_devicegroup"].queryset = device_group_qs
+                
+                # Replace default_devicegroup field with display widget for existing integrations
+                if self.instance.pk and self.instance.default_devicegroup:  # If this is an existing integration with a default device group
+                    self.fields["default_devicegroup"].widget = DeviceGroupDisplayWidget()
+                    self.fields["default_devicegroup"].help_text = "Default Device Group cannot be changed for existing integrations."
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
@@ -117,6 +122,18 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
+
+    def save(self, commit=True):
+        """Override save to preserve default_devicegroup value when using display widget."""
+        instance = super().save(commit=False)
+        
+        # If using DeviceGroupDisplayWidget, preserve the original value
+        if self.instance.pk and isinstance(self.fields['default_devicegroup'].widget, DeviceGroupDisplayWidget):
+            instance.default_devicegroup = self.instance.default_devicegroup
+        
+        if commit:
+            instance.save()
+        return instance
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

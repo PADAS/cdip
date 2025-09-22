@@ -1,6 +1,7 @@
 from django import forms
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.urls import reverse
 
 
 class SearchableMultiSelectWidget(forms.Widget):
@@ -942,3 +943,47 @@ class DeviceGroupAutoCreateField(forms.ModelChoiceField):
         kwargs['widget'] = widget
         kwargs['required'] = False
         super().__init__(*args, **kwargs)
+
+
+class DeviceGroupDisplayWidget(forms.Widget):
+    """
+    A widget that displays the device group name with a link to its manage page.
+    """
+    
+    def render(self, name, value, attrs=None, renderer=None):
+        if not value:
+            return format_html('<div class="text-muted">No default device group set</div>')
+        
+        try:
+            from integrations.models import DeviceGroup
+            device_group = DeviceGroup.objects.get(id=value)
+            manage_url = reverse('device_group_management_update', kwargs={'device_group_id': device_group.id})
+            
+            return format_html(
+                '''
+                <div class="device-group-display">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-layer-group me-2 text-primary"></i>
+                        <div>
+                            <strong>{device_group_name}</strong><br>
+                            <small class="text-muted">Organization: {owner_name}</small><br>
+                            <a href="{manage_url}" class="btn btn-sm btn-outline-primary mt-1">
+                                <i class="fas fa-cog"></i> Manage Device Group
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="{name}" value="{value}">
+                ''',
+                device_group_name=device_group.name,
+                owner_name=device_group.owner.name,
+                manage_url=manage_url,
+                name=name,
+                value=value
+            )
+        except DeviceGroup.DoesNotExist:
+            return format_html('<div class="text-muted">Device group not found</div>')
+    
+    def value_from_datadict(self, data, files, name):
+        """Return the hidden input value to preserve the device group ID."""
+        return data.get(name)

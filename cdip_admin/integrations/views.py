@@ -209,6 +209,14 @@ class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
         context = super().get_context_data(**kwargs)
         base_url = reverse("device_list")
         context["base_url"] = base_url
+        
+        # Get the inbound integration configuration that uses this device group as default
+        try:
+            inbound_integration = self.object.inbound_integration_configuration.get()
+            context["inbound_integration"] = inbound_integration
+        except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
+            context["inbound_integration"] = None
+        
         return context
 
 
@@ -308,6 +316,18 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return self.render_to_response(self.get_context_data(form=form))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get the inbound integration configuration that uses this device group as default
+        try:
+            inbound_integration = self.object.inbound_integration_configuration.get()
+            context["inbound_integration"] = inbound_integration
+        except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
+            context["inbound_integration"] = None
+        
+        return context
 
     def post(self, request, *args, **kwargs):
         """Override post method to ensure many-to-many relationships are saved properly."""

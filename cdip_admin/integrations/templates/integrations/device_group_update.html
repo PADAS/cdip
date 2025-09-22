@@ -8,8 +8,24 @@
 {% block content %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
+    {% if inbound_integration %}
+    <div class="alert alert-info mb-3">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle me-2"></i>
+            <div>
+                <strong>Default Device Group for:</strong> 
+                <a href="{% url 'inbound_integration_configuration_update' inbound_integration.id %}" class="alert-link">
+                    {{ inbound_integration.name|default:inbound_integration.type.name }}
+                </a>
+                <br>
+                <small>This device group is used as the default for the {{ inbound_integration.type.name }} integration configuration.</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <form method="post">
-        <h3>Device Group</h3>
+        <h3>Manage Device Group</h3>
         {% csrf_token %}
         {% crispy form %}
     </form>
