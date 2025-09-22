@@ -28,6 +28,7 @@ from .filters import (
 )
 from .forms import (
     InboundIntegrationConfigurationForm,
+    InboundIntegrationConfigurationAddForm,
     OutboundIntegrationConfigurationForm,
     DeviceGroupForm,
     DeviceGroupManagementForm,
@@ -524,20 +525,20 @@ def inbound_integration_configuration_detail(request, id):
 
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     template_name = "integrations/inbound_integration_configuration_add.html"
-    form_class = InboundIntegrationConfigurationForm
+    form_class = InboundIntegrationConfigurationAddForm
     model = InboundIntegrationConfiguration
     permission_required = "integrations.add_inboundintegrationconfiguration"
 
     def post(self, request, *args, **kwargs):
-        form = InboundIntegrationConfigurationForm(request.POST)
+        form = InboundIntegrationConfigurationAddForm(request.POST, request=request)
         if form.is_valid():
             config: InboundIntegrationConfiguration = form.save()
             device_group = config.default_devicegroup
-            return redirect("device_group_update", device_group_id=device_group.id)
+            return redirect("device_group_management_update", device_group_id=device_group.id)
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
-        form = InboundIntegrationConfigurationForm()
+        form = InboundIntegrationConfigurationAddForm(request=self.request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form.fields[
                 "owner"
@@ -555,6 +556,12 @@ class InboundIntegrationConfigurationUpdateView(
     form_class = InboundIntegrationConfigurationForm
     model = InboundIntegrationConfiguration
     permission_required = "integrations.change_inboundintegrationconfiguration"
+
+    def get_form_kwargs(self):
+        """Add request to form kwargs."""
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     @staticmethod
     @requires_csrf_token

@@ -758,3 +758,187 @@ class SubjectTypeAutocompleteField(forms.ModelChoiceField):
         widget = SubjectTypeAutocompleteWidget()
         kwargs['widget'] = widget
         super().__init__(*args, **kwargs)
+
+
+class DeviceGroupSelectWithLinkWidget(forms.Widget):
+    """
+    A widget that displays a device group select field with a link to manage the selected group.
+    """
+    
+    def __init__(self, attrs=None):
+        default_attrs = {
+            'class': 'form-control device-group-select-with-link'
+        }
+        if attrs:
+            default_attrs.update(attrs)
+        super().__init__(default_attrs)
+    
+    def render(self, name, value, attrs=None, renderer=None):
+        if attrs is None:
+            attrs = {}
+        
+        # Get the field instance to access choices
+        field = self.attrs.get('field')
+        if not field:
+            return format_html('<div class="alert alert-warning">Field not available</div>')
+        
+        # Get all available choices
+        choices = []
+        if hasattr(field, 'queryset') and field.queryset:
+            try:
+                queryset = field.queryset.all().select_related('owner')
+                for obj in queryset:
+                    choices.append((str(obj.pk), str(obj)))
+            except Exception as e:
+                print(f"Error getting queryset: {e}")
+        elif hasattr(field, 'choices') and field.choices:
+            choices = field.choices
+        
+        widget_id = attrs.get('id', f'id_{name}')
+        
+        # Create the select element
+        select_html = f'<select name="{name}" id="{widget_id}" class="form-control">'
+        select_html += '<option value="">---------</option>'
+        
+        for choice_value, choice_label in choices:
+            selected = 'selected' if str(choice_value) == str(value) else ''
+            select_html += f'<option value="{choice_value}" {selected}>{choice_label}</option>'
+        
+        select_html += '</select>'
+        
+        # Create the manage link (only show if a value is selected)
+        manage_link_html = ''
+        if value:
+            manage_link_html = f'''
+                <div class="mt-2">
+                    <a href="/integrations/devicegroups/{value}/manage" 
+                       class="btn btn-sm btn-outline-primary" 
+                       target="_blank">
+                        <i class="fas fa-cog"></i> Manage Device Group
+                    </a>
+                </div>
+            '''
+        
+        # Add JavaScript to update the manage link when selection changes
+        js_html = f'''
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                const select = document.getElementById('{widget_id}');
+                const manageLinkContainer = document.getElementById('{widget_id}_manage_link');
+                
+                if (select && manageLinkContainer) {{
+                    select.addEventListener('change', function() {{
+                        const selectedValue = this.value;
+                        if (selectedValue) {{
+                            manageLinkContainer.innerHTML = `
+                                <div class="mt-2">
+                                    <a href="/integrations/devicegroups/${{selectedValue}}/manage" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       target="_blank">
+                                        <i class="fas fa-cog"></i> Manage Device Group
+                                    </a>
+                                </div>
+                            `;
+                        }} else {{
+                            manageLinkContainer.innerHTML = '';
+                        }}
+                    }});
+                }}
+            }});
+            </script>
+        '''
+        
+        html = format_html(
+            '''
+            <div class="device-group-select-with-link-container">
+                {select_html}
+                <div id="{widget_id}_manage_link">
+                    {manage_link_html}
+                </div>
+            </div>
+            {js_html}
+            ''',
+            select_html=mark_safe(select_html),
+            widget_id=widget_id,
+            manage_link_html=mark_safe(manage_link_html),
+            js_html=mark_safe(js_html)
+        )
+        
+        return html
+    
+    def value_from_datadict(self, data, files, name):
+        """Extract the selected value from form data."""
+        return data.get(name)
+
+
+class DeviceGroupSelectWithLinkField(forms.ModelChoiceField):
+    """
+    A custom field that uses the DeviceGroupSelectWithLinkWidget.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        from integrations.models import DeviceGroup
+        queryset = kwargs.get('queryset', DeviceGroup.objects.all())
+        kwargs['queryset'] = queryset
+        widget = DeviceGroupSelectWithLinkWidget()
+        kwargs['widget'] = widget
+        super().__init__(*args, **kwargs)
+        # Store the field reference in the widget after initialization
+        self.widget.attrs['field'] = self
+
+
+class DeviceGroupAutoCreateWidget(forms.Widget):
+    """
+    A widget that displays a message indicating a default device group will be created automatically.
+    """
+    
+    def __init__(self, attrs=None):
+        default_attrs = {
+            'class': 'form-control device-group-auto-create'
+        }
+        if attrs:
+            default_attrs.update(attrs)
+        super().__init__(default_attrs)
+    
+    def render(self, name, value, attrs=None, renderer=None):
+        widget_id = attrs.get('id', f'id_{name}') if attrs else f'id_{name}'
+        
+        html = format_html(
+            '''
+            <div class="device-group-auto-create-container">
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Default Device Group</strong><br>
+                            <small>A default device group will be created automatically when you save this integration configuration.</small>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="{name}" id="{widget_id}" value="">
+            </div>
+            ''',
+            name=name,
+            widget_id=widget_id
+        )
+        
+        return html
+    
+    def value_from_datadict(self, data, files, name):
+        """Return empty value since this field is auto-created."""
+        return None
+
+
+class DeviceGroupAutoCreateField(forms.ModelChoiceField):
+    """
+    A custom field that uses the DeviceGroupAutoCreateWidget.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        from integrations.models import DeviceGroup
+        queryset = kwargs.get('queryset', DeviceGroup.objects.none())  # Empty queryset since we don't want to show options
+        kwargs['queryset'] = queryset
+        widget = DeviceGroupAutoCreateWidget()
+        kwargs['widget'] = widget
+        kwargs['required'] = False
+        super().__init__(*args, **kwargs)

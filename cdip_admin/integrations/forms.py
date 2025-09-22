@@ -22,7 +22,7 @@ from .models import (
     BridgeIntegration,
     Device
 )
-from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField
+from .widgets import SearchableMultiSelectField, SubjectTypeAutocompleteField, DeviceSearchableMultiSelectField, DeviceGroupSelectWithLinkField, DeviceGroupAutoCreateField
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 import json
@@ -35,6 +35,138 @@ def tooltip_labels(text):
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
+    # Override the default_devicegroup field to use our custom widget
+    default_devicegroup = DeviceGroupSelectWithLinkField(
+        queryset=DeviceGroup.objects.all(),
+        required=False,
+        label="Default Device Group"
+    )
+    
+    class Meta:
+        model = InboundIntegrationConfiguration
+        exclude = [
+            "id",
+        ]
+        fields = ("name", "owner", "type", "provider", "enabled",
+                  "default_devicegroup", "endpoint", "token",
+                  "login", "password", "state")
+        widgets = {
+            "password": PeekabooTextInput(),
+            "token": PeekabooTextInput(),
+            # "state": FormattedJsonFieldWidget(),
+            "apikey": PeekabooTextInput(),
+            "type": forms.Select(
+                attrs={
+                    'name': "type",
+                    'hx-trigger': 'change',
+                    'hx-target': 'body',
+                    'hx-swap': 'beforeend'
+                }),
+            "state": JSONFormWidget(
+                schema=InboundIntegrationType.objects.configuration_schema,
+            ),
+            "owner": forms.Select(
+                attrs={
+                    'name': "owner",
+                    'hx-trigger': 'load',
+                    'hx-target': '#div_id_state',
+                    'hx-swap': 'outerHTML'
+                },
+            )
+        }
+
+    def __init__(self, *args, request=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance:
+            for field_name in self.fields:
+                if self.fields[field_name].help_text != "":
+                    self.fields[
+                        field_name
+                    ].label += tooltip_labels(self.fields[field_name].help_text)
+                self.fields[field_name].help_text = None
+            if request:
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "owner"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        qs, request.user, "name", admin_only=True
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
+                
+                # Filter device groups based on user permissions
+                device_group_qs = DeviceGroup.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields[
+                        "default_devicegroup"
+                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
+                        device_group_qs, request.user, "owner__name"
+                    )
+                else:
+                    self.fields["default_devicegroup"].queryset = device_group_qs
+            # TODO: review how we trigger the warning modal
+            self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
+                                                                 kwargs={"integration_id": self.instance.id})
+            if hasattr(self.instance, 'type'):
+                # TODO: review how we trigger the schema view
+                self.fields['owner'].widget.attrs['hx-get'] = reverse("inboundconfigurations/schema",
+                                                                      kwargs={"integration_type": self.instance.type.id,
+                                                                              "integration_id": self.instance.id,
+                                                                              "update": "false"})
+                if hasattr(request, 'session'):
+                    request.session["integration_type"] = str(self.instance.type.id)
+                self.fields['state'].widget.instance = self.instance.type.id
+
+    helper = FormHelper()
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.form_method = "POST"
+
+    helper.layout = Layout(
+        Row(
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column("type", css_class="form-group col-lg-3 mb-0"),
+            Column(
+                Field("provider", autocomplete="off"), css_class="form-group col-lg-3 mb-0"
+            ),
+            css_class="form-row",
+        ),
+        "enabled",
+        Row(
+            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(
+                Field("endpoint", autocomplete="off"),
+                css_class="form-group col-lg-3 mb-0",
+            ),
+            Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
+        Row(
+            Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
+            Column(
+                Field("password", autocomplete="off"), css_class="form-group col-md-3"
+            ),
+            css_class="form-row",
+        ),
+        Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+    )
+
+
+class InboundIntegrationConfigurationAddForm(forms.ModelForm):
+    # Override the default_devicegroup field to show auto-create message
+    default_devicegroup = DeviceGroupAutoCreateField(
+        queryset=DeviceGroup.objects.none(),
+        required=False,
+        label="Default Device Group"
+    )
+    
     class Meta:
         model = InboundIntegrationConfiguration
         exclude = [
