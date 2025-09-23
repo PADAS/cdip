@@ -344,10 +344,38 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+    search = django_filters.CharFilter(method='filter_search', label='Search')
 
     class Meta:
         model = BridgeIntegration
-        fields = ("enabled",)
+        fields = ("enabled", "search")
+
+    def filter_search(self, queryset, name, value):
+        """
+        Search across owner.name, name, state, and additional fields
+        """
+        if not value:
+            return queryset
+        
+        # Create a Q object for OR conditions
+        from django.db.models import Q
+        
+        # Search in owner.name
+        owner_q = Q(owner__name__icontains=value)
+        
+        # Search in name field
+        name_q = Q(name__icontains=value)
+        
+        # Search in state JSON field (as text)
+        state_q = Q(state__icontains=value)
+        
+        # Search in additional JSON field (as text)
+        additional_q = Q(additional__icontains=value)
+        
+        # Combine all search conditions with OR
+        search_q = owner_q | name_q | state_q | additional_q
+        
+        return queryset.filter(search_q).distinct()
 
 
 class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):
