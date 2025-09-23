@@ -20,11 +20,6 @@ class SearchableMultiSelectWidget(forms.Widget):
         super().__init__(default_attrs)
     
     def render(self, name, value, attrs=None, renderer=None):
-        print(f"=== WIDGET RENDER DEBUG ===")
-        print(f"Widget render called for field: {name}")
-        print(f"Value: {value}")
-        print(f"Attrs: {attrs}")
-        
         if value is None:
             value = []
         
@@ -76,7 +71,7 @@ class SearchableMultiSelectWidget(forms.Widget):
                         obj.endpoint or 'N/A'
                     ))
             except Exception as e:
-                print(f"Error getting queryset: {e}")
+                pass  # Silently handle queryset errors
         elif hasattr(field, 'choices') and field.choices:
             choices = field.choices
         
@@ -204,10 +199,6 @@ class SearchableMultiSelectWidget(forms.Widget):
     
     def value_from_datadict(self, data, files, name):
         """Extract selected values from form data."""
-        print(f"=== VALUE_FROM_DATADICT DEBUG ===")
-        print(f"Field name: {name}")
-        print(f"Data keys: {list(data.keys())}")
-        
         values = []
         
         # Look for values with the pattern name_0, name_1, etc.
@@ -219,7 +210,6 @@ class SearchableMultiSelectWidget(forms.Widget):
                 # Skip empty values (they indicate clearing the selection)
                 if value and value.strip():
                     values.append(value)
-                print(f"Found {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
                 i += 1
             else:
                 break
@@ -227,7 +217,6 @@ class SearchableMultiSelectWidget(forms.Widget):
         # Also check for a single value with the name
         if name in data:
             values.append(data[name])
-            print(f"Found {name}: {data[name]}")
         
         # Handle the case where field names might include UUIDs
         # Look for any keys that start with the field name
@@ -238,9 +227,7 @@ class SearchableMultiSelectWidget(forms.Widget):
                 # Only add non-empty values
                 if value and value.strip():
                     values.append(value)
-                print(f"Found UUID-based field {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
         
-        print(f"Final values: {values}")
         return values
 
 
@@ -286,11 +273,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         super().__init__(default_attrs)
     
     def render(self, name, value, attrs=None, renderer=None):
-        print(f"=== DEVICE WIDGET RENDER DEBUG ===")
-        print(f"Widget render called for field: {name}")
-        print(f"Value: {value}")
-        print(f"Attrs: {attrs}")
-        
         if value is None:
             value = []
         
@@ -343,7 +325,7 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                         obj.inbound_configuration.name if obj.inbound_configuration else 'N/A'
                     ))
             except Exception as e:
-                print(f"Error getting queryset: {e}")
+                pass  # Silently handle queryset errors
         elif hasattr(field, 'choices') and field.choices:
             choices = field.choices
         
@@ -471,10 +453,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
     
     def value_from_datadict(self, data, files, name):
         """Extract selected values from form data."""
-        print(f"=== DEVICE VALUE_FROM_DATADICT DEBUG ===")
-        print(f"Field name: {name}")
-        print(f"Data keys: {list(data.keys())}")
-        
         values = []
         
         # Look for values with the pattern name_0, name_1, etc.
@@ -486,7 +464,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                 # Skip empty values (they indicate clearing the selection)
                 if value and value.strip():
                     values.append(value)
-                print(f"Found {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
                 i += 1
             else:
                 break
@@ -494,7 +471,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         # Also check for a single value with the name
         if name in data:
             values.append(data[name])
-            print(f"Found {name}: {data[name]}")
         
         # Handle the case where field names might include UUIDs
         # Look for any keys that start with the field name
@@ -505,9 +481,7 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                 # Only add non-empty values
                 if value and value.strip():
                     values.append(value)
-                print(f"Found UUID-based field {key}: {value} {'(skipped empty)' if not value or not value.strip() else ''}")
         
-        print(f"Final values: {values}")
         return values
 
 
@@ -553,11 +527,6 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
         super().__init__(default_attrs)
 
     def render(self, name, value, attrs=None, renderer=None):
-        print(f"=== SUBJECT TYPE WIDGET RENDER DEBUG ===")
-        print(f"Widget render called for field: {name}")
-        print(f"Value: {value}")
-        print(f"Attrs: {attrs}")
-
         if value is None:
             value = ''
 
@@ -661,9 +630,7 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
         if os.path.exists(js_file_path):
             with open(js_file_path, 'r') as f:
                 js_content = f.read()
-                print(f"DEBUG: Read {len(js_content)} characters from JavaScript file")
         else:
-            print(f"DEBUG: JavaScript file not found at {js_file_path}")
             # Fallback: embed a minimal version of the JavaScript
             js_content = """
             function initSubjectTypeAutocomplete(widgetId, options) {
@@ -791,7 +758,7 @@ class DeviceGroupSelectWithLinkWidget(forms.Widget):
                 for obj in queryset:
                     choices.append((str(obj.pk), str(obj)))
             except Exception as e:
-                print(f"Error getting queryset: {e}")
+                pass  # Silently handle queryset errors
         elif hasattr(field, 'choices') and field.choices:
             choices = field.choices
         
