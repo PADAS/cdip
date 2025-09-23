@@ -385,13 +385,17 @@ class DeviceGroupManagementForm(forms.ModelForm):
             
             # Filter devices to only show devices from the inbound integration associated with this device group
             try:
-                inbound_integration = self.instance.inbound_integration_configuration.get()
-                # Limit devices to only those from the associated inbound integration
-                self.fields["devices"].queryset = Device.objects.filter(
-                    inbound_configuration=inbound_integration
-                )
-            except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
-                # If no inbound integration is associated, show no devices
+                inbound_integration = self.instance.inbound_integration_configuration.first()
+                if inbound_integration:
+                    # Limit devices to only those from the associated inbound integration
+                    self.fields["devices"].queryset = Device.objects.filter(
+                        inbound_configuration=inbound_integration
+                    )
+                else:
+                    # If no inbound integration is associated, show no devices
+                    self.fields["devices"].queryset = Device.objects.none()
+            except Exception:
+                # If there's any error, show no devices
                 self.fields["devices"].queryset = Device.objects.none()
 
     field_order = [
