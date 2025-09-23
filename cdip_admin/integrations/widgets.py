@@ -649,13 +649,17 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
         import json
         import os
         from django.utils.safestring import mark_safe
+        from django.conf import settings
         
         # Ensure proper JSON escaping
         choices_json = json.dumps(choices)
         current_value = value if value else ''
 
         # Read the JavaScript file content and include it inline
-        js_file_path = '/Users/chrisdo/padas/cdip/cdip_admin/integrations/static/integrations/js/subject-type-autocomplete.js'
+        js_file_path = os.path.join(
+            settings.BASE_DIR,
+            'cdip_admin', 'integrations', 'static', 'integrations', 'js', 'subject-type-autocomplete.js'
+        )
         
         js_content = ""
         if os.path.exists(js_file_path):
