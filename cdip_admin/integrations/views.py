@@ -858,7 +858,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
     @staticmethod
     @requires_csrf_token
     def type_modal(request, configuration_id):
-        if request.GET.get("type") != '':
+        if request.GET.get("type"):
             integration_type = request.GET.get("type")
             selected_type = OutboundIntegrationType.objects.get(id=integration_type)
         else:
