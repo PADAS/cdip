@@ -344,7 +344,7 @@ class Command(BaseCommand):
                             self.stdout.write(
                                 f" -- Integration {integration.name} (ID: {integration.id}) was migrated correctly from inbound ID {inbound.id}... -- \n\n")
                         else:
-                            inreach_er_integrations_skipped += 1
+                            er_inreach_integrations_skipped += 1
                             self.stdout.write(f" -- Integration {integration.name} (ID: {integration.id}) already exists, skipping creation... -- \n\n")
 
                 except Exception as e:
