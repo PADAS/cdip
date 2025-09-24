@@ -16,68 +16,68 @@ from integrations.models import (
 
 
 ER_DESTINATION_JSON_SCHEMA = {
-	"if": {
-		"properties": {
-			"authentication_type": {
-				"const": "token"
-			}
-		}
-	},
-	"else": {
-		"required": ["username", "password"],
-		"properties": {
-			"password": {
-				"type": "string",
-				"title": "Password",
-				"format": "password",
-				"default": "",
-				"example": "mypasswd1234abc",
-				"writeOnly": True,
-				"description": "Password used to authenticate against Earth Ranger API"
-			},
-			"username": {
-				"type": "string",
-				"title": "Username",
-				"default": "",
-				"example": "myuser",
-				"description": "Username used to authenticate against Earth Ranger API"
-			}
-		}
-	},
-	"then": {
-		"required": ["token"],
-		"properties": {
-			"token": {
-				"type": "string",
-				"title": "Token",
-				"format": "password",
-				"default": "",
-				"example": "1b4c1e9c-5ee0-44db-c7f1-177ede2f854a",
-				"writeOnly": True,
-				"description": "Token used to authenticate against Earth Ranger API"
-			}
-		}
-	},
-	"type": "object",
-	"title": "AuthenticateConfig",
-	"properties": {
-		"authentication_type": {
-			"allOf": [{
-				"$ref": "#/definitions/ERAuthenticationType"
-			}],
-			"default": "token",
-			"description": "Type of authentication to use."
-		}
-	},
-	"definitions": {
-		"ERAuthenticationType": {
-			"enum": ["token", "username_password"],
-			"type": "string",
-			"title": "ERAuthenticationType",
-			"description": "An enumeration."
-		}
-	},
-	"is_executable": True
+    "if": {
+        "properties": {
+            "authentication_type": {
+                "const": "token"
+            }
+        }
+    },
+    "else": {
+        "required": ["username", "password"],
+        "properties": {
+            "password": {
+                "type": "string",
+                "title": "Password",
+                "format": "password",
+                "default": "",
+                "example": "mypasswd1234abc",
+                "writeOnly": True,
+                "description": "Password used to authenticate against Earth Ranger API"
+            },
+            "username": {
+                "type": "string",
+                "title": "Username",
+                "default": "",
+                "example": "myuser",
+                "description": "Username used to authenticate against Earth Ranger API"
+            }
+        }
+    },
+    "then": {
+        "required": ["token"],
+        "properties": {
+            "token": {
+                "type": "string",
+                "title": "Token",
+                "format": "password",
+                "default": "",
+                "example": "1b4c1e9c-5ee0-44db-c7f1-177ede2f854a",
+                "writeOnly": True,
+                "description": "Token used to authenticate against Earth Ranger API"
+            }
+        }
+    },
+    "type": "object",
+    "title": "AuthenticateConfig",
+    "properties": {
+        "authentication_type": {
+            "allOf": [{
+                "$ref": "#/definitions/ERAuthenticationType"
+            }],
+            "default": "token",
+            "description": "Type of authentication to use."
+        }
+    },
+    "definitions": {
+        "ERAuthenticationType": {
+            "enum": ["token", "username_password"],
+            "type": "string",
+            "title": "ERAuthenticationType",
+            "description": "An enumeration."
+        }
+    },
+    "is_executable": True
 }
 
 ER_DESTINATION_UI_SCHEMA = {"ui:order": ["authentication_type", "token", "username", "password"]}
