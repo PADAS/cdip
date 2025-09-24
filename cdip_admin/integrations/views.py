@@ -371,7 +371,7 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
 
     def get_success_url(self):
         return reverse(
-            "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
+            "device_group", kwargs={"device_group_id": self.kwargs.get("device_group_id")}
         )
 
 
