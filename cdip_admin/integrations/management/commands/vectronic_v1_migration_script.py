@@ -211,12 +211,18 @@ class Command(BaseCommand):
                             field_mappings_result = {
                                 "field_mappings": field_mappings
                             }
-                            route_config, _ = RouteConfiguration.objects.get_or_create(
-                                name=integration.default_route.name + " - Default Configuration",
+                            route_config, created = RouteConfiguration.objects.get_or_create(
+                                name=f"{integration.default_route.name} (Integration ID: {str(integration.id)}) - Default Configuration",
                                 defaults={
                                     "data": field_mappings_result
                                 }
                             )
+
+                            if not created:
+                                # A route config already exists for this migration, we need to update it
+                                route_config.data = field_mappings_result
+                                route_config.save()
+
                             integration.default_route.configuration = route_config
                             integration.default_route.save()
                             integration.save()
