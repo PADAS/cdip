@@ -222,7 +222,7 @@ class Command(BaseCommand):
 
                                 # Create AUTH action config for the destination integration (ER)
                                 try:
-                                    er_auth_action, created = IntegrationAction.objects.get_or_create(
+                                    er_auth_action = IntegrationAction.objects.get(
                                         type=IntegrationAction.ActionTypes.AUTHENTICATION,
                                         name="Auth",
                                         value="auth",
