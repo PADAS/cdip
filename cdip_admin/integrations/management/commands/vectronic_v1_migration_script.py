@@ -44,7 +44,7 @@ class Command(BaseCommand):
             "--all",
             action="store_true",
             default=False,
-            help="If present, migrate all the plugins, regardless of the other option"
+            help="If present, migrate all the plugins, regardless of the other options"
         )
 
     def handle(self, *args, **options):
