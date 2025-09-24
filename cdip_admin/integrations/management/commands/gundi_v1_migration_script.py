@@ -166,9 +166,8 @@ class Command(BaseCommand):
             for inbound in inbounds_to_migrate:
                 try:
                     with transaction.atomic():
-                        inbound_owner, _ = Organization.objects.get_or_create(
-                            name=inbound.owner.name
-                        )
+                        inbound_owner = inbound.owner
+
                         integration, created = Integration.objects.get_or_create(
                             type=v2_integration_type,
                             name=f"[V1 to V2] - {inbound.name} ({inbound.login})",
