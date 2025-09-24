@@ -134,7 +134,7 @@ class Command(BaseCommand):
                                             "comID": "N/A",
                                             "key": collar.get("collar_key", "N/A"),
                                         },
-                                        "uploadDate": datetime.now(tz=timezone.utc).strftime("%-m/%-d/%Y, %-I:%M:%S %p")
+                                        "uploadDate": datetime.now(tz=timezone.utc).strftime("%m/%d/%Y, %I:%M:%S %p")
                                     })
                                 action_config.data = {"files": json.dumps(collars_list), "default_lookback_hours": 12}
                                 action_config.save()
