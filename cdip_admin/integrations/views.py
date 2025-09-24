@@ -32,6 +32,7 @@ from .forms import (
     OutboundIntegrationConfigurationForm,
     DeviceGroupForm,
     DeviceGroupManagementForm,
+    DeviceGroupDevicesManagementForm,
     InboundIntegrationTypeForm,
     OutboundIntegrationTypeForm,
     BridgeIntegrationForm,
@@ -192,23 +193,46 @@ class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
         return qs.annotate(device_count=Count("devices"))
 
 
-class DeviceGroupDetail(PermissionRequiredMixin, SingleTableMixin, DetailView):
-    template_name = "integrations/device_group_detail.html"
+
+
+class DeviceGroupDevicesManagementView(PermissionRequiredMixin, UpdateView):
+    template_name = "integrations/device_group_devices_manage.html"
+    form_class = DeviceGroupDevicesManagementForm
     model = DeviceGroup
-    table_class = DeviceTable
-    paginate_by = default_paginate_by
-    permission_required = "integrations.view_devicegroup"
+    permission_required = "integrations.change_devicegroup"
 
     def get_object(self):
-        return get_object_or_404(DeviceGroup, pk=self.kwargs.get("module_id"))
+        device_group = get_object_or_404(
+            DeviceGroup, pk=self.kwargs.get("device_group_id")
+        )
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            if not IsOrganizationMember.is_object_owner(
+                    self.request.user, device_group.owner
+            ):
+                raise PermissionDenied
+        return device_group
 
-    def get_table_data(self):
-        return self.get_object().devices
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(instance=self.object, request=request)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
+    def form_valid(self, form):
+        form.save()
+        return redirect("device_group", device_group_id=str(self.object.id))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        base_url = reverse("device_list")
-        context["base_url"] = base_url
+        context["device_group"] = self.object
         
         # Get the inbound integration configuration that uses this device group as default
         try:
@@ -287,7 +311,7 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
     template_name = "integrations/device_group_update.html"
     form_class = DeviceGroupManagementForm
     model = DeviceGroup
-    permission_required = "integrations.change_devicegroup"
+    permission_required = "integrations.view_devicegroup"
 
     def get_object(self):
         device_group = get_object_or_404(
@@ -317,6 +341,12 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
             context["inbound_integration"] = inbound_integration
         except (InboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.MultipleObjectsReturned):
             context["inbound_integration"] = None
+        
+        # Add device information for display
+        context["devices"] = self.object.devices.select_related(
+            'inbound_configuration__owner', 
+            'inbound_configuration__type'
+        ).all()
         
         return context
 

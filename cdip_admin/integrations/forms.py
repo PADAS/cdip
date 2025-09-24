@@ -346,12 +346,6 @@ class DeviceGroupManagementForm(forms.ModelForm):
         label="Destinations"
     )
     
-    # Override the devices field to use our custom widget
-    devices = DeviceSearchableMultiSelectField(
-        queryset=Device.objects.all(),
-        required=False,
-        label="Devices"
-    )
     
     # Override the default_subject_type field to use our custom widget
     default_subject_type = SubjectTypeAutocompleteField(
@@ -362,7 +356,7 @@ class DeviceGroupManagementForm(forms.ModelForm):
     
     class Meta:
         model = DeviceGroup
-        exclude = ["id"]
+        exclude = ["id", "devices"]
 
     def __init__(self, *args, request=None, **kwargs):
         super(DeviceGroupManagementForm, self).__init__(*args, **kwargs)
@@ -382,7 +376,35 @@ class DeviceGroupManagementForm(forms.ModelForm):
                 )
             else:
                 self.fields["owner"].queryset = qs
-            
+
+    field_order = [
+        "name",
+        "owner",
+        "default_subject_type",
+        "destinations",
+    ]
+
+    helper = FormHelper()
+    helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
+    helper.form_method = "POST"
+
+
+class DeviceGroupDevicesManagementForm(forms.ModelForm):
+    # Use a simple multiple choice field for devices
+    devices = forms.ModelMultipleChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        label="Devices",
+        widget=forms.CheckboxSelectMultiple
+    )
+    
+    class Meta:
+        model = DeviceGroup
+        fields = ["devices"]
+
+    def __init__(self, *args, request=None, **kwargs):
+        super(DeviceGroupDevicesManagementForm, self).__init__(*args, **kwargs)
+        if self.instance and request:
             # Filter devices to only show devices from the inbound integration associated with this device group
             try:
                 inbound_integration = self.instance.inbound_integration_configuration.first()
@@ -390,21 +412,13 @@ class DeviceGroupManagementForm(forms.ModelForm):
                     # Limit devices to only those from the associated inbound integration
                     self.fields["devices"].queryset = Device.objects.filter(
                         inbound_configuration=inbound_integration
-                    )
+                    ).select_related('inbound_configuration__owner', 'inbound_configuration__type')
                 else:
                     # If no inbound integration is associated, show no devices
                     self.fields["devices"].queryset = Device.objects.none()
             except Exception:
                 # If there's any error, show no devices
                 self.fields["devices"].queryset = Device.objects.none()
-
-    field_order = [
-        "name",
-        "owner",
-        "default_subject_type",
-        "destinations",
-        "devices",
-    ]
 
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

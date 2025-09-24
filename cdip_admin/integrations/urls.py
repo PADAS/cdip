@@ -12,8 +12,8 @@ urlpatterns = [
     path("devices", views.DeviceList.as_view(), name="device_list"),
     path("devices/add", views.DeviceAddView.as_view(), name="device_add"),
     path(
-        "devicegroups/<uuid:module_id>",
-        views.DeviceGroupDetail.as_view(),
+        "devicegroups/<uuid:device_group_id>",
+        views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group",
     ),
     path("devicegroups", views.DeviceGroupListView.as_view(), name="device_group_list"),
@@ -22,6 +22,11 @@ urlpatterns = [
         "devicegroups/<uuid:device_group_id>/manage",
         views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group_management_update",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/devices/manage",
+        views.DeviceGroupDevicesManagementView.as_view(),
+        name="device_group_devices_manage",
     ),
     path("devicestates", views.DeviceStateList.as_view(), name="device_state_list"),
     path(

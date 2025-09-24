@@ -338,13 +338,19 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         # Render the widget HTML
         widget_id = attrs.get('id', f'id_{name}')
         
+        # Import json for data serialization
+        import json
+        
         html = format_html(
                    '''
-                   <div class="searchable-multiselect-container" id="{widget_id}_container">
+                   <div class="searchable-multiselect-container" id="{widget_id}_container" 
+                        data-choices='{choices_json}' 
+                        data-selected='{selected_json}' 
+                        data-name="{name}">
                        <div class="search-input-container mb-3">
                            <input type="text" 
                                   class="form-control search-input" 
-                                  placeholder="Search by name, external ID, owner, type, or configuration..." 
+                                  placeholder="Search devices by name, external ID, owner, type, or configuration..." 
                                   id="{widget_id}_search">
                        </div>
                        
@@ -352,6 +358,14 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                            <div class="col-md-6">
                                <div class="available-items">
                                    <h6 class="text-muted mb-3">Available Devices</h6>
+                                   <div class="device-headers mb-2">
+                                       <div class="row text-muted small fw-bold">
+                                           <div class="col-3">Name</div>
+                                           <div class="col-3">External ID</div>
+                                           <div class="col-3">Type</div>
+                                           <div class="col-3">Owner</div>
+                                       </div>
+                                   </div>
                                    <div class="available-list" id="{widget_id}_available">
                                        <!-- Available items will be populated here -->
                                    </div>
@@ -361,6 +375,14 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                            <div class="col-md-6">
                                <div class="selected-items">
                                    <h6 class="text-muted mb-3">Selected Devices</h6>
+                                   <div class="device-headers mb-2">
+                                       <div class="row text-muted small fw-bold">
+                                           <div class="col-3">Name</div>
+                                           <div class="col-3">External ID</div>
+                                           <div class="col-3">Type</div>
+                                           <div class="col-3">Owner</div>
+                                       </div>
+                                   </div>
                                    <div class="selected-list" id="{widget_id}_selected">
                                        <!-- Selected items will be populated here -->
                                    </div>
@@ -374,7 +396,10 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                        </div>
                    </div>
                    ''',
-                   widget_id=widget_id
+                   widget_id=widget_id,
+                   choices_json=json.dumps(choices),
+                   selected_json=json.dumps(selected_values),
+                   name=name
                )
         
         # Add JavaScript to initialize the widget
@@ -386,7 +411,7 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         
         # Read the JavaScript file content and include it inline
         import os
-        js_file_path = os.path.join(os.path.dirname(__file__), 'static', 'integrations', 'js', 'searchable-multiselect.js')
+        js_file_path = os.path.join(os.path.dirname(__file__), 'static', 'integrations', 'js', 'device-searchable-multiselect.js')
         
         js_content = ""
         if os.path.exists(js_file_path):
@@ -405,11 +430,7 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
                 console.log('Selected:', {selected_json});
                 
                 try {{
-                    initSearchableMultiSelect('{widget_id}', {{
-                        choices: {choices_json},
-                        selected: {selected_json},
-                        name: '{name}'
-                    }});
+                    initDeviceWidget(document.getElementById('{widget_id}_container'));
                     console.log('Device searchable multiselect initialized successfully');
                 }} catch (error) {{
                     console.error('Error initializing device searchable multiselect:', error);

@@ -3,10 +3,21 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
-{% block title %}Update Device Group{% endblock %}
+{% block title %}Device Group: {{object.name}}{% endblock %}
 
 {% block content %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <div class="row">
+        <div class="col-md-8">
+            <h3>{{object.name}}</h3>
+            <p class="text-muted">Organization: {{object.owner.name}}</p>
+        </div>
+        <div class="col-md-4 d-flex justify-content-end mb-3">
+            <a class="btn btn-success me-2" href="{% url 'device_group_devices_manage' object.id %}" role="button">Manage Devices</a>
+            <a class="btn btn-secondary" href="{% url 'device_group_list' %}" role="button">Back to List</a>
+        </div>
+    </div>
     
     {% if inbound_integration %}
     <div class="alert alert-info mb-3">
@@ -24,9 +35,78 @@
     </div>
     {% endif %}
     
-    <form method="post">
-        <h3>Manage Device Group</h3>
-        {% csrf_token %}
-        {% crispy form %}
-    </form>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog me-2"></i>
+                        Group Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% crispy form %}
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-mobile-alt me-2"></i>
+                        Devices in Group ({{ devices|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if devices %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>External ID</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in devices %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'device_detail' device.id %}" class="text-decoration-none">
+                                                    {{ device.name|default:"N/A" }}
+                                                </a>
+                                            </td>
+                                            <td>{{ device.external_id|default:"N/A" }}</td>
+                                            <td>
+                                                <span class="badge bg-info">{{ device.inbound_configuration.type.name }}</span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-edit me-1"></i>
+                                Manage Devices
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-muted text-center py-3">
+                            <i class="fas fa-mobile-alt fa-2x mb-2"></i>
+                            <p>No devices in this group</p>
+                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus me-1"></i>
+                                Add Devices
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}

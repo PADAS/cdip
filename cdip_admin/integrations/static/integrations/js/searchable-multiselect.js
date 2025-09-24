@@ -27,27 +27,14 @@ function initSearchableMultiSelect(widgetId, options) {
         selectedList.innerHTML = '';
         
         if (selectedValues.size === 0) {
-            // Determine if this is for devices or destinations based on the first choice
-            const isDeviceWidget = allChoices.length > 0 && allChoices[0].length >= 6;
-            const emptyText = isDeviceWidget ? 'No devices selected' : 'No destinations selected';
-            selectedList.innerHTML = `<div class="text-muted">${emptyText}</div>`;
+            selectedList.innerHTML = `<div class="text-muted">No destinations selected</div>`;
         } else {
             selectedValues.forEach(value => {
                 const choice = allChoices.find(c => c[0] == value);
                 if (choice) {
-                    // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
                     // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
-                    if (choice.length >= 6) {
-                        // Device: (value, label, owner, type, endpoint, externalId)
-                        // choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
-                        const item = createSelectedItem(choice[0], choice[1], choice[3], choice[4], choice[5], choice[2]);
-                        selectedList.appendChild(item);
-                    } else {
-                        // Destination: (value, label, owner, type, endpoint, undefined)
-                        // choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
-                        const item = createSelectedItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
-                        selectedList.appendChild(item);
-                    }
+                    const item = createSelectedItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
+                    selectedList.appendChild(item);
                 }
             });
         }
@@ -56,100 +43,48 @@ function initSearchableMultiSelect(widgetId, options) {
         updateHiddenInputs();
     }
     
-    // Render available items
+    // Render available items (destinations only)
     function renderAvailableItems() {
         availableList.innerHTML = '';
         
         const availableChoices = filteredChoices.filter(choice => !selectedValues.has(choice[0]));
         
         if (availableChoices.length === 0) {
-            // Determine if this is for devices or destinations based on the first choice
-            const isDeviceWidget = allChoices.length > 0 && allChoices[0].length >= 6;
-            const emptyText = isDeviceWidget ? 'No devices available' : 'No destinations available';
-            availableList.innerHTML = `<div class="text-muted">${emptyText}</div>`;
+            availableList.innerHTML = `<div class="text-muted">No destinations available</div>`;
             return;
         }
         
         availableChoices.forEach(choice => {
-            // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
             // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
-            if (choice.length >= 6) {
-                // Device: (value, label, owner, type, endpoint, externalId)
-                const item = createAvailableItem(choice[0], choice[1], choice[3], choice[4], choice[5], choice[2]);
-                availableList.appendChild(item);
-            } else {
-                // Destination: (value, label, owner, type, endpoint, undefined)
-                const item = createAvailableItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
-                availableList.appendChild(item);
-            }
+            const item = createAvailableItem(choice[0], choice[1], choice[2], choice[3], choice[4], undefined);
+            availableList.appendChild(item);
         });
     }
     
-    // Create a selected item element as a card
+    // Create a selected item element as a list item (destinations only)
     function createSelectedItem(value, label, owner, type, endpoint, externalId) {
         const item = document.createElement('div');
-        item.className = 'destination-card selected-card mb-2';
+        item.className = 'list-group-item list-group-item-action list-group-item-success d-flex justify-content-between align-items-center mb-1';
         
-        // Determine if this is a device (6 elements) or destination (5 elements)
-        const isDevice = externalId !== undefined;
-        
-        let infoHtml = '';
-        if (isDevice) {
-            infoHtml = `
-                <div class="destination-info">
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">External ID:</span>
-                        <span class="info-value">${externalId}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Owner:</span>
-                        <span class="info-value">${owner}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Type:</span>
-                        <span class="info-value">${type}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label fw-bold">Configuration:</span>
-                        <span class="info-value text-break">${endpoint}</span>
-                    </div>
-                </div>
-            `;
-        } else {
-            infoHtml = `
-                <div class="destination-info">
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Owner:</span>
-                        <span class="info-value">${owner}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Type:</span>
-                        <span class="info-value">${type}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label fw-bold">Endpoint:</span>
-                        <span class="info-value text-break">${endpoint}</span>
-                    </div>
-                </div>
-            `;
-        }
-        
-        item.innerHTML = `
-            <div class="card border-success">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <strong>${label}</strong>
-                    <button type="button" class="btn btn-sm btn-outline-light remove-item" data-value="${value}">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="card-body">
-                    ${infoHtml}
-                </div>
+        const infoHtml = `
+            <div>
+                <h6 class="mb-1">${label}</h6>
+                <small class="text-muted">${owner} • ${type}</small>
+                <br>
+                <small class="text-muted">${endpoint}</small>
             </div>
         `;
         
+        item.innerHTML = `
+            ${infoHtml}
+            <button type="button" class="btn btn-sm btn-outline-danger remove-item" data-value="${value}">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
         // Add remove functionality
-        item.querySelector('.remove-item').addEventListener('click', () => {
+        item.querySelector('.remove-item').addEventListener('click', (e) => {
+            e.stopPropagation();
             selectedValues.delete(value);
             renderSelectedItems();
             renderAvailableItems();
@@ -158,68 +93,27 @@ function initSearchableMultiSelect(widgetId, options) {
         return item;
     }
     
-    // Create an available item element as a card
+    // Create an available item element (destinations only)
     function createAvailableItem(value, label, owner, type, endpoint, externalId) {
         const item = document.createElement('div');
-        item.className = 'destination-card available-card mb-2 cursor-pointer';
+        item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-1';
         item.style.cursor = 'pointer';
         
-        // Determine if this is a device (6 elements) or destination (5 elements)
-        const isDevice = externalId !== undefined;
-        
-        let infoHtml = '';
-        if (isDevice) {
-            infoHtml = `
-                <div class="destination-info">
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">External ID:</span>
-                        <span class="info-value">${externalId}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Owner:</span>
-                        <span class="info-value">${owner}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Type:</span>
-                        <span class="info-value">${type}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label fw-bold">Configuration:</span>
-                        <span class="info-value text-break">${endpoint}</span>
-                    </div>
-                </div>
-            `;
-        } else {
-            infoHtml = `
-                <div class="destination-info">
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Owner:</span>
-                        <span class="info-value">${owner}</span>
-                    </div>
-                    <div class="info-row mb-1">
-                        <span class="info-label fw-bold">Type:</span>
-                        <span class="info-value">${type}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label fw-bold">Endpoint:</span>
-                        <span class="info-value text-break">${endpoint}</span>
-                    </div>
-                </div>
-            `;
-        }
+        // This function is only used for destinations now
+        const infoHtml = `
+            <div>
+                <h6 class="mb-1">${label}</h6>
+                <small class="text-muted">${owner} • ${type}</small>
+                <br>
+                <small class="text-muted">${endpoint}</small>
+            </div>
+        `;
         
         item.innerHTML = `
-            <div class="card border-primary">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <strong>${label}</strong>
-                    <button type="button" class="btn btn-sm btn-outline-light add-item" data-value="${value}">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-                <div class="card-body">
-                    ${infoHtml}
-                </div>
-            </div>
+            ${infoHtml}
+            <button type="button" class="btn btn-sm btn-outline-primary add-item" data-value="${value}">
+                <i class="fas fa-plus"></i>
+            </button>
         `;
         
         // Add click functionality to the entire item
@@ -230,7 +124,8 @@ function initSearchableMultiSelect(widgetId, options) {
         });
         
         // Add button click functionality
-        item.querySelector('.add-item').addEventListener('click', () => {
+        item.querySelector('.add-item').addEventListener('click', (e) => {
+            e.stopPropagation();
             addItem(value);
         });
         
@@ -281,31 +176,20 @@ function initSearchableMultiSelect(widgetId, options) {
     
     // Setup event listeners
     function setupEventListeners() {
-        // Search functionality
+        // Search functionality - filters destinations only
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             filteredChoices = allChoices.filter(choice => {
-                // For devices: choice[0]=id, choice[1]=name, choice[2]=external_id, choice[3]=owner, choice[4]=type, choice[5]=config
                 // For destinations: choice[0]=id, choice[1]=name, choice[2]=owner, choice[3]=type, choice[4]=endpoint
-                let matches = choice[1].toLowerCase().includes(searchTerm);  // name (always choice[1])
-                
-                if (choice.length >= 6) {
-                    // Device: search in external_id, owner, type, config
-                    matches = matches || 
-                             choice[2].toLowerCase().includes(searchTerm) ||  // external_id
-                             choice[3].toLowerCase().includes(searchTerm) ||  // owner
-                             choice[4].toLowerCase().includes(searchTerm) ||  // type
-                             choice[5].toLowerCase().includes(searchTerm);    // config
-                } else {
-                    // Destination: search in owner, type, endpoint
-                    matches = matches || 
-                             choice[2].toLowerCase().includes(searchTerm) ||  // owner
-                             choice[3].toLowerCase().includes(searchTerm) ||  // type
-                             choice[4].toLowerCase().includes(searchTerm);    // endpoint
-                }
+                let matches = choice[1].toLowerCase().includes(searchTerm);  // name
+                matches = matches || 
+                         choice[2].toLowerCase().includes(searchTerm) ||  // owner
+                         choice[3].toLowerCase().includes(searchTerm) ||  // type
+                         choice[4].toLowerCase().includes(searchTerm);    // endpoint
                 
                 return matches;
             });
+            renderSelectedItems();
             renderAvailableItems();
         });
         
@@ -314,6 +198,7 @@ function initSearchableMultiSelect(widgetId, options) {
             if (!container.contains(e.target)) {
                 searchInput.value = '';
                 filteredChoices = [...allChoices];
+                renderSelectedItems();
                 renderAvailableItems();
             }
         });
@@ -360,8 +245,18 @@ function initSearchableMultiSelect(widgetId, options) {
                 overflow-y: auto;
                 border: 1px solid #dee2e6;
                 border-radius: 0.375rem;
-                padding: 0.5rem;
+                padding: 0;
                 background-color: #f8f9fa;
+            }
+            
+            .selected-list .list-group-item, .available-list .list-group-item {
+                border: none;
+                border-bottom: 1px solid #dee2e6;
+                border-radius: 0;
+            }
+            
+            .selected-list .list-group-item:last-child, .available-list .list-group-item:last-child {
+                border-bottom: none;
             }
             
             .info-label {
