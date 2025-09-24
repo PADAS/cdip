@@ -131,8 +131,7 @@ class Command(BaseCommand):
             for inbound in inbounds_to_migrate:
                 try:
                     with transaction.atomic():
-                        inbound_owner, _ = Organization.objects.get_or_create(
-                            name=inbound.owner.name
+                        inbound_owner = inbound.owner
                         )
 
                         self.stdout.write(f" -- Step 1: Inreach to ER -- \n\n")
