@@ -132,7 +132,6 @@ class Command(BaseCommand):
                 try:
                     with transaction.atomic():
                         inbound_owner = inbound.owner
-                        )
 
                         self.stdout.write(f" -- Step 1: Inreach to ER -- \n\n")
                         integration, created = Integration.objects.get_or_create(
@@ -250,6 +249,7 @@ class Command(BaseCommand):
                             inbound_field_mapping["default"] = er_source_provider
 
                             field_mappings[str(integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
+                            field_mappings[str(integration.id)]["txt"][str(destination_integration.id)] = inbound_field_mapping
 
                             field_mappings_result = {
                                 "field_mappings": field_mappings
