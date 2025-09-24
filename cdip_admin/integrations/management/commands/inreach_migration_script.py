@@ -176,7 +176,8 @@ class Command(BaseCommand):
 
                             field_mappings = {
                                 str(integration.id): {
-                                    "obv": {}
+                                    "obv": {},
+                                    "txt": {}
                                 }
                             }
 
