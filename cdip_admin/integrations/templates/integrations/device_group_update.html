@@ -34,15 +34,27 @@
     </div>
     {% endif %}
     
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-cog me-2"></i>
-                        Group Settings
-                    </h5>
-                </div>
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs" id="deviceGroupTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link active" id="settings-tab" data-toggle="tab" href="#settings" role="tab" aria-controls="settings" aria-selected="true">
+                <i class="fas fa-cog me-2"></i>
+                Group Settings
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" id="devices-tab" data-toggle="tab" href="#devices" role="tab" aria-controls="devices" aria-selected="false">
+                <i class="fas fa-mobile-alt me-2"></i>
+                Devices in Group ({{ devices|length }})
+            </a>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="deviceGroupTabsContent">
+        <!-- Group Settings Tab -->
+        <div class="tab-pane fade show active" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+            <div class="card border-top-0">
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
@@ -51,24 +63,21 @@
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-mobile-alt me-2"></i>
-                        Devices in Group ({{ devices|length }})
-                    </h5>
-                </div>
+
+        <!-- Devices Tab -->
+        <div class="tab-pane fade" id="devices" role="tabpanel" aria-labelledby="devices-tab">
+            <div class="card border-top-0">
                 <div class="card-body">
                     {% if devices %}
                         <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
+                            <table class="table table-hover">
+                                <thead class="table-light">
                                     <tr>
                                         <th>Name</th>
                                         <th>External ID</th>
                                         <th>Type</th>
+                                        <th>Owner</th>
+                                        <th>Configuration</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -76,30 +85,33 @@
                                         <tr>
                                             <td>
                                                 <a href="{% url 'device_detail' device.id %}" class="text-decoration-none">
-                                                    {{ device.name|default:"N/A" }}
+                                                    <strong>{{ device.name|default:"N/A" }}</strong>
                                                 </a>
                                             </td>
                                             <td>{{ device.external_id|default:"N/A" }}</td>
                                             <td>
                                                 <span class="badge bg-info">{{ device.inbound_configuration.type.name }}</span>
                                             </td>
+                                            <td>{{ device.inbound_configuration.owner.name }}</td>
+                                            <td>{{ device.inbound_configuration.name|default:"N/A" }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
-                        <div class="mt-2">
-                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-edit me-1"></i>
+                        <div class="mt-3">
+                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-primary">
+                                <i class="fas fa-edit me-2"></i>
                                 Manage Devices
                             </a>
                         </div>
                     {% else %}
-                        <div class="text-muted text-center py-3">
-                            <i class="fas fa-mobile-alt fa-2x mb-2"></i>
-                            <p>No devices in this group</p>
-                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus me-1"></i>
+                        <div class="text-muted text-center py-5">
+                            <i class="fas fa-mobile-alt fa-3x mb-3"></i>
+                            <h5>No devices in this group</h5>
+                            <p class="mb-4">Add devices to this group to start managing them.</p>
+                            <a href="{% url 'device_group_devices_manage' object.id %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>
                                 Add Devices
                             </a>
                         </div>
@@ -108,4 +120,16 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tabs
+    $('#deviceGroupTabs a').on('click', function (e) {
+        e.preventDefault();
+        $(this).tab('show');
+    });
+});
+</script>
 {% endblock %}
