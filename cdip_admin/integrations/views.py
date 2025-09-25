@@ -325,6 +325,8 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
         return device_group
 
     def get(self, request, *args, **kwargs):
+        print(f"DEBUG: DeviceGroupManagementUpdateView.get() called")
+        print(f"DEBUG: Using template: {self.template_name}")
         form_class = self.get_form_class()
         self.object = self.get_object()
         form = form_class(instance=self.object, request=request)

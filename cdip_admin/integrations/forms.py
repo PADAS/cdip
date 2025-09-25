@@ -18,6 +18,7 @@ from .models import (
     InboundIntegrationConfiguration,
     InboundIntegrationType,
     DeviceGroup,
+    SubjectType,
     BridgeIntegrationType,
     BridgeIntegration,
     Device
@@ -347,11 +348,13 @@ class DeviceGroupManagementForm(forms.ModelForm):
     )
     
     
-    # Override the default_subject_type field to use our custom widget
-    default_subject_type = SubjectTypeAutocompleteField(
+    # Use a simple ModelChoiceField instead of the problematic autocomplete widget
+    default_subject_type = forms.ModelChoiceField(
+        queryset=SubjectType.objects.all(),
         required=False,
         label="Default Subject Type",
-        empty_label="Select or create a subject type..."
+        empty_label="Select a subject type...",
+        widget=forms.Select(attrs={'class': 'form-control'})
     )
     
     class Meta:

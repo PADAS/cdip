@@ -577,7 +577,7 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
                     <button type="button" 
                             class="btn btn-outline-secondary dropdown-toggle" 
                             id="{widget_id}_dropdown"
-                            data-bs-toggle="dropdown">
+                            data-toggle="dropdown">
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu autocomplete-dropdown" 
@@ -713,20 +713,37 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
 
         js = format_html(
             '''
-            <script>
+            <script data-widget-id="{widget_id}">
             {js_content}
             
-            document.addEventListener('DOMContentLoaded', function() {{
+            function initWidget_{widget_id}() {{
                 console.log('Initializing subject type autocomplete widget...');
                 console.log('Widget ID:', '{widget_id}');
                 console.log('Choices:', {choices_json});
                 console.log('Current value:', '{current_value}');
                 
-                initSubjectTypeAutocomplete('{widget_id}', {{
-                    choices: {choices_json},
-                    currentValue: '{current_value}',
-                    name: '{name}'
-                }});
+                if (typeof initSubjectTypeAutocomplete === 'function') {{
+                    initSubjectTypeAutocomplete('{widget_id}', {{
+                        choices: {choices_json},
+                        currentValue: '{current_value}',
+                        name: '{name}'
+                    }});
+                }} else {{
+                    console.error('initSubjectTypeAutocomplete function not found');
+                }}
+            }}
+            
+            document.addEventListener('DOMContentLoaded', function() {{
+                // Store the initialization function globally
+                window.initWidget_{widget_id} = initWidget_{widget_id};
+                
+                // Initialize immediately if the widget is visible
+                const container = document.getElementById('{widget_id}_container');
+                if (container && container.offsetParent !== null) {{
+                    initWidget_{widget_id}();
+                }} else {{
+                    console.log('Widget {widget_id} not visible yet, will initialize when tab becomes active');
+                }}
             }});
             </script>
             ''',

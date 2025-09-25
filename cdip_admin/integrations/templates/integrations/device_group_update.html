@@ -121,15 +121,3 @@
         </div>
     </div>
 {% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Bootstrap tabs
-    $('#deviceGroupTabs a').on('click', function (e) {
-        e.preventDefault();
-        $(this).tab('show');
-    });
-});
-</script>
-{% endblock %}
