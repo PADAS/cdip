@@ -635,124 +635,42 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
             value=value
         )
 
-        # Add JavaScript to initialize the widget
+        # Add JavaScript to initialize the widget using external file reference
         import json
-        import os
         from django.utils.safestring import mark_safe
-        from django.conf import settings
         
         # Ensure proper JSON escaping
         choices_json = json.dumps(choices)
         current_value = value if value else ''
 
-        # Read the JavaScript file content and include it inline
-        js_file_path = os.path.join(
-            settings.BASE_DIR,
-            'cdip_admin', 'integrations', 'static', 'integrations', 'js', 'subject-type-autocomplete.js'
-        )
-        
-        js_content = ""
-        if os.path.exists(js_file_path):
-            with open(js_file_path, 'r') as f:
-                js_content = f.read()
-        else:
-            # Fallback: embed a minimal version of the JavaScript
-            js_content = """
-            function initSubjectTypeAutocomplete(widgetId, options) {
-                console.log('Subject Type Widget: Fallback initialization');
-                console.log('Subject Type Widget: allChoices =', options.choices);
-                
-                const container = document.getElementById(widgetId + '_container');
-                const input = document.getElementById(widgetId + '_input');
-                const hiddenInput = document.getElementById(widgetId + '_hidden');
-                const dropdown = document.getElementById(widgetId + '_dropdown');
-                const dropdownMenu = document.getElementById(widgetId + '_dropdown_menu');
-                
-                if (!container || !input || !hiddenInput || !dropdown || !dropdownMenu) {
-                    console.error('Subject Type Widget: Required elements not found');
-                    return;
-                }
-                
-                let allChoices = options.choices || [];
-                let currentValue = options.currentValue || '';
-                
-                // Show all choices when dropdown is clicked
-                dropdown.addEventListener('click', function() {
-                    console.log('Subject Type Widget: Dropdown clicked');
-                    dropdownMenu.innerHTML = '';
-                    
-                    if (allChoices.length === 0) {
-                        dropdownMenu.innerHTML = '<div class="dropdown-item-text text-muted">No subject types found</div>';
-                        return;
-                    }
-                    
-                    allChoices.forEach(choice => {
-                        const item = document.createElement('div');
-                        item.className = 'dropdown-item choice-item';
-                        item.innerHTML = '<div><strong>' + choice[1] + '</strong><small class="text-muted d-block">' + choice[2] + '</small></div>';
-                        item.addEventListener('click', function() {
-                            hiddenInput.value = choice[0];
-                            input.value = choice[1];
-                            dropdownMenu.style.display = 'none';
-                            console.log('Subject Type Widget: Selected', choice[1]);
-                        });
-                        dropdownMenu.appendChild(item);
-                    });
-                    
-                    dropdownMenu.style.display = 'block';
-                });
-                
-                // Hide dropdown when clicking outside
-                document.addEventListener('click', function(e) {
-                    if (!container.contains(e.target)) {
-                        dropdownMenu.style.display = 'none';
-                    }
-                });
-            }
-            """
-
-        js = format_html(
-            '''
-            <script data-widget-id="{widget_id}">
-            {js_content}
+        # Add a script tag that loads the external JavaScript file
+        js = f"""
+        <script>
+        // Initialize the subject type autocomplete widget
+        document.addEventListener('DOMContentLoaded', function() {{
+            console.log('Subject Type Widget: DOM loaded, initializing widget {widget_id}');
             
-            function initWidget_{widget_id}() {{
-                console.log('Initializing subject type autocomplete widget...');
-                console.log('Widget ID:', '{widget_id}');
-                console.log('Choices:', {choices_json});
-                console.log('Current value:', '{current_value}');
-                
+            // Load the external JavaScript file first
+            const script = document.createElement('script');
+            script.src = '/static/integrations/js/subject-type-autocomplete.js';
+            script.onload = function() {{
+                console.log('Subject Type Widget: External script loaded');
                 if (typeof initSubjectTypeAutocomplete === 'function') {{
                     initSubjectTypeAutocomplete('{widget_id}', {{
                         choices: {choices_json},
-                        currentValue: '{current_value}',
-                        name: '{name}'
+                        currentValue: '{current_value}'
                     }});
                 }} else {{
-                    console.error('initSubjectTypeAutocomplete function not found');
+                    console.error('Subject Type Widget: initSubjectTypeAutocomplete function not found');
                 }}
-            }}
-            
-            document.addEventListener('DOMContentLoaded', function() {{
-                // Store the initialization function globally
-                window.initWidget_{widget_id} = initWidget_{widget_id};
-                
-                // Initialize immediately if the widget is visible
-                const container = document.getElementById('{widget_id}_container');
-                if (container && container.offsetParent !== null) {{
-                    initWidget_{widget_id}();
-                }} else {{
-                    console.log('Widget {widget_id} not visible yet, will initialize when tab becomes active');
-                }}
-            }});
-            </script>
-            ''',
-            js_content=mark_safe(js_content),
-            widget_id=widget_id,
-            choices_json=mark_safe(choices_json),
-            current_value=current_value,
-            name=name
-        )
+            }};
+            script.onerror = function() {{
+                console.error('Subject Type Widget: Failed to load external script');
+            }};
+            document.head.appendChild(script);
+        }});
+        </script>
+        """
         
         return mark_safe(html + js)
 

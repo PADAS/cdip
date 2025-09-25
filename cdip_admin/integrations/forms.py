@@ -348,13 +348,11 @@ class DeviceGroupManagementForm(forms.ModelForm):
     )
     
     
-    # Use a simple ModelChoiceField instead of the problematic autocomplete widget
-    default_subject_type = forms.ModelChoiceField(
-        queryset=SubjectType.objects.all(),
+    # Override the default_subject_type field to use our custom widget
+    default_subject_type = SubjectTypeAutocompleteField(
         required=False,
         label="Default Subject Type",
-        empty_label="Select a subject type...",
-        widget=forms.Select(attrs={'class': 'form-control'})
+        empty_label="Select or create a subject type..."
     )
     
     class Meta:

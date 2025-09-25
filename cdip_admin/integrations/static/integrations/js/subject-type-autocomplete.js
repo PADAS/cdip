@@ -5,6 +5,10 @@
  */
 
 function initSubjectTypeAutocomplete(widgetId, options) {
+    console.log('=== INITIALIZING SUBJECT TYPE WIDGET ===');
+    console.log('Widget ID:', widgetId);
+    console.log('Options:', options);
+    
     const container = document.getElementById(widgetId + '_container');
     const input = document.getElementById(widgetId + '_input');
     const hiddenInput = document.getElementById(widgetId + '_hidden');
@@ -12,6 +16,28 @@ function initSubjectTypeAutocomplete(widgetId, options) {
     const dropdownMenu = document.getElementById(widgetId + '_dropdown_menu');
     const selectedSection = document.getElementById(widgetId + '_selected');
     const createNewSection = document.getElementById(widgetId + '_create_new');
+    
+    console.log('Found elements:', {
+        container: !!container,
+        input: !!input,
+        hiddenInput: !!hiddenInput,
+        dropdown: !!dropdown,
+        dropdownMenu: !!dropdownMenu,
+        selectedSection: !!selectedSection,
+        createNewSection: !!createNewSection
+    });
+    
+    if (!container || !input || !hiddenInput) {
+        console.error('Required elements not found for widget:', widgetId);
+        return;
+    }
+    
+    // Check if this widget is already initialized
+    if (container.dataset.initialized === 'true') {
+        console.warn('Widget already initialized:', widgetId);
+        return;
+    }
+    container.dataset.initialized = 'true';
     
     let allChoices = options.choices || [];
     let currentValue = options.currentValue || '';
@@ -24,6 +50,24 @@ function initSubjectTypeAutocomplete(widgetId, options) {
         console.log('Subject Type Widget: currentValue =', currentValue);
         
         setupEventListeners();
+        
+        // Add form submission debugging
+        const form = container.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                console.log('Form submitted!');
+                console.log('Hidden input value before submit:', hiddenInput.value);
+                console.log('Hidden input name:', hiddenInput.name);
+                
+                // Log all form data
+                const formData = new FormData(form);
+                console.log('All form data:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}: ${value}`);
+                }
+            });
+        }
+        
         if (currentValue) {
             // Find and set the current selection
             const choice = allChoices.find(c => c[0] === currentValue);
@@ -195,6 +239,10 @@ function initSubjectTypeAutocomplete(widgetId, options) {
     
     // Select a choice
     function selectChoice(choice) {
+        console.log('selectChoice called with:', choice);
+        console.log('Current hidden input value before update:', hiddenInput.value);
+        console.log('Current hidden input name:', hiddenInput.name);
+        
         selectedChoice = choice;
         hiddenInput.value = choice[0];
         input.value = '';
@@ -205,6 +253,14 @@ function initSubjectTypeAutocomplete(widgetId, options) {
         selectedSection.style.display = 'block';
         
         console.log('Selected subject type:', choice);
+        console.log('Hidden input value set to:', hiddenInput.value);
+        console.log('Hidden input name:', hiddenInput.name);
+        console.log('Hidden input element:', hiddenInput);
+        
+        // Verify the value was actually set
+        setTimeout(() => {
+            console.log('Verification - hidden input value after 100ms:', hiddenInput.value);
+        }, 100);
     }
     
     // Clear selection
