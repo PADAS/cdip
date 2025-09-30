@@ -1,5 +1,6 @@
 import logging
 import random
+import json
 
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
@@ -325,8 +326,6 @@ class DeviceGroupManagementUpdateView(PermissionRequiredMixin, UpdateView):
         return device_group
 
     def get(self, request, *args, **kwargs):
-        print(f"DEBUG: DeviceGroupManagementUpdateView.get() called")
-        print(f"DEBUG: Using template: {self.template_name}")
         form_class = self.get_form_class()
         self.object = self.get_object()
         form = form_class(instance=self.object, request=request)
@@ -1166,11 +1165,11 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
             form.fields['additional'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
             )
-            form.fields['additional'].initial = selected_integration.additional
+            form.fields['additional'].initial = initial_additional  
         # load a textarea populated with json from the integration
         else:
             form.fields['additional'].widget = FormattedJsonFieldWidget()
-            form.fields['additional'].initial = selected_integration.additional
+            form.fields['additional'].initial = initial_additional
         return HttpResponse(as_crispy_field(form["additional"]))
 
     def get_object(self):
@@ -1199,7 +1198,6 @@ def create_subject_type_api(request):
     """
     if request.method == 'POST':
         try:
-            import json
             data = json.loads(request.body)
             
             display_name = data.get('display_name', '').strip()

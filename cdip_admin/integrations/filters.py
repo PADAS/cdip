@@ -240,7 +240,7 @@ class DeviceFilter(django_filters.FilterSet):
                 self.request.session["owner_filter"] = self.data["organization"]
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             return IsOrganizationMember.filter_queryset_for_user(
-                qs, self.request.user, "owner__name"
+                qs, self.request.user, "inbound_configuration__owner__name"
             )
         if "owner_filter" in self.request.session:
             return qs.filter(

@@ -1,8 +1,11 @@
+import os
 from django import forms
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 
+import json
+from django.utils.safestring import mark_safe
 
 class SearchableMultiSelectWidget(forms.Widget):
     """
@@ -124,14 +127,10 @@ class SearchableMultiSelectWidget(forms.Widget):
                )
         
         # Add JavaScript to initialize the widget
-        import json
-        from django.utils.safestring import mark_safe
-        
         choices_json = mark_safe(json.dumps(choices))
         selected_json = mark_safe(json.dumps(selected_values))
         
         # Read the JavaScript file content and include it inline
-        import os
         js_file_path = os.path.join(os.path.dirname(__file__), 'static', 'integrations', 'js', 'searchable-multiselect.js')
         
         js_content = ""
@@ -338,9 +337,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         # Render the widget HTML
         widget_id = attrs.get('id', f'id_{name}')
         
-        # Import json for data serialization
-        import json
-        
         html = format_html(
                    '''
                    <div class="searchable-multiselect-container" id="{widget_id}_container" 
@@ -410,7 +406,6 @@ class DeviceSearchableMultiSelectWidget(forms.Widget):
         selected_json = mark_safe(json.dumps(selected_values))
         
         # Read the JavaScript file content and include it inline
-        import os
         js_file_path = os.path.join(os.path.dirname(__file__), 'static', 'integrations', 'js', 'device-searchable-multiselect.js')
         
         js_content = ""
@@ -636,9 +631,6 @@ class SubjectTypeAutocompleteWidget(forms.Widget):
         )
 
         # Add JavaScript to initialize the widget using external file reference
-        import json
-        from django.utils.safestring import mark_safe
-        
         # Ensure proper JSON escaping
         choices_json = json.dumps(choices)
         current_value = value if value else ''
