@@ -1144,7 +1144,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         if integration_type == 'none':
             return HttpResponse("Please select an integration type")
         try:
-            initial_additional = BridgeIntegration.objects.get(id=integration_id).state or {}
+            initial_additional = BridgeIntegration.objects.get(id=integration_id).additional or {}
         except BridgeIntegration.DoesNotExist:
             initial_additional = {}        # a new type is selected and schema needs to be updated
         if update == "true":
@@ -1159,8 +1159,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         # loading the schema already associated with the form
         # load the proper schema populated with additional values from the integration
 
-        form.fields['additional'].initial = initial_additional
-        
         if selected_type.configuration_schema != {}:
             form.fields['additional'].widget = JSONFormWidget(
                 schema=selected_type.configuration_schema,
