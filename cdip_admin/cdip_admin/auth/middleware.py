@@ -71,6 +71,14 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
             # If specified header doesn't exist then remove any existing
             # authenticated remote-user, or return (leaving request.user set to
             # AnonymousUser by the AuthenticationMiddleware).
+            
+            # Don't force logout for form submissions or HTMX requests if user is already authenticated
+            # This prevents issues with regular form submissions and HTMX requests that don't include the header
+            if (self.force_logout_if_no_header and request.user.is_authenticated and 
+                ((request.method == 'POST' and 'csrfmiddlewaretoken' in request.POST) or
+                 (request.method == 'GET' and (request.headers.get('HX-Request') or request.path.startswith('/integrations/'))))):
+                return
+                
             if self.force_logout_if_no_header and request.user.is_authenticated:
                 self._remove_invalid_user(request)
             return

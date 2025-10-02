@@ -668,14 +668,7 @@ class BridgeIntegrationForm(forms.ModelForm):
             "additional": JSONFormWidget(
                 schema=BridgeIntegrationType.objects.configuration_schema,
             ),
-            "owner": forms.Select(
-                attrs={
-                    'name': "owner",
-                    'hx-trigger': 'load',
-                    'hx-target': '#div_id_additional',
-                    'hx-swap': 'outerHTML'
-                },
-            ),
+            "owner": forms.Select(),
             "state": FormattedJsonFieldWidget(),
         }
 
@@ -698,16 +691,12 @@ class BridgeIntegrationForm(forms.ModelForm):
                     )
                 else:
                     self.fields["owner"].queryset = qs
-            # TODO: review how we trigger the warning modal
-            self.fields['type'].widget.attrs['hx-get'] = reverse("bridges/type_modal",
-                                                                 kwargs={"integration_id": self.instance.id})
+            # Set up HTMX attributes for type field to trigger modal
+            if self.instance and self.instance.id:
+                self.fields['type'].widget.attrs['hx-get'] = reverse("bridges/type_modal",
+                                                                     kwargs={"integration_id": self.instance.id})
 
-            if hasattr(self.instance, 'type'):
-                # TODO: review how we trigger the schema view
-                self.fields['owner'].widget.attrs['hx-get'] = reverse("bridges/schema",
-                                                                      kwargs={"integration_type": self.instance.type.id,
-                                                                              "integration_id": self.instance.id,
-                                                                              "update": "false"})
+            if hasattr(self.instance, 'type') and self.instance.type:
                 if hasattr(request, 'session'):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['additional'].widget.instance = self.instance.type.id

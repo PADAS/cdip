@@ -751,7 +751,7 @@ class InboundIntegrationConfigurationUpdateView(
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                            hx-get={type_modal}
+                            hx-get="{type_modal}"
                             class="select form-control"
                             required id="id_type">
                                 <option value="" selected>-------</option>"""
@@ -946,7 +946,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
                                 <span class="asteriskField">*</span></label> 
                                 <div class="">
                                     <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                                    hx-get={type_modal}
+                                    hx-get="{type_modal}"
                                     class="select form-control"
                                     required id="id_type">
                                         <option value="" selected>-------</option>"""
@@ -1081,8 +1081,23 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     model = BridgeIntegration
     permission_required = "integrations.change_bridgeintegration"
 
+    def get_form_kwargs(self):
+        """Add request to form kwargs."""
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
+    def post(self, request, *args, **kwargs):
+        """Override post method to ensure proper form handling."""
+        self.object = self.get_object()
+        form = self.get_form()
+        
+        if not form.is_valid():
+            return self.form_invalid(form)
+        
+        return self.form_valid(form)
+
     @staticmethod
-    @requires_csrf_token
     def type_modal(request, integration_id):
         if request.GET.get("type"):
             integration_type = request.GET.get("type")
@@ -1106,7 +1121,6 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return HttpResponse(rendered)
 
     @staticmethod
-    @requires_csrf_token
     def dropdown_restore(request, integration_id):
         type_modal = reverse("bridges/type_modal", kwargs={"integration_id": integration_id})
         response = f"""<div id="div_id_type" class="form-group">
@@ -1119,7 +1133,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
-                            hx-get={type_modal}
+                            hx-get="{type_modal}"
                             class="select form-control"
                             required id="id_type">
                                 <option value="" selected>-------</option>"""
@@ -1133,9 +1147,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return HttpResponse(response)
 
     @staticmethod
-    @requires_csrf_token
     def schema(request, integration_type, integration_id, update):
-        # TODO: We might need to find a way to provide an existing BridgeIntegration object here.
         form = BridgeIntegrationForm(request=request)
         selected_type = BridgeIntegrationType.objects.get(id=integration_type)
 
@@ -1143,32 +1155,24 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         # No type selected
         if integration_type == 'none':
             return HttpResponse("Please select an integration type")
+
         try:
-            initial_additional = BridgeIntegration.objects.get(id=integration_id).additional or {}
+            bridge_integration = BridgeIntegration.objects.get(id=integration_id)
+            initial_additional = bridge_integration.additional or {}
         except BridgeIntegration.DoesNotExist:
-            initial_additional = {}        # a new type is selected and schema needs to be updated
-        if update == "true":
-            if selected_type.configuration_schema != {}:
-                request.session["integration_type"] = integration_type
-                form.fields['additional'].widget.instance = selected_type.id
-            else:
-                form.fields['additional'].widget = FormattedJsonFieldWidget()
-                form.fields['additional'].initial = initial_additional
-            return HttpResponse(as_crispy_field(form["additional"]))
+            bridge_integration = None
+            initial_additional = {}
 
-        # loading the schema already associated with the form
-        # load the proper schema populated with additional values from the integration
+        # Set up the additional field with proper widget and initial data
+        form.fields['additional'].initial = initial_additional
+        form.fields['additional'].widget.instance = selected_type.id
 
-        if selected_type.configuration_schema != {}:
-            form.fields['additional'].widget = JSONFormWidget(
-                schema=selected_type.configuration_schema,
-            )
-            form.fields['additional'].initial = initial_additional  
-        # load a textarea populated with json from the integration
-        else:
-            form.fields['additional'].widget = FormattedJsonFieldWidget()
-            form.fields['additional'].initial = initial_additional
+        # Always use JSONFormWidget, but with appropriate schema
+        schema = selected_type.configuration_schema if selected_type.configuration_schema else {}
+        form.fields['additional'].widget = JSONFormWidget(schema=schema)
+
         return HttpResponse(as_crispy_field(form["additional"]))
+
 
     def get_object(self):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
@@ -1180,6 +1184,17 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         self.object = self.get_object()
         # needed for model form field filtering
         form = form_class(request=request, instance=self.object)
+        
+        # Set up the additional field widget based on the current integration type
+        if hasattr(self.object, 'type') and self.object.type:
+            if hasattr(request, 'session'):
+                request.session["integration_type"] = str(self.object.type.id)
+            
+            # Always use JSONFormWidget, but with appropriate schema
+            schema = self.object.type.configuration_schema if self.object.type.configuration_schema else {}
+            form.fields['additional'].widget = JSONFormWidget(schema=schema)
+            form.fields['additional'].widget.instance = self.object.type.id
+        
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
