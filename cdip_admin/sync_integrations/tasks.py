@@ -59,7 +59,7 @@ def run_er_smart_sync_integrations():
         enabled=True, type__slug="smart_connect"
     )
     for i in smart_integrations:
-        run_er_smart_sync_integration(smart_integration_id=str(i.id))
+        run_er_smart_sync_integration.delay(smart_integration_id=str(i.id))
 
 @celery.app.task
 def maintain_smart_integrations():
@@ -76,9 +76,7 @@ def _maintain_smart_integration(integration_id:str):
 
 
 @celery.app.task(base=QueueOnce, once={"graceful": True})
-def run_er_smart_sync_integration(*args, smart_integration_id=None):
-
-    assert not args, "Only keyword arguments are allowed"
+def run_er_smart_sync_integration(*, smart_integration_id=None):
 
     try:
         smart_integration = OutboundIntegrationConfiguration.objects.get(
@@ -88,6 +86,8 @@ def run_er_smart_sync_integration(*args, smart_integration_id=None):
     except OutboundIntegrationConfiguration.DoesNotExist:
         logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
         return
+
+    logger.info(f"Running ER smart sync integration for {smart_integration.name} ({smart_integration.id}) with endpoint {smart_integration.endpoint}")
 
     device_groups = smart_integration.devicegroups.all()
 
