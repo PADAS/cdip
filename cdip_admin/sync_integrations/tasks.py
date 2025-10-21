@@ -217,23 +217,23 @@ def run_er_smart_sync_integration(*, smart_integration_id=None):
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        # Chain the tasks: datamodels -> events -> patrols
+        # Chain the tasks: datamodels -> events -> patrols in the background
         task_chain = chain(
-            sync_er_smart_datamodels.s(
+            sync_er_smart_datamodels.si(
                 smart_integration_id=str(smart_integration.id),
                 er_integration_id=str(er_configuration.id)
             ),
-            sync_er_events.s(
+            sync_er_events.si(
                 smart_integration_id=str(smart_integration.id),
                 er_integration_id=str(er_configuration.id)
             ),
-            sync_er_patrols.s(
+            sync_er_patrols.si(
                 smart_integration_id=str(smart_integration.id),
                 er_integration_id=str(er_configuration.id)
             )
         )
         
-        # Execute the chain
+        # Execute the chain in the background
         task_chain.apply_async()
 
     logger.info(f"Finished creating sync chains for {smart_integration.name} ({smart_integration.id})")
