@@ -394,7 +394,7 @@ class ER_SMART_Synchronizer:
         
         if not response.ok:
             raise RuntimeError(
-                f"Failed to download file from {url}: {response.status_code} - {response.text}"
+                f"Failed to download file from {url}: {response.status_code} - {response.reason}"
             )
         
         image_uri = self.cloud_storage.upload(response.content, file_name)
