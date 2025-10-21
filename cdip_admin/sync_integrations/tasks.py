@@ -2,8 +2,8 @@ import logging
 
 from django.db.models import Q
 from celery_once import QueueOnce
+from celery import shared_task, chain, group
 
-from cdip_admin import celery
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration,\
     InboundIntegrationType, OutboundIntegrationType, Device
 
@@ -14,7 +14,7 @@ from sync_integrations.utils import (
 
 logger = logging.getLogger(__name__)
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def synchronize_smart_datamodels(integration_id:str):
 
     smart_config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
@@ -25,19 +25,19 @@ def synchronize_smart_datamodels(integration_id:str):
     logger.info('Finished synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def synchronize_smart_datamodels_all():
 
     for oic in OutboundIntegrationConfiguration.objects.filter(type__slug='smart_connect', enabled=True):
         synchronize_smart_datamodels.delay(str(oic.id))
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def run_sync_integrations():
     run_er_smart_sync_integrations()
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def handle_outboundintegration_save(integration_id):
 
     try:
@@ -52,7 +52,7 @@ def handle_outboundintegration_save(integration_id):
 
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def run_er_smart_sync_integrations():
     # TODO: Better way to associate in portal which integrations should be synced
     smart_integrations = OutboundIntegrationConfiguration.objects.filter(
@@ -61,7 +61,7 @@ def run_er_smart_sync_integrations():
     for i in smart_integrations:
         run_er_smart_sync_integration.delay(smart_integration_id=str(i.id))
 
-@celery.app.task
+@shared_task
 def maintain_smart_integrations():
     smart_integrations = OutboundIntegrationConfiguration.objects.filter(
         enabled=True, type__slug="smart_connect"
@@ -70,12 +70,12 @@ def maintain_smart_integrations():
         _maintain_smart_integration.delay(integration_id=str(i.id))
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-@celery.app.task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True})
 def run_er_smart_sync_integration(*, smart_integration_id=None):
 
     try:
