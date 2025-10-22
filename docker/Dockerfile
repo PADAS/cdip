@@ -22,10 +22,10 @@ RUN apt-get update && \
     && apt-get autoremove
 
 # Install Python 3.11
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils && \
-    apt-get autoremove
+RUN add-apt-repository ppa:deadsnakes/ppa 
+RUN apt-get update 
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
+RUN apt-get autoremove
 
 # Install pip for Python 3.11
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
