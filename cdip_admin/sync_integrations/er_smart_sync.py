@@ -296,7 +296,7 @@ class ER_SMART_Synchronizer:
         events = parse_obj_as(
             List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at)
         )
-        logger.info(f"Pulled {len(events)} events from ER")
+        logger.info(f"Read {len(events)} events from {config.endpoint} (id={config.id})")
         
         for event in events:
             with tracing.tracer.start_as_current_span(
@@ -638,19 +638,20 @@ class ER_SMART_Synchronizer:
             self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
         )
         logger.info(
-            f"Pulled {len(patrols)} patrols from ER",
+            f"Read {len(patrols)} patrols from integration {config.endpoint} (id={config.id})",
             extra=dict(
                 lower=lower.strftime(FILTER_DATETIME_FORMAT),
                 upper=upper.strftime(FILTER_DATETIME_FORMAT),
             ),
         )
 
-        self.process_er_patrols(
-            patrols=patrols,
-            integration_id=config.id,
-            patrol_last_poll_at=lower,
-            upper=upper,
-        )
+        if len(patrols) > 0:
+            self.process_er_patrols(
+                patrols=patrols,
+                integration_id=config.id,
+                patrol_last_poll_at=lower,
+                upper=upper,
+            )
 
         i_state.patrol_last_poll_at = upper
         set_earthranger_last_poll(integration_id=config.id, state=i_state)

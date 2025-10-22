@@ -1,8 +1,11 @@
 import logging
+import time
+from functools import wraps
 
 from django.db.models import Q
 from celery_once import QueueOnce
 from celery import shared_task, chain, group
+from celery.exceptions import SoftTimeLimitExceeded
 
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration,\
     InboundIntegrationType, OutboundIntegrationType, Device
@@ -14,7 +17,46 @@ from sync_integrations.utils import (
 
 logger = logging.getLogger(__name__)
 
+
+def handle_timeout_exceptions(func):
+    """Decorator to catch and log SoftTimeLimitExceeded exceptions with task duration."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        try:
+            return func(*args, **kwargs)
+        except SoftTimeLimitExceeded as e:
+            duration = time.time() - start_time
+            logger.error(
+                f"Task {func.__name__} timed out after {duration:.2f} seconds",
+                extra={
+                    'task_name': func.__name__,
+                    'duration_seconds': duration,
+                    'args': args,
+                    'kwargs': kwargs,
+                    'exception_type': 'SoftTimeLimitExceeded',
+                    'exception_message': str(e)
+                }
+            )
+            raise  # Re-raise the exception so Celery can handle it properly
+        except Exception as e:
+            duration = time.time() - start_time
+            logger.exception(
+                f"Task {func.__name__} failed after {duration:.2f} seconds",
+                extra={
+                    'task_name': func.__name__,
+                    'duration_seconds': duration,
+                    'args': args,
+                    'kwargs': kwargs,
+                    'exception_type': type(e).__name__,
+                    'exception_message': str(e)
+                }
+            )
+            raise
+    return wrapper
+
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def synchronize_smart_datamodels(integration_id:str):
 
     smart_config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
@@ -26,6 +68,7 @@ def synchronize_smart_datamodels(integration_id:str):
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def synchronize_smart_datamodels_all():
 
     for oic in OutboundIntegrationConfiguration.objects.filter(type__slug='smart_connect', enabled=True):
@@ -33,11 +76,13 @@ def synchronize_smart_datamodels_all():
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def run_sync_integrations():
     run_er_smart_sync_integrations()
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def handle_outboundintegration_save(integration_id):
 
     try:
@@ -53,6 +98,7 @@ def handle_outboundintegration_save(integration_id):
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def run_er_smart_sync_integrations():
     # TODO: Better way to associate in portal which integrations should be synced
     smart_integrations = OutboundIntegrationConfiguration.objects.filter(
@@ -62,6 +108,7 @@ def run_er_smart_sync_integrations():
         run_er_smart_sync_integration.delay(smart_integration_id=str(i.id))
 
 @shared_task
+@handle_timeout_exceptions
 def maintain_smart_integrations():
     smart_integrations = OutboundIntegrationConfiguration.objects.filter(
         enabled=True, type__slug="smart_connect"
@@ -71,11 +118,13 @@ def maintain_smart_integrations():
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=300)
+@handle_timeout_exceptions
 def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize SMART data models and patrol data models to EarthRanger."""
     try:
@@ -112,6 +161,7 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger events to SMART."""
     try:
@@ -146,7 +196,8 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=300)
+@handle_timeout_exceptions
 def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger patrols to SMART."""
     try:
@@ -182,6 +233,7 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
 
 
 @shared_task(base=QueueOnce, once={"graceful": True})
+@handle_timeout_exceptions
 def run_er_smart_sync_integration(*, smart_integration_id=None):
     """Orchestrate the full ER-SMART synchronization process using task chains."""
     try:
