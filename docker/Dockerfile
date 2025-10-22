@@ -1,34 +1,46 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 MAINTAINER chrisdo@vulcan.com
 
-# use apt-get update and install in the same RUN command: http://lenguyenthedat.com/docker-cache/
+# Install basic tools first, then add PostgreSQL repository
 RUN apt-get update && \
     apt-get -y upgrade && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    && apt-get autoremove
+
+# Add PostgreSQL official repository for PostgreSQL 12
+RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | tee /etc/apt/sources.list.d/pgdg.list
+
+# Install remaining packages including postgresql-client-12
+RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
     git \
     libpq-dev \
     python3-pip \
-    curl \
     python3-openssl \
     libssl-dev \
-    wget \
-    gnupg \
     locales locales-all \
-    software-properties-common \
     postgresql-client-12 \
     vim \
     build-essential \
     && apt-get autoremove
 
 # Install Python 3.11
-RUN add-apt-repository ppa:deadsnakes/ppa 
-RUN apt-get update 
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-dev
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-venv
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-distutils
-RUN apt-get autoremove
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3.11-distutils && \
+    apt-get autoremove
 
 # Install pip for Python 3.11
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
@@ -37,9 +49,9 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
     update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 1
 
-# Use ubuntugis/ppa for bionic since it's not available for 20.04 (focal) yet.
+# Use ubuntugis/ppa for jammy (Ubuntu 22.04)
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 089EBE08314DF160
-RUN /bin/sh -c 'echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu bionic main" >> /etc/apt/sources.list.d/ubuntugis.list'
+RUN /bin/sh -c 'echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu jammy main" >> /etc/apt/sources.list.d/ubuntugis.list'
 
 #RUN apt-get update
 RUN apt-get update && \
