@@ -265,8 +265,11 @@ class ER_SMART_Synchronizer:
                 existing_er_event_type = next(
                     (
                         x for x in existing_event_types
-                        if (x.get("value") == event_type.value and 
-                            x.get('category', {}).get('value') == event_type.category)
+                        if (
+                            x.get("value") == event_type.value
+                            and "category" in x
+                            and x["category"].get("value") == event_type.category
+                        )
                     ),
                     None,
                 )
@@ -391,7 +394,7 @@ class ER_SMART_Synchronizer:
         
         if not response.ok:
             raise RuntimeError(
-                f"Failed to download file from {url}: {response.status_code} - {response.text}"
+                f"Failed to download file from {url}: {response.status_code} - {response.reason}"
             )
         
         image_uri = self.cloud_storage.upload(response.content, file_name)
