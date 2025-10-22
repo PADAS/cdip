@@ -24,7 +24,10 @@ RUN apt-get update && \
 # Install Python 3.11
 RUN add-apt-repository ppa:deadsnakes/ppa 
 RUN apt-get update 
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-venv
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11-distutils
 RUN apt-get autoremove
 
 # Install pip for Python 3.11
