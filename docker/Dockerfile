@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 MAINTAINER chrisdo@vulcan.com
 
-# Install basic tools first, then add PostgreSQL repository
+# Install basic tools first
 RUN apt-get update && \
     apt-get -y upgrade && \
     DEBIAN_FRONTEND=noninteractive \
@@ -17,7 +17,7 @@ RUN apt-get update && \
 RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg && \
     echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | tee /etc/apt/sources.list.d/pgdg.list
 
-# Install remaining packages including postgresql-client-12
+# Install postgresql-client-12 and other base packages
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
@@ -53,7 +53,6 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 089EBE08314DF160
 RUN /bin/sh -c 'echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu jammy main" >> /etc/apt/sources.list.d/ubuntugis.list'
 
-#RUN apt-get update
 RUN apt-get update && \
     apt-get -y install gdal-bin libgdal-dev
 RUN export CPLUS_INCLUDE_PATH=/usr/include/gdal
