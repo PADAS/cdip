@@ -378,6 +378,18 @@ CELERY_TASK_ROUTES = {
     "sync_integrations.tasks.run_er_smart_sync_integration": {
         "queue": "smartsyncs", "routing_key": "smartsyncs"
     },
+    "sync_integrations.tasks.synchronize_smart_datamodels_all": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.sync_er_smart_datamodels": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.sync_er_events": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
+    "sync_integrations.tasks.sync_er_patrols": {
+        "queue": "smartsyncs", "routing_key": "smartsyncs"
+    },
 }
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": True}
