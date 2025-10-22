@@ -24,6 +24,7 @@ from smartconnect.er_sync_utils import (
     get_earthranger_last_poll,
     set_earthranger_last_poll,
 )
+from google.cloud.pubsub_v1.publisher.exceptions import MessageTooLargeError
 from packaging import version
 from cdip_admin import settings
 from core import tracing
@@ -587,6 +588,11 @@ class ER_SMART_Synchronizer:
                         ),
                     )
 
+                    # Hack to reduce message size (these are destined for Smart Connect)
+                    for track_point in segment.track_points:
+                        track_point.observation_details = None
+
+
                 if max_update < patrol_last_poll_at and \
                         not any(len(seg.track_points) > 0 for seg in patrol.patrol_segments):
                     logger.info(
@@ -607,16 +613,55 @@ class ER_SMART_Synchronizer:
                             tracing.instrumentation.build_context_headers(),
                             default=str,
                         )
-                        self.publisher.publish(
-                            topic=settings.RAW_OBSERVATIONS_TOPIC,
-                            data=json.loads(patrol.json()),  # This is suboptimal but it's fixed in pydantic 2
+                        
+                        # Create a copy of patrol data without track points to reduce message size
+                        patrol_data = json.loads(patrol.json())
+                        
+                        # Calculate the byte size of the serialized JSON data
+                        serialized_json = json.dumps(patrol_data)
+                        message_size_bytes = len(serialized_json.encode('utf-8'))
+                        message_size_mb = message_size_bytes / (1024 * 1024)
+                        
+                        logger.info(
+                            f"Patrol message size: {message_size_bytes:,} bytes ({message_size_mb:.2f} MB)",
                             extra={
-                                "observation_type": StreamPrefixEnum.earthranger_patrol.value,
-                                "gundi_version": "v1",  # Add the version so routing knows how to handle it
-                                "tracing_context": tracing_context  # Propagate OTel context in message attributes
-                            },
+                                'patrol_id': patrol.id,
+                                'patrol_serial_number': patrol.serial_number,
+                                'message_size_bytes': message_size_bytes,
+                                'message_size_mb': round(message_size_mb, 2)
+                            }
                         )
-                        subspan.add_event("gundi_er_smart_sync.patrol_sent_to_routing")
+                        
+                        # # Remove track points from each segment to prevent message size issues
+                        # if 'patrol_segments' in patrol_data:
+                        #     for segment in patrol_data['patrol_segments']:
+                        #         if 'track_points' in segment:
+                        #             track_point_count = len(segment['track_points'])
+                        #             logger.info(f"Removing {track_point_count} track points from segment to reduce message size")
+                        #             del segment['track_points']
+                        try:
+                            self.publisher.publish(
+                                topic=settings.RAW_OBSERVATIONS_TOPIC,
+                                data=patrol_data,
+                                extra={
+                                    "observation_type": StreamPrefixEnum.earthranger_patrol.value,
+                                    "gundi_version": "v1",  # Add the version so routing knows how to handle it
+                                    "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                                },
+                            )
+                            subspan.add_event("gundi_er_smart_sync.patrol_sent_to_routing")
+                        except MessageTooLargeError as e:
+                            logger.exception(
+                                f"Patrol {patrol.id} ({patrol.serial_number}) message too large to publish. Will skip it and continue with next patrol.",
+                                extra={
+                                    'patrol_id': patrol.id,
+                                    'patrol_serial_number': patrol.serial_number,
+                                    'message_size_bytes': message_size_bytes,
+                                    'message_size_mb': round(message_size_mb, 2)
+                                }
+                            )
+                            current_span.add_event("gundi_er_smart_sync.patrol_message_too_large")
+
 
     def get_er_patrols(self, *, config: InboundIntegrationConfiguration) -> None:
 
