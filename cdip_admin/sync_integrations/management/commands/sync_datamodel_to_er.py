@@ -32,7 +32,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        sclient = SmartClient(api='https://tempuri.org/', username='', password='', use_language_code='en')
+        sclient = SmartClient(api='https://tempuri.org/', username='', password='', use_language_code='en', read_timeout=300.0, connect_timeout=10.0)
         dm = sclient.load_datamodel(filename='DATA_MODEL_FILENAME')
 
         er_host = 'er_site.pamdas.org'

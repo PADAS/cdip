@@ -77,6 +77,8 @@ class ER_SMART_Synchronizer:
             password=smart_config.password,
             version=smart_config.additional.get("version"),
             use_language_code=smart_config.additional.get("use_language_code", "en"),
+            read_timeout=300.0,
+            connect_timeout=10.0,
         )
 
         provider_key = self.smart_config.type.slug

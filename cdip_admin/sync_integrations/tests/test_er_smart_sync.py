@@ -27,7 +27,7 @@ def test_synchronizer_get_events(
     er_smart_sync.cloud_storage = mock_cloud_storage
 
     # Run the synchronizer on events
-    er_smart_sync.get_er_events(config=inbound_integration_er)
+    er_smart_sync.synchronize_er_events_to_smart_connect(config=inbound_integration_er)
 
     # Check that events were fetched from ER
     events = mock_das_client.get_events.return_value
@@ -59,7 +59,7 @@ def test_synchronizer_get_patrols(
     er_smart_sync.cloud_storage = mock_cloud_storage
 
     # Run the synchronizer on patrols
-    er_smart_sync.get_er_patrols(config=inbound_integration_er)
+    er_smart_sync.synchronize_er_patrols_to_smart_connect(config=inbound_integration_er)
 
     # Check that patrols were fetched from ER
     patrols = mock_das_client.get_patrols.return_value
