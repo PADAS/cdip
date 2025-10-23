@@ -55,7 +55,8 @@ jobs:
 
   deploy_dev_legacy:
     uses: PADAS/gundi-workflows/.github/workflows/update_k8s_image.yml@v2
-    if: startsWith(github.ref, 'refs/heads/release')
+    if: false  # Temporarily disabled
+    # if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build]
     strategy:
       matrix:
