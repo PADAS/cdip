@@ -184,7 +184,7 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.sychronize_er_events_to_smartconnect(config=er_configuration)
+        er_smart_sync.synchronize_er_events_to_smart_connect(config=er_configuration)
 
         logger.info("Finished synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
