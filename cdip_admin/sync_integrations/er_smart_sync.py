@@ -179,7 +179,36 @@ class ER_SMART_Synchronizer:
             )
 
             event_category = dict(value=event_category_value, display=event_category_display)
-            self.das_client.post_event_category(event_category)
+            try:
+                self.das_client.post_event_category(event_category)
+                logger.info(
+                    "Successfully created event category",
+                    extra=dict(value=event_category_value, display=event_category_display),
+                )
+            except Exception as e:
+                error_message = str(e)
+                if "duplicate key value violates unique constraint" in error_message:
+                    logger.warning(
+                        "Event category already exists (likely created in previous run but not readable due to permissions)",
+                        extra=dict(
+                            value=event_category_value, 
+                            display=event_category_display,
+                            error=error_message
+                        ),
+                    )
+                    # Event category exists but we can't read it due to permissions
+                    raise
+                else:
+                    logger.error(
+                        "Failed to create event category for some unknown reason. Will raise an error and stop the task.",
+                        extra=dict(
+                            value=event_category_value,
+                            display=event_category_display,
+                            error=error_message
+                        ),
+                    )
+                    raise
+
         self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
             f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}"
