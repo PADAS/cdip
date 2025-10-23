@@ -95,7 +95,19 @@ class ER_SMART_Synchronizer:
 
 
     def synchronize_datamodel(self) -> None:
-        # Given a single smart integration, synchronize the datamodels for all the CAs and CMs.
+        """
+        Synchronize SMART Connect data models to EarthRanger.
+        
+        Iterates through all conservation areas (CAs) and configurable models (CMs)
+        configured for this SMART integration and pushes their data models to the
+        corresponding EarthRanger instance.
+        
+        Note:
+            - Processes all conservation areas in the integration configuration
+            - Only synchronizes configurable models marked for use with EarthRanger
+            - Creates or updates event types and categories in EarthRanger
+            - Logs progress for each conservation area and configurable model
+        """
         for ca_uuid in self.smart_config.additional.get('ca_uuids', []):
             ca = self.smart_client.get_conservation_area(ca_uuid=ca_uuid)
 
@@ -288,7 +300,28 @@ class ER_SMART_Synchronizer:
                 extra=dict(event_type=event_type.dict(by_alias=True, exclude_none=True), error=str(e)),
             )
 
-    def get_er_events(self, *, config: InboundIntegrationConfiguration) -> None:
+    def synchronize_er_events_to_smart_connect(self, *, config: InboundIntegrationConfiguration) -> None:
+        """
+        Synchronize EarthRanger events to SMART Connect.
+        
+        Retrieves events from EarthRanger that have been updated since the last poll,
+        processes any associated files, and publishes them to the routing system for
+        delivery to SMART Connect. Excludes events that are associated with patrols
+        as they are handled separately.
+        
+        Args:
+            config: The EarthRanger inbound integration configuration containing
+                   connection details and last poll state.
+                   
+        Raises:
+            ValueError: If required configuration parameters are missing.
+            
+        Note:
+            - Only processes independent incidents (events not associated with patrols)
+            - Downloads and uploads event files to cloud storage
+            - Updates event state tracking for incremental synchronization
+            - Uses distributed tracing for observability
+        """
 
         i_state = get_earthranger_last_poll(integration_id=config.id)
 
@@ -372,6 +405,22 @@ class ER_SMART_Synchronizer:
         set_earthranger_last_poll(integration_id=config.id, state=i_state)
 
     def update_event_with_smart_data(self, event) -> None:
+        """
+        Update EarthRanger event with SMART observation UUID.
+        
+        Adds a unique SMART observation UUID to the event's event_details if one
+        doesn't already exist. This UUID is used for tracking the event in SMART
+        Connect and is required for proper synchronization.
+        
+        Args:
+            event: EarthRanger event object to update.
+            
+        Note:
+            - Only adds UUID if smart_observation_uuid doesn't already exist
+            - Uses UUID1 for generating unique identifiers
+            - Updates the event in EarthRanger via API call
+            - This is a stopgap solution for SMART Connect compatibility
+        """
         if not event.event_details.get("smart_observation_uuid"):
             # Generate a unique observation UUID for SMART tracking
             smart_observation_uuid = uuid.uuid1()
@@ -380,6 +429,31 @@ class ER_SMART_Synchronizer:
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
 
     def process_file(self, file: Dict) -> Optional[str]:
+        """
+        Download and upload a file from EarthRanger to cloud storage.
+        
+        Downloads a file from EarthRanger using the provided file information,
+        then uploads it to cloud storage for later access. Uses the file ID
+        instead of filename to avoid naming collisions.
+        
+        Args:
+            file: Dictionary containing file information with keys:
+                - 'filename': Original filename with extension
+                - 'id': Unique file identifier
+                - 'url': Download URL from EarthRanger
+                
+        Returns:
+            Optional[str]: Cloud storage URI if upload successful, None if file
+                          already exists in cloud storage.
+                          
+        Raises:
+            RuntimeError: If file download fails from EarthRanger.
+            
+        Note:
+            - Skips download if file already exists in cloud storage
+            - Uses file ID + extension for cloud storage filename
+            - Logs successful uploads and existing files
+        """
         file_extension = pathlib.Path(file.get("filename")).suffix
         # use id instead of file_name so that we dont have collisions with other attachments
         file_name = file.get("id") + file_extension
@@ -403,6 +477,22 @@ class ER_SMART_Synchronizer:
         return image_uri
 
     def sync_patrol_datamodel(self) -> None:
+        """
+        Synchronize SMART Connect patrol data models to EarthRanger.
+        
+        Downloads the patrol data model from SMART Connect and synchronizes patrol
+        subjects (team members) to EarthRanger. Creates new subjects or updates
+        existing ones based on SMART member IDs.
+        
+        Raises:
+            ValueError: If no conservation areas are configured for the integration.
+            
+        Note:
+            - Uses the first conservation area from the configuration
+            - Matches subjects by SMART member ID to avoid duplicates
+            - Adds conservation area identifier to subject names for clarity
+            - Subject updates are logged but not yet implemented
+        """
 
         ca_uuids = self.smart_config.additional.get("ca_uuids", [])
         if not ca_uuids:
@@ -663,7 +753,26 @@ class ER_SMART_Synchronizer:
                             current_span.add_event("gundi_er_smart_sync.patrol_message_too_large")
 
 
-    def get_er_patrols(self, *, config: InboundIntegrationConfiguration) -> None:
+    def synchronize_er_patrols_to_smart_connect(self, *, config: InboundIntegrationConfiguration) -> None:
+        """
+        Synchronize EarthRanger patrols to SMART Connect.
+        
+        Retrieves patrols from EarthRanger that have been updated since the last poll,
+        processes patrol segments with events, files, and track points, and publishes
+        them to the routing system for delivery to SMART Connect.
+        
+        Args:
+            config: The EarthRanger inbound integration configuration containing
+                   connection details and last poll state.
+                   
+        Note:
+            - Processes patrols with associated events, files, and track points
+            - Downloads and uploads patrol and event files to cloud storage
+            - Handles message size optimization by removing observation_details
+            - Updates patrol state tracking for incremental synchronization
+            - Uses distributed tracing for observability
+            - Skips patrols that don't have updates since last poll
+        """
 
         i_state = get_earthranger_last_poll(integration_id=config.id)
 
@@ -694,12 +803,8 @@ class ER_SMART_Synchronizer:
         )
 
         if len(patrols) > 0:
-            self.process_er_patrols(
-                patrols=patrols,
-                integration_id=config.id,
-                patrol_last_poll_at=lower,
-                upper=upper,
-            )
+            self.process_er_patrols(patrols=patrols, integration_id=config.id,
+                                    patrol_last_poll_at=lower, upper=upper)
 
         i_state.patrol_last_poll_at = upper
         set_earthranger_last_poll(integration_id=config.id, state=i_state)

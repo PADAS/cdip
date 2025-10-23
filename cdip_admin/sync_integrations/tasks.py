@@ -123,7 +123,7 @@ def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=300)
+@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
 @handle_timeout_exceptions
 def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize SMART data models and patrol data models to EarthRanger."""
@@ -160,7 +160,7 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True})
+@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
 @handle_timeout_exceptions
 def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger events to SMART."""
@@ -184,7 +184,7 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.get_er_events(config=er_configuration)
+        er_smart_sync.sychronize_er_events_to_smartconnect(config=er_configuration)
 
         logger.info("Finished synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -196,7 +196,7 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=300)
+@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
 @handle_timeout_exceptions
 def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger patrols to SMART."""
@@ -220,7 +220,7 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.get_er_patrols(config=er_configuration)
+        er_smart_sync.synchronize_er_patrols_to_smart_connect(config=er_configuration)
 
         logger.info("Finished synchronizing EarthRanger patrols for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
