@@ -24,6 +24,7 @@ from smartconnect.er_sync_utils import (
     get_earthranger_last_poll,
     set_earthranger_last_poll,
 )
+from google.cloud.pubsub_v1.publisher.exceptions import MessageTooLargeError
 from packaging import version
 from cdip_admin import settings
 from core import tracing
@@ -58,10 +59,7 @@ class SmartIntegrationAdditional(pydantic.BaseModel):
 
 class ER_SMART_Synchronizer:
 
-    def __init__(self, *args, smart_config=None, er_config=None, das_client=None):
-
-
-        assert not args, "ER_SMART_Synchronizer does not support positional arguments"
+    def __init__(self, *, smart_config=None, er_config=None, das_client=None):
 
         if das_client:
             self.das_client = das_client
@@ -79,12 +77,14 @@ class ER_SMART_Synchronizer:
             password=smart_config.password,
             version=smart_config.additional.get("version"),
             use_language_code=smart_config.additional.get("use_language_code", "en"),
+            read_timeout=300.0,
+            connect_timeout=10.0,
         )
 
         provider_key = self.smart_config.type.slug
         url_parse = urlparse(self.er_config.endpoint)
 
-        # TODO: Replace with er-client
+        # Note: DasClient is deprecated and should be replaced with er-client in future
         self.das_client = DasClient(
             service_root=self.er_config.endpoint,
             username=self.er_config.login,
@@ -96,8 +96,20 @@ class ER_SMART_Synchronizer:
         )
 
 
-    def synchronize_datamodel(self):
-        # Given a single smart integration, synchronize the datamodels for all the CAs and CMs.
+    def synchronize_datamodel(self) -> None:
+        """
+        Synchronize SMART Connect data models to EarthRanger.
+        
+        Iterates through all conservation areas (CAs) and configurable models (CMs)
+        configured for this SMART integration and pushes their data models to the
+        corresponding EarthRanger instance.
+        
+        Note:
+            - Processes all conservation areas in the integration configuration
+            - Only synchronizes configurable models marked for use with EarthRanger
+            - Creates or updates event types and categories in EarthRanger
+            - Logs progress for each conservation area and configurable model
+        """
         for ca_uuid in self.smart_config.additional.get('ca_uuids', []):
             ca = self.smart_client.get_conservation_area(ca_uuid=ca_uuid)
 
@@ -119,10 +131,8 @@ class ER_SMART_Synchronizer:
 
 
 
-    def push_smart_datamodel_to_earthranger(self, *args, smart_ca_uuid=None, ca=None,
-                                            smart_cm_uuid=None):
-
-        assert not args, 'This method does not accept positional arguments'
+    def push_smart_datamodel_to_earthranger(self, *, smart_ca_uuid=None, ca=None,
+                                            smart_cm_uuid=None) -> None:
 
         dm = self.smart_client.get_data_model(ca_uuid=smart_ca_uuid)
 
@@ -134,9 +144,7 @@ class ER_SMART_Synchronizer:
         return self.push_smart_ca_datamodel_to_earthranger(dm=dm, smart_ca_uuid=smart_ca_uuid, ca_label=ca.label,
                                                            cm=cm)
 
-    def push_smart_ca_datamodel_to_earthranger(self, *args, dm=None, smart_ca_uuid=None, ca_label=None, cm=None):
-
-        assert not args, 'This method does not accept positional arguments'
+    def push_smart_ca_datamodel_to_earthranger(self, *, dm=None, smart_ca_uuid=None, ca_label=None, cm=None) -> None:
 
         if not dm:
             raise ValueError('dm is required')
@@ -171,25 +179,60 @@ class ER_SMART_Synchronizer:
             )
 
             event_category = dict(value=event_category_value, display=event_category_display)
-            self.das_client.post_event_category(event_category)
+            try:
+                self.das_client.post_event_category(event_category)
+                logger.info(
+                    "Successfully created event category",
+                    extra=dict(value=event_category_value, display=event_category_display),
+                )
+            except Exception as e:
+                error_message = str(e)
+                if "duplicate key value violates unique constraint" in error_message:
+                    logger.warning(
+                        "Event category already exists (likely created in previous run but not readable due to permissions)",
+                        extra=dict(
+                            value=event_category_value, 
+                            display=event_category_display,
+                            error=error_message
+                        ),
+                    )
+                    # Event category exists but we can't read it due to permissions
+                    raise
+                else:
+                    logger.error(
+                        "Failed to create event category for some unknown reason. Will raise an error and stop the task.",
+                        extra=dict(
+                            value=event_category_value,
+                            display=event_category_display,
+                            error=error_message
+                        ),
+                    )
+                    raise
+
         self.create_or_update_er_event_types(event_category=event_category, event_types=event_types)
         logger.info(
             f"Finished syncing {len(event_types)} event_types for event_category {event_category.get('display')}"
         )
 
     @staticmethod
-    def calculate_event_category_value(ca_label: str=None, cm_label: str=None):
-        translation = {
-            ord("["): '', ord("]"): '', ord(" "): "_", ord("-"): "_", ord("/"): "_", ord("("): '', ord(")"): '',
-            ord("'"): '', ord('"'): '', ord("."): '', ord(","): '', ord(":"): '', ord(";"): '', ord("&"): '',
-            ord("$"): '', ord("#"): '', ord("@"): '', ord("!"): '', ord("?"): '', ord("%"): '', ord("*"): '',
-        }
-
-        calcuated_value = ca_label.translate(translation).lower() + "_" + cm_label.translate(translation).lower() if cm_label else ca_label.translate(translation).lower()
-        return unicode_to_ascii(calcuated_value)
+    def calculate_event_category_value(ca_label: str, cm_label: Optional[str] = None) -> str:
+        if not ca_label:
+            raise ValueError("ca_label is required")
+        
+        translation = str.maketrans({
+            "[": '', "]": '', " ": "_", "-": "_", "/": "_", "(": '', ")": '',
+            "'": '', '"': '', ".": '', ",": '', ":": '', ";": '', "&": '',
+            "$": '', "#": '', "@": '', "!": '', "?": '', "%": '', "*": '',
+        })
+        
+        calculated_value = ca_label.translate(translation).lower()
+        if cm_label:
+            calculated_value += "_" + cm_label.translate(translation).lower()
+        
+        return unicode_to_ascii(calculated_value)
 
     @staticmethod
-    def get_identifier_from_ca_label(ca_label: str = ""):
+    def get_identifier_from_ca_label(ca_label: str = "") -> str:
         """
         Expect a string like "Some Name [SONM]"
         Return what's in the brackets (eg. SONM).
@@ -202,80 +245,114 @@ class ER_SMART_Synchronizer:
         logger.warning(f"Unable to get identifier from ca_label {ca_label}")
         return ""
 
-    def create_or_update_er_event_types(self, *args, event_category: dict = None, event_types: dict = None):
+    def _event_type_needs_update(self, event_type: EREventType, existing_er_event_type: dict) -> bool:
+        """Check if an event type needs to be updated."""
+        # Check basic properties
+        if (event_type.is_active != existing_er_event_type.get("is_active") or
+            event_type.display != existing_er_event_type.get("display")):
+            return True
+        
+        # Check schema if event is active and has schema
+        if event_type.is_active and event_type.event_schema:
+            new_schema = json.loads(event_type.event_schema).get("schema")
+            existing_schema = json.loads(existing_er_event_type.get("schema", "{}")).get("schema")
+            if not er_event_type_schemas_equal(new_schema, existing_schema):
+                return True
+        
+        return False
 
-        assert not args, 'This method does not accept positional arguments'
+    def _create_event_type(self, event_type: EREventType) -> None:
+        """Create a new event type in EarthRanger."""
+        logger.info(
+            "Creating ER event type",
+            extra=dict(value=event_type.value, category=event_type.category),
+        )
+        try:
+            self.das_client.post_event_type(
+                event_type.dict(by_alias=True, exclude_none=True)
+            )
+        except Exception as e:
+            logger.exception(
+                "Error occurred during das_client.post_event_type",
+                extra=dict(event_type=event_type.dict(by_alias=True, exclude_none=True), error=str(e)),
+            )
+
+    def _update_event_type(self, event_type: EREventType, existing_er_event_type: dict) -> None:
+        """Update an existing event type in EarthRanger."""
+        logger.info(
+            "Updating ER event type",
+            extra=dict(value=event_type.value),
+        )
+        event_type.id = existing_er_event_type.get("id")
+        try:
+            self.das_client.patch_event_type(
+                event_type.dict(by_alias=True, exclude_none=True)
+            )
+        except Exception as e:
+            logger.exception(
+                "Error occurred during das_client.patch_event_type",
+                extra=dict(event_type=event_type.dict(by_alias=True, exclude_none=True), error=str(e)),
+            )
+
+    def create_or_update_er_event_types(self, *, event_category: dict = None, event_types: List[EREventType] = None) -> None:
 
         # Note: In EarthRanger, EventType.value must be globally unique (not just within category though)
         existing_event_types = self.das_client.get_event_types(
             include_inactive=True, include_schema=True
         )
+        
         try:
-            event_type: EREventType
             for event_type in event_types:
                 event_type.category = event_category.get("value")
+                
+                # Find existing event type
                 existing_er_event_type = next(
                     (
-                        x
-                        for x in existing_event_types
-                        if (x.get("value") == event_type.value and x.get('category').get('value') == event_type.category)
+                        x for x in existing_event_types
+                        if (
+                            x.get("value") == event_type.value
+                            and "category" in x
+                            and x["category"].get("value") == event_type.category
+                        )
                     ),
                     None,
                 )
-                if existing_er_event_type:
-                    if (
-                            event_type.is_active != existing_er_event_type.get("is_active")
-                            or event_type.display != existing_er_event_type.get("display")
-                            or (
-                                    event_type.is_active
-                                    and event_type.event_schema
-                                    and not er_event_type_schemas_equal(
-                                json.loads(event_type.event_schema).get("schema"),
-                                json.loads(existing_er_event_type.get("schema")).get(
-                                    "schema"
-                                ),
-                            )
-                            )
-                    ):
-                        logger.info(
-                            f"Updating ER event type",
-                            extra=dict(value=event_type.value),
-                        )
-                        event_type.id = existing_er_event_type.get("id")
-                        try:
-                            self.das_client.patch_event_type(
-                                event_type.dict(by_alias=True, exclude_none=True)
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f" Error occurred during das_client.patch_event_type",
-                                extra=dict(event_type=event_type, exception=e),
-                            )
-                else:
-                    logger.info(
-                        f"Creating ER event type",
-                        extra=dict(
-                            value=event_type.value, category=event_type.category
-                        ),
-                    )
-                    try:
-                        self.das_client.post_event_type(
-                            event_type.dict(by_alias=True, exclude_none=True)
-                        )
-                    except:
-                        logger.error(
-                            f" Error occurred during das_client.post_event_type",
-                            extra=dict(event_type=event_type),
-                        )
+                
+                if not existing_er_event_type:
+                    # Create new event type
+                    self._create_event_type(event_type)
+                elif self._event_type_needs_update(event_type, existing_er_event_type):
+                    # Update existing event type
+                    self._update_event_type(event_type, existing_er_event_type)
+                    
         except Exception as e:
             logger.exception(
-                f"Unexpected Error occurred during create_or_update_er_event_types",
-                extra=dict(event_type=event_type, exception=e),
+                "Unexpected error occurred during create_or_update_er_event_types",
+                extra=dict(event_type=event_type.dict(by_alias=True, exclude_none=True), error=str(e)),
             )
 
-    def get_er_events(self, *args, config: InboundIntegrationConfiguration):
-
-        assert not args, 'This method does not accept positional arguments'
+    def synchronize_er_events_to_smart_connect(self, *, config: InboundIntegrationConfiguration) -> None:
+        """
+        Synchronize EarthRanger events to SMART Connect.
+        
+        Retrieves events from EarthRanger that have been updated since the last poll,
+        processes any associated files, and publishes them to the routing system for
+        delivery to SMART Connect. Excludes events that are associated with patrols
+        as they are handled separately.
+        
+        Args:
+            config: The EarthRanger inbound integration configuration containing
+                   connection details and last poll state.
+                   
+        Raises:
+            ValueError: If required configuration parameters are missing.
+            
+        Note:
+            - Only processes independent incidents (events not associated with patrols)
+            - Downloads and uploads event files to cloud storage
+            - Updates event state tracking for incremental synchronization
+            - Uses distributed tracing for observability
+        """
 
         i_state = get_earthranger_last_poll(integration_id=config.id)
 
@@ -287,8 +364,8 @@ class ER_SMART_Synchronizer:
         events = parse_obj_as(
             List[EREvent], self.das_client.get_events(updated_since=event_last_poll_at)
         )
-        logger.info(f"Pulled {len(events)} events from ER")
-        event: EREvent
+        logger.info(f"Read {len(events)} events from {config.endpoint} (id={config.id})")
+        
         for event in events:
             with tracing.tracer.start_as_current_span(
                     f"gundi_er_smart_sync.process_event", kind=trace.SpanKind.PRODUCER
@@ -358,31 +435,100 @@ class ER_SMART_Synchronizer:
         i_state.event_last_poll_at = current_time
         set_earthranger_last_poll(integration_id=config.id, state=i_state)
 
-    def update_event_with_smart_data(self, event):
+    def update_event_with_smart_data(self, event) -> None:
+        """
+        Update EarthRanger event with SMART observation UUID.
+        
+        Adds a unique SMART observation UUID to the event's event_details if one
+        doesn't already exist. This UUID is used for tracking the event in SMART
+        Connect and is required for proper synchronization.
+        
+        Args:
+            event: EarthRanger event object to update.
+            
+        Note:
+            - Only adds UUID if smart_observation_uuid doesn't already exist
+            - Uses UUID1 for generating unique identifiers
+            - Updates the event in EarthRanger via API call
+            - This is a stopgap solution for SMART Connect compatibility
+        """
         if not event.event_details.get("smart_observation_uuid"):
-            # TODO: Populate observation uuid if it does not exist
+            # Generate a unique observation UUID for SMART tracking
             smart_observation_uuid = uuid.uuid1()
             event.event_details["smart_observation_uuid"] = str(smart_observation_uuid)
             payload = dict(event_details=event.event_details)
             self.das_client.patch_event(event_id=str(event.id), payload=payload)
 
-    def process_file(self, file):
+    def process_file(self, file: Dict) -> Optional[str]:
+        """
+        Download and upload a file from EarthRanger to cloud storage.
+        
+        Downloads a file from EarthRanger using the provided file information,
+        then uploads it to cloud storage for later access. Uses the file ID
+        instead of filename to avoid naming collisions.
+        
+        Args:
+            file: Dictionary containing file information with keys:
+                - 'filename': Original filename with extension
+                - 'id': Unique file identifier
+                - 'url': Download URL from EarthRanger
+                
+        Returns:
+            Optional[str]: Cloud storage URI if upload successful, None if file
+                          already exists in cloud storage.
+                          
+        Raises:
+            RuntimeError: If file download fails from EarthRanger.
+            
+        Note:
+            - Skips download if file already exists in cloud storage
+            - Uses file ID + extension for cloud storage filename
+            - Logs successful uploads and existing files
+        """
         file_extension = pathlib.Path(file.get("filename")).suffix
         # use id instead of file_name so that we dont have collisions with other attachments
         file_name = file.get("id") + file_extension
+        
         # check if we have already uploaded to cloud storage
-        if not self.cloud_storage.check_exists(file_name=file_name):
-            # download from ER server
-            url = file.get("url")
-            response = self.das_client.get_file(url)
-            if response.ok:
-                image_uri = self.cloud_storage.upload(response.content, file_name)
-            else:
-                raise Exception("Error processing file")
+        if self.cloud_storage.check_exists(file_name=file_name):
+            logger.debug(f"File already exists in cloud storage: {file_name}")
+            return None
+        
+        # download from ER server
+        url = file.get("url")
+        response = self.das_client.get_file(url)
+        
+        if not response.ok:
+            raise RuntimeError(
+                f"Failed to download file from {url}: {response.status_code} - {response.reason}"
+            )
+        
+        image_uri = self.cloud_storage.upload(response.content, file_name)
+        logger.info(f"Successfully uploaded file to cloud storage: {image_uri}")
+        return image_uri
 
-    def sync_patrol_datamodel(self):
+    def sync_patrol_datamodel(self) -> None:
+        """
+        Synchronize SMART Connect patrol data models to EarthRanger.
+        
+        Downloads the patrol data model from SMART Connect and synchronizes patrol
+        subjects (team members) to EarthRanger. Creates new subjects or updates
+        existing ones based on SMART member IDs.
+        
+        Raises:
+            ValueError: If no conservation areas are configured for the integration.
+            
+        Note:
+            - Uses the first conservation area from the configuration
+            - Matches subjects by SMART member ID to avoid duplicates
+            - Adds conservation area identifier to subject names for clarity
+            - Subject updates are logged but not yet implemented
+        """
 
-        smart_ca_uuid=self.smart_config.additional.get("ca_uuids")[0]
+        ca_uuids = self.smart_config.additional.get("ca_uuids", [])
+        if not ca_uuids:
+            raise ValueError("No conservation areas configured for this integration")
+        smart_ca_uuid = ca_uuids[0]
         ca = self.smart_client.get_conservation_area(ca_uuid=smart_ca_uuid)
 
         patrol_data_model = self.smart_client.download_patrolmodel(
@@ -409,30 +555,45 @@ class ER_SMART_Synchronizer:
             if existing_subject_match:
                 subject.id = existing_subject_match.id
                 if not er_subjects_equal(subject, existing_subject_match):
-                    pass
-                    # TODO: subject updates
-                    # das_client.patch_subject(subject.dict())
+                    # Subject updates not implemented yet - differences will be logged but not synced
+                    logger.info(
+                        "Subject differs from existing but updates are not implemented",
+                        extra=dict(
+                            smart_member_id=smart_member_id,
+                            subject_name=subject.name
+                        )
+                    )
             else:
                 try:
-                    ca_identifier = ca.label.split("[")[1].strip("]")
-                    subject.name = f"{subject.name} ({ca_identifier})"
+                    ca_identifier = self.get_identifier_from_ca_label(ca.label)
+                    if ca_identifier:
+                        subject.name = f"{subject.name} ({ca_identifier})"
                     self.das_client.post_subject(subject.dict(exclude_none=True))
-                except Exception:
-                    logger.error(
-                        f"Error occurred while attempting to create ER subject {subject.dict(exclude_none=True)}"
+                except Exception as e:
+                    logger.exception(
+                        "Error occurred while attempting to create ER subject",
+                        extra=dict(subject=subject.dict(exclude_none=True), error=str(e))
                     )
 
     def process_er_patrols(
             self,
-            *args,
-            patrols: List[ERPatrol],
-            integration_id: str,
-            patrol_last_poll_at: datetime,
-            upper: datetime,
-    ):
+            *,
+            patrols: List[ERPatrol] = None,
+            integration_id: str = None,
+            patrol_last_poll_at: datetime = None,
+            upper: datetime = None
+    ) -> None:
 
-        assert not args, 'This method does not accept positional arguments'
-        patrol: ERPatrol
+        if not patrols:
+            raise ValueError("patrols is required")
+        if not integration_id:
+            raise ValueError("integration_id is required")
+        if not patrol_last_poll_at:
+            raise ValueError("patrol_last_poll_at is required")
+        if not upper:
+            raise ValueError("upper is required")
+
+            
         for patrol in patrols:
             with tracing.tracer.start_as_current_span(
                     f"gundi_er_smart_sync.process_patrol", kind=trace.SpanKind.PRODUCER
@@ -487,7 +648,8 @@ class ER_SMART_Synchronizer:
                         publish_observation = False
                         continue
 
-                    # TODO: Ask ER Core to update endpoint to be able to accept list of event_ids
+                    # Note: This makes individual API calls per event (N+1 problem)
+                    # ER Core endpoint should be updated to accept list of event_ids for batch retrieval
                     for segment_event in segment.events:
                         # Need to get event details for each event since they are not provided in patrol get
                         event_details = parse_obj_as(
@@ -517,10 +679,10 @@ class ER_SMART_Synchronizer:
                         for event in segment.event_details:
                             try:
                                 self.update_event_with_smart_data(event=event)
-                            except:
-                                logger.error(
+                            except Exception as e:
+                                logger.exception(
                                     "Error patching event_type with smart_observation_uuid, event not processed",
-                                    extra=dict(event_id=event.id, event_title=event.title),
+                                    extra=dict(event_id=event.id, event_title=event.title, error=str(e)),
                                 )
 
                     # process patrol files
@@ -547,6 +709,11 @@ class ER_SMART_Synchronizer:
                         ),
                     )
 
+                    # Hack to reduce message size (these are destined for Smart Connect)
+                    for track_point in segment.track_points:
+                        track_point.observation_details = None
+
+
                 if max_update < patrol_last_poll_at and \
                         not any(len(seg.track_points) > 0 for seg in patrol.patrol_segments):
                     logger.info(
@@ -556,7 +723,8 @@ class ER_SMART_Synchronizer:
                     current_span.add_event("gundi_er_smart_sync.skipped_patrol_no_updates")
                     continue
 
-                # TODO: Will need to revisit this if we support processing of multiple segments in the future
+                # Note: Currently only supports single segment patrols
+                # Multi-segment patrol support will require revisiting this logic
                 if publish_observation:
                     logger.info(f"Publishing observation for ER Patrol", extra=extra_dict)
                     with tracing.tracer.start_as_current_span(
@@ -566,20 +734,76 @@ class ER_SMART_Synchronizer:
                             tracing.instrumentation.build_context_headers(),
                             default=str,
                         )
-                        self.publisher.publish(
-                            topic=settings.RAW_OBSERVATIONS_TOPIC,
-                            data=json.loads(patrol.json()),  # This is suboptimal but it's fixed in pydantic 2
+                        
+                        # Create a copy of patrol data without track points to reduce message size
+                        patrol_data = json.loads(patrol.json())
+                        
+                        # Calculate the byte size of the serialized JSON data
+                        serialized_json = json.dumps(patrol_data)
+                        message_size_bytes = len(serialized_json.encode('utf-8'))
+                        message_size_mb = message_size_bytes / (1024 * 1024)
+                        
+                        logger.info(
+                            f"Patrol message size: {message_size_bytes:,} bytes ({message_size_mb:.2f} MB)",
                             extra={
-                                "observation_type": StreamPrefixEnum.earthranger_patrol.value,
-                                "gundi_version": "v1",  # Add the version so routing knows how to handle it
-                                "tracing_context": tracing_context  # Propagate OTel context in message attributes
-                            },
+                                'patrol_id': patrol.id,
+                                'patrol_serial_number': patrol.serial_number,
+                                'message_size_bytes': message_size_bytes,
+                                'message_size_mb': round(message_size_mb, 2)
+                            }
                         )
-                        subspan.add_event("gundi_er_smart_sync.patrol_sent_to_routing")
+                        
+                        # # Remove track points from each segment to prevent message size issues
+                        # if 'patrol_segments' in patrol_data:
+                        #     for segment in patrol_data['patrol_segments']:
+                        #         if 'track_points' in segment:
+                        #             track_point_count = len(segment['track_points'])
+                        #             logger.info(f"Removing {track_point_count} track points from segment to reduce message size")
+                        #             del segment['track_points']
+                        try:
+                            self.publisher.publish(
+                                topic=settings.RAW_OBSERVATIONS_TOPIC,
+                                data=patrol_data,
+                                extra={
+                                    "observation_type": StreamPrefixEnum.earthranger_patrol.value,
+                                    "gundi_version": "v1",  # Add the version so routing knows how to handle it
+                                    "tracing_context": tracing_context  # Propagate OTel context in message attributes
+                                },
+                            )
+                            subspan.add_event("gundi_er_smart_sync.patrol_sent_to_routing")
+                        except MessageTooLargeError as e:
+                            logger.exception(
+                                f"Patrol {patrol.id} ({patrol.serial_number}) message too large to publish. Will skip it and continue with next patrol.",
+                                extra={
+                                    'patrol_id': patrol.id,
+                                    'patrol_serial_number': patrol.serial_number,
+                                    'message_size_bytes': message_size_bytes,
+                                    'message_size_mb': round(message_size_mb, 2)
+                                }
+                            )
+                            current_span.add_event("gundi_er_smart_sync.patrol_message_too_large")
 
-    def get_er_patrols(self, *args, config: InboundIntegrationConfiguration):
 
-        assert not args, 'This method does not accept positional arguments'
+    def synchronize_er_patrols_to_smart_connect(self, *, config: InboundIntegrationConfiguration) -> None:
+        """
+        Synchronize EarthRanger patrols to SMART Connect.
+        
+        Retrieves patrols from EarthRanger that have been updated since the last poll,
+        processes patrol segments with events, files, and track points, and publishes
+        them to the routing system for delivery to SMART Connect.
+        
+        Args:
+            config: The EarthRanger inbound integration configuration containing
+                   connection details and last poll state.
+                   
+        Note:
+            - Processes patrols with associated events, files, and track points
+            - Downloads and uploads patrol and event files to cloud storage
+            - Handles message size optimization by removing observation_details
+            - Updates patrol state tracking for incremental synchronization
+            - Uses distributed tracing for observability
+            - Skips patrols that don't have updates since last poll
+        """
 
         i_state = get_earthranger_last_poll(integration_id=config.id)
 
@@ -602,19 +826,16 @@ class ER_SMART_Synchronizer:
             self.das_client.get_patrols(filter=json.dumps(patrol_filter_spec)),
         )
         logger.info(
-            f"Pulled {len(patrols)} patrols from ER",
+            f"Read {len(patrols)} patrols from integration {config.endpoint} (id={config.id})",
             extra=dict(
                 lower=lower.strftime(FILTER_DATETIME_FORMAT),
                 upper=upper.strftime(FILTER_DATETIME_FORMAT),
             ),
         )
 
-        self.process_er_patrols(
-            patrols=patrols,
-            integration_id=config.id,
-            patrol_last_poll_at=lower,
-            upper=upper,
-        )
+        if len(patrols) > 0:
+            self.process_er_patrols(patrols=patrols, integration_id=config.id,
+                                    patrol_last_poll_at=lower, upper=upper)
 
         i_state.patrol_last_poll_at = upper
         set_earthranger_last_poll(integration_id=config.id, state=i_state)

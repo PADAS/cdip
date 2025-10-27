@@ -32,6 +32,8 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
         password=config.password,
         use_language_code=use_language_code,
         version=version,
+        read_timeout=300.0,
+        connect_timeout=10.0,
     )
     ca_uuids = config.additional.get("ca_uuids")
     configurable_models_lists = {}
@@ -41,7 +43,7 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
             smart_client.get_conservation_area(ca_uuid=ca_uuid, force=True)
             cm_values = smart_client.list_configurable_datamodels(ca_uuid=ca_uuid)
 
-            print(json.dumps(cm_values, indent=2))
+            logger.info(f'Smart Connect {config.name}, ({config.endpoint} / {ca_uuid}) configurable models', extra=dict(configurable_models=cm_values))
 
             configurable_models_lists[ca_uuid] = cm_values
 

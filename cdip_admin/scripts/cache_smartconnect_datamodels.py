@@ -43,7 +43,9 @@ def primecache():
         print(f"Processing {oic}")
 
         smartclient = SmartClient(
-            api=oic.endpoint, username=oic.login, password=oic.password
+            api=oic.endpoint, username=oic.login, password=oic.password,
+            read_timeout=300.0,
+            connect_timeout=10.0,
         )
 
         for ca_uuid in oic.additional.get("ca_uuids", []):
