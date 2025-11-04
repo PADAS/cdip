@@ -27,6 +27,18 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--collars-file",
+            type=str,
+            required=True,
+            help="Specify the collars data JSON file to migrate [REQUIRED]",
+        )
+        parser.add_argument(
+            "--destinations-file",
+            type=str,
+            required=True,
+            help="Specify the destinations data JSON file to migrate [REQUIRED]",
+        )
+        parser.add_argument(
             '--sites',
             nargs='+',
             type=str,
@@ -80,7 +92,7 @@ class Command(BaseCommand):
             destination_integration_created = 0
 
             # Read destinations JSON
-            with open('er-prod.gundi-tokens.json', 'r') as f:
+            with open(options["collars_file"], 'r') as f:
                 destinations_data = json.load(f)
 
             for tenant_site, collars in plugins_to_migrate.items():
@@ -244,7 +256,7 @@ class Command(BaseCommand):
             self.stdout.write(f" -- Destination Integrations created: {destination_integration_created} -- ")
 
     def _get_plugins(self, options):
-        with open('er-prod.vectronic.json', 'r') as f:
+        with open(options["collars_file"], 'r') as f:
             plugins_data = json.load(f)
 
         plugins_grouped_by_tenant = defaultdict(list)
