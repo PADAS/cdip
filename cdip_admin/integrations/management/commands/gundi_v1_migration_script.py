@@ -1,4 +1,5 @@
 import copy
+import logging
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -129,6 +130,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+
+        # TODO: FOR LOCAL EXECUTION ONLY! Remove if running in pod
+        logging.getLogger('django.db.backends').setLevel(logging.WARNING)
+        logging.getLogger('activity_log.mixins').setLevel(logging.ERROR)
+        logging.getLogger('integrations.tasks').setLevel(logging.WARNING)
+
+
         inbound_type = options["inbound_type"].capitalize()
         self.stdout.write(f" -- Starting {inbound_type} v1 migration script -- \n\n")
         if inbounds_to_migrate := self._get_v1_inbounds(options=options):
@@ -282,7 +290,7 @@ class Command(BaseCommand):
                                 "field_mappings": field_mappings
                             }
                             route_config, created = RouteConfiguration.objects.get_or_create(
-                                name=f"{integration.default_route.name} (Integration ID: {str(integration.id)}) - Default Configuration",
+                                name=f"{integration.default_route.name} (Integration ID: {str(integration.id)}) - Default Config",
                                 defaults={
                                     "data": field_mappings_result
                                 }
