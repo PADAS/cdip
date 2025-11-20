@@ -62,42 +62,42 @@ class Command(BaseCommand):
                     self.stdout.write(f" -- ERROR: Destination ID {destination_id} does not exist in Gundi v2 -- ")
                     return
 
-            self.stdout.write(f" -- Connection: {source_integration.name} -- \n")
-            self.stdout.write(f" -- Destination: {destination_integration.name} -- \n")
-            self.stdout.write(f" -- Provider Key: {provider_key} -- \n\n")
+                self.stdout.write(f" -- Connection: {source_integration.name} -- \n")
+                self.stdout.write(f" -- Destination: {destination_integration.name} -- \n")
+                self.stdout.write(f" -- Provider Key: {provider_key} -- \n\n")
 
-            field_mappings = {
-                str(source_integration.id): {
-                    "obv": {}
+                field_mappings = {
+                    str(source_integration.id): {
+                        "obv": {}
+                    }
                 }
-            }
 
-            inbound_field_mapping = copy.deepcopy(DEFAULT_FIELD_MAPPING)
-            inbound_field_mapping["default"] = provider_key
+                inbound_field_mapping = copy.deepcopy(DEFAULT_FIELD_MAPPING)
+                inbound_field_mapping["default"] = provider_key
 
-            field_mappings[str(source_integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
+                field_mappings[str(source_integration.id)]["obv"][str(destination_integration.id)] = inbound_field_mapping
 
-            field_mappings_result = {
-                "field_mappings": field_mappings
-            }
-            route_config, created = RouteConfiguration.objects.get_or_create(
-                name=f"{source_integration.default_route.name} (Integration ID: {str(source_integration.id)}) - Default Config",
-                defaults={
-                    "data": field_mappings_result
+                field_mappings_result = {
+                    "field_mappings": field_mappings
                 }
-            )
+                route_config, created = RouteConfiguration.objects.get_or_create(
+                    name=f"{source_integration.default_route.name} (Integration ID: {source_integration.id}) - Default Config",
+                    defaults={
+                        "data": field_mappings_result
+                    }
+                )
 
-            if not created:
-                # A route config already exists for this migration, we need to update it
-                route_config.data = field_mappings_result
-                route_config.save()
+                if not created:
+                    # A route config already exists for this integration/connection, we need to update it
+                    route_config.data = field_mappings_result
+                    route_config.save()
 
-            source_integration.default_route.configuration = route_config
-            source_integration.default_route.save()
-            source_integration.save()
+                source_integration.default_route.configuration = route_config
+                source_integration.default_route.save()
 
-            self.stdout.write(f" -- Connection '{source_integration.name}' (ID: '{source_integration.id}') route config (field_mapping) created correctly... -- \n")
-            self.stdout.write(f" -- Name: '{route_config.name}', ID: '{route_config.id}' ... -- \n\n")
+                self.stdout.write(f" -- Connection '{source_integration.name}' (ID: '{source_integration.id}') route config (field_mapping) created correctly... -- \n")
+                self.stdout.write(f" -- Name: '{route_config.name}', ID: '{route_config.id}' ... -- \n\n")
 
         except Exception as e:
             self.stderr.write(f" -- ERROR creating field mapping for connection ID {connection_id}, destination ID: {destination_id}: {e}")
+            raise
