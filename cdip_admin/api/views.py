@@ -430,6 +430,8 @@ def update_inbound_integration_state(request, integration_id):
             )
             raise Http404
 
-        result = post_device_information(data, config)
-        response = list(result)
-        return JsonResponse(response, safe=False)
+        post_device_information(data, config)
+        
+        logger.info("Inbound Configuration State Updated", extra={"integration_id": integration_id})
+        return JsonResponse(data={"integration_id": integration_id, 
+            "message": "Inbound Configuration State Updated"})
