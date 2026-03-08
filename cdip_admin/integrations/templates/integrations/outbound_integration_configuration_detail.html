@@ -25,9 +25,14 @@
                 <b>ID: </b>{{module.id}}<br/>
                 <b>Owner: </b><a href="{% url 'organizations_detail' module.owner.id %}"> {{module.owner.name}} </a><br/>
                 <b>Endpoint: </b>{{module.endpoint}}<br/>
-                <b>State: </b>{<pre>{{ module.state | pprint }}</pre><br/>
                 <b>Enabled: </b>{{module.enabled}}<br/>
             </p>
+
+            {% if module.state.error %}
+            <div class="alert alert-danger mt-3">
+                <strong>Error:</strong> {{ module.state.error }}
+            </div>
+            {% endif %}
         </div>
     </div>
 

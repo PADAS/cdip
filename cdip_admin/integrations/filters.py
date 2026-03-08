@@ -298,6 +298,12 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
 
+    has_errors = django_filters.BooleanFilter(
+        widget=HasErrorBooleanWidget,
+        field_name='state',
+        method=filter_has_error_key,
+    )
+
     outbound_affected_destinations = django_filters.ModelChoiceFilter(
         queryset=inbound_type_filter,
         method='affected_destinations_filter',
@@ -344,6 +350,12 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
+
+    has_errors = django_filters.BooleanFilter(
+        widget=HasErrorBooleanWidget,
+        field_name='state',
+        method=filter_has_error_key,
+    )
 
     class Meta:
         model = BridgeIntegration

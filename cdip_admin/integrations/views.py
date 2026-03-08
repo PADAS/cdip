@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from django.db.models import Count
+from django.db.models import Count, Case, When, Value, BooleanField
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -667,16 +667,24 @@ class InboundIntegrationConfigurationListView(
         context = super().get_context_data(**kwargs)
         base_url = reverse("inbound_integration_configuration_list")
         context["base_url"] = base_url
+        qs = self.filterset.qs
+        context["error_count"] = qs.filter(state__has_key='error').count()
+        context["total_count"] = qs.count()
         return context
 
     def get_queryset(self):
         qs = super(InboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(
+            qs = IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        return qs.annotate(
+            _has_error=Case(
+                When(state__has_key='error', then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        ).order_by('-_has_error', 'type__name', 'id')
 
 
 ###
@@ -862,16 +870,24 @@ class OutboundIntegrationConfigurationListView(
         context = super().get_context_data(**kwargs)
         base_url = reverse("outbound_integration_configuration_list")
         context["base_url"] = base_url
+        qs = self.filterset.qs
+        context["error_count"] = qs.filter(state__has_key='error').count()
+        context["total_count"] = qs.count()
         return context
 
     def get_queryset(self):
         qs = super(OutboundIntegrationConfigurationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(
+            qs = IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        return qs.annotate(
+            _has_error=Case(
+                When(state__has_key='error', then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        ).order_by('-_has_error', 'type__name', 'id')
 
 
 class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -884,16 +900,24 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["base_url"] = reverse("bridge_integration_list")
+        qs = self.filterset.qs
+        context["error_count"] = qs.filter(state__has_key='error').count()
+        context["total_count"] = qs.count()
         return context
 
-    def get_querset(self):
+    def get_queryset(self):
         qs = super(BridgeIntegrationListView, self).get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
-            return IsOrganizationMember.filter_queryset_for_user(
+            qs = IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        else:
-            return qs
+        return qs.annotate(
+            _has_error=Case(
+                When(state__has_key='error', then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        ).order_by('-_has_error', 'name', 'id')
 
 
 @permission_required("integrations.view_bridgeintegration", raise_exception=True)
