@@ -879,19 +879,7 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
 
 @permission_required("integrations.view_bridgeintegration", raise_exception=True)
 def bridge_integration_view(request, module_id):
-    bridge = get_object_or_404(BridgeIntegration, pk=module_id)
-    permission_can_view(request, bridge)
-    form = KeyAuthForm()
-
-    key = get_api_key(bridge)
-    if key:
-        form.fields["key"].initial = key
-
-    return render(
-        request,
-        "integrations/bridge_integration_view.html",
-        {"module": bridge, "form": form},
-    )
+    return redirect("bridge_integration_update", id=module_id)
 
 
 class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
@@ -906,7 +894,7 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
 
         if form.is_valid():
             config = form.save()
-            return redirect("bridge_integration_view", config.id)
+            return redirect("bridge_integration_update", id=config.id)
 
         return render(request, self.template_name, {'form': form})
 
@@ -926,6 +914,19 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
     form_class = BridgeIntegrationForm
     model = BridgeIntegration
     permission_required = "integrations.change_bridgeintegration"
+
+    def get(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        self.object = self.get_object()
+        form = form_class(request=request, instance=self.object)
+        key_form = KeyAuthForm()
+        key = get_api_key(self.object)
+        if key:
+            key_form.fields["key"].initial = key
+        return self.render_to_response(self.get_context_data(form=form, key_form=key_form))
+
+    def get_success_url(self):
+        return reverse("bridge_integration_list")
 
     @staticmethod
     @requires_csrf_token
@@ -1023,14 +1024,3 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         permission_can_view(self.request, configuration)
         return configuration
 
-    def get(self, request, *args, **kwargs):
-        form_class = self.get_form_class()
-        self.object = self.get_object()
-        # needed for model form field filtering
-        form = form_class(request=request, instance=self.object)
-        return self.render_to_response(self.get_context_data(form=form))
-
-    def get_success_url(self):
-        return reverse(
-            "bridge_integration_view", kwargs={"module_id": self.kwargs.get("id")}
-        )

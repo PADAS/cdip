@@ -171,7 +171,7 @@ class BridgeIntegrationTable(tables.Table):
     )
     name = tables.TemplateColumn(
         template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
-        verbose_name="Name",
+        verbose_name="Name / Type",
     )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
@@ -187,11 +187,18 @@ class BridgeIntegrationTable(tables.Table):
         verbose_name="Status",
         orderable=False,
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <a href="{% url 'bridge_integration_update' id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = BridgeIntegration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("enabled", "status", "name", "organization")
-        row_attrs = {"bridge-config-id": lambda record: record.id}
+        fields = ("actions", "enabled", "status", "name", "organization")
+        sequence = ("actions", "enabled", "status", "name", "organization")
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"
