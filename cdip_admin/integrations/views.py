@@ -4,8 +4,10 @@ import random
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
@@ -1023,4 +1025,46 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         configuration = get_object_or_404(BridgeIntegration, pk=self.kwargs.get("id"))
         permission_can_view(self.request, configuration)
         return configuration
+
+
+def _enabled_icon_response(record, url_name, url_kwargs):
+    toggle_url = reverse(url_name, kwargs=url_kwargs)
+    if record.enabled:
+        icon = '<span class="text-success" title="Enabled">&#10003;</span>'
+    else:
+        icon = '<span class="text-muted" title="Disabled">&#10005;</span>'
+    return HttpResponse(
+        f'<span hx-post="{toggle_url}" hx-swap="outerHTML" '
+        f'style="cursor: pointer;">{icon}</span>'
+    )
+
+
+@require_POST
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def toggle_inbound_enabled(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    return _enabled_icon_response(config, "inbound_toggle_enabled", {"configuration_id": config.id})
+
+
+@require_POST
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def toggle_outbound_enabled(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    return _enabled_icon_response(config, "outbound_toggle_enabled", {"configuration_id": config.id})
+
+
+@require_POST
+@permission_required("integrations.change_bridgeintegration", raise_exception=True)
+def toggle_bridge_enabled(request, id):
+    config = get_object_or_404(BridgeIntegration, pk=id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    return _enabled_icon_response(config, "bridge_toggle_enabled", {"id": config.id})
 

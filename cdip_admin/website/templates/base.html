@@ -13,6 +13,14 @@
     <script src="{% static 'website/js/bootstrap.bundle.min.js' %} "></script>
     <script src="https://unpkg.com/htmx.org@1.6.1"></script>
     <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
+    <script>
+        document.addEventListener('htmx:configRequest', function(evt) {
+            var csrfCookie = document.cookie.split('; ').find(function(c) { return c.startsWith('csrftoken='); });
+            if (csrfCookie) {
+                evt.detail.headers['X-CSRFToken'] = csrfCookie.split('=')[1];
+            }
+        });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         $(function () {

@@ -161,5 +161,20 @@ urlpatterns = [
         "bridges/dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
         name="bridges/dropdown_restore",
-    )
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/toggle-enabled",
+        views.toggle_inbound_enabled,
+        name="inbound_toggle_enabled",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/toggle-enabled",
+        views.toggle_outbound_enabled,
+        name="outbound_toggle_enabled",
+    ),
+    path(
+        "bridges/<uuid:id>/toggle-enabled",
+        views.toggle_bridge_enabled,
+        name="bridge_toggle_enabled",
+    ),
 ]
