@@ -185,6 +185,3 @@ ul ul a {
 	text-transform: capitalize;
 }
 
-tr[has_error="true"] {
-    background-color: #ffd0d0;
-}

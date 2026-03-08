@@ -505,3 +505,12 @@ class KeyAuthForm(forms.Form):
         widget=ReadonlyPeekabooTextInput,
         required=False,
     )
+
+    helper = FormHelper()
+    helper.form_tag = False
+    helper.layout = Layout(
+        Row(
+            Column("key", css_class="form-group col-lg-6 mb-0"),
+            css_class="form-row",
+        ),
+    )

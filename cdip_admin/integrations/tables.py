@@ -78,6 +78,15 @@ class DeviceTable(tables.Table):
 
 class InboundIntegrationConfigurationTable(tables.Table):
 
+    enabled = tables.TemplateColumn(
+        template_code='''{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name / Type",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
@@ -94,8 +103,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'inbound_integration_configuration_detail' id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
-        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
+        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
         ''',
         verbose_name="",
         orderable=False,
@@ -104,16 +112,24 @@ class InboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type__name", "organization", "endpoint", "enabled", "status", "actions")
-        row_attrs = {"inbound-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in record.state).lower()}
+        fields = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        sequence = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        row_attrs = {"inbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
         order_by = "type__name"
 
 
 class OutboundIntegrationConfigurationTable(tables.Table):
-    type = tables.Column(accessor="type__name", verbose_name="Type")
 
+    enabled = tables.TemplateColumn(
+        template_code='''{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name / Type",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
@@ -130,8 +146,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'outbound_integration_configuration_detail' module_id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
-        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
+        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
         ''',
         verbose_name="",
         orderable=False,
@@ -140,15 +155,24 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = OutboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "endpoint", "enabled", "status", "actions")
-        row_attrs = {"outbound-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
+        fields = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        sequence = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        row_attrs = {"outbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = "type__name"
 
 
 class BridgeIntegrationTable(tables.Table):
-    type = tables.Column(accessor="type__name", verbose_name="Type")
+
+    enabled = tables.TemplateColumn(
+        template_code='''{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
@@ -167,8 +191,7 @@ class BridgeIntegrationTable(tables.Table):
     class Meta:
         model = BridgeIntegration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "enabled", "status")
-        row_attrs = {"bridge-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
+        fields = ("enabled", "status", "name", "organization")
+        row_attrs = {"bridge-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"

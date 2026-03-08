@@ -148,11 +148,8 @@ def test_inbound_integration_configuration_list_renders_action_buttons(
     rendered_screen = response.content.decode("utf-8")
     configurations = InboundIntegrationConfiguration.objects.all()
     for config in configurations:
-        detail_url = reverse("inbound_integration_configuration_detail", kwargs={"id": config.id})
         update_url = reverse("inbound_integration_configuration_update", kwargs={"configuration_id": config.id})
-        assert detail_url in rendered_screen
         assert update_url in rendered_screen
-    assert "Overview" in rendered_screen
     assert "Edit" in rendered_screen
 
 
@@ -261,46 +258,6 @@ def test_get_inbound_integration_configuration_list_filter_by_has_errors_false(
     ).order_by("id")
     assert list(response.context["inboundintegrationconfiguration_list"]) == list(non_error_configurations)
     assert ii1 not in response.context["inboundintegrationconfiguration_list"]
-
-
-def test_get_inbound_integration_configurations_detail_organization_member_hybrid(
-        client, organization_member_user, setup_data, mocker
-):
-    mocker.patch("integrations.views.get_api_key", mocker.MagicMock(return_value="TestAPiKey"))
-    org1 = setup_data["org1"]
-    org2 = setup_data["org2"]
-    ii = setup_data["ii1"]
-    o_ii = setup_data["ii2"]
-
-    account_profile_mapping = {
-        (organization_member_user.user, org1, RoleChoices.VIEWER),
-        (organization_member_user.user, org2, RoleChoices.ADMIN),
-    }
-    setup_account_profile_mapping(account_profile_mapping)
-
-    client.force_login(organization_member_user.user)
-
-    # Get inbound integration configuration detail
-    response = client.get(
-        reverse("inbound_integration_configuration_detail", kwargs={"id": ii.id}),
-        HTTP_X_USERINFO=organization_member_user.user_info,
-    )
-
-    # confirm viewer role passes object permission check
-    assert response.status_code == 200
-
-    assert response.context["module"].id == ii.id
-
-    # Get inbound integration configuration detail for other type
-    response = client.get(
-        reverse("inbound_integration_configuration_detail", kwargs={"id": o_ii.id}),
-        HTTP_X_USERINFO=organization_member_user.user_info,
-    )
-
-    # confirm admin role passes object permission check
-    assert response.status_code == 200
-
-    assert response.context["module"].id == o_ii.id
 
 
 def test_inbound_integration_update_form_save(
@@ -472,11 +429,8 @@ def test_outbound_integration_configuration_list_renders_action_buttons(
     rendered_screen = response.content.decode("utf-8")
     configurations = OutboundIntegrationConfiguration.objects.all()
     for config in configurations:
-        detail_url = reverse("outbound_integration_configuration_detail", kwargs={"module_id": config.id})
         update_url = reverse("outbound_integration_configuration_update", kwargs={"configuration_id": config.id})
-        assert detail_url in rendered_screen
         assert update_url in rendered_screen
-    assert "Overview" in rendered_screen
     assert "Edit" in rendered_screen
 
 

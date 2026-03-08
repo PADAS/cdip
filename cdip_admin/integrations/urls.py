@@ -75,11 +75,6 @@ urlpatterns = [
         name="inbound_integration_configuration_list",
     ),
     path(
-        "inboundconfigurations/<uuid:id>",
-        views.inbound_integration_configuration_detail,
-        name="inbound_integration_configuration_detail",
-    ),
-    path(
         "inboundconfigurations/add",
         views.InboundIntegrationConfigurationAddView.as_view(),
         name="inbound_integration_configuration_add",
@@ -108,11 +103,6 @@ urlpatterns = [
         "outboundconfigurations",
         views.OutboundIntegrationConfigurationListView.as_view(),
         name="outbound_integration_configuration_list",
-    ),
-    path(
-        "outboundconfigurations/<uuid:module_id>",
-        views.outbound_integration_configuration_detail,
-        name="outbound_integration_configuration_detail",
     ),
     path(
         "outboundconfigurations/add",

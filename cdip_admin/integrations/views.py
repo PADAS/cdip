@@ -477,30 +477,6 @@ def permission_can_administer(request, target):
 ###
 # Inbound Integration Configuration Methods/Classes
 ###
-@permission_required(
-    "integrations.view_inboundintegrationconfiguration", raise_exception=True
-)
-def inbound_integration_configuration_detail(request, id):
-    integration = get_object_or_404(InboundIntegrationConfiguration, pk=id)
-
-    permission_can_view(request, integration)
-
-    form = KeyAuthForm()
-
-    key = get_api_key(integration)
-    if key:
-        form.fields["key"].initial = key
-
-    return render(
-        request,
-        "integrations/inbound_integration_configuration_detail.html",
-        {
-            "module": integration,
-            "form": form,
-        },
-    )
-
-
 class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     template_name = "integrations/inbound_integration_configuration_add.html"
     form_class = InboundIntegrationConfigurationForm
@@ -645,13 +621,14 @@ class InboundIntegrationConfigurationUpdateView(
         self.object = self.get_object()
         # needed for model form field filtering
         form = form_class(request=request, instance=self.object)
-        return self.render_to_response(self.get_context_data(form=form))
+        key_form = KeyAuthForm()
+        key = get_api_key(self.object)
+        if key:
+            key_form.fields["key"].initial = key
+        return self.render_to_response(self.get_context_data(form=form, key_form=key_form))
 
     def get_success_url(self):
-        return reverse(
-            "inbound_integration_configuration_detail",
-            kwargs={"id": self.kwargs.get("configuration_id")},
-        )
+        return reverse("inbound_integration_configuration_list")
 
 
 class InboundIntegrationConfigurationListView(
@@ -690,23 +667,6 @@ class InboundIntegrationConfigurationListView(
 ###
 # Outbound Integration Configuration Methods/Classes
 ###
-@permission_required(
-    "integrations.view_outboundintegrationconfiguration", raise_exception=True
-)
-def outbound_integration_configuration_detail(request, module_id):
-    integration_module = get_object_or_404(
-        OutboundIntegrationConfiguration, pk=module_id
-    )
-
-    permission_can_view(request, integration_module)
-
-    return render(
-        request,
-        "integrations/outbound_integration_configuration_detail.html",
-        {"module": integration_module},
-    )
-
-
 class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     template_name = "integrations/outbound_integration_configuration_add.html"
     form_class = OutboundIntegrationConfigurationForm
@@ -717,7 +677,7 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
         form = OutboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             config = form.save()
-            return redirect("outbound_integration_configuration_detail", config.id)
+            return redirect("outbound_integration_configuration_list")
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
@@ -851,10 +811,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
-        return reverse(
-            "outbound_integration_configuration_detail",
-            kwargs={"module_id": self.kwargs.get("configuration_id")},
-        )
+        return reverse("outbound_integration_configuration_list")
 
 
 class OutboundIntegrationConfigurationListView(
