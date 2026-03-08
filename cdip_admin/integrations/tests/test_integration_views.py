@@ -219,6 +219,50 @@ def test_get_inbound_integration_configuration_list_filter_by_enabled_unset(
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
 
 
+def test_get_inbound_integration_configuration_list_filter_by_has_errors_true(
+        client, global_admin_user, setup_data
+):
+    ii1 = setup_data["ii1"]
+    ii1.state = {"error": "something went wrong"}
+    ii1.save()
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        data={"has_errors": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    error_configurations = InboundIntegrationConfiguration.objects.filter(
+        state__has_key='error'
+    ).order_by("id")
+    assert list(response.context["inboundintegrationconfiguration_list"]) == list(error_configurations)
+    assert ii1 in response.context["inboundintegrationconfiguration_list"]
+
+
+def test_get_inbound_integration_configuration_list_filter_by_has_errors_false(
+        client, global_admin_user, setup_data
+):
+    ii1 = setup_data["ii1"]
+    ii1.state = {"error": "something went wrong"}
+    ii1.save()
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        data={"has_errors": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    non_error_configurations = InboundIntegrationConfiguration.objects.exclude(
+        state__has_key='error'
+    ).order_by("id")
+    assert list(response.context["inboundintegrationconfiguration_list"]) == list(non_error_configurations)
+    assert ii1 not in response.context["inboundintegrationconfiguration_list"]
+
+
 def test_get_inbound_integration_configurations_detail_organization_member_hybrid(
         client, organization_member_user, setup_data, mocker
 ):
@@ -497,6 +541,50 @@ def test_get_outbound_integration_configuration_list_filter_by_enabled_unset(
     # Check that at least the minimal data for each configuration is seen in the screen
     rendered_screen = response.content.decode("utf-8")
     _test_basic_config_data_is_rendered(all_configurations, rendered_screen)
+
+
+def test_get_outbound_integration_configuration_list_filter_by_has_errors_true(
+        client, global_admin_user, setup_data
+):
+    oi1 = setup_data["oi1"]
+    oi1.state = {"error": "something went wrong"}
+    oi1.save()
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        data={"has_errors": True},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    error_configurations = OutboundIntegrationConfiguration.objects.filter(
+        state__has_key='error'
+    ).order_by("id")
+    assert list(response.context["outboundintegrationconfiguration_list"]) == list(error_configurations)
+    assert oi1 in response.context["outboundintegrationconfiguration_list"]
+
+
+def test_get_outbound_integration_configuration_list_filter_by_has_errors_false(
+        client, global_admin_user, setup_data
+):
+    oi1 = setup_data["oi1"]
+    oi1.state = {"error": "something went wrong"}
+    oi1.save()
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        data={"has_errors": False},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    non_error_configurations = OutboundIntegrationConfiguration.objects.exclude(
+        state__has_key='error'
+    ).order_by("id")
+    assert list(response.context["outboundintegrationconfiguration_list"]) == list(non_error_configurations)
+    assert oi1 not in response.context["outboundintegrationconfiguration_list"]
 
 
 # TODO: Get Post Working

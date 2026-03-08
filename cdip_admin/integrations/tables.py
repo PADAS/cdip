@@ -94,8 +94,8 @@ class InboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'inbound_integration_configuration_detail' id=record.id %}" class="btn btn-sm btn-outline-primary mr-1">Overview</a>
-        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+        <a href="{% url 'inbound_integration_configuration_detail' id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
+        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
         ''',
         verbose_name="",
         orderable=False,
@@ -130,8 +130,8 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'outbound_integration_configuration_detail' module_id=record.id %}" class="btn btn-sm btn-outline-primary mr-1">Overview</a>
-        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+        <a href="{% url 'outbound_integration_configuration_detail' module_id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
+        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
         ''',
         verbose_name="",
         orderable=False,

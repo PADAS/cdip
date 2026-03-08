@@ -684,7 +684,7 @@ class InboundIntegrationConfigurationListView(
                 default=Value(False),
                 output_field=BooleanField(),
             )
-        ).order_by('-_has_error', 'type__name')
+        ).order_by('-_has_error', 'type__name', 'id')
 
 
 ###
@@ -887,7 +887,7 @@ class OutboundIntegrationConfigurationListView(
                 default=Value(False),
                 output_field=BooleanField(),
             )
-        ).order_by('-_has_error', 'type__name')
+        ).order_by('-_has_error', 'type__name', 'id')
 
 
 class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -917,7 +917,7 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
                 default=Value(False),
                 output_field=BooleanField(),
             )
-        ).order_by('-_has_error', 'name')
+        ).order_by('-_has_error', 'name', 'id')
 
 
 @permission_required("integrations.view_bridgeintegration", raise_exception=True)
