@@ -30,6 +30,12 @@
                 <b>Login: </b>{{module.login}}<br/>
                 <b>Enabled: </b>{{module.enabled}}<br/>
             </p>
+            {% if module.state.error %}
+            <div class="alert alert-danger mt-3">
+                <strong>Error:</strong> {{ module.state.error }}
+            </div>
+            {% endif %}
+
             {% crispy form %}
         </div>
     </div>

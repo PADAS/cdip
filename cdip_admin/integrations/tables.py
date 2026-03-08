@@ -81,16 +81,30 @@ class InboundIntegrationConfigurationTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
-    has_error = tables.BooleanColumn(
-        verbose_name='Has Errors?',
-        accessor="state__error",
-        linkify=False
+    status = tables.TemplateColumn(
+        template_code='''
+        {% if record.state.error %}
+          <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
+        {% else %}
+          <span class="badge badge-success">OK</span>
+        {% endif %}
+        ''',
+        verbose_name="Status",
+        orderable=False,
+    )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <a href="{% url 'inbound_integration_configuration_detail' id=record.id %}" class="btn btn-sm btn-outline-primary mr-1">Overview</a>
+        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+        ''',
+        verbose_name="",
+        orderable=False,
     )
 
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type__name", "organization", "endpoint", "enabled", "has_error")
+        fields = ("name", "type__name", "organization", "endpoint", "enabled", "status", "actions")
         row_attrs = {"inbound-config-id": lambda record: record.id,
                      "has_error": lambda record: str('error' in record.state).lower()}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
@@ -103,12 +117,32 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    status = tables.TemplateColumn(
+        template_code='''
+        {% if record.state.error %}
+          <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
+        {% else %}
+          <span class="badge badge-success">OK</span>
+        {% endif %}
+        ''',
+        verbose_name="Status",
+        orderable=False,
+    )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <a href="{% url 'outbound_integration_configuration_detail' module_id=record.id %}" class="btn btn-sm btn-outline-primary mr-1">Overview</a>
+        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = OutboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "endpoint", "enabled")
-        row_attrs = {"outbound-config-id": lambda record: record.id}
+        fields = ("name", "type", "organization", "endpoint", "enabled", "status", "actions")
+        row_attrs = {"outbound-config-id": lambda record: record.id,
+                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = "type__name"
 
@@ -118,11 +152,23 @@ class BridgeIntegrationTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    status = tables.TemplateColumn(
+        template_code='''
+        {% if record.state.error %}
+          <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
+        {% else %}
+          <span class="badge badge-success">OK</span>
+        {% endif %}
+        ''',
+        verbose_name="Status",
+        orderable=False,
+    )
 
     class Meta:
         model = BridgeIntegration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "enabled")
-        row_attrs = {"bridge-config-id": lambda record: record.id}
+        fields = ("name", "type", "organization", "enabled", "status")
+        row_attrs = {"bridge-config-id": lambda record: record.id,
+                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"

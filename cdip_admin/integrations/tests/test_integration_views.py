@@ -136,6 +136,26 @@ def _test_basic_config_data_is_rendered(configurations: List, rendered_screen: s
         assert str(config.owner) in rendered_screen
 
 
+def test_inbound_integration_configuration_list_renders_action_buttons(
+        client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("inbound_integration_configuration_list"),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+    assert response.status_code == 200
+    rendered_screen = response.content.decode("utf-8")
+    configurations = InboundIntegrationConfiguration.objects.all()
+    for config in configurations:
+        detail_url = reverse("inbound_integration_configuration_detail", kwargs={"id": config.id})
+        update_url = reverse("inbound_integration_configuration_update", kwargs={"configuration_id": config.id})
+        assert detail_url in rendered_screen
+        assert update_url in rendered_screen
+    assert "Overview" in rendered_screen
+    assert "Edit" in rendered_screen
+
+
 def test_get_inbound_integration_configuration_list_filter_by_enabled_true(
         client, global_admin_user, setup_data
 ):
@@ -394,6 +414,26 @@ def test_get_outbound_integration_configuration_list_organization_member_viewer(
     assert list(response.context["outboundintegrationconfiguration_list"]) == list(
         OutboundIntegrationConfiguration.objects.filter(owner=org1).order_by("id")
     )
+
+
+def test_outbound_integration_configuration_list_renders_action_buttons(
+        client, global_admin_user, setup_data
+):
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("outbound_integration_configuration_list"),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+    assert response.status_code == 200
+    rendered_screen = response.content.decode("utf-8")
+    configurations = OutboundIntegrationConfiguration.objects.all()
+    for config in configurations:
+        detail_url = reverse("outbound_integration_configuration_detail", kwargs={"module_id": config.id})
+        update_url = reverse("outbound_integration_configuration_update", kwargs={"configuration_id": config.id})
+        assert detail_url in rendered_screen
+        assert update_url in rendered_screen
+    assert "Overview" in rendered_screen
+    assert "Edit" in rendered_screen
 
 
 def test_get_outbound_integration_configuration_list_filter_by_enabled_true(

@@ -43,6 +43,11 @@
               </tbody>
             </table>
 
+            {% if module.state.error %}
+            <div class="alert alert-danger mt-3">
+                <strong>Error:</strong> {{ module.state.error }}
+            </div>
+            {% endif %}
 
             {% crispy form %}
 

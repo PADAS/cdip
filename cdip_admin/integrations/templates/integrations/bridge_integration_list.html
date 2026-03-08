@@ -18,6 +18,12 @@
         </div>
     </div>
 
+    {% if error_count > 0 %}
+    <div class="alert alert-warning mt-2">
+        <strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors
+    </div>
+    {% endif %}
+
     {% if filter %}
     <div class="row">
         <div class="col-md-12">
