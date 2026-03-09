@@ -1,10 +1,31 @@
 from django import forms
 import json
+import django_filters
 from django_filters.widgets import BooleanWidget
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class LenientModelChoiceField(forms.ModelChoiceField):
+    """ModelChoiceField that silently ignores invalid/stale choices.
+
+    When browsers restore old form values (e.g. a renamed or removed type),
+    this field returns None instead of raising a validation error.
+    """
+
+    def clean(self, value):
+        try:
+            return super().clean(value)
+        except forms.ValidationError:
+            return None
+
+
+class LenientModelChoiceFilter(django_filters.ModelChoiceFilter):
+    """ModelChoiceFilter that ignores invalid choices instead of showing errors."""
+
+    field_class = LenientModelChoiceField
 
 
 class FormattedJsonFieldWidget(forms.widgets.Textarea):

@@ -21,7 +21,7 @@ from integrations.models import (
     get_user_integrations_qs,
     Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
-from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
+from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, LenientModelChoiceFilter
 from django.db.models import Q
 from django.contrib.postgres.aggregates import ArrayAgg
 
@@ -116,14 +116,14 @@ class DeviceStateFilter(django_filters.FilterSet):
         label=_("External ID"),
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="device__inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="device__inbound_configuration__type",
         to_field_name="name",
@@ -155,14 +155,14 @@ class DeviceGroupFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label="Name"
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Organizations"),
     )
 
-    destinations = django_filters.ModelChoiceFilter(
+    destinations = LenientModelChoiceFilter(
         queryset=outbound_integration_filter,
         field_name="destinations",
         to_field_name="name",
@@ -203,14 +203,14 @@ class DeviceFilter(django_filters.FilterSet):
         field_name="external_id", lookup_expr="icontains", label=_("External ID")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="inbound_configuration__type",
         to_field_name="name",
@@ -262,14 +262,14 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label=_("Name")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="type",
         to_field_name="name",
@@ -321,14 +321,14 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label=_("Name")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
     )
 
-    outbound_config_type = django_filters.ModelChoiceFilter(
+    outbound_config_type = LenientModelChoiceFilter(
         queryset=outbound_type_filter,
         field_name="type",
         to_field_name="name",
@@ -343,7 +343,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         method=filter_has_error_key,
     )
 
-    outbound_affected_destinations = django_filters.ModelChoiceFilter(
+    outbound_affected_destinations = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         method='affected_destinations_filter',
         to_field_name="name",
@@ -392,14 +392,14 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label=_("Name")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
     )
 
-    bridge_type = django_filters.ModelChoiceFilter(
+    bridge_type = LenientModelChoiceFilter(
         queryset=bridge_type_filter,
         field_name="type",
         to_field_name="name",
