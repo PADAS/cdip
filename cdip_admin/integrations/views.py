@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 
@@ -1616,7 +1617,10 @@ def _enabled_icon_response(record, url_name, url_kwargs):
     else:
         icon = '<span class="text-muted" title="Disabled">&#10005;</span>'
     response = HttpResponse(icon)
-    response["HX-Trigger"] = "tableChanged"
+    response["HX-Trigger"] = json.dumps({
+        "tableChanged": None,
+        "toggleFeedback": {"enabled": record.enabled, "name": str(record.name)},
+    })
     return response
 
 

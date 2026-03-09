@@ -80,6 +80,21 @@
                 htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
             });
 
+            document.body.addEventListener('toggleFeedback', function(e) {
+                var d = e.detail;
+                var Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true,
+                });
+                Toast.fire({
+                    icon: d.enabled ? 'success' : 'info',
+                    title: d.name + (d.enabled ? ' enabled' : ' disabled'),
+                });
+            });
+
             document.addEventListener('keydown', function(e) {
                 if (!panel.classList.contains('open')) return;
                 if (e.key === 'Escape') {

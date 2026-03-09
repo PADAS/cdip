@@ -239,6 +239,17 @@ ul ul a {
 
 }
 
+@keyframes flash-enabled {
+    0% { background-color: rgba(40, 167, 69, 0.25); }
+    100% { background-color: transparent; }
+}
+@keyframes flash-disabled {
+    0% { background-color: rgba(108, 117, 125, 0.25); }
+    100% { background-color: transparent; }
+}
+.htmx-settling tr.flash-enabled td { animation: flash-enabled 1s ease; }
+.htmx-settling tr.flash-disabled td { animation: flash-disabled 1s ease; }
+
 .ul.errorlist {
 	text-transform: capitalize;
 }
