@@ -179,7 +179,6 @@ ul ul a {
 	width: min(840px, 90vw);
 	background: #fff;
 	z-index: 1001;
-	overflow-y: auto;
 	transition: right 0.3s ease;
 	box-shadow: -2px 0 8px rgba(0,0,0,0.15);
 }
@@ -188,23 +187,26 @@ ul ul a {
 	right: 0;
 }
 
-#slide-panel .slide-panel-header {
-	display: flex;
-	justify-content: flex-end;
-	padding: 12px 16px 0;
-}
-
-#slide-panel .slide-panel-header .close-btn {
-	background: none;
-	border: none;
-	font-size: 1.5rem;
-	cursor: pointer;
-	color: #333;
-	line-height: 1;
-}
-
 #slide-panel-body {
-	padding: 0 24px 24px;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.slide-panel-toolbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 24px;
+	border-bottom: 1px solid #dee2e6;
+	background: #fff;
+	flex-shrink: 0;
+}
+
+.slide-panel-content {
+	flex: 1;
+	overflow-y: auto;
+	padding: 24px;
 }
 
 

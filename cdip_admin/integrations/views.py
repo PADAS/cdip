@@ -669,6 +669,7 @@ class InboundIntegrationConfigurationUpdateView(
         form_action = reverse(url_name, kwargs=url_kwargs)
         form.helper.form_action = form_action
         form.helper.include_media = False
+        form.helper.inputs = []
         form.helper.attrs = {
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
@@ -908,6 +909,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         form_action = reverse(url_name, kwargs=url_kwargs)
         form.helper.form_action = form_action
         form.helper.include_media = False
+        form.helper.inputs = []
         form.helper.attrs = {
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
@@ -1085,6 +1087,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         form_action = reverse(url_name, kwargs=url_kwargs)
         form.helper.form_action = form_action
         form.helper.include_media = False
+        form.helper.inputs = []
         form.helper.attrs = {
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
@@ -1197,10 +1200,12 @@ def _enabled_icon_response(record, url_name, url_kwargs):
         icon = '<span class="text-success" title="Enabled">&#10003;</span>'
     else:
         icon = '<span class="text-muted" title="Disabled">&#10005;</span>'
-    return HttpResponse(
+    response = HttpResponse(
         f'<span hx-post="{toggle_url}" hx-target="this" hx-swap="outerHTML" '
         f'style="cursor: pointer;">{icon}</span>'
     )
+    response["HX-Trigger"] = "tableChanged"
+    return response
 
 
 @require_POST

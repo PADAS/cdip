@@ -15,6 +15,7 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     BridgeIntegration,
+    BridgeIntegrationType,
     Integration,
     IntegrationType,
     get_user_integrations_qs,
@@ -65,6 +66,18 @@ def outbound_type_filter(request):
         )
         type_qs = type_qs.filter(
             outboundintegrationconfiguration__owner__in=org_qs
+        ).distinct()
+    return type_qs
+
+
+def bridge_type_filter(request):
+    type_qs = BridgeIntegrationType.objects.all()
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        org_qs = IsOrganizationMember.filter_queryset_for_user(
+            Organization.objects.all(), request.user, "name"
+        )
+        type_qs = type_qs.filter(
+            bridgeintegration__owner__in=org_qs
         ).distinct()
     return type_qs
 
@@ -349,6 +362,24 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name", lookup_expr="icontains", label=_("Name")
+    )
+
+    organization = django_filters.ModelChoiceFilter(
+        queryset=organization_filter,
+        field_name="owner",
+        to_field_name="name",
+        empty_label=_("All Owners"),
+    )
+
+    bridge_type = django_filters.ModelChoiceFilter(
+        queryset=bridge_type_filter,
+        field_name="type",
+        to_field_name="name",
+        empty_label=_("All Types"),
+    )
+
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
 
     has_errors = django_filters.BooleanFilter(
@@ -359,7 +390,28 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
 
     class Meta:
         model = BridgeIntegration
-        fields = ("enabled",)
+        fields = ("organization", "bridge_type", "name", "enabled")
+
+    def __init__(self, *args, **kwargs):
+        super(BridgeIntegrationFilter, self).__init__(*args, **kwargs)
+        if "owner_filter" in self.request.session:
+            self.form.initial["organization"] = self.request.session["owner_filter"]
+
+    @property
+    def qs(self):
+        qs = super().qs
+        if "organization" in self.data:
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
+            else:
+                self.request.session["owner_filter"] = self.data["organization"]
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        if "owner_filter" in self.request.session:
+            return qs.filter(owner__name=self.request.session["owner_filter"])
+        return qs
 
 
 class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):

@@ -43,9 +43,6 @@
 
     <!-- Slide panel -->
     <div id="slide-panel">
-        <div class="slide-panel-header">
-            <button type="button" class="close-btn" id="slide-panel-close">&times;</button>
-        </div>
         <div id="slide-panel-body"></div>
     </div>
 
@@ -54,8 +51,6 @@
             var overlay = document.getElementById('slide-panel-overlay');
             var panel = document.getElementById('slide-panel');
             var panelBody = document.getElementById('slide-panel-body');
-            var closeBtn = document.getElementById('slide-panel-close');
-
             function openPanel() {
                 overlay.classList.add('open');
                 panel.classList.add('open');
@@ -73,16 +68,24 @@
             document.body.addEventListener('openPanel', openPanel);
             document.body.addEventListener('closePanel', closePanel);
             overlay.addEventListener('click', closePanel);
-            closeBtn.addEventListener('click', closePanel);
 
             document.body.addEventListener('panelFormSaved', function() {
                 closePanel();
                 htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
             });
 
+            document.body.addEventListener('tableChanged', function() {
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && panel.classList.contains('open')) {
+                if (!panel.classList.contains('open')) return;
+                if (e.key === 'Escape') {
                     closePanel();
+                } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    var form = panelBody.querySelector('form');
+                    if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
                 }
             });
         })();
