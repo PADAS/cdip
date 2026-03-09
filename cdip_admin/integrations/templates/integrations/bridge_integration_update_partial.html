@@ -11,6 +11,6 @@
         {% crispy key_form %}
     {% endif %}
 
-    <div class="form-group px-0 list-inline">{{ form.errors }}</div>
+    {% include "integrations/_form_errors.html" %}
     {% crispy form %}
 </div>

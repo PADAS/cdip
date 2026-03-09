@@ -7,7 +7,7 @@
     </div>
 </div>
 <div class="slide-panel-content">
-    <div class="form-group px-0 list-inline">{{ form.errors }}</div>
+    {% include "integrations/_form_errors.html" %}
     {% crispy form %}
 
     <div id="outbound-connections-section"

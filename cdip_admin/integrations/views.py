@@ -65,6 +65,7 @@ from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
 from django.views.decorators.csrf import requires_csrf_token
 from django.template.loader import render_to_string
 from core.widgets import FormattedJsonFieldWidget
+from django.forms.fields import InvalidJSONInput
 from django_jsonform.widgets import JSONFormWidget
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,36 @@ default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
 def random_string(n=4):
     return "".join(random.sample([chr(x) for x in range(97, 97 + 26)], n))
+
+
+def _preserve_state_on_error(form, request):
+    """Fix two issues when re-rendering a form after validation failure:
+
+    1. The owner field has hx-trigger="load" which auto-fetches the schema
+       endpoint and replaces the state widget with the saved DB value,
+       discarding the user's changes.  Strip those HTMX attrs on re-render.
+
+    2. If the submitted state value is invalid JSON, the JSONFormWidget's
+       inline script crashes on JSON.parse, leaving an empty container.
+       Fall back to a plain textarea so the user can see and fix their input.
+    """
+    # 1) Stop owner from re-fetching the schema endpoint on load.
+    #    Replace the attrs dict (don't mutate in-place) to avoid polluting
+    #    the class-level widget definition shared across form instances.
+    if "owner" in form.fields:
+        owner_widget = form.fields["owner"].widget
+        owner_widget.attrs = {
+            k: v for k, v in owner_widget.attrs.items()
+            if k not in ("hx-trigger", "hx-get", "hx-target", "hx-swap")
+        }
+
+    # 2) Fall back to textarea for invalid JSON so the editor doesn't vanish
+    for field_name in ("state", "additional"):
+        if field_name not in form.fields:
+            continue
+        bf = form[field_name]
+        if isinstance(bf.value(), InvalidJSONInput):
+            form.fields[field_name].widget = FormattedJsonFieldWidget()
 
 
 ###
@@ -148,6 +179,7 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -203,6 +235,7 @@ class DeviceUpdateView(
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -368,6 +401,7 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -424,6 +458,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -525,6 +560,7 @@ class InboundIntegrationTypeAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -568,6 +604,7 @@ class InboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -649,6 +686,7 @@ class OutboundIntegrationTypeAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -692,6 +730,7 @@ class OutboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -806,6 +845,7 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -923,13 +963,16 @@ class InboundIntegrationConfigurationUpdateView(
                 raise PermissionDenied
         return configuration
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
         is_htmx = request.headers.get("HX-Request")
-        # needed for model form field filtering
-        form_kwargs = dict(request=request, instance=self.object)
-        form = form_class(**form_kwargs)
+        form = form_class(request=request, instance=self.object)
         key_form = KeyAuthForm()
         key = get_api_key(self.object)
         if key:
@@ -956,6 +999,7 @@ class InboundIntegrationConfigurationUpdateView(
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
+        _preserve_state_on_error(form, self.request)
         if self.request.headers.get("HX-Request"):
             self._configure_htmx_helper(
                 form, "inbound_integration_configuration_update",
@@ -979,6 +1023,7 @@ class InboundIntegrationConfigurationUpdateView(
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -1079,6 +1124,7 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -1194,13 +1240,16 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
                 raise PermissionDenied
         return configuration
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
         is_htmx = request.headers.get("HX-Request")
-        # needed for model form field filtering
-        form_kwargs = dict(request=request, instance=self.object)
-        form = form_class(**form_kwargs)
+        form = form_class(request=request, instance=self.object)
         context = self.get_context_data(form=form)
         if is_htmx:
             self._configure_htmx_helper(
@@ -1223,6 +1272,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
+        _preserve_state_on_error(form, self.request)
         if self.request.headers.get("HX-Request"):
             self._configure_htmx_helper(
                 form, "outbound_integration_configuration_update",
@@ -1246,6 +1296,7 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
@@ -1390,6 +1441,7 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
 
@@ -1401,12 +1453,16 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
 
     pk_url_kwarg = "id"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
         is_htmx = request.headers.get("HX-Request")
-        form_kwargs = dict(request=request, instance=self.object)
-        form = form_class(**form_kwargs)
+        form = form_class(request=request, instance=self.object)
         key_form = KeyAuthForm()
         key = get_api_key(self.object)
         if key:
@@ -1430,6 +1486,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
+        _preserve_state_on_error(form, self.request)
         if self.request.headers.get("HX-Request"):
             self._configure_htmx_helper(form, "bridge_integration_update", {"id": self.object.pk})
             context = self.get_context_data(form=form)
@@ -1450,6 +1507,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
             "hx-post": form_action,
             "hx-target": "#slide-panel-body",
             "hx-swap": "innerHTML",
+            "novalidate": "",
         }
 
     def get_success_url(self):
