@@ -73,11 +73,11 @@
 
             document.body.addEventListener('panelFormSaved', function() {
                 closePanel();
-                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
             });
 
             document.body.addEventListener('tableChanged', function() {
-                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
             });
 
             document.addEventListener('keydown', function(e) {

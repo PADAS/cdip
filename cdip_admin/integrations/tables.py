@@ -99,7 +99,7 @@ class DeviceTable(tables.Table):
 class InboundIntegrationConfigurationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'inbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'inbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )
@@ -146,7 +146,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
 class OutboundIntegrationConfigurationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'outbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'outbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )
@@ -193,7 +193,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
 class BridgeIntegrationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'bridge_toggle_enabled' id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'bridge_toggle_enabled' id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )

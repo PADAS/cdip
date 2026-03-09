@@ -1611,15 +1611,11 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
 
 
 def _enabled_icon_response(record, url_name, url_kwargs):
-    toggle_url = reverse(url_name, kwargs=url_kwargs)
     if record.enabled:
         icon = '<span class="text-success" title="Enabled">&#10003;</span>'
     else:
         icon = '<span class="text-muted" title="Disabled">&#10005;</span>'
-    response = HttpResponse(
-        f'<span hx-post="{toggle_url}" hx-target="this" hx-swap="outerHTML" '
-        f'style="cursor: pointer;">{icon}</span>'
-    )
+    response = HttpResponse(icon)
     response["HX-Trigger"] = "tableChanged"
     return response
 
