@@ -10,8 +10,10 @@
             <h2>Inbound Integration Types</h2>
         </div>
         <div class="col-md-3 d-flex justify-content-end">
-            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
-               href="{% url 'inbound_integration_type_add' %}" role="button">Add Type</a>
+            <button type="button"
+                class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
+                onclick="htmx.ajax('GET', '{% url 'inbound_integration_type_add' %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));"
+                {% if not perms.integrations.add_inboundintegrationtype %}disabled{% endif %}>Add Type</button>
         </div>
     </div>
 

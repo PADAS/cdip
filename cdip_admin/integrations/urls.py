@@ -36,7 +36,7 @@ urlpatterns = [
     ),
     path(
         "inboundtypes/add",
-        views.inbound_integration_type_add,
+        views.InboundIntegrationTypeAddView.as_view(),
         name="inbound_integration_type_add",
     ),
     path(
@@ -56,7 +56,7 @@ urlpatterns = [
     ),
     path(
         "outboundtypes/add",
-        views.outbound_integration_type_add,
+        views.OutboundIntegrationTypeAddView.as_view(),
         name="outbound_integration_type_add",
     ),
     path(

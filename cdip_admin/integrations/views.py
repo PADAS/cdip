@@ -287,7 +287,26 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         form = form_class(instance=self.object)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
-        return self.render_to_response(self.get_context_data(form=form))
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            return render(request, "integrations/device_group_update_partial.html", context)
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        self.object = form.save()
+        if self.request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = "panelFormSaved"
+            return response
+        return redirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        if self.request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            context = self.get_context_data(form=form)
+            return render(self.request, "integrations/device_group_update_partial.html", context)
+        return super().form_invalid(form)
 
     def get_object(self):
         device_group = get_object_or_404(
@@ -299,6 +318,17 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
             ):
                 raise PermissionDenied
         return device_group
+
+    @staticmethod
+    def _configure_htmx_helper(form, pk):
+        form_action = reverse("device_group_update", kwargs={"device_group_id": pk})
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
     def get_success_url(self):
         return reverse(
@@ -363,18 +393,43 @@ def inbound_integration_type_detail(request, module_id):
     )
 
 
-@permission_required("integrations.add_inboundintegrationtype", raise_exception=True)
-def inbound_integration_type_add(request):
-    if request.method == "POST":
+class InboundIntegrationTypeAddView(PermissionRequiredMixin, FormView):
+    template_name = "integrations/inbound_integration_type_add.html"
+    form_class = InboundIntegrationTypeForm
+    permission_required = "integrations.add_inboundintegrationtype"
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/inbound_integration_type_add_partial.html", context)
+        return self.render_to_response(context)
+
+    def post(self, request, *args, **kwargs):
         form = InboundIntegrationTypeForm(request.POST)
         if form.is_valid():
             integration_type = form.save()
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("inbound_integration_type_detail", integration_type.id)
-    else:
-        form = InboundIntegrationTypeForm
-    return render(
-        request, "integrations/inbound_integration_type_add.html", {"form": form}
-    )
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/inbound_integration_type_add_partial.html", {"form": form})
+        return render(request, self.template_name, {"form": form})
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("inbound_integration_type_add")
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class InboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
@@ -462,18 +517,43 @@ def outbound_integration_type_detail(request, module_id):
     )
 
 
-@permission_required("integrations.add_outboundintegrationtype", raise_exception=True)
-def outbound_integration_type_add(request):
-    if request.method == "POST":
+class OutboundIntegrationTypeAddView(PermissionRequiredMixin, FormView):
+    template_name = "integrations/outbound_integration_type_add.html"
+    form_class = OutboundIntegrationTypeForm
+    permission_required = "integrations.add_outboundintegrationtype"
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/outbound_integration_type_add_partial.html", context)
+        return self.render_to_response(context)
+
+    def post(self, request, *args, **kwargs):
         form = OutboundIntegrationTypeForm(request.POST)
         if form.is_valid():
             integration_type = form.save()
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("outbound_integration_type_detail", integration_type.id)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/outbound_integration_type_add_partial.html", {"form": form})
+        return render(request, self.template_name, {"form": form})
 
-    form = OutboundIntegrationTypeForm
-    return render(
-        request, "integrations/outbound_integration_type_add.html", {"form": form}
-    )
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("outbound_integration_type_add")
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class OutboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
@@ -583,12 +663,31 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
     model = InboundIntegrationConfiguration
     permission_required = "integrations.add_inboundintegrationconfiguration"
 
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/inbound_integration_configuration_add_partial.html", context)
+        return self.render_to_response(context)
+
     def post(self, request, *args, **kwargs):
         form = InboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             config: InboundIntegrationConfiguration = form.save()
+            if request.headers.get("HX-Request"):
+                device_group = config.default_devicegroup
+                device_group_url = reverse("device_group_update", kwargs={"device_group_id": device_group.id})
+                return render(
+                    request,
+                    "integrations/inbound_integration_configuration_add_success.html",
+                    {"config": config, "device_group_url": device_group_url},
+                )
             device_group = config.default_devicegroup
             return redirect("device_group_update", device_group_id=device_group.id)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/inbound_integration_configuration_add_partial.html", {"form": form})
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
@@ -600,6 +699,18 @@ class InboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView):
                 form.fields["owner"].queryset, self.request.user, "name", True
             )
         return form
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("inbound_integration_configuration_add")
+        form.helper.form_action = form_action
+        form.helper.include_media = False
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class InboundIntegrationConfigurationUpdateView(
@@ -830,11 +941,26 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
     model = OutboundIntegrationConfiguration
     permission_required = "integrations.add_outboundintegrationconfiguration"
 
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/outbound_integration_configuration_add_partial.html", context)
+        return self.render_to_response(context)
+
     def post(self, request, *args, **kwargs):
         form = OutboundIntegrationConfigurationForm(request.POST)
         if form.is_valid():
             config = form.save()
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("outbound_integration_configuration_list")
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/outbound_integration_configuration_add_partial.html", {"form": form})
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
@@ -846,6 +972,18 @@ class OutboundIntegrationConfigurationAddView(PermissionRequiredMixin, FormView)
                 form.fields["owner"].queryset, self.request.user, "name", True
             )
         return form
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("outbound_integration_configuration_add")
+        form.helper.form_action = form_action
+        form.helper.include_media = False
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, UpdateView):
@@ -1112,14 +1250,28 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
     model = BridgeIntegration
     permission_required = "integrations.add_bridgeintegration"
 
-    # replace this with get_success_url
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/bridge_integration_add_partial.html", context)
+        return self.render_to_response(context)
+
     def post(self, request, *args, **kwargs):
         form = BridgeIntegrationForm(request.POST)
 
         if form.is_valid():
             config = form.save()
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("bridge_integration_update", id=config.id)
 
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/bridge_integration_add_partial.html", {"form": form})
         return render(request, self.template_name, {'form': form})
 
     def get_form(self, form_class=None):
@@ -1131,6 +1283,18 @@ class BridgeIntegrationAddView(PermissionRequiredMixin, FormView):
                 form.fields["owner"].queryset, self.request.user, "name", True
             )
         return form
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("bridge_integration_add")
+        form.helper.form_action = form_action
+        form.helper.include_media = False
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
