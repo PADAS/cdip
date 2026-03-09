@@ -11,8 +11,10 @@
             <h2>Devices</h2>
         </div>
         <div class="col-md-3 d-flex justify-content-end">
-            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_device %} disabled {% endif %}"
-               href="{% url 'device_add' %}" role="button">Add Device</a>
+            <button type="button"
+                class="mb-2 btn btn-primary {% if not perms.integrations.add_device %} disabled {% endif %}"
+                onclick="htmx.ajax('GET', '{% url 'device_add' %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));"
+                {% if not perms.integrations.add_device %}disabled{% endif %}>Add Device</button>
         </div>
     </div>
     {% if filter %}
@@ -23,13 +25,62 @@
         </form>
     </div>
     {% endif %}
-    {% render_table table %}
-    <script type="text/javascript"
-            id="row-click-handler"
-            data-table-id="device-table"
-            data-row-attribute="device-id"
-            data-url="{{ base_url }}"
-            src="{% static 'website/js/cdip.custom.js' %}">
+
+    <div id="table-container">
+        {% render_table table %}
+    </div>
+
+    <!-- Slide panel overlay -->
+    <div id="slide-panel-overlay"></div>
+
+    <!-- Slide panel -->
+    <div id="slide-panel">
+        <div id="slide-panel-body"></div>
+    </div>
+
+    <script>
+        (function() {
+            var overlay = document.getElementById('slide-panel-overlay');
+            var panel = document.getElementById('slide-panel');
+            var panelBody = document.getElementById('slide-panel-body');
+            function openPanel() {
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            }
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                panel.addEventListener('transitionend', function handler() {
+                    panelBody.innerHTML = '';
+                    panel.removeEventListener('transitionend', handler);
+                });
+            }
+
+            document.body.addEventListener('openPanel', openPanel);
+            document.body.addEventListener('closePanel', closePanel);
+            overlay.addEventListener('click', closePanel);
+
+            document.body.addEventListener('panelFormSaved', function() {
+                closePanel();
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.body.addEventListener('tableChanged', function() {
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (!panel.classList.contains('open')) return;
+                if (e.key === 'Escape') {
+                    closePanel();
+                } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    var form = panelBody.querySelector('form');
+                    if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
+                }
+            });
+        })();
     </script>
 
 {% endblock %}

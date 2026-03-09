@@ -46,14 +46,23 @@ class DeviceGroupTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'device_group_update' device_group_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = DeviceGroup
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name",)
+        fields = ("actions", "name",)
         row_attrs = {"device-group-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-group-table"}
-        sequence = ("name", "organization", "device_count", "created")
+        sequence = ("actions", "name", "organization", "device_count", "created")
         order_by = ["organization", "-created"]
 
 
@@ -67,14 +76,23 @@ class DeviceTable(tables.Table):
     integration_type = tables.Column(
         accessor="inbound_configuration__type__name", verbose_name="Integration Type"
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'device_update' module_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = Device
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("external_id", "owner", "integration_type")
+        fields = ("actions", "external_id", "owner", "integration_type")
         row_attrs = {"device-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-table"}
-        sequence = ("external_id", "owner", "integration_type", "created")
+        sequence = ("actions", "external_id", "owner", "integration_type", "created")
         order_by = "-created"
 
 

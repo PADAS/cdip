@@ -93,6 +93,14 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
     model = Device
     permission_required = "integrations.add_device"
 
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/device_add_partial.html", context)
+        return self.render_to_response(context)
+
     def post(self, request, *args, **kwargs):
         form = DeviceForm(request.POST)
         if form.is_valid():
@@ -107,10 +115,17 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
                 logger.warning(
                     f"Did not find default device group for {dev.id} with integration id: {dev.inbound_configuration}"
                 )
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("device_list")
         else:
             logger.warning(f"Error saving device form: {form.errors}")
-            # TODO: Validate JSON before saving
+            if request.headers.get("HX-Request"):
+                self._configure_htmx_helper(form)
+                return render(request, "integrations/device_add_partial.html", {"form": form})
+            return render(request, self.template_name, {"form": form})
 
     def get_form(self, form_class=None):
         form = DeviceForm()
@@ -123,6 +138,17 @@ class DeviceAddView(PermissionRequiredMixin, FormView):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return form
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("device_add")
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class DeviceUpdateView(
@@ -145,7 +171,39 @@ class DeviceUpdateView(
         form_class = self.get_form_class()
         self.object = self.get_object()
         form = form_class(instance=self.object)
-        return self.render_to_response(self.get_context_data(form=form))
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            form = filter_device_group_form_fields(form, self.request.user)
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            return render(request, "integrations/device_update_partial.html", context)
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        self.object = form.save()
+        if self.request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = "panelFormSaved"
+            return response
+        return redirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        if self.request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            context = self.get_context_data(form=form)
+            return render(self.request, "integrations/device_update_partial.html", context)
+        return super().form_invalid(form)
+
+    @staticmethod
+    def _configure_htmx_helper(form, pk):
+        form_action = reverse("device_update", kwargs={"module_id": pk})
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
     def get_success_url(self):
         return reverse(
@@ -173,6 +231,11 @@ class DeviceList(LoginRequiredMixin, SingleTableMixin, FilterView):
         # context["base_url"] = base_url
         # return context
 
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["integrations/table_partial.html"]
+        return super().get_template_names()
+
 
 ###
 # Device Group Methods/Classes
@@ -188,6 +251,11 @@ class DeviceGroupListView(LoginRequiredMixin, SingleTableMixin, FilterView):
         base_url = reverse("device_group_list")
         context["base_url"] = base_url
         return context
+
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["integrations/table_partial.html"]
+        return super().get_template_names()
 
     def get_table_data(self):
         qs = super().get_table_data()
@@ -256,11 +324,28 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
     model = DeviceGroup
     permission_required = "integrations.add_devicegroup"
 
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/device_group_add_partial.html", context)
+        return self.render_to_response(context)
+
     def post(self, request, *args, **kwargs):
         form = DeviceGroupForm(request.POST)
         if form.is_valid():
             config = form.save()
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
             return redirect("device_group", str(config.id))
+
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form)
+            return render(request, "integrations/device_group_add_partial.html", {"form": form})
+        return render(request, self.template_name, {"form": form})
 
     def get_form(self, form_class=None):
         form = DeviceGroupForm()
@@ -273,6 +358,17 @@ class DeviceGroupAddView(PermissionRequiredMixin, FormView):
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         return form
+
+    @staticmethod
+    def _configure_htmx_helper(form):
+        form_action = reverse("device_group_add")
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
 
 
 class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
