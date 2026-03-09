@@ -1,21 +1,28 @@
 import logging
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
+from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import SuspiciousOperation, PermissionDenied
+from django.urls import reverse
 from django.views.generic import ListView, FormView, UpdateView
 from django.contrib.auth.models import User
+from django_filters.views import FilterView
+from django_tables2.views import SingleTableMixin
 from cdip_admin import settings
 from core.enums import RoleChoices
 from core.permissions import IsOrganizationMember, IsGlobalAdmin
 from organizations.models import Organization
+from .filters import AccountFilter
 from .forms import AccountForm, AccountUpdateForm, AccountProfileForm
 from .models import AccountProfile, AccountProfileOrganization
+from .tables import AccountTable
 from .utils import add_or_create_user_in_org
 
 KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 logger = logging.getLogger(__name__)
+default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
 
 def get_accounts_in_user_organization(user):
@@ -31,20 +38,29 @@ def get_accounts_in_user_organization(user):
     return accounts
 
 
-class AccountsListView(LoginRequiredMixin, ListView):
+class AccountsListView(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = "accounts/account_list.html"
+    table_class = AccountTable
+    paginate_by = default_paginate_by
+    filterset_class = AccountFilter
     queryset = User.objects.filter(email__contains="@").order_by("last_name")
-    context_object_name = "accounts"
-    logger.info("Getting account list")
 
     def get_queryset(self):
         qs = super().get_queryset()
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             accounts = get_accounts_in_user_organization(self.request.user)
             qs = qs.filter(id__in=accounts)
-            return qs
-        else:
-            return qs
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_url"] = reverse("account_list")
+        return context
+
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["accounts/table_partial.html"]
+        return super().get_template_names()
 
 
 @permission_required("accounts.view_accountprofile")
@@ -108,16 +124,37 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
     form_class = AccountUpdateForm
     permission_required = "accounts.change_accountprofile"
 
-    def post(self, request, *args, **kwargs):
-        user_id = self.kwargs.get("user_id")
-        user = get_object_or_404(User, id=user_id)
-
-        # check that requesting user has permission to update this account
-        if not IsGlobalAdmin.has_permission(None, request, None):
-            accounts = get_accounts_in_user_organization(request.user)
+    def get_object(self):
+        user = get_object_or_404(User, id=self.kwargs.get("user_id"))
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            accounts = get_accounts_in_user_organization(self.request.user)
             if user.id not in accounts:
                 raise PermissionDenied
+        return user
 
+    def get(self, request, *args, **kwargs):
+        user = self.get_object()
+        account_form = AccountUpdateForm()
+        account_form.initial["firstName"] = user.first_name
+        account_form.initial["lastName"] = user.last_name
+        account_form.initial["username"] = user.username
+
+        is_htmx = request.headers.get("HX-Request")
+        if is_htmx:
+            self._configure_htmx_helper(account_form, user.id)
+            return render(
+                request,
+                "accounts/account_update_partial.html",
+                {"account_form": account_form, "user_id": user.id},
+            )
+        return render(
+            request,
+            "accounts/account_update.html",
+            {"account_form": account_form, "user_id": user.id},
+        )
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
         account_form = AccountUpdateForm(request.POST)
 
         if account_form.is_valid():
@@ -126,30 +163,32 @@ class AccountsUpdateView(PermissionRequiredMixin, UpdateView):
             user.last_name = data["lastName"]
             user.username = data["username"]
             user.save()
-            return redirect("account_detail", user_id=user_id)
+            if request.headers.get("HX-Request"):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "panelFormSaved"
+                return response
+            return redirect("account_detail", user_id=user.id)
         else:
+            if request.headers.get("HX-Request"):
+                self._configure_htmx_helper(account_form, user.id)
+                return render(
+                    request,
+                    "accounts/account_update_partial.html",
+                    {"account_form": account_form, "user_id": user.id},
+                )
             raise SuspiciousOperation
 
-    def get(self, request, *args, **kwargs):
-        account_form = AccountUpdateForm()
-        user_id = self.kwargs.get("user_id")
-        user = get_object_or_404(User, id=user_id)
-
-        # check that requesting user has permission to update this account
-        if not IsGlobalAdmin.has_permission(None, request, None):
-            accounts = get_accounts_in_user_organization(request.user)
-            if user.id not in accounts:
-                raise PermissionDenied
-
-        account_form.initial["firstName"] = user.first_name
-        account_form.initial["lastName"] = user.last_name
-        account_form.initial["username"] = user.username
-
-        return render(
-            request,
-            "accounts/account_update.html",
-            {"account_form": account_form, "user_id": user_id},
-        )
+    @staticmethod
+    def _configure_htmx_helper(form, user_id):
+        form_action = reverse("account_update", kwargs={"user_id": user_id})
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+            "novalidate": "",
+        }
 
 
 class AccountProfileUpdateView(PermissionRequiredMixin, UpdateView):
