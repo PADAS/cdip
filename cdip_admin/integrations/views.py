@@ -73,6 +73,38 @@ logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
 
 
+@require_GET
+@permission_required("integrations.change_inboundintegrationconfiguration")
+def api_key_fragment(request, integration_id):
+    """Return the API key form as an HTML fragment for lazy loading."""
+    integration = get_object_or_404(
+        InboundIntegrationConfiguration, pk=integration_id
+    )
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        if not IsOrganizationMember.is_object_owner(request.user, integration):
+            raise PermissionDenied
+    key_form = KeyAuthForm()
+    key = get_api_key(integration)
+    if key:
+        key_form.fields["key"].initial = key
+    return render(request, "integrations/_api_key_fragment.html", {"key_form": key_form})
+
+
+@require_GET
+@permission_required("integrations.change_bridgeintegration")
+def bridge_api_key_fragment(request, integration_id):
+    """Return the API key form as an HTML fragment for lazy loading."""
+    integration = get_object_or_404(BridgeIntegration, pk=integration_id)
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        if not IsOrganizationMember.is_object_owner(request.user, integration):
+            raise PermissionDenied
+    key_form = KeyAuthForm()
+    key = get_api_key(integration)
+    if key:
+        key_form.fields["key"].initial = key
+    return render(request, "integrations/_api_key_fragment.html", {"key_form": key_form})
+
+
 def random_string(n=4):
     return "".join(random.sample([chr(x) for x in range(97, 97 + 26)], n))
 
@@ -974,11 +1006,7 @@ class InboundIntegrationConfigurationUpdateView(
         self.object = self.get_object()
         is_htmx = request.headers.get("HX-Request")
         form = form_class(request=request, instance=self.object)
-        key_form = KeyAuthForm()
-        key = get_api_key(self.object)
-        if key:
-            key_form.fields["key"].initial = key
-        context = self.get_context_data(form=form, key_form=key_form)
+        context = self.get_context_data(form=form)
         if is_htmx:
             self._configure_htmx_helper(
                 form, "inbound_integration_configuration_update",
@@ -989,6 +1017,11 @@ class InboundIntegrationConfigurationUpdateView(
                 "integrations/inbound_integration_configuration_update_partial.html",
                 context,
             )
+        key_form = KeyAuthForm()
+        key = get_api_key(self.object)
+        if key:
+            key_form.fields["key"].initial = key
+        context["key_form"] = key_form
         return self.render_to_response(context)
 
     def form_valid(self, form):
@@ -1464,11 +1497,7 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         self.object = self.get_object()
         is_htmx = request.headers.get("HX-Request")
         form = form_class(request=request, instance=self.object)
-        key_form = KeyAuthForm()
-        key = get_api_key(self.object)
-        if key:
-            key_form.fields["key"].initial = key
-        context = self.get_context_data(form=form, key_form=key_form)
+        context = self.get_context_data(form=form)
         if is_htmx:
             self._configure_htmx_helper(form, "bridge_integration_update", {"id": self.object.pk})
             return render(
@@ -1476,6 +1505,11 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
                 "integrations/bridge_integration_update_partial.html",
                 context,
             )
+        key_form = KeyAuthForm()
+        key = get_api_key(self.object)
+        if key:
+            key_form.fields["key"].initial = key
+        context["key_form"] = key_form
         return self.render_to_response(context)
 
     def form_valid(self, form):

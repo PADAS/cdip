@@ -85,6 +85,11 @@ urlpatterns = [
         name="inbound_integration_configuration_update",
     ),
     path(
+        "inboundconfigurations/<uuid:integration_id>/api-key",
+        views.api_key_fragment,
+        name="inbound_api_key_fragment",
+    ),
+    path(
         "inboundconfigurations/type_modal/<uuid:integration_id>/",
         views.InboundIntegrationConfigurationUpdateView.type_modal,
         name="inboundconfigurations/type_modal",
@@ -146,6 +151,11 @@ urlpatterns = [
         "bridges/<uuid:id>/edit",
         views.BridgeIntegrationUpdateView.as_view(),
         name="bridge_integration_update",
+    ),
+    path(
+        "bridges/<uuid:integration_id>/api-key",
+        views.bridge_api_key_fragment,
+        name="bridge_api_key_fragment",
     ),
     path(
         "bridges/type_modal/<uuid:integration_id>/",
