@@ -209,6 +209,26 @@ ul ul a {
 	padding: 24px;
 }
 
+.slide-panel-content form {
+	width: 100%;
+}
+
+/* Inside the slide panel, widen Bootstrap grid columns so fields
+   fill the available space instead of using page-oriented col-lg-3. */
+.slide-panel-content .col-lg-3 {
+	flex: 0 0 50%;
+	max-width: 50%;
+}
+.slide-panel-content .col-md-3 {
+	flex: 0 0 50%;
+	max-width: 50%;
+}
+.slide-panel-content .col-lg-6,
+.slide-panel-content .col-md-6 {
+	flex: 0 0 100%;
+	max-width: 100%;
+}
+
 
 .arrow {
   border: solid black;

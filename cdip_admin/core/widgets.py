@@ -33,6 +33,7 @@ class FormattedJsonFieldWidget(forms.widgets.Textarea):
     class Media:
         # Remember, these are either paths in /static/ or absolute URLs.
         css = {"all": ("widgets/formatted_json/formatted_json.css",)}
+        js = ("widgets/formatted_json/formatted_json.js",)
 
 
 class PeekabooTextInput(forms.widgets.TextInput):
