@@ -146,6 +146,7 @@ class DeviceGroupForm(forms.ModelForm):
         exclude = [
             "id",
             "devices",
+            "destinations",
         ]
 
     def __init__(self, *args, request=None, **kwargs):
@@ -171,7 +172,6 @@ class DeviceGroupForm(forms.ModelForm):
         "name",
         "owner",
         "default_subject_type",
-        "destinations",
     ]
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))

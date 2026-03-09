@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from django.views.generic import ListView, DetailView, UpdateView, FormView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
@@ -1498,4 +1498,162 @@ def toggle_bridge_enabled(request, id):
     config.enabled = not config.enabled
     config.save(update_fields=["enabled"])
     return _enabled_icon_response(config, "bridge_toggle_enabled", {"id": config.id})
+
+
+###
+# Connections views
+###
+
+def _inbound_connections_context(config):
+    """Build context dict for the inbound connections partial."""
+    default_dg = config.default_devicegroup
+    connected_outbound = list(default_dg.destinations.all()) if default_dg else []
+    connected_ids = [o.id for o in connected_outbound]
+
+    available_outbound = OutboundIntegrationConfiguration.objects.filter(
+        owner=config.owner,
+    ).exclude(id__in=connected_ids).order_by("name")
+
+    # Non-default device groups that contain devices from this inbound config
+    advanced_groups = DeviceGroup.objects.filter(
+        devices__inbound_configuration=config,
+    ).exclude(
+        id=default_dg.id if default_dg else None,
+    ).distinct()
+
+    return {
+        "configuration_id": config.id,
+        "connected_outbound": connected_outbound,
+        "available_outbound": available_outbound,
+        "advanced_groups": advanced_groups,
+    }
+
+
+@require_GET
+@permission_required("integrations.view_inboundintegrationconfiguration", raise_exception=True)
+def inbound_connections_list(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    context = _inbound_connections_context(config)
+    return render(request, "integrations/inbound_connections_partial.html", context)
+
+
+@require_POST
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def inbound_connections_add(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    outbound_id = request.POST.get("outbound_id")
+    outbound = get_object_or_404(OutboundIntegrationConfiguration, pk=outbound_id)
+    default_dg = config.default_devicegroup
+    default_dg.destinations.add(outbound)
+    default_dg.save()
+    context = _inbound_connections_context(config)
+    return render(request, "integrations/inbound_connections_partial.html", context)
+
+
+@require_POST
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def inbound_connections_remove(request, configuration_id, outbound_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    default_dg = config.default_devicegroup
+    default_dg.destinations.remove(outbound_id)
+    default_dg.save()
+    context = _inbound_connections_context(config)
+    return render(request, "integrations/inbound_connections_partial.html", context)
+
+
+def _device_group_destinations_context(device_group):
+    """Build context dict for the device group destinations partial."""
+    current_destinations = list(device_group.destinations.all())
+    current_ids = [d.id for d in current_destinations]
+
+    available_outbound = OutboundIntegrationConfiguration.objects.filter(
+        owner=device_group.owner,
+    ).exclude(id__in=current_ids).order_by("name")
+
+    return {
+        "device_group_id": device_group.id,
+        "current_destinations": current_destinations,
+        "available_outbound": available_outbound,
+    }
+
+
+@require_GET
+@permission_required("integrations.view_devicegroup", raise_exception=True)
+def device_group_destinations_list(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    context = _device_group_destinations_context(device_group)
+    return render(request, "integrations/device_group_destinations_partial.html", context)
+
+
+@require_POST
+@permission_required("integrations.change_devicegroup", raise_exception=True)
+def device_group_destinations_add(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    outbound_id = request.POST.get("outbound_id")
+    outbound = get_object_or_404(OutboundIntegrationConfiguration, pk=outbound_id)
+    device_group.destinations.add(outbound)
+    device_group.save()
+    context = _device_group_destinations_context(device_group)
+    return render(request, "integrations/device_group_destinations_partial.html", context)
+
+
+@require_POST
+@permission_required("integrations.change_devicegroup", raise_exception=True)
+def device_group_destinations_remove(request, device_group_id, outbound_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    device_group.destinations.remove(outbound_id)
+    device_group.save()
+    context = _device_group_destinations_context(device_group)
+    return render(request, "integrations/device_group_destinations_partial.html", context)
+
+
+def _outbound_connections_context(config):
+    """Build context dict for the outbound connections partial."""
+    # Inbound configs whose default_devicegroup routes to this outbound
+    connected_inbound = InboundIntegrationConfiguration.objects.filter(
+        default_devicegroup__destinations=config,
+    ).distinct()
+
+    # Non-default device groups that route to this outbound
+    advanced_groups = DeviceGroup.objects.filter(
+        destinations=config,
+    ).exclude(
+        id__in=InboundIntegrationConfiguration.objects.filter(
+            default_devicegroup__destinations=config,
+        ).values_list("default_devicegroup_id", flat=True),
+    ).distinct()
+
+    return {
+        "configuration_id": config.id,
+        "connected_inbound": connected_inbound,
+        "advanced_groups": advanced_groups,
+    }
+
+
+@require_GET
+@permission_required("integrations.view_outboundintegrationconfiguration", raise_exception=True)
+def outbound_connections_list(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    context = _outbound_connections_context(config)
+    return render(request, "integrations/outbound_connections_partial.html", context)
+
+
+@require_POST
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def outbound_connections_remove(request, configuration_id, inbound_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    inbound = get_object_or_404(InboundIntegrationConfiguration, pk=inbound_id)
+    default_dg = inbound.default_devicegroup
+    default_dg.destinations.remove(config)
+    default_dg.save()
+    context = _outbound_connections_context(config)
+    return render(request, "integrations/outbound_connections_partial.html", context)
 

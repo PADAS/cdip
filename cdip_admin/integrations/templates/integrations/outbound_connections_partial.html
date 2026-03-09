@@ -1,0 +1,66 @@
+<div id="outbound-connections-section" class="mt-4">
+    <h5>Connections</h5>
+    {% if connected_inbound %}
+    <table class="table table-sm table-bordered">
+        <thead class="thead-light">
+            <tr>
+                <th>Inbound Source</th>
+                <th>Type</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inbound in connected_inbound %}
+            <tr>
+                <td>
+                    <a href="#"
+                       hx-get="{% url 'inbound_integration_configuration_update' configuration_id=inbound.id %}"
+                       hx-target="#slide-panel-body"
+                       hx-swap="innerHTML">{{ inbound.name|default:inbound }}</a>
+                </td>
+                <td>{{ inbound.type.name }}</td>
+                <td class="text-right">
+                    <button class="btn btn-outline-danger btn-sm"
+                            hx-post="{% url 'outbound_connections_remove' configuration_id=configuration_id inbound_id=inbound.id %}"
+                            hx-target="#outbound-connections-section"
+                            hx-swap="outerHTML"
+                            hx-confirm="Remove connection from {{ inbound.name|default:inbound }}?">Remove</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No inbound sources connected.</p>
+    {% endif %}
+
+    {% if advanced_groups %}
+    <details class="mt-2">
+        <summary class="text-muted" style="cursor: pointer; font-size: 0.9em;">Advanced Routing ({{ advanced_groups|length }} additional group{{ advanced_groups|length|pluralize }})</summary>
+        <table class="table table-sm table-bordered mt-2">
+            <thead class="thead-light">
+                <tr>
+                    <th>Device Group</th>
+                    <th>Inbound Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in advanced_groups %}
+                <tr>
+                    <td>
+                        <a href="{% url 'device_group_update' device_group_id=group.id %}">{{ group.name }}</a>
+                    </td>
+                    <td>
+                        {% for ic in group.inbound_integration_configuration.all %}
+                            {{ ic.name|default:ic }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            <span class="text-muted">None</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
+</div>

@@ -13,4 +13,21 @@
 
     <div class="form-group px-0 list-inline">{{ form.errors }}</div>
     {% crispy form %}
+
+    {% if form.instance.default_devicegroup %}
+    <div class="mt-3">
+        <a href="#"
+           hx-get="{% url 'device_group_update' device_group_id=form.instance.default_devicegroup.id %}"
+           hx-target="#slide-panel-body"
+           hx-swap="innerHTML"
+           class="btn btn-outline-secondary btn-sm">View Device Group</a>
+    </div>
+    {% endif %}
+
+    <div id="inbound-connections-section"
+         hx-get="{% url 'inbound_connections_list' configuration_id=form.instance.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading connections...</p>
+    </div>
 </div>

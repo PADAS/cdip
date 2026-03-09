@@ -9,4 +9,11 @@
 <div class="slide-panel-content">
     <div class="form-group px-0 list-inline">{{ form.errors }}</div>
     {% crispy form %}
+
+    <div id="outbound-connections-section"
+         hx-get="{% url 'outbound_connections_list' configuration_id=form.instance.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading connections...</p>
+    </div>
 </div>

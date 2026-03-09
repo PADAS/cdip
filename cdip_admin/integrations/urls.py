@@ -177,4 +177,46 @@ urlpatterns = [
         views.toggle_bridge_enabled,
         name="bridge_toggle_enabled",
     ),
+    # Connections
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections",
+        views.inbound_connections_list,
+        name="inbound_connections_list",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections/add",
+        views.inbound_connections_add,
+        name="inbound_connections_add",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections/<uuid:outbound_id>/remove",
+        views.inbound_connections_remove,
+        name="inbound_connections_remove",
+    ),
+    # Device Group Destinations
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations",
+        views.device_group_destinations_list,
+        name="device_group_destinations_list",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations/add",
+        views.device_group_destinations_add,
+        name="device_group_destinations_add",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations/<uuid:outbound_id>/remove",
+        views.device_group_destinations_remove,
+        name="device_group_destinations_remove",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/connections",
+        views.outbound_connections_list,
+        name="outbound_connections_list",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/connections/<uuid:inbound_id>/remove",
+        views.outbound_connections_remove,
+        name="outbound_connections_remove",
+    ),
 ]

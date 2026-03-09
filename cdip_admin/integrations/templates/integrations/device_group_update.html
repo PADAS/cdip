@@ -10,4 +10,10 @@
         {% csrf_token %}
         {% crispy form %}
     </form>
+    <div id="device-group-destinations-section"
+         hx-get="{% url 'device_group_destinations_list' device_group_id=form.instance.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading destinations...</p>
+    </div>
 {% endblock %}
