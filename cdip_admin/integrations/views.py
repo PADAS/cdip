@@ -21,6 +21,8 @@ from .filters import (
     DeviceStateFilter,
     DeviceGroupFilter,
     DeviceFilter,
+    InboundIntegrationTypeFilter,
+    OutboundIntegrationTypeFilter,
     InboundIntegrationFilter,
     OutboundIntegrationFilter,
     BridgeIntegrationFilter
@@ -50,6 +52,8 @@ from .tables import (
     DeviceStateTable,
     DeviceGroupTable,
     DeviceTable,
+    InboundIntegrationTypeTable,
+    OutboundIntegrationTypeTable,
     InboundIntegrationConfigurationTable,
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
@@ -373,25 +377,73 @@ def inbound_integration_type_add(request):
     )
 
 
-@permission_required("integrations.change_inboundintegrationtype", raise_exception=True)
-def inbound_integration_type_update(request, inbound_integration_type_id):
-    integration_type = get_object_or_404(
-        InboundIntegrationType, id=inbound_integration_type_id
-    )
-    form = InboundIntegrationTypeForm(request.POST or None, instance=integration_type)
-    if form.is_valid():
-        form.save()
-        return redirect("inbound_integration_type_detail", inbound_integration_type_id)
-    return render(
-        request, "integrations/inbound_integration_type_update.html", {"form": form}
-    )
+class InboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
+    model = InboundIntegrationType
+    form_class = InboundIntegrationTypeForm
+    template_name = "integrations/inbound_integration_type_update.html"
+    permission_required = "integrations.change_inboundintegrationtype"
+    pk_url_kwarg = "inbound_integration_type_id"
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            return render(request, "integrations/inbound_integration_type_update_partial.html", context)
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        self.object = form.save()
+        if self.request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = "panelFormSaved"
+            return response
+        return redirect("inbound_integration_type_detail", self.object.pk)
+
+    def form_invalid(self, form):
+        if self.request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            context = self.get_context_data(form=form)
+            return render(self.request, "integrations/inbound_integration_type_update_partial.html", context)
+        return super().form_invalid(form)
+
+    @staticmethod
+    def _configure_htmx_helper(form, pk):
+        form_action = reverse("inbound_integration_type_update", kwargs={"inbound_integration_type_id": pk})
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
+
+    def get_success_url(self):
+        return reverse("inbound_integration_type_list")
 
 
-class InboundIntegrationTypeListView(LoginRequiredMixin, ListView):
+class InboundIntegrationTypeListView(LoginRequiredMixin, SingleTableMixin, FilterView):
+    table_class = InboundIntegrationTypeTable
     template_name = "integrations/inbound_integration_type_list.html"
     queryset = InboundIntegrationType.objects.get_queryset().order_by("name")
-    context_object_name = "integrations"
     paginate_by = default_paginate_by
+    filterset_class = InboundIntegrationTypeFilter
+
+    def get_filterset(self, *args, **kwargs):
+        fs = super().get_filterset(*args, **kwargs)
+        fs.form.auto_id = "filter_%s"
+        return fs
+
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["integrations/table_partial.html"]
+        return [self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_url"] = reverse("inbound_integration_type_list")
+        return context
 
 
 ###
@@ -424,27 +476,73 @@ def outbound_integration_type_add(request):
     )
 
 
-@permission_required("integrations.change_inboundintegrationtype", raise_exception=True)
-def outbound_integration_type_update(request, outbound_integration_type_id):
-    integration_type = get_object_or_404(
-        OutboundIntegrationType, id=outbound_integration_type_id
-    )
-    form = OutboundIntegrationTypeForm(request.POST or None, instance=integration_type)
-    if form.is_valid():
-        form.save()
-        return redirect(
-            "outbound_integration_type_detail", outbound_integration_type_id
-        )
-    return render(
-        request, "integrations/outbound_integration_type_update.html", {"form": form}
-    )
+class OutboundIntegrationTypeUpdateView(PermissionRequiredMixin, UpdateView):
+    model = OutboundIntegrationType
+    form_class = OutboundIntegrationTypeForm
+    template_name = "integrations/outbound_integration_type_update.html"
+    permission_required = "integrations.change_outboundintegrationtype"
+    pk_url_kwarg = "outbound_integration_type_id"
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        context = self.get_context_data(form=form)
+        if request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            return render(request, "integrations/outbound_integration_type_update_partial.html", context)
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        self.object = form.save()
+        if self.request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = "panelFormSaved"
+            return response
+        return redirect("outbound_integration_type_detail", self.object.pk)
+
+    def form_invalid(self, form):
+        if self.request.headers.get("HX-Request"):
+            self._configure_htmx_helper(form, self.object.pk)
+            context = self.get_context_data(form=form)
+            return render(self.request, "integrations/outbound_integration_type_update_partial.html", context)
+        return super().form_invalid(form)
+
+    @staticmethod
+    def _configure_htmx_helper(form, pk):
+        form_action = reverse("outbound_integration_type_update", kwargs={"outbound_integration_type_id": pk})
+        form.helper.form_action = form_action
+        form.helper.inputs = []
+        form.helper.attrs = {
+            "hx-post": form_action,
+            "hx-target": "#slide-panel-body",
+            "hx-swap": "innerHTML",
+        }
+
+    def get_success_url(self):
+        return reverse("outbound_integration_type_list")
 
 
-class OutboundIntegrationTypeList(LoginRequiredMixin, ListView):
+class OutboundIntegrationTypeListView(LoginRequiredMixin, SingleTableMixin, FilterView):
+    table_class = OutboundIntegrationTypeTable
     template_name = "integrations/outbound_integration_type_list.html"
     queryset = OutboundIntegrationType.objects.get_queryset().order_by("name")
-    context_object_name = "integrations"
     paginate_by = default_paginate_by
+    filterset_class = OutboundIntegrationTypeFilter
+
+    def get_filterset(self, *args, **kwargs):
+        fs = super().get_filterset(*args, **kwargs)
+        fs.form.auto_id = "filter_%s"
+        return fs
+
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["integrations/table_partial.html"]
+        return [self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_url"] = reverse("outbound_integration_type_list")
+        return context
 
 
 def permission_has_role(user, target, roles=("viewer",)):

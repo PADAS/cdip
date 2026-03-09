@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
 
 {% block title %}Inbound Integration Types{% endblock %}
 
@@ -12,32 +14,70 @@
                href="{% url 'inbound_integration_type_add' %}" role="button">Add Type</a>
         </div>
     </div>
+
+    {% if filter %}
     <div class="row">
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Slug</th>
-              <th scope="col">Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for integration in integrations %}
-              <tr>
-                  <td>
-                    <a href="{% url 'inbound_integration_type_detail' integration.id %}">
-                        {{ integration.name }}
-                    </a>
-                  </td>
-                  <td>
-                        {{ integration.slug }}
-                  </td>
-                  <td>
-                        {{ integration.description }}
-                  </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="col-md-12">
+            <form action="" method="get" class="form form-inline">
+                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+                {% bootstrap_button 'Filter' extra_classes='' %}
+            </form>
+        </div>
     </div>
+    {% endif %}
+
+    <div id="table-container">
+        {% render_table table %}
+    </div>
+
+    <!-- Slide panel overlay -->
+    <div id="slide-panel-overlay"></div>
+
+    <!-- Slide panel -->
+    <div id="slide-panel">
+        <div id="slide-panel-body"></div>
+    </div>
+
+    <script>
+        (function() {
+            var overlay = document.getElementById('slide-panel-overlay');
+            var panel = document.getElementById('slide-panel');
+            var panelBody = document.getElementById('slide-panel-body');
+
+            function openPanel() {
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            }
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                panel.addEventListener('transitionend', function handler() {
+                    panelBody.innerHTML = '';
+                    panel.removeEventListener('transitionend', handler);
+                });
+            }
+
+            document.body.addEventListener('openPanel', openPanel);
+            document.body.addEventListener('closePanel', closePanel);
+            overlay.addEventListener('click', closePanel);
+
+            document.body.addEventListener('panelFormSaved', function() {
+                closePanel();
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (!panel.classList.contains('open')) return;
+                if (e.key === 'Escape') {
+                    closePanel();
+                } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    var form = panelBody.querySelector('form');
+                    if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
+                }
+            });
+        })();
+    </script>
+
 {% endblock %}

@@ -82,6 +82,32 @@ def bridge_type_filter(request):
     return type_qs
 
 
+class InboundIntegrationTypeFilter(django_filters.FilterSet):
+    search = django_filters.CharFilter(
+        method="filter_search", label=_("Name / Slug")
+    )
+
+    class Meta:
+        model = InboundIntegrationType
+        fields = ("search",)
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value))
+
+
+class OutboundIntegrationTypeFilter(django_filters.FilterSet):
+    search = django_filters.CharFilter(
+        method="filter_search", label=_("Name / Slug")
+    )
+
+    class Meta:
+        model = OutboundIntegrationType
+        fields = ("search",)
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value))
+
+
 class DeviceStateFilter(django_filters.FilterSet):
 
     external_id = django_filters.CharFilter(

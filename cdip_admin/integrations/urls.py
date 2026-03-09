@@ -41,7 +41,7 @@ urlpatterns = [
     ),
     path(
         "inboundtypes/<uuid:inbound_integration_type_id>/edit",
-        views.inbound_integration_type_update,
+        views.InboundIntegrationTypeUpdateView.as_view(),
         name="inbound_integration_type_update",
     ),
     path(
@@ -61,12 +61,12 @@ urlpatterns = [
     ),
     path(
         "outboundtypes/<uuid:outbound_integration_type_id>/edit",
-        views.outbound_integration_type_update,
+        views.OutboundIntegrationTypeUpdateView.as_view(),
         name="outbound_integration_type_update",
     ),
     path(
         "outboundtypes",
-        views.OutboundIntegrationTypeList.as_view(),
+        views.OutboundIntegrationTypeListView.as_view(),
         name="outbound_integration_type_list",
     ),
     path(

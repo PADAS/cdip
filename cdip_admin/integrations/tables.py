@@ -4,7 +4,9 @@ from .models import (
     DeviceState,
     DeviceGroup,
     Device,
+    InboundIntegrationType,
     InboundIntegrationConfiguration,
+    OutboundIntegrationType,
     OutboundIntegrationConfiguration,
     BridgeIntegration,
 )
@@ -214,3 +216,49 @@ class BridgeIntegrationTable(tables.Table):
         sequence = ("actions", "enabled", "status", "name", "organization")
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"
+
+
+class InboundIntegrationTypeTable(tables.Table):
+    name = tables.Column(verbose_name="Name")
+    slug = tables.Column(verbose_name="Slug")
+    description = tables.Column(verbose_name="Description")
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'inbound_integration_type_update' inbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
+
+    class Meta:
+        model = InboundIntegrationType
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ("actions", "name", "slug", "description")
+        sequence = ("actions", "name", "slug", "description")
+        attrs = {"class": "table table-hover", "id": "inbound-type-table"}
+        order_by = "name"
+
+
+class OutboundIntegrationTypeTable(tables.Table):
+    name = tables.Column(verbose_name="Name")
+    slug = tables.Column(verbose_name="Slug")
+    description = tables.Column(verbose_name="Description")
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'outbound_integration_type_update' outbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
+
+    class Meta:
+        model = OutboundIntegrationType
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ("actions", "name", "slug", "description")
+        sequence = ("actions", "name", "slug", "description")
+        attrs = {"class": "table table-hover", "id": "outbound-type-table"}
+        order_by = "name"
