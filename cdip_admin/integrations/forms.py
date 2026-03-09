@@ -477,20 +477,20 @@ class BridgeIntegrationForm(forms.ModelForm):
     helper = FormHelper()
     helper.layout = Layout(
         Row(
-            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
-            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            Column(Field("name", autocomplete="off"), css_class="form-group col-md-6 mb-0"),
+            Column("owner", css_class="form-group col-md-6 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            Column("enabled", css_class="form-group col-md-6 mt-0"),
             css_class="form-row",
         ),
         Row(
-            Column("type", css_class="form-group col-lg-6"),
+            Column("type", css_class="form-group col-md-12"),
             css_class="form-row",
         ),
         Row(
-            Column("additional", css_class="form-group col-lg-6"),
+            Column("additional", css_class="form-group col-md-12"),
             css_class="form-row",
         ),
     )

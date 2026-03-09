@@ -152,6 +152,62 @@ ul ul a {
 	100% {transform: scale(0.9);}
 }
 
+/***** SLIDE PANEL ****/
+#slide-panel-overlay {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background-color: rgba(0,0,0,0.5);
+	z-index: 1000;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	pointer-events: none;
+}
+
+#slide-panel-overlay.open {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+#slide-panel {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	right: -100%;
+	width: min(840px, 90vw);
+	background: #fff;
+	z-index: 1001;
+	overflow-y: auto;
+	transition: right 0.3s ease;
+	box-shadow: -2px 0 8px rgba(0,0,0,0.15);
+}
+
+#slide-panel.open {
+	right: 0;
+}
+
+#slide-panel .slide-panel-header {
+	display: flex;
+	justify-content: flex-end;
+	padding: 12px 16px 0;
+}
+
+#slide-panel .slide-panel-header .close-btn {
+	background: none;
+	border: none;
+	font-size: 1.5rem;
+	cursor: pointer;
+	color: #333;
+	line-height: 1;
+}
+
+#slide-panel-body {
+	padding: 0 24px 24px;
+}
+
+
 .arrow {
   border: solid black;
   border-width: 0 3px 3px 0;

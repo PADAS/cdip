@@ -79,7 +79,7 @@ class DeviceTable(tables.Table):
 class InboundIntegrationConfigurationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'inbound_toggle_enabled' configuration_id=record.id %}" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'inbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )
@@ -105,7 +105,9 @@ class InboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'inbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -124,7 +126,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
 class OutboundIntegrationConfigurationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'outbound_toggle_enabled' configuration_id=record.id %}" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'outbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )
@@ -150,7 +152,9 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'outbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -169,7 +173,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
 class BridgeIntegrationTable(tables.Table):
 
     enabled = tables.TemplateColumn(
-        template_code='''<span hx-post="{% url 'bridge_toggle_enabled' id=record.id %}" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        template_code='''<span hx-post="{% url 'bridge_toggle_enabled' id=record.id %}" hx-target="this" hx-swap="outerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
         verbose_name="Enabled",
         orderable=False,
     )
@@ -195,7 +199,9 @@ class BridgeIntegrationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'bridge_integration_update' id=record.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Edit</a>
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="htmx.ajax('GET', '{% url 'bridge_integration_update' id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,

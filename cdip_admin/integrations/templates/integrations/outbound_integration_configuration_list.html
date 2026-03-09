@@ -35,6 +35,58 @@
     {% endif %}
 
 
-{% render_table table %}
+    <div id="table-container">
+        {% render_table table %}
+    </div>
+
+    <!-- Slide panel overlay -->
+    <div id="slide-panel-overlay"></div>
+
+    <!-- Slide panel -->
+    <div id="slide-panel">
+        <div class="slide-panel-header">
+            <button type="button" class="close-btn" id="slide-panel-close">&times;</button>
+        </div>
+        <div id="slide-panel-body"></div>
+    </div>
+
+    <script>
+        (function() {
+            var overlay = document.getElementById('slide-panel-overlay');
+            var panel = document.getElementById('slide-panel');
+            var panelBody = document.getElementById('slide-panel-body');
+            var closeBtn = document.getElementById('slide-panel-close');
+
+            function openPanel() {
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            }
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                panel.addEventListener('transitionend', function handler() {
+                    panelBody.innerHTML = '';
+                    panel.removeEventListener('transitionend', handler);
+                });
+            }
+
+            document.body.addEventListener('openPanel', openPanel);
+            document.body.addEventListener('closePanel', closePanel);
+            overlay.addEventListener('click', closePanel);
+            closeBtn.addEventListener('click', closePanel);
+
+            document.body.addEventListener('panelFormSaved', function() {
+                closePanel();
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && panel.classList.contains('open')) {
+                    closePanel();
+                }
+            });
+        })();
+    </script>
 
 {% endblock %}
