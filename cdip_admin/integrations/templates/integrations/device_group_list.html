@@ -45,6 +45,7 @@
             var panel = document.getElementById('slide-panel');
             var panelBody = document.getElementById('slide-panel-body');
             function openPanel() {
+                panelBody.innerHTML = '<div class="slide-panel-loading"><div class="spinner-border text-success" role="status"><span class="sr-only">Loading...</span></div></div>';
                 overlay.classList.add('open');
                 panel.classList.add('open');
             }

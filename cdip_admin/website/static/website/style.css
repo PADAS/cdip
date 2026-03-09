@@ -254,3 +254,10 @@ ul ul a {
 	text-transform: capitalize;
 }
 
+.slide-panel-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
