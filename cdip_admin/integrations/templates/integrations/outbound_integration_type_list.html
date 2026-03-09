@@ -62,11 +62,18 @@
             }
 
             document.body.addEventListener('openPanel', openPanel);
-            document.body.addEventListener('closePanel', closePanel);
-            overlay.addEventListener('click', closePanel);
+            document.body.addEventListener('closePanel', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
+            overlay.addEventListener('click', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
 
             document.body.addEventListener('panelFormSaved', function() {
                 closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
                 htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
             });
 
@@ -74,12 +81,21 @@
                 if (!panel.classList.contains('open')) return;
                 if (e.key === 'Escape') {
                     closePanel();
+                    history.replaceState(null, '', location.pathname + location.search);
                 } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
                     e.preventDefault();
                     var form = panelBody.querySelector('form');
                     if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
                 }
             });
+
+            // Deep-link: open edit panel from URL hash
+            var hashMatch = location.hash.match(/^#edit=(.+)$/);
+            if (hashMatch) {
+                var editId = hashMatch[1];
+                openPanel();
+                htmx.ajax('GET', '{% url "outbound_integration_type_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
+            }
         })();
     </script>
 

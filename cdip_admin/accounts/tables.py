@@ -9,7 +9,7 @@ class AccountTable(tables.Table):
             hx-get="{% url 'account_update' user_id=record.id %}"
             hx-target="#slide-panel-body"
             hx-swap="innerHTML"
-            onclick="document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+            onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         orderable=False,
         verbose_name="",

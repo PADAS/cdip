@@ -50,7 +50,7 @@ class DeviceGroupTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'device_group_update' device_group_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'device_group_update' device_group_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -80,7 +80,7 @@ class DeviceTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'device_update' module_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'device_update' module_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -127,7 +127,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'inbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'inbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -174,7 +174,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'outbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'outbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -221,7 +221,7 @@ class BridgeIntegrationTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'bridge_integration_update' id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'bridge_integration_update' id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -244,7 +244,7 @@ class InboundIntegrationTypeTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'inbound_integration_type_update' inbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'inbound_integration_type_update' inbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -267,7 +267,7 @@ class OutboundIntegrationTypeTable(tables.Table):
         template_code='''
         <button type="button"
            class="btn btn-sm btn-outline-primary"
-           onclick="htmx.ajax('GET', '{% url 'outbound_integration_type_update' outbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'outbound_integration_type_update' outbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
