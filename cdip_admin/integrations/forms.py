@@ -146,6 +146,7 @@ class DeviceGroupForm(forms.ModelForm):
         exclude = [
             "id",
             "devices",
+            "destinations",
         ]
 
     def __init__(self, *args, request=None, **kwargs):
@@ -171,7 +172,6 @@ class DeviceGroupForm(forms.ModelForm):
         "name",
         "owner",
         "default_subject_type",
-        "destinations",
     ]
     helper = FormHelper()
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
@@ -477,20 +477,20 @@ class BridgeIntegrationForm(forms.ModelForm):
     helper = FormHelper()
     helper.layout = Layout(
         Row(
-            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
-            Column("owner", css_class="form-group col-lg-3 mb-0"),
+            Column(Field("name", autocomplete="off"), css_class="form-group col-md-6 mb-0"),
+            Column("owner", css_class="form-group col-md-6 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            Column("enabled", css_class="form-group col-md-6 mt-0"),
             css_class="form-row",
         ),
         Row(
-            Column("type", css_class="form-group col-lg-6"),
+            Column("type", css_class="form-group col-md-12"),
             css_class="form-row",
         ),
         Row(
-            Column("additional", css_class="form-group col-lg-6"),
+            Column("additional", css_class="form-group col-md-12"),
             css_class="form-row",
         ),
     )
@@ -504,4 +504,13 @@ class KeyAuthForm(forms.Form):
         max_length=100,
         widget=ReadonlyPeekabooTextInput,
         required=False,
+    )
+
+    helper = FormHelper()
+    helper.form_tag = False
+    helper.layout = Layout(
+        Row(
+            Column("key", css_class="form-group col-lg-6 mb-0"),
+            css_class="form-row",
+        ),
     )

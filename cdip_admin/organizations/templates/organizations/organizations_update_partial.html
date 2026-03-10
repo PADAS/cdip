@@ -1,0 +1,19 @@
+{% load crispy_forms_tags %}
+<div class="slide-panel-toolbar">
+    <h4 class="mb-0">Update Organization</h4>
+    <div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel'));">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>
+    </div>
+</div>
+<div class="slide-panel-content">
+    {% include "integrations/_form_errors.html" with form=form %}
+    {% crispy form %}
+
+    <div id="org-members-section"
+         hx-get="{% url 'org_members_list' organization_id=organization.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading members...</p>
+    </div>
+</div>

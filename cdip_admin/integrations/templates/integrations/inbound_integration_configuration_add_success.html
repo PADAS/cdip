@@ -1,0 +1,18 @@
+<div class="slide-panel-toolbar">
+    <h4 class="mb-0">Integration Created</h4>
+    <div>
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+            onclick="document.body.dispatchEvent(new Event('closePanel'));
+                     document.body.dispatchEvent(new Event('panelFormSaved'));">Done</button>
+    </div>
+</div>
+<div class="slide-panel-content">
+    <div class="alert alert-success">
+        <strong>{{ config.name }}</strong> has been created.
+    </div>
+    <p>To route data to an outbound integration, set up destinations on the device group.</p>
+    <button type="button" class="btn btn-primary"
+        onclick="htmx.ajax('GET', '{{ device_group_url }}', {target: '#slide-panel-body', swap: 'innerHTML'});">
+        Set up routing
+    </button>
+</div>

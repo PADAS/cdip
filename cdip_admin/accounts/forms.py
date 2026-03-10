@@ -25,12 +25,6 @@ class AccountUpdateForm(forms.Form):
     username = forms.CharField(max_length=200, label="User Name", required=True)
 
     helper = FormHelper()
-    helper.layout = Layout(
-        Row(
-            Column("role", css_class="form-group col-lg-6 mb-0"),
-            css_class="form-row",
-        ),
-    )
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
 
 

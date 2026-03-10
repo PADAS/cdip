@@ -3,7 +3,7 @@
                value="{{ widget.value|stringformat:'s' }}"{% endif %}
                {% include "django/forms/widgets/attrs.html" %} {{ widget.readonly }}>
 
-        <a href=""><i class="fa fa-eye-slash peakaboo" aria-hidden="true"></i></a>
+        <i class="fa fa-eye-slash peakaboo" aria-hidden="true" onclick="toggle_peekaboo(event)" style="cursor:pointer;"></i>
 
         <i title="Copy To Clipboard" class="fas fa-copy copy-to-clip tooltiptarget" onclick="copy_to_clipboard(event)" onmouseout="reset_tooltip(event)">
         <span class="tooltiptext">Copy to clipboard</span>

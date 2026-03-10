@@ -1,0 +1,54 @@
+<div id="device-group-destinations-section" class="mt-4">
+    <h5>Destinations</h5>
+    {% if current_destinations %}
+    <table class="table table-sm table-bordered">
+        <thead class="thead-light">
+            <tr>
+                <th>Outbound Destination</th>
+                <th>Type</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dest in current_destinations %}
+            <tr>
+                <td>
+                    <a href="#"
+                       hx-get="{% url 'outbound_integration_configuration_update' configuration_id=dest.id %}"
+                       hx-target="#slide-panel-body"
+                       hx-swap="innerHTML">{{ dest.name|default:dest }}</a>
+                </td>
+                <td>{{ dest.type.name }}</td>
+                <td class="text-right">
+                    <button class="btn btn-outline-danger btn-sm"
+                            hx-post="{% url 'device_group_destinations_remove' device_group_id=device_group_id outbound_id=dest.id %}"
+                            hx-target="#device-group-destinations-section"
+                            hx-swap="outerHTML"
+                            hx-confirm="Remove destination {{ dest.name|default:dest }}?">Remove</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No destinations configured.</p>
+    {% endif %}
+
+    <form hx-post="{% url 'device_group_destinations_add' device_group_id=device_group_id %}"
+          hx-target="#device-group-destinations-section"
+          hx-swap="outerHTML"
+          class="form-inline mb-3">
+        {% csrf_token %}
+        <select name="outbound_id" class="form-control form-control-sm mr-2" required{% if not available_outbound %} disabled{% endif %}>
+            {% if available_outbound %}
+            <option value="">-- Select destination --</option>
+            {% for outbound in available_outbound %}
+            <option value="{{ outbound.id }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
+            {% endfor %}
+            {% else %}
+            <option value="">No destinations available</option>
+            {% endif %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary btn-sm"{% if not available_outbound %} disabled{% endif %}>Add Destination</button>
+    </form>
+</div>

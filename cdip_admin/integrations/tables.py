@@ -4,7 +4,9 @@ from .models import (
     DeviceState,
     DeviceGroup,
     Device,
+    InboundIntegrationType,
     InboundIntegrationConfiguration,
+    OutboundIntegrationType,
     OutboundIntegrationConfiguration,
     BridgeIntegration,
 )
@@ -44,14 +46,23 @@ class DeviceGroupTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'device_group_update' device_group_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = DeviceGroup
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name",)
+        fields = ("actions", "name",)
         row_attrs = {"device-group-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-group-table"}
-        sequence = ("name", "organization", "device_count", "created")
+        sequence = ("actions", "name", "organization", "device_count", "created")
         order_by = ["organization", "-created"]
 
 
@@ -65,25 +76,45 @@ class DeviceTable(tables.Table):
     integration_type = tables.Column(
         accessor="inbound_configuration__type__name", verbose_name="Integration Type"
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'device_update' module_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = Device
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("external_id", "owner", "integration_type")
+        fields = ("actions", "external_id", "owner", "integration_type")
         row_attrs = {"device-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "device-table"}
-        sequence = ("external_id", "owner", "integration_type", "created")
+        sequence = ("actions", "external_id", "owner", "integration_type", "created")
         order_by = "-created"
 
 
 class InboundIntegrationConfigurationTable(tables.Table):
 
+    enabled = tables.TemplateColumn(
+        template_code='''<span hx-post="{% url 'inbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name / Type",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
     status = tables.TemplateColumn(
         template_code='''
-        {% if record.state.error %}
+        {% if not record.enabled %}
+          <span class="badge badge-secondary">OK</span>
+        {% elif record.state.error %}
           <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
         {% else %}
           <span class="badge badge-success">OK</span>
@@ -94,8 +125,9 @@ class InboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'inbound_integration_configuration_detail' id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
-        <a href="{% url 'inbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'inbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -104,22 +136,32 @@ class InboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = InboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type__name", "organization", "endpoint", "enabled", "status", "actions")
-        row_attrs = {"inbound-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in record.state).lower()}
+        fields = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        sequence = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        row_attrs = {"inbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "inbound-config-table"}
         order_by = "type__name"
 
 
 class OutboundIntegrationConfigurationTable(tables.Table):
-    type = tables.Column(accessor="type__name", verbose_name="Type")
 
+    enabled = tables.TemplateColumn(
+        template_code='''<span hx-post="{% url 'outbound_toggle_enabled' configuration_id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name / Type",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
     status = tables.TemplateColumn(
         template_code='''
-        {% if record.state.error %}
+        {% if not record.enabled %}
+          <span class="badge badge-secondary">OK</span>
+        {% elif record.state.error %}
           <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
         {% else %}
           <span class="badge badge-success">OK</span>
@@ -130,8 +172,9 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     )
     actions = tables.TemplateColumn(
         template_code='''
-        <a href="{% url 'outbound_integration_configuration_detail' module_id=record.id %}" class="btn btn-sm btn-outline-primary mr-1" onclick="event.stopPropagation();">Overview</a>
-        <a href="{% url 'outbound_integration_configuration_update' configuration_id=record.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">Edit</a>
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'outbound_integration_configuration_update' configuration_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
         ''',
         verbose_name="",
         orderable=False,
@@ -140,21 +183,32 @@ class OutboundIntegrationConfigurationTable(tables.Table):
     class Meta:
         model = OutboundIntegrationConfiguration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "endpoint", "enabled", "status", "actions")
-        row_attrs = {"outbound-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
+        fields = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        sequence = ("actions", "enabled", "status", "name", "organization", "endpoint")
+        row_attrs = {"outbound-config-id": lambda record: record.id}
         attrs = {"class": "table table-hover", "id": "outbound-config-table"}
         order_by = "type__name"
 
 
 class BridgeIntegrationTable(tables.Table):
-    type = tables.Column(accessor="type__name", verbose_name="Type")
+
+    enabled = tables.TemplateColumn(
+        template_code='''<span hx-post="{% url 'bridge_toggle_enabled' id=record.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if record.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>''',
+        verbose_name="Enabled",
+        orderable=False,
+    )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        verbose_name="Name / Type",
+    )
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
     status = tables.TemplateColumn(
         template_code='''
-        {% if record.state.error %}
+        {% if not record.enabled %}
+          <span class="badge badge-secondary">OK</span>
+        {% elif record.state.error %}
           <span class="badge badge-danger" title="{{ record.state.error }}">Error</span>
         {% else %}
           <span class="badge badge-success">OK</span>
@@ -163,12 +217,66 @@ class BridgeIntegrationTable(tables.Table):
         verbose_name="Status",
         orderable=False,
     )
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'bridge_integration_update' id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
 
     class Meta:
         model = BridgeIntegration
         template_name = "django_tables2/bootstrap4.html"
-        fields = ("name", "type", "organization", "enabled", "status")
-        row_attrs = {"bridge-config-id": lambda record: record.id,
-                     "has_error": lambda record: str('error' in (record.state or {})).lower()}
+        fields = ("actions", "enabled", "status", "name", "organization")
+        sequence = ("actions", "enabled", "status", "name", "organization")
         attrs = {"class": "table table-hover", "id": "bridge-config-table"}
         order_by = "type__name"
+
+
+class InboundIntegrationTypeTable(tables.Table):
+    name = tables.Column(verbose_name="Name")
+    slug = tables.Column(verbose_name="Slug")
+    description = tables.Column(verbose_name="Description")
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'inbound_integration_type_update' inbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
+
+    class Meta:
+        model = InboundIntegrationType
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ("actions", "name", "slug", "description")
+        sequence = ("actions", "name", "slug", "description")
+        attrs = {"class": "table table-hover", "id": "inbound-type-table"}
+        order_by = "name"
+
+
+class OutboundIntegrationTypeTable(tables.Table):
+    name = tables.Column(verbose_name="Name")
+    slug = tables.Column(verbose_name="Slug")
+    description = tables.Column(verbose_name="Description")
+    actions = tables.TemplateColumn(
+        template_code='''
+        <button type="button"
+           class="btn btn-sm btn-outline-primary"
+           onclick="history.replaceState(null, '', location.pathname + location.search + '#edit={{ record.id }}'); htmx.ajax('GET', '{% url 'outbound_integration_type_update' outbound_integration_type_id=record.id %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));">Edit</button>
+        ''',
+        verbose_name="",
+        orderable=False,
+    )
+
+    class Meta:
+        model = OutboundIntegrationType
+        template_name = "django_tables2/bootstrap4.html"
+        fields = ("actions", "name", "slug", "description")
+        sequence = ("actions", "name", "slug", "description")
+        attrs = {"class": "table table-hover", "id": "outbound-type-table"}
+        order_by = "name"

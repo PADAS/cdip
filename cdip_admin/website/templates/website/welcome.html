@@ -2,9 +2,14 @@
 
 {% load i18n %}
 
-{% block title %}{% trans 'Gundi Project Admin Portal' as title %}{% endblock %}
+{% block title %}Gundi Version 1.0{% endblock %}
 
 {% block content %}
-    <h1 class="text-center">{% trans 'Gundi Project Portal' %}</h1>
-    <p class="text-center">{% trans 'This portal is designed to facilitate the administration of the Gundi Platform.'%}</p>
+    <h1 class="text-center">Gundi Version 1.0</h1>
+    <div class="alert alert-info mt-4 mx-auto" style="max-width: 720px;">
+        This portal is used to configure legacy integrations that have not yet been ported to
+        <a href="https://gundiservice.org" target="_blank" rel="noopener">Gundi V2</a>.
+        For all new integrations, please use the
+        <a href="https://gundiservice.org" target="_blank" rel="noopener">Gundi V2 platform</a>.
+    </div>
 {% endblock %}

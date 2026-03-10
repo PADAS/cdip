@@ -12,8 +12,10 @@
             <h2>Inbound Integrations</h2>
         </div>
         <div class="col-md-3 d-flex justify-content-end">
-        <a class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationconfiguration %} disabled {% endif %}"
-           href="{% url 'inbound_integration_configuration_add' %}" role="button">Add Integration</a>
+        <button type="button"
+            class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationconfiguration %} disabled {% endif %}"
+            onclick="htmx.ajax('GET', '{% url 'inbound_integration_configuration_add' %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));"
+            {% if not perms.integrations.add_inboundintegrationconfiguration %}disabled{% endif %}>Add Integration</button>
         </div>
     </div>
 
@@ -34,13 +36,93 @@
     </div>
     {% endif %}
 
-    {% render_table table %}
-    <script type="text/javascript"
-            id="row-click-handler"
-            data-table-id="inbound-config-table"
-            data-row-attribute="inbound-config-id"
-            data-url="{{ base_url }}"
-            src="{% static 'website/js/cdip.custom.js' %}">
+    <div id="table-container">
+        {% render_table table %}
+    </div>
+
+    <!-- Slide panel overlay -->
+    <div id="slide-panel-overlay"></div>
+
+    <!-- Slide panel -->
+    <div id="slide-panel">
+        <div id="slide-panel-body"></div>
+    </div>
+
+    <script>
+        (function() {
+            var overlay = document.getElementById('slide-panel-overlay');
+            var panel = document.getElementById('slide-panel');
+            var panelBody = document.getElementById('slide-panel-body');
+            function openPanel() {
+                panelBody.innerHTML = '<div class="slide-panel-loading"><div class="spinner-border text-success" role="status"><span class="sr-only">Loading...</span></div></div>';
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            }
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                panel.addEventListener('transitionend', function handler() {
+                    panelBody.innerHTML = '';
+                    panel.removeEventListener('transitionend', handler);
+                });
+            }
+
+            document.body.addEventListener('openPanel', openPanel);
+            document.body.addEventListener('closePanel', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
+            overlay.addEventListener('click', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
+
+            document.body.addEventListener('panelFormSaved', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.body.addEventListener('tableChanged', function() {
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.body.addEventListener('toggleFeedback', function(e) {
+                var d = e.detail;
+                var Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true,
+                });
+                Toast.fire({
+                    icon: d.enabled ? 'success' : 'info',
+                    title: d.name + (d.enabled ? ' enabled' : ' disabled'),
+                });
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (!panel.classList.contains('open')) return;
+                if (e.key === 'Escape') {
+                    closePanel();
+                    history.replaceState(null, '', location.pathname + location.search);
+                } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    var form = panelBody.querySelector('form');
+                    if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
+                }
+            });
+
+            // Deep-link: open edit panel from URL hash
+            var hashMatch = location.hash.match(/^#edit=(.+)$/);
+            if (hashMatch) {
+                var editId = hashMatch[1];
+                openPanel();
+                htmx.ajax('GET', '{% url "inbound_integration_configuration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
+            }
+        })();
     </script>
 
 {% endblock %}

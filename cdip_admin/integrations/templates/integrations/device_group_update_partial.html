@@ -1,0 +1,18 @@
+{% load crispy_forms_tags %}
+<div class="slide-panel-toolbar">
+    <h4 class="mb-0">Edit Device Group</h4>
+    <div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel')); document.body.dispatchEvent(new Event('panelFormSaved'));">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>
+    </div>
+</div>
+<div class="slide-panel-content">
+    {% include "integrations/_form_errors.html" %}
+    {% crispy form %}
+    <div id="device-group-destinations-section"
+         hx-get="{% url 'device_group_destinations_list' device_group_id=form.instance.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading destinations...</p>
+    </div>
+</div>

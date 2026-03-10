@@ -15,12 +15,13 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     OutboundIntegrationType,
     BridgeIntegration,
+    BridgeIntegrationType,
     Integration,
     IntegrationType,
     get_user_integrations_qs,
     Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
-from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget
+from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, LenientModelChoiceFilter
 from django.db.models import Q
 from django.contrib.postgres.aggregates import ArrayAgg
 
@@ -69,6 +70,44 @@ def outbound_type_filter(request):
     return type_qs
 
 
+def bridge_type_filter(request):
+    type_qs = BridgeIntegrationType.objects.all()
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        org_qs = IsOrganizationMember.filter_queryset_for_user(
+            Organization.objects.all(), request.user, "name"
+        )
+        type_qs = type_qs.filter(
+            bridgeintegration__owner__in=org_qs
+        ).distinct()
+    return type_qs
+
+
+class InboundIntegrationTypeFilter(django_filters.FilterSet):
+    search = django_filters.CharFilter(
+        method="filter_search", label=_("Name / Slug")
+    )
+
+    class Meta:
+        model = InboundIntegrationType
+        fields = ("search",)
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value))
+
+
+class OutboundIntegrationTypeFilter(django_filters.FilterSet):
+    search = django_filters.CharFilter(
+        method="filter_search", label=_("Name / Slug")
+    )
+
+    class Meta:
+        model = OutboundIntegrationType
+        fields = ("search",)
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value))
+
+
 class DeviceStateFilter(django_filters.FilterSet):
 
     external_id = django_filters.CharFilter(
@@ -77,14 +116,14 @@ class DeviceStateFilter(django_filters.FilterSet):
         label=_("External ID"),
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="device__inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="device__inbound_configuration__type",
         to_field_name="name",
@@ -116,14 +155,14 @@ class DeviceGroupFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label="Name"
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Organizations"),
     )
 
-    destinations = django_filters.ModelChoiceFilter(
+    destinations = LenientModelChoiceFilter(
         queryset=outbound_integration_filter,
         field_name="destinations",
         to_field_name="name",
@@ -164,14 +203,14 @@ class DeviceFilter(django_filters.FilterSet):
         field_name="external_id", lookup_expr="icontains", label=_("External ID")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="inbound_configuration__owner",
         to_field_name="name",
         empty_label=_("Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="inbound_configuration__type",
         to_field_name="name",
@@ -223,14 +262,14 @@ class InboundIntegrationFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label=_("Name")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
     )
 
-    inbound_config_type = django_filters.ModelChoiceFilter(
+    inbound_config_type = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         field_name="type",
         to_field_name="name",
@@ -282,14 +321,14 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         field_name="name", lookup_expr="icontains", label=_("Name")
     )
 
-    organization = django_filters.ModelChoiceFilter(
+    organization = LenientModelChoiceFilter(
         queryset=organization_filter,
         field_name="owner",
         to_field_name="name",
         empty_label=_("All Owners"),
     )
 
-    outbound_config_type = django_filters.ModelChoiceFilter(
+    outbound_config_type = LenientModelChoiceFilter(
         queryset=outbound_type_filter,
         field_name="type",
         to_field_name="name",
@@ -304,7 +343,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
         method=filter_has_error_key,
     )
 
-    outbound_affected_destinations = django_filters.ModelChoiceFilter(
+    outbound_affected_destinations = LenientModelChoiceFilter(
         queryset=inbound_type_filter,
         method='affected_destinations_filter',
         to_field_name="name",
@@ -349,6 +388,24 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
 
 class BridgeIntegrationFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name", lookup_expr="icontains", label=_("Name")
+    )
+
+    organization = LenientModelChoiceFilter(
+        queryset=organization_filter,
+        field_name="owner",
+        to_field_name="name",
+        empty_label=_("All Owners"),
+    )
+
+    bridge_type = LenientModelChoiceFilter(
+        queryset=bridge_type_filter,
+        field_name="type",
+        to_field_name="name",
+        empty_label=_("All Types"),
+    )
+
     enabled = django_filters.BooleanFilter(widget=CustomBooleanWidget)
 
     has_errors = django_filters.BooleanFilter(
@@ -359,7 +416,28 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
 
     class Meta:
         model = BridgeIntegration
-        fields = ("enabled",)
+        fields = ("organization", "bridge_type", "name", "enabled")
+
+    def __init__(self, *args, **kwargs):
+        super(BridgeIntegrationFilter, self).__init__(*args, **kwargs)
+        if "owner_filter" in self.request.session:
+            self.form.initial["organization"] = self.request.session["owner_filter"]
+
+    @property
+    def qs(self):
+        qs = super().qs
+        if "organization" in self.data:
+            if not self.data.get("organization"):
+                self.request.session.pop("owner_filter", None)
+            else:
+                self.request.session["owner_filter"] = self.data["organization"]
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            return IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        if "owner_filter" in self.request.session:
+            return qs.filter(owner__name=self.request.session["owner_filter"])
+        return qs
 
 
 class CharInFilter(django_filters_rest.BaseInFilter, django_filters_rest.CharFilter):

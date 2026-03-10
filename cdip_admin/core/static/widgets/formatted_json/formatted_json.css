@@ -4,3 +4,11 @@
     font-family: Consolas, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
 }
 
+.CodeMirror.CodeMirror {
+    font-size: 11px;
+    font-family: Consolas, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
+    border: 1px solid #adb5bd;
+    border-radius: .25rem;
+    width: 100%;
+}
+

@@ -11,8 +11,28 @@
     <script src="{% static 'website/js/jquery-3.5.1.min.js' %}"></script>
     <script src="{% static 'website/js/bootstrap.js' %} "></script>
     <script src="{% static 'website/js/bootstrap.bundle.min.js' %} "></script>
+    <link rel="stylesheet" href="{% static 'widgets/peekaboo/peekaboo.css' %}">
+    <script src="{% static 'widgets/peekaboo/peekaboo.js' %}"></script>
+    <script src="https://kit.fontawesome.com/0f5032f73b.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="{% static 'django_jsonform/style.css' %}">
+    <script src="{% static 'django_jsonform/vendor/react.production.min.js' %}"></script>
+    <script src="{% static 'django_jsonform/vendor/react-dom.production.min.js' %}"></script>
+    <script src="{% static 'django_jsonform/vendor/react-modal.min.js' %}"></script>
+    <script src="{% static 'django_jsonform/react-json-form.js' %}"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+    <script src="{% static 'widgets/formatted_json/formatted_json.js' %}"></script>
     <script src="https://unpkg.com/htmx.org@1.6.1"></script>
     <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
+    <script>
+        document.addEventListener('htmx:configRequest', function(evt) {
+            var csrfCookie = document.cookie.split('; ').find(function(c) { return c.startsWith('csrftoken='); });
+            if (csrfCookie) {
+                evt.detail.headers['X-CSRFToken'] = csrfCookie.split('=')[1];
+            }
+        });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         $(function () {

@@ -36,12 +36,12 @@ urlpatterns = [
     ),
     path(
         "inboundtypes/add",
-        views.inbound_integration_type_add,
+        views.InboundIntegrationTypeAddView.as_view(),
         name="inbound_integration_type_add",
     ),
     path(
         "inboundtypes/<uuid:inbound_integration_type_id>/edit",
-        views.inbound_integration_type_update,
+        views.InboundIntegrationTypeUpdateView.as_view(),
         name="inbound_integration_type_update",
     ),
     path(
@@ -56,28 +56,23 @@ urlpatterns = [
     ),
     path(
         "outboundtypes/add",
-        views.outbound_integration_type_add,
+        views.OutboundIntegrationTypeAddView.as_view(),
         name="outbound_integration_type_add",
     ),
     path(
         "outboundtypes/<uuid:outbound_integration_type_id>/edit",
-        views.outbound_integration_type_update,
+        views.OutboundIntegrationTypeUpdateView.as_view(),
         name="outbound_integration_type_update",
     ),
     path(
         "outboundtypes",
-        views.OutboundIntegrationTypeList.as_view(),
+        views.OutboundIntegrationTypeListView.as_view(),
         name="outbound_integration_type_list",
     ),
     path(
         "inboundconfigurations",
         views.InboundIntegrationConfigurationListView.as_view(),
         name="inbound_integration_configuration_list",
-    ),
-    path(
-        "inboundconfigurations/<uuid:id>",
-        views.inbound_integration_configuration_detail,
-        name="inbound_integration_configuration_detail",
     ),
     path(
         "inboundconfigurations/add",
@@ -88,6 +83,11 @@ urlpatterns = [
         "inboundconfigurations/<uuid:configuration_id>/edit",
         views.InboundIntegrationConfigurationUpdateView.as_view(),
         name="inbound_integration_configuration_update",
+    ),
+    path(
+        "inboundconfigurations/<uuid:integration_id>/api-key",
+        views.api_key_fragment,
+        name="inbound_api_key_fragment",
     ),
     path(
         "inboundconfigurations/type_modal/<uuid:integration_id>/",
@@ -108,11 +108,6 @@ urlpatterns = [
         "outboundconfigurations",
         views.OutboundIntegrationConfigurationListView.as_view(),
         name="outbound_integration_configuration_list",
-    ),
-    path(
-        "outboundconfigurations/<uuid:module_id>",
-        views.outbound_integration_configuration_detail,
-        name="outbound_integration_configuration_detail",
     ),
     path(
         "outboundconfigurations/add",
@@ -158,6 +153,11 @@ urlpatterns = [
         name="bridge_integration_update",
     ),
     path(
+        "bridges/<uuid:integration_id>/api-key",
+        views.bridge_api_key_fragment,
+        name="bridge_api_key_fragment",
+    ),
+    path(
         "bridges/type_modal/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.type_modal,
         name="bridges/type_modal",
@@ -171,5 +171,62 @@ urlpatterns = [
         "bridges/dropdown_restore/<uuid:integration_id>/",
         views.BridgeIntegrationUpdateView.dropdown_restore,
         name="bridges/dropdown_restore",
-    )
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/toggle-enabled",
+        views.toggle_inbound_enabled,
+        name="inbound_toggle_enabled",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/toggle-enabled",
+        views.toggle_outbound_enabled,
+        name="outbound_toggle_enabled",
+    ),
+    path(
+        "bridges/<uuid:id>/toggle-enabled",
+        views.toggle_bridge_enabled,
+        name="bridge_toggle_enabled",
+    ),
+    # Connections
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections",
+        views.inbound_connections_list,
+        name="inbound_connections_list",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections/add",
+        views.inbound_connections_add,
+        name="inbound_connections_add",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/connections/<uuid:outbound_id>/remove",
+        views.inbound_connections_remove,
+        name="inbound_connections_remove",
+    ),
+    # Device Group Destinations
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations",
+        views.device_group_destinations_list,
+        name="device_group_destinations_list",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations/add",
+        views.device_group_destinations_add,
+        name="device_group_destinations_add",
+    ),
+    path(
+        "devicegroups/<uuid:device_group_id>/destinations/<uuid:outbound_id>/remove",
+        views.device_group_destinations_remove,
+        name="device_group_destinations_remove",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/connections",
+        views.outbound_connections_list,
+        name="outbound_connections_list",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/connections/<uuid:inbound_id>/remove",
+        views.outbound_connections_remove,
+        name="outbound_connections_remove",
+    ),
 ]

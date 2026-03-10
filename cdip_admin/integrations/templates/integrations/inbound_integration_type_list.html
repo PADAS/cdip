@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load render_table from django_tables2 %}
+{% load bootstrap4 %}
 
 {% block title %}Inbound Integration Types{% endblock %}
 
@@ -8,36 +10,93 @@
             <h2>Inbound Integration Types</h2>
         </div>
         <div class="col-md-3 d-flex justify-content-end">
-            <a class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
-               href="{% url 'inbound_integration_type_add' %}" role="button">Add Type</a>
+            <button type="button"
+                class="mb-2 btn btn-primary {% if not perms.integrations.add_inboundintegrationtype %} disabled {% endif %}"
+                onclick="htmx.ajax('GET', '{% url 'inbound_integration_type_add' %}', {target: '#slide-panel-body', swap: 'innerHTML'}); document.body.dispatchEvent(new Event('openPanel'));"
+                {% if not perms.integrations.add_inboundintegrationtype %}disabled{% endif %}>Add Type</button>
         </div>
     </div>
+
+    {% if filter %}
     <div class="row">
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Slug</th>
-              <th scope="col">Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for integration in integrations %}
-              <tr>
-                  <td>
-                    <a href="{% url 'inbound_integration_type_detail' integration.id %}">
-                        {{ integration.name }}
-                    </a>
-                  </td>
-                  <td>
-                        {{ integration.slug }}
-                  </td>
-                  <td>
-                        {{ integration.description }}
-                  </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="col-md-12">
+            <form action="" method="get" class="form form-inline">
+                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
+                {% bootstrap_button 'Filter' extra_classes='' %}
+            </form>
+        </div>
     </div>
+    {% endif %}
+
+    <div id="table-container">
+        {% render_table table %}
+    </div>
+
+    <!-- Slide panel overlay -->
+    <div id="slide-panel-overlay"></div>
+
+    <!-- Slide panel -->
+    <div id="slide-panel">
+        <div id="slide-panel-body"></div>
+    </div>
+
+    <script>
+        (function() {
+            var overlay = document.getElementById('slide-panel-overlay');
+            var panel = document.getElementById('slide-panel');
+            var panelBody = document.getElementById('slide-panel-body');
+
+            function openPanel() {
+                panelBody.innerHTML = '<div class="slide-panel-loading"><div class="spinner-border text-success" role="status"><span class="sr-only">Loading...</span></div></div>';
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            }
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                panel.addEventListener('transitionend', function handler() {
+                    panelBody.innerHTML = '';
+                    panel.removeEventListener('transitionend', handler);
+                });
+            }
+
+            document.body.addEventListener('openPanel', openPanel);
+            document.body.addEventListener('closePanel', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
+            overlay.addEventListener('click', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            });
+
+            document.body.addEventListener('panelFormSaved', function() {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+                htmx.ajax('GET', '{{ base_url }}?{{ request.GET.urlencode|safe }}', {target: '#table-container', swap: 'innerHTML'});
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (!panel.classList.contains('open')) return;
+                if (e.key === 'Escape') {
+                    closePanel();
+                    history.replaceState(null, '', location.pathname + location.search);
+                } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    var form = panelBody.querySelector('form');
+                    if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
+                }
+            });
+
+            // Deep-link: open edit panel from URL hash
+            var hashMatch = location.hash.match(/^#edit=(.+)$/);
+            if (hashMatch) {
+                var editId = hashMatch[1];
+                openPanel();
+                htmx.ajax('GET', '{% url "inbound_integration_type_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
+            }
+        })();
+    </script>
+
 {% endblock %}
