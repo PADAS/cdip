@@ -1692,15 +1692,18 @@ def toggle_bridge_enabled(request, id):
 # Connections views
 ###
 
-def _inbound_connections_context(config):
+def _inbound_connections_context(config, request):
     """Build context dict for the inbound connections partial."""
     default_dg = config.default_devicegroup
     connected_outbound = list(default_dg.destinations.all()) if default_dg else []
     connected_ids = [o.id for o in connected_outbound]
 
-    available_outbound = OutboundIntegrationConfiguration.objects.filter(
-        owner=config.owner,
-    ).exclude(id__in=connected_ids).order_by("name")
+    available_outbound = OutboundIntegrationConfiguration.objects.all()
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        available_outbound = IsOrganizationMember.filter_queryset_for_user(
+            available_outbound, request.user, "name"
+        )
+    available_outbound = available_outbound.exclude(id__in=connected_ids).order_by("name")
 
     # Non-default device groups that contain devices from this inbound config
     advanced_groups = DeviceGroup.objects.filter(
@@ -1722,7 +1725,7 @@ def _inbound_connections_context(config):
 def inbound_connections_list(request, configuration_id):
     config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
     permission_can_view(request, config)
-    context = _inbound_connections_context(config)
+    context = _inbound_connections_context(config, request)
     return render(request, "integrations/inbound_connections_partial.html", context)
 
 
@@ -1736,7 +1739,7 @@ def inbound_connections_add(request, configuration_id):
     default_dg = config.default_devicegroup
     default_dg.destinations.add(outbound)
     default_dg.save()
-    context = _inbound_connections_context(config)
+    context = _inbound_connections_context(config, request)
     return render(request, "integrations/inbound_connections_partial.html", context)
 
 
@@ -1748,18 +1751,21 @@ def inbound_connections_remove(request, configuration_id, outbound_id):
     default_dg = config.default_devicegroup
     default_dg.destinations.remove(outbound_id)
     default_dg.save()
-    context = _inbound_connections_context(config)
+    context = _inbound_connections_context(config, request)
     return render(request, "integrations/inbound_connections_partial.html", context)
 
 
-def _device_group_destinations_context(device_group):
+def _device_group_destinations_context(device_group, request):
     """Build context dict for the device group destinations partial."""
     current_destinations = list(device_group.destinations.all())
     current_ids = [d.id for d in current_destinations]
 
-    available_outbound = OutboundIntegrationConfiguration.objects.filter(
-        owner=device_group.owner,
-    ).exclude(id__in=current_ids).order_by("name")
+    available_outbound = OutboundIntegrationConfiguration.objects.all()
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        available_outbound = IsOrganizationMember.filter_queryset_for_user(
+            available_outbound, request.user, "name"
+        )
+    available_outbound = available_outbound.exclude(id__in=current_ids).order_by("name")
 
     return {
         "device_group_id": device_group.id,
@@ -1773,7 +1779,7 @@ def _device_group_destinations_context(device_group):
 def device_group_destinations_list(request, device_group_id):
     device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
     permission_can_view(request, device_group)
-    context = _device_group_destinations_context(device_group)
+    context = _device_group_destinations_context(device_group, request)
     return render(request, "integrations/device_group_destinations_partial.html", context)
 
 
@@ -1786,7 +1792,7 @@ def device_group_destinations_add(request, device_group_id):
     outbound = get_object_or_404(OutboundIntegrationConfiguration, pk=outbound_id)
     device_group.destinations.add(outbound)
     device_group.save()
-    context = _device_group_destinations_context(device_group)
+    context = _device_group_destinations_context(device_group, request)
     return render(request, "integrations/device_group_destinations_partial.html", context)
 
 
@@ -1797,7 +1803,7 @@ def device_group_destinations_remove(request, device_group_id, outbound_id):
     permission_can_view(request, device_group)
     device_group.destinations.remove(outbound_id)
     device_group.save()
-    context = _device_group_destinations_context(device_group)
+    context = _device_group_destinations_context(device_group, request)
     return render(request, "integrations/device_group_destinations_partial.html", context)
 
 
