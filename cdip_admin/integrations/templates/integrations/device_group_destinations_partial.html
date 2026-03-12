@@ -17,14 +17,30 @@
                        hx-get="{% url 'outbound_integration_configuration_update' configuration_id=dest.id %}"
                        hx-target="#slide-panel-body"
                        hx-swap="innerHTML">{{ dest.name|default:dest }}</a>
+                    {% if dest.owner.name %}<div class="text-muted" style="font-size: 0.8em;">{{ dest.owner.name }}</div>{% endif %}
+                    {% if dest.endpoint %}<div class="text-muted" style="font-size: 0.8em;">{{ dest.endpoint }}</div>{% endif %}
                 </td>
                 <td>{{ dest.type.name }}</td>
                 <td class="text-right">
-                    <button class="btn btn-outline-danger btn-sm"
-                            hx-post="{% url 'device_group_destinations_remove' device_group_id=device_group_id outbound_id=dest.id %}"
-                            hx-target="#device-group-destinations-section"
-                            hx-swap="outerHTML"
-                            hx-confirm="Remove destination {{ dest.name|default:dest }}?">Remove</button>
+                    <span class="remove-btn-{{ dest.id }}">
+                        <button class="btn btn-outline-danger btn-sm"
+                                _="on click hide .remove-btn-{{ dest.id }} then show .confirm-remove-{{ dest.id }}">
+                            Remove
+                        </button>
+                    </span>
+                    <span class="confirm-remove-{{ dest.id }} align-items-center justify-content-end" style="display: none; gap: .4rem;">
+                        <small class="text-muted">Remove {{ dest.name|default:dest }}?</small>
+                        <button class="btn btn-danger btn-sm"
+                                hx-post="{% url 'device_group_destinations_remove' device_group_id=device_group_id outbound_id=dest.id %}"
+                                hx-target="#device-group-destinations-section"
+                                hx-swap="outerHTML">
+                            Confirm
+                        </button>
+                        <button class="btn btn-secondary btn-sm"
+                                _="on click hide .confirm-remove-{{ dest.id }} then show .remove-btn-{{ dest.id }}">
+                            Cancel
+                        </button>
+                    </span>
                 </td>
             </tr>
             {% endfor %}
@@ -43,7 +59,7 @@
             {% if available_outbound %}
             <option value=""></option>
             {% for outbound in available_outbound %}
-            <option value="{{ outbound.id }}" data-organization="{{ outbound.owner.name }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }}) — {{ outbound.owner.name }}</option>
+            <option value="{{ outbound.id }}" data-organization="{{ outbound.owner.name }}" data-endpoint="{{ outbound.endpoint }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
             {% endfor %}
             {% else %}
             <option value="">No destinations available</option>

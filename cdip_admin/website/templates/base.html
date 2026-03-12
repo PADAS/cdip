@@ -42,22 +42,36 @@
         })
     </script>
     <style>
-        .ts-wrapper.destination-select { min-width: 300px; }
+        .ts-wrapper.destination-select { flex: 1 1 auto; min-width: 0; }
     </style>
     <script>
         document.addEventListener('htmx:afterSettle', function(evt) {
             evt.detail.elt.querySelectorAll('select[name="outbound_id"]').forEach(function(el) {
                 if (!el.tomselect) {
                     var ts = new TomSelect(el, {
-                        searchField: ['text', 'organization'],
+                        searchField: ['text', 'organization', 'endpoint'],
                         placeholder: '-- Select destination --',
                         allowEmptyOption: true,
+                        onItemAdd: function() { this.blur(); },
+                        render: {
+                            option: function(data, escape) {
+                                var html = '<div>' + escape(data.text) + '</div>';
+                                if (data.organization) {
+                                    html += '<div class="text-muted" style="font-size: 0.8em;">' + escape(data.organization) + '</div>';
+                                }
+                                if (data.endpoint) {
+                                    html += '<div class="text-muted" style="font-size: 0.8em;">' + escape(data.endpoint) + '</div>';
+                                }
+                                return '<div>' + html + '</div>';
+                            }
+                        },
                     });
-                    // Backfill organization field from data-organization attribute
+                    // Backfill organization and endpoint fields from data attributes
                     el.querySelectorAll('option[data-organization]').forEach(function(optEl) {
                         var key = optEl.value;
                         if (ts.options[key]) {
                             ts.options[key].organization = optEl.dataset.organization;
+                            ts.options[key].endpoint = optEl.dataset.endpoint || '';
                         }
                     });
                 }
