@@ -39,11 +39,11 @@
           hx-swap="outerHTML"
           class="form-inline mb-3">
         {% csrf_token %}
-        <select name="outbound_id" class="form-control form-control-sm mr-2" required{% if not available_outbound %} disabled{% endif %}>
+        <select name="outbound_id" class="form-control form-control-sm mr-2 destination-select" required{% if not available_outbound %} disabled{% endif %}>
             {% if available_outbound %}
-            <option value="">-- Select destination --</option>
+            <option value=""></option>
             {% for outbound in available_outbound %}
-            <option value="{{ outbound.id }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
+            <option value="{{ outbound.id }}" data-organization="{{ outbound.owner.name }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }}) — {{ outbound.owner.name }}</option>
             {% endfor %}
             {% else %}
             <option value="">No destinations available</option>

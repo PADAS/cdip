@@ -34,10 +34,35 @@
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap4.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         $(function () {
           $('[data-toggle="tooltip"]').tooltip()
         })
+    </script>
+    <style>
+        .ts-wrapper.destination-select { min-width: 300px; }
+    </style>
+    <script>
+        document.addEventListener('htmx:afterSettle', function(evt) {
+            evt.detail.elt.querySelectorAll('select[name="outbound_id"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    var ts = new TomSelect(el, {
+                        searchField: ['text', 'organization'],
+                        placeholder: '-- Select destination --',
+                        allowEmptyOption: true,
+                    });
+                    // Backfill organization field from data-organization attribute
+                    el.querySelectorAll('option[data-organization]').forEach(function(optEl) {
+                        var key = optEl.value;
+                        if (ts.options[key]) {
+                            ts.options[key].organization = optEl.dataset.organization;
+                        }
+                    });
+                }
+            });
+        });
     </script>
 </head>
 <body>

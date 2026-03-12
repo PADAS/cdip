@@ -40,10 +40,10 @@
           hx-swap="outerHTML"
           class="form-inline mb-3">
         {% csrf_token %}
-        <select name="outbound_id" class="form-control form-control-sm mr-2" required>
-            <option value="">-- Select outbound --</option>
+        <select name="outbound_id" class="form-control form-control-sm mr-2 destination-select" required>
+            <option value=""></option>
             {% for outbound in available_outbound %}
-            <option value="{{ outbound.id }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
+            <option value="{{ outbound.id }}" data-organization="{{ outbound.owner.name }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }}) — {{ outbound.owner.name }}</option>
             {% endfor %}
         </select>
         <button type="submit" class="btn btn-outline-primary btn-sm">Add Connection</button>
