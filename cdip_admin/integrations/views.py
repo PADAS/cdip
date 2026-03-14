@@ -1695,13 +1695,13 @@ def toggle_bridge_enabled(request, id):
 def _inbound_connections_context(config, request):
     """Build context dict for the inbound connections partial."""
     default_dg = config.default_devicegroup
-    connected_outbound = list(default_dg.destinations.all()) if default_dg else []
+    connected_outbound = list(default_dg.destinations.select_related('type', 'owner').all()) if default_dg else []
     connected_ids = [o.id for o in connected_outbound]
 
-    available_outbound = OutboundIntegrationConfiguration.objects.all()
+    available_outbound = OutboundIntegrationConfiguration.objects.select_related('type', 'owner')
     if not IsGlobalAdmin.has_permission(None, request, None):
         available_outbound = IsOrganizationMember.filter_queryset_for_user(
-            available_outbound, request.user, "name"
+            available_outbound, request.user, "owner__name"
         )
     available_outbound = available_outbound.exclude(id__in=connected_ids).order_by("name")
 
@@ -1757,13 +1757,13 @@ def inbound_connections_remove(request, configuration_id, outbound_id):
 
 def _device_group_destinations_context(device_group, request):
     """Build context dict for the device group destinations partial."""
-    current_destinations = list(device_group.destinations.all())
+    current_destinations = list(device_group.destinations.select_related('type', 'owner').all())
     current_ids = [d.id for d in current_destinations]
 
-    available_outbound = OutboundIntegrationConfiguration.objects.all()
+    available_outbound = OutboundIntegrationConfiguration.objects.select_related('type', 'owner')
     if not IsGlobalAdmin.has_permission(None, request, None):
         available_outbound = IsOrganizationMember.filter_queryset_for_user(
-            available_outbound, request.user, "name"
+            available_outbound, request.user, "owner__name"
         )
     available_outbound = available_outbound.exclude(id__in=current_ids).order_by("name")
 
