@@ -1117,7 +1117,8 @@ class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
             qs = IsOrganizationMember.filter_queryset_for_user(
                 qs, self.request.user, "owner__name"
             )
-        errors_qs = qs.filter(state__has_key='error').select_related('type', 'owner')
+        filterset = InboundIntegrationFilter(self.request.GET, queryset=qs, request=self.request)
+        errors_qs = filterset.qs.filter(state__has_key='error').select_related('type', 'owner')
 
         from collections import defaultdict
         groups = defaultdict(list)
@@ -1127,6 +1128,7 @@ class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
                 error_val = json.dumps(error_val)
             groups[error_val].append(config)
 
+        context['filter'] = filterset
         context['error_groups'] = sorted(groups.items(), key=lambda x: -len(x[1]))
         context['total_error_count'] = errors_qs.count()
         return context

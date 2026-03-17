@@ -22,19 +22,77 @@
     {% if error_count > 0 %}
     <div class="alert alert-warning mt-2 d-flex justify-content-between align-items-center">
         <span><strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors</span>
-        <a href="{% url 'inbound_integration_errors' %}" class="btn btn-sm btn-warning">View grouped errors</a>
+        <a href="{% url 'inbound_integration_errors' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-warning">View grouped errors</a>
     </div>
     {% endif %}
 
     {% if filter %}
-    <div class="row">
-        <div class="col-md-12">
-            <form action="" method="get" class="form form-inline">
-                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-                {% bootstrap_button 'Filter' extra_classes='' %}
-            </form>
-        </div>
-    </div>
+    <form id="inbound-filter-form" action="" method="get" class="d-flex align-items-center mt-3" style="gap: 0.5rem;">
+        <div style="flex: 2 1 150px;">{{ filter.form.name }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.inbound_config_type }}</div>
+        <div style="flex: 2 1 130px;">{{ filter.form.enabled }}</div>
+        <div style="flex: 1 1 100px;">{{ filter.form.has_errors }}</div>
+    </form>
+    <style>
+        #inbound-filter-form .ts-wrapper { width: 100%; }
+        #inbound-filter-form select,
+        #inbound-filter-form input[type="text"] { width: 100%; }
+        #inbound-filter-form .ts-wrapper.single .ts-control::after { display: none; }
+        #inbound-filter-form .ts-control .item {
+            background: #e9ecef;
+            color: #343a40;
+            border-radius: 1rem;
+            padding: 0.1rem 0.5rem 0.1rem 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        #inbound-filter-form .ts-control .item .remove {
+            font-size: 1rem;
+            line-height: 1;
+            color: #6c757d;
+            text-decoration: none;
+        }
+        #inbound-filter-form .ts-control .item .remove:hover { color: #343a40; }
+    </style>
+    <script>
+        (function() {
+            var form = document.getElementById('inbound-filter-form');
+
+            var nameInput = document.querySelector('#inbound-filter-form input[name="name"]');
+            if (nameInput) {
+                nameInput.classList.add('form-control');
+                nameInput.placeholder = 'Name';
+                var debounceTimer;
+                nameInput.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(function() { form.submit(); }, 400);
+                });
+            }
+
+            [
+                { name: 'organization',        placeholder: 'Owner'  },
+                { name: 'inbound_config_type', placeholder: 'Type'   },
+                { name: 'enabled',             placeholder: 'Status' },
+                { name: 'has_errors',          placeholder: 'Errors' },
+            ].forEach(function(cfg) {
+                var el = document.querySelector('#inbound-filter-form select[name="' + cfg.name + '"]');
+                if (!el || el.tomselect) return;
+                var emptyOpt = el.querySelector('option[value=""]');
+                if (emptyOpt) emptyOpt.textContent = '';
+                var ts = new TomSelect(el, {
+                    placeholder: cfg.placeholder,
+                    plugins: ['remove_button'],
+                    onItemAdd: function() { this.blur(); },
+                    onChange: function() { form.submit(); },
+                });
+                if (!el.value) ts.clear();
+            });
+        })();
+    </script>
     {% endif %}
 
     <div id="table-container">

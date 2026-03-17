@@ -285,7 +285,7 @@ class InboundIntegrationFilter(django_filters.FilterSet):
 
     class Meta:
         model = InboundIntegrationConfiguration
-        fields = ("organization", "inbound_config_type", "name", "enabled")
+        fields = ("name", "organization", "inbound_config_type", "enabled")
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
