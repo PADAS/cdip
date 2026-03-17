@@ -1120,16 +1120,28 @@ class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
         filterset = InboundIntegrationFilter(self.request.GET, queryset=qs, request=self.request)
         errors_qs = filterset.qs.filter(state__has_key='error').select_related('type', 'owner')
 
-        from collections import defaultdict
-        groups = defaultdict(list)
-        for config in errors_qs:
-            error_val = config.state.get('error', '')
+        def _extract_error_msg(error_val):
+            if isinstance(error_val, dict):
+                return error_val.get('message') or json.dumps(error_val)
             if not isinstance(error_val, str):
-                error_val = json.dumps(error_val)
-            groups[error_val].append(config)
+                return json.dumps(error_val)
+            return error_val
+
+        from collections import defaultdict
+        type_groups = defaultdict(lambda: defaultdict(list))
+        for config in errors_qs:
+            error_msg = _extract_error_msg(config.state.get('error', ''))
+            type_groups[config.type.name][error_msg].append(config)
+
+        error_by_type = []
+        for type_name, err_groups in type_groups.items():
+            sorted_groups = sorted(err_groups.items(), key=lambda x: -len(x[1]))
+            total = sum(len(v) for v in err_groups.values())
+            error_by_type.append((type_name, sorted_groups, total))
+        error_by_type.sort(key=lambda x: -x[2])
 
         context['filter'] = filterset
-        context['error_groups'] = sorted(groups.items(), key=lambda x: -len(x[1]))
+        context['error_by_type'] = error_by_type
         context['total_error_count'] = errors_qs.count()
         return context
 

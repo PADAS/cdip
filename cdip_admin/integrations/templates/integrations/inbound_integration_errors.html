@@ -107,9 +107,14 @@
 </script>
 {% endif %}
 
-{% if error_groups %}
-    {% for error_msg, configs in error_groups %}
-    <div class="card mb-3">
+{% if error_by_type %}
+    {% for type_name, err_groups, type_count in error_by_type %}
+    <h5 class="mt-4 mb-2">
+        {{ type_name }}
+        <span class="badge badge-secondary ml-1">{{ type_count }}</span>
+    </h5>
+    {% for error_msg, configs in err_groups %}
+    <div class="card mb-2">
         <div class="card-header d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
                 <span class="badge badge-warning mr-2">{{ configs|length }}</span>
@@ -118,18 +123,17 @@
             <button class="btn btn-sm btn-outline-secondary"
                     type="button"
                     data-toggle="collapse"
-                    data-target="#group-{{ forloop.counter }}"
+                    data-target="#group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
                     aria-expanded="true">
                 Toggle
             </button>
         </div>
-        <div class="collapse show" id="group-{{ forloop.counter }}">
+        <div class="collapse show" id="group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
                     <thead class="thead-light">
                         <tr>
                             <th>Name</th>
-                            <th>Type</th>
                             <th>Organization</th>
                             <th></th>
                         </tr>
@@ -138,7 +142,6 @@
                         {% for config in configs %}
                         <tr>
                             <td>{{ config.name }}</td>
-                            <td>{{ config.type.name }}</td>
                             <td>{{ config.owner.name }}</td>
                             <td class="text-right">
                                 <a href="{% url 'inbound_integration_configuration_list' %}#edit={{ config.id }}"
@@ -155,6 +158,7 @@
             </div>
         </div>
     </div>
+    {% endfor %}
     {% endfor %}
 {% else %}
     <div class="alert alert-success">No integration errors found.</div>
