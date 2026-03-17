@@ -353,7 +353,7 @@ class OutboundIntegrationFilter(django_filters.FilterSet):
 
     class Meta:
         model = OutboundIntegrationConfiguration
-        fields = ("organization", "name", "outbound_config_type", "outbound_affected_destinations", "enabled")
+        fields = ("name", "organization", "outbound_config_type", "outbound_affected_destinations", "enabled")
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements
@@ -416,7 +416,7 @@ class BridgeIntegrationFilter(django_filters.FilterSet):
 
     class Meta:
         model = BridgeIntegration
-        fields = ("organization", "bridge_type", "name", "enabled")
+        fields = ("name", "organization", "bridge_type", "enabled")
 
     def __init__(self, *args, **kwargs):
         super(BridgeIntegrationFilter, self).__init__(*args, **kwargs)

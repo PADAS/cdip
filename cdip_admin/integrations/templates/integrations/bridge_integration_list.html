@@ -27,14 +27,92 @@
     {% endif %}
 
     {% if filter %}
-    <div class="row">
-        <div class="col-md-12">
-            <form action="" method="get" class="form form-inline">
-                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-                {% bootstrap_button 'Filter' extra_classes='' %}
-            </form>
+    <form id="bridge-filter-form" action="" method="get" class="d-flex align-items-center mt-3" style="gap: 0.5rem;">
+        <div style="flex: 2 1 150px; position: relative;">
+            {{ filter.form.name }}
+            <button type="button" class="name-clear-btn" aria-label="Clear">&times;</button>
         </div>
-    </div>
+        <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.bridge_type }}</div>
+        <div style="flex: 2 1 130px;">{{ filter.form.enabled }}</div>
+        <div style="flex: 1 1 100px;">{{ filter.form.has_errors }}</div>
+        {% if request.GET %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary" style="white-space: nowrap;">Clear All</a>{% endif %}
+    </form>
+    <style>
+        #bridge-filter-form .ts-wrapper { width: 100%; }
+        #bridge-filter-form select,
+        #bridge-filter-form input[type="text"] { width: 100%; }
+        #bridge-filter-form input[name="name"] { padding-right: 1.75rem; }
+        #bridge-filter-form .name-clear-btn {
+            position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: #adb5bd; cursor: pointer;
+            padding: 0; font-size: 1.1rem; line-height: 1; display: none;
+        }
+        #bridge-filter-form .name-clear-btn:hover { color: #343a40; }
+        #bridge-filter-form .ts-wrapper.single .ts-control::after { display: none; }
+        #bridge-filter-form .ts-control .item {
+            background: #e9ecef;
+            color: #343a40;
+            border-radius: 1rem;
+            padding: 0.1rem 0.5rem 0.1rem 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        #bridge-filter-form .ts-control .item .remove {
+            font-size: 1rem;
+            line-height: 1;
+            color: #6c757d;
+            text-decoration: none;
+        }
+        #bridge-filter-form .ts-control .item .remove:hover { color: #343a40; }
+    </style>
+    <script>
+        (function() {
+            var form = document.getElementById('bridge-filter-form');
+            var nameInput = document.querySelector('#bridge-filter-form input[name="name"]');
+            var nameClearBtn = document.querySelector('#bridge-filter-form .name-clear-btn');
+            if (nameInput) {
+                nameInput.classList.add('form-control');
+                nameInput.placeholder = 'Name';
+                function syncNameClear() {
+                    nameClearBtn.style.display = nameInput.value ? 'block' : 'none';
+                }
+                syncNameClear();
+                var debounceTimer;
+                nameInput.addEventListener('input', function() {
+                    syncNameClear();
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(function() { form.submit(); }, 400);
+                });
+                nameClearBtn.addEventListener('click', function() {
+                    nameInput.value = '';
+                    syncNameClear();
+                    form.submit();
+                });
+            }
+            [
+                { name: 'organization', placeholder: 'Owner'  },
+                { name: 'bridge_type',  placeholder: 'Type'   },
+                { name: 'enabled',      placeholder: 'Status' },
+                { name: 'has_errors',   placeholder: 'Errors' },
+            ].forEach(function(cfg) {
+                var el = document.querySelector('#bridge-filter-form select[name="' + cfg.name + '"]');
+                if (!el || el.tomselect) return;
+                var emptyOpt = el.querySelector('option[value=""]');
+                if (emptyOpt) emptyOpt.textContent = '';
+                var ts = new TomSelect(el, {
+                    placeholder: cfg.placeholder,
+                    plugins: ['remove_button'],
+                    onItemAdd: function() { this.blur(); },
+                    onChange: function() { form.submit(); },
+                });
+                if (!el.value) ts.clear();
+            });
+        })();
+    </script>
     {% endif %}
 
     <div id="table-container">
