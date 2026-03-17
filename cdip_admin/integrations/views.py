@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
-from django.views.generic import ListView, DetailView, UpdateView, FormView
+from django.views.generic import ListView, DetailView, UpdateView, FormView, TemplateView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count, Case, When, Value, BooleanField
@@ -1105,6 +1105,31 @@ class InboundIntegrationConfigurationListView(
                 output_field=BooleanField(),
             )
         ).order_by('-_has_error', 'type__name', 'id')
+
+
+class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
+    template_name = "integrations/inbound_integration_errors.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        qs = InboundIntegrationConfiguration.objects.get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            qs = IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        errors_qs = qs.filter(state__has_key='error').select_related('type', 'owner')
+
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for config in errors_qs:
+            error_val = config.state.get('error', '')
+            if not isinstance(error_val, str):
+                error_val = json.dumps(error_val)
+            groups[error_val].append(config)
+
+        context['error_groups'] = sorted(groups.items(), key=lambda x: -len(x[1]))
+        context['total_error_count'] = errors_qs.count()
+        return context
 
 
 ###

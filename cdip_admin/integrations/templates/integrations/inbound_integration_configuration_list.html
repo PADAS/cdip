@@ -20,8 +20,9 @@
     </div>
 
     {% if error_count > 0 %}
-    <div class="alert alert-warning mt-2">
-        <strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors
+    <div class="alert alert-warning mt-2 d-flex justify-content-between align-items-center">
+        <span><strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors</span>
+        <a href="{% url 'inbound_integration_errors' %}" class="btn btn-sm btn-warning">View grouped errors</a>
     </div>
     {% endif %}
 

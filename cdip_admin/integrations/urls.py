@@ -75,6 +75,11 @@ urlpatterns = [
         name="inbound_integration_configuration_list",
     ),
     path(
+        "inboundconfigurations/errors/",
+        views.InboundIntegrationErrorsView.as_view(),
+        name="inbound_integration_errors",
+    ),
+    path(
         "inboundconfigurations/add",
         views.InboundIntegrationConfigurationAddView.as_view(),
         name="inbound_integration_configuration_add",
