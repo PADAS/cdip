@@ -1,5 +1,22 @@
 <div id="inbound-connections-section" class="mt-4">
     <h5>Connections</h5>
+
+    {% if available_outbound %}
+    <form hx-post="{% url 'inbound_connections_add' configuration_id=configuration_id %}"
+          hx-target="#inbound-connections-section"
+          hx-swap="outerHTML"
+          class="d-flex align-items-center mb-3">
+        {% csrf_token %}
+        <select name="outbound_id" class="form-control form-control-sm mr-2 destination-select" style="flex: 1 1 auto; min-width: 0;" required>
+            <option value=""></option>
+            {% for outbound in available_outbound %}
+            <option value="{{ outbound.id }}" data-organization="{{ outbound.owner.name }}" data-endpoint="{{ outbound.endpoint }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary btn-sm" style="flex-shrink: 0;">Add Connection</button>
+    </form>
+    {% endif %}
+
     {% if connected_outbound %}
     <table class="table table-sm table-bordered">
         <thead class="thead-light">
@@ -17,14 +34,30 @@
                        hx-get="{% url 'outbound_integration_configuration_update' configuration_id=outbound.id %}"
                        hx-target="#slide-panel-body"
                        hx-swap="innerHTML">{{ outbound.name|default:outbound }}</a>
+                    {% if outbound.owner.name %}<div class="text-muted" style="font-size: 0.8em;">{{ outbound.owner.name }}</div>{% endif %}
+                    {% if outbound.endpoint %}<div class="text-muted" style="font-size: 0.8em;">{{ outbound.endpoint }}</div>{% endif %}
                 </td>
                 <td>{{ outbound.type.name }}</td>
                 <td class="text-right">
-                    <button class="btn btn-outline-danger btn-sm"
-                            hx-post="{% url 'inbound_connections_remove' configuration_id=configuration_id outbound_id=outbound.id %}"
-                            hx-target="#inbound-connections-section"
-                            hx-swap="outerHTML"
-                            hx-confirm="Remove connection to {{ outbound.name|default:outbound }}?">Remove</button>
+                    <span class="remove-btn-{{ outbound.id }}">
+                        <button class="btn btn-outline-danger btn-sm"
+                                _="on click hide .remove-btn-{{ outbound.id }} then show .confirm-remove-{{ outbound.id }} with display:flex">
+                            Remove
+                        </button>
+                    </span>
+                    <span class="confirm-remove-{{ outbound.id }} align-items-center justify-content-end" style="display: none; gap: .4rem;">
+                        <small class="text-muted">Remove {{ outbound.name|default:outbound }}?</small>
+                        <button class="btn btn-danger btn-sm"
+                                hx-post="{% url 'inbound_connections_remove' configuration_id=configuration_id outbound_id=outbound.id %}"
+                                hx-target="#inbound-connections-section"
+                                hx-swap="outerHTML">
+                            Confirm
+                        </button>
+                        <button class="btn btn-secondary btn-sm"
+                                _="on click hide .confirm-remove-{{ outbound.id }} then show .remove-btn-{{ outbound.id }}">
+                            Cancel
+                        </button>
+                    </span>
                 </td>
             </tr>
             {% endfor %}
@@ -32,22 +65,6 @@
     </table>
     {% else %}
     <p class="text-muted">No outbound destinations connected.</p>
-    {% endif %}
-
-    {% if available_outbound %}
-    <form hx-post="{% url 'inbound_connections_add' configuration_id=configuration_id %}"
-          hx-target="#inbound-connections-section"
-          hx-swap="outerHTML"
-          class="form-inline mb-3">
-        {% csrf_token %}
-        <select name="outbound_id" class="form-control form-control-sm mr-2" required>
-            <option value="">-- Select outbound --</option>
-            {% for outbound in available_outbound %}
-            <option value="{{ outbound.id }}">{{ outbound.name|default:outbound }} ({{ outbound.type.name }})</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-outline-primary btn-sm">Add Connection</button>
-    </form>
     {% endif %}
 
     {% if advanced_groups %}

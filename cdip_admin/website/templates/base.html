@@ -34,10 +34,49 @@
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap4.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         $(function () {
           $('[data-toggle="tooltip"]').tooltip()
         })
+    </script>
+    <style>
+        .ts-wrapper.destination-select { flex: 1 1 auto; min-width: 0; }
+    </style>
+    <script>
+        document.addEventListener('htmx:afterSettle', function(evt) {
+            evt.detail.elt.querySelectorAll('select[name="outbound_id"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    var ts = new TomSelect(el, {
+                        searchField: ['text', 'organization', 'endpoint'],
+                        placeholder: '-- Select destination --',
+                        allowEmptyOption: true,
+                        onItemAdd: function() { this.blur(); },
+                        render: {
+                            option: function(data, escape) {
+                                var html = '<div>' + escape(data.text) + '</div>';
+                                if (data.organization) {
+                                    html += '<div class="text-muted" style="font-size: 0.8em;">' + escape(data.organization) + '</div>';
+                                }
+                                if (data.endpoint) {
+                                    html += '<div class="text-muted" style="font-size: 0.8em;">' + escape(data.endpoint) + '</div>';
+                                }
+                                return '<div>' + html + '</div>';
+                            }
+                        },
+                    });
+                    // Backfill organization and endpoint fields from data attributes
+                    el.querySelectorAll('option[data-organization]').forEach(function(optEl) {
+                        var key = optEl.value;
+                        if (ts.options[key]) {
+                            ts.options[key].organization = optEl.dataset.organization;
+                            ts.options[key].endpoint = optEl.dataset.endpoint || '';
+                        }
+                    });
+                }
+            });
+        });
     </script>
 </head>
 <body>
