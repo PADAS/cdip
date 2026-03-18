@@ -1,6 +1,12 @@
 {% load crispy_forms_tags %}
 <div class="slide-panel-toolbar">
-    <h4 class="mb-0">Update Outbound Integration</h4>
+    <div>
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                hx-post="{% url 'outbound_integration_configuration_delete' configuration_id=form.instance.id %}"
+                hx-confirm="Delete '{{ form.instance.name }}'? This cannot be undone."
+                hx-swap="none">Delete</button>
+    </div>
     <div>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel'));">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>

@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
-from django.views.generic import ListView, DetailView, UpdateView, FormView, TemplateView
+from django.views.generic import ListView, DetailView, UpdateView, FormView, TemplateView, View
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count, Case, When, Value, BooleanField
@@ -1064,6 +1064,20 @@ class InboundIntegrationConfigurationUpdateView(
         return reverse("inbound_integration_configuration_list")
 
 
+class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, configuration_id):
+        configuration = get_object_or_404(
+            InboundIntegrationConfiguration, pk=configuration_id
+        )
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, configuration):
+                raise PermissionDenied
+        configuration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
 class InboundIntegrationConfigurationListView(
     LoginRequiredMixin, SingleTableMixin, FilterView
 ):
@@ -1374,6 +1388,20 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
 
     def get_success_url(self):
         return reverse("outbound_integration_configuration_list")
+
+
+class OutboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, configuration_id):
+        configuration = get_object_or_404(
+            OutboundIntegrationConfiguration, pk=configuration_id
+        )
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, configuration):
+                raise PermissionDenied
+        configuration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
 
 
 class OutboundIntegrationConfigurationListView(

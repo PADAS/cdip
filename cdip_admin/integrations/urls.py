@@ -90,6 +90,11 @@ urlpatterns = [
         name="inbound_integration_configuration_update",
     ),
     path(
+        "inboundconfigurations/<uuid:configuration_id>/delete",
+        views.InboundIntegrationConfigurationDeleteView.as_view(),
+        name="inbound_integration_configuration_delete",
+    ),
+    path(
         "inboundconfigurations/<uuid:integration_id>/api-key",
         views.api_key_fragment,
         name="inbound_api_key_fragment",
@@ -123,6 +128,11 @@ urlpatterns = [
         "outboundconfigurations/<uuid:configuration_id>/edit",
         views.OutboundIntegrationConfigurationUpdateView.as_view(),
         name="outbound_integration_configuration_update",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/delete",
+        views.OutboundIntegrationConfigurationDeleteView.as_view(),
+        name="outbound_integration_configuration_delete",
     ),
     path(
         "outboundconfigurations/type_modal/<uuid:configuration_id>/",
