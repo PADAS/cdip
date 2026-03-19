@@ -21,7 +21,7 @@ from integrations.models import (
     get_user_integrations_qs,
     Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
-from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, LenientModelChoiceFilter
+from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, OrphanedBooleanWidget, LenientModelChoiceFilter
 from django.db.models import Q
 from django.contrib.postgres.aggregates import ArrayAgg
 
@@ -169,9 +169,23 @@ class DeviceGroupFilter(django_filters.FilterSet):
         empty_label=_("All Destinations"),
     )
 
+    orphaned = django_filters.BooleanFilter(
+        method="filter_orphaned",
+        label="Orphaned only",
+        widget=OrphanedBooleanWidget,
+    )
+
     class Meta:
         model = DeviceGroup
-        fields = ("organization", "device_group", "destinations")
+        fields = ("organization", "device_group", "destinations", "orphaned")
+
+    def filter_orphaned(self, qs, name, value):
+        if value:
+            return qs.filter(
+                inbound_integration_configurations__isnull=True,
+                destinations__isnull=True,
+            ).distinct()
+        return qs
 
     def __init__(self, *args, **kwargs):
         # this can appropriately update the ui filter elements

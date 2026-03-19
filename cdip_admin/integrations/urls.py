@@ -24,6 +24,11 @@ urlpatterns = [
         name="device_group_update",
     ),
     path(
+        "devicegroups/<uuid:device_group_id>/delete",
+        views.DeviceGroupDeleteView.as_view(),
+        name="device_group_delete",
+    ),
+    path(
         "devicegroups/<uuid:device_group_id>/manage",
         views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group_management_update",

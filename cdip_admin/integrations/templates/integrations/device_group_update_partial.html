@@ -1,6 +1,31 @@
 {% load crispy_forms_tags %}
 <div class="slide-panel-toolbar">
-    <h4 class="mb-0">Edit Device Group</h4>
+    <span id="delete-btn">
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                _="on click hide #delete-btn then show #delete-confirm with display:flex">Delete</button>
+    </span>
+    <span id="delete-confirm" class="align-items-center" style="display: none; gap: .4rem;">
+        <small class="text-muted">Delete {{ form.instance.name }}?</small>
+        <button type="button"
+                class="btn btn-danger btn-sm"
+                hx-post="{% url 'device_group_delete' device_group_id=form.instance.id %}"
+                hx-swap="none"
+                _="on htmx:responseError from me
+                     if event.detail.xhr.status == 409
+                       hide #delete-confirm
+                       show #delete-error with display:flex
+                     end">Confirm</button>
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                _="on click hide #delete-confirm then show #delete-btn">Cancel</button>
+    </span>
+    <span id="delete-error" class="align-items-center text-danger" style="display: none; gap: .4rem; font-size:.85rem;">
+        Still referenced by an inbound integration.
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                _="on click hide #delete-error then show #delete-btn">OK</button>
+    </span>
     <div>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel')); document.body.dispatchEvent(new Event('panelFormSaved'));">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>

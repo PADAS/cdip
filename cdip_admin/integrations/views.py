@@ -500,6 +500,25 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         )
 
 
+class DeviceGroupDeleteView(LoginRequiredMixin, View):
+    def post(self, request, device_group_id):
+        from django.db.models import ProtectedError
+        device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, device_group.owner):
+                raise PermissionDenied
+        try:
+            device_group.delete()
+        except ProtectedError:
+            return HttpResponse(
+                "Cannot delete: this device group is still referenced by an inbound integration.",
+                status=409,
+            )
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
 class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "integrations/device_group_update.html"
     form_class = DeviceGroupManagementForm
