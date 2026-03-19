@@ -68,6 +68,7 @@ from django.template.loader import render_to_string
 from core.widgets import FormattedJsonFieldWidget
 from django.forms.fields import InvalidJSONInput
 from django_jsonform.widgets import JSONFormWidget
+from deployments.models import DispatcherDeployment
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -1417,6 +1418,17 @@ class OutboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
         if not IsGlobalAdmin.has_permission(None, request, None):
             if not IsOrganizationMember.is_object_owner(request.user, configuration):
                 raise PermissionDenied
+        try:
+            deployment = configuration.dispatcher_by_outbound
+        except OutboundIntegrationConfiguration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
+            pass
+        else:
+            safe_statuses = [
+                DispatcherDeployment.Status.COMPLETE,
+                DispatcherDeployment.Status.ERROR,
+            ]
+            if deployment.integration is None and deployment.status in safe_statuses:
+                deployment.delete()
         configuration.delete()
         response = HttpResponse(status=204)
         response["HX-Trigger"] = "panelFormSaved"
