@@ -1,5 +1,5 @@
 {% load crispy_forms_tags %}
-<div hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-params="not csrfmiddlewaretoken">
 <div class="slide-panel-toolbar">
     <span id="delete-btn">
         <button type="button"

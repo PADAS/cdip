@@ -28,9 +28,11 @@
     <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
     <script>
         document.addEventListener('htmx:configRequest', function(evt) {
-            var csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-                evt.detail.headers['X-CSRFToken'] = csrfToken.getAttribute('content');
+            if (!evt.detail.headers['X-CSRFToken']) {
+                var csrfToken = document.querySelector('meta[name="csrf-token"]');
+                if (csrfToken) {
+                    evt.detail.headers['X-CSRFToken'] = csrfToken.getAttribute('content');
+                }
             }
         });
     </script>
