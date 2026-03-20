@@ -2,10 +2,10 @@ import json
 import logging
 import random
 
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
@@ -448,7 +448,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
-        form = form_class(instance=self.object)
+        form = form_class(instance=self.object, request=request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         context = self.get_context_data(form=form)
@@ -456,6 +456,11 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
             self._configure_htmx_helper(form, self.object.pk)
             return render(request, "integrations/device_group_update_partial.html", context)
         return self.render_to_response(context)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def form_valid(self, form):
         self.object = form.save()
@@ -1949,3 +1954,23 @@ def outbound_connections_remove(request, configuration_id, inbound_id):
     context = _outbound_connections_context(config)
     return render(request, "integrations/outbound_connections_partial.html", context)
 
+
+
+@login_required
+def device_group_autocomplete(request):
+    q = request.GET.get("q", "")
+    qs = DeviceGroup.objects.filter(name__icontains=q)
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        qs = qs.filter(owner__accountprofile__user=request.user)
+    results = [{"id": str(dg.id), "name": dg.name} for dg in qs.order_by("name")[:50]]
+    return JsonResponse(results, safe=False)
+
+
+@login_required
+def organization_autocomplete(request):
+    q = request.GET.get("q", "")
+    qs = Organization.objects.filter(name__icontains=q)
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, "name")
+    results = [{"id": str(org.id), "name": org.name} for org in qs.order_by("name")[:50]]
+    return JsonResponse(results, safe=False)

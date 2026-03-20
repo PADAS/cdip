@@ -51,9 +51,46 @@
     </script>
     <style>
         .ts-wrapper.destination-select { flex: 1 1 auto; min-width: 0; }
+        .ts-wrapper.lazy-select.single .ts-control:after { display: none; }
     </style>
     <script>
+        function makeLazySelect(el, url) {
+            new TomSelect(el, {
+                valueField: 'id',
+                labelField: 'name',
+                searchField: 'name',
+                preload: 'focus',
+                wrapperClass: 'form-control ts-wrapper lazy-select',
+                onItemAdd: function() { this.blur(); },
+                load: function(query, callback) {
+                    fetch(url + encodeURIComponent(query))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) { callback(data); })
+                        .catch(function() { callback(); });
+                },
+            });
+        }
+
+        function initTomSelects(root) {
+            root.querySelectorAll('select[name="owner"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    makeLazySelect(el, '/integrations/autocomplete/organizations/?q=');
+                }
+            });
+
+            root.querySelectorAll('select[name="default_devicegroup"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    makeLazySelect(el, '/integrations/autocomplete/device-groups/?q=');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initTomSelects(document);
+        });
+
         document.addEventListener('htmx:afterSettle', function(evt) {
+            initTomSelects(evt.detail.elt);
             evt.detail.elt.querySelectorAll('select[name="outbound_id"]').forEach(function(el) {
                 if (!el.tomselect) {
                     var ts = new TomSelect(el, {
@@ -84,6 +121,7 @@
                     });
                 }
             });
+
         });
     </script>
 </head>

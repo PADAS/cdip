@@ -77,15 +77,26 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if request:
-                qs = Organization.objects.all()
-                if not IsGlobalAdmin.has_permission(None, request, None):
-                    self.fields[
-                        "owner"
-                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                        qs, request.user, "name", admin_only=True
+                if self.instance and self.instance.pk and not self.is_bound:
+                    self.fields["owner"].queryset = Organization.objects.filter(
+                        pk=self.instance.owner_id
                     )
                 else:
-                    self.fields["owner"].queryset = qs
+                    qs = Organization.objects.all()
+                    if not IsGlobalAdmin.has_permission(None, request, None):
+                        self.fields["owner"].queryset = (
+                            IsOrganizationMember.filter_queryset_for_user(
+                                qs, request.user, "name", admin_only=True
+                            )
+                        )
+                    else:
+                        self.fields["owner"].queryset = qs
+            if self.instance and self.instance.pk and not self.is_bound:
+                dg_id = self.instance.default_devicegroup_id
+                if dg_id:
+                    self.fields["default_devicegroup"].queryset = DeviceGroup.objects.filter(pk=dg_id)
+                else:
+                    self.fields["default_devicegroup"].queryset = DeviceGroup.objects.none()
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
@@ -158,15 +169,20 @@ class DeviceGroupForm(forms.ModelForm):
                 ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
         if self.instance and request:
-            qs = Organization.objects.all()
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name"
+            if self.instance.pk and not self.is_bound:
+                self.fields["owner"].queryset = Organization.objects.filter(
+                    pk=self.instance.owner_id
                 )
             else:
-                self.fields["owner"].queryset = qs
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields["owner"].queryset = (
+                        IsOrganizationMember.filter_queryset_for_user(
+                            qs, request.user, "name"
+                        )
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
 
     field_order = [
         "name",
@@ -294,15 +310,20 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if request:
-                qs = Organization.objects.all()
-                if not IsGlobalAdmin.has_permission(None, request, None):
-                    self.fields[
-                        "owner"
-                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                        qs, request.user, "name", admin_only=True
+                if self.instance and self.instance.pk and not self.is_bound:
+                    self.fields["owner"].queryset = Organization.objects.filter(
+                        pk=self.instance.owner_id
                     )
                 else:
-                    self.fields["owner"].queryset = qs
+                    qs = Organization.objects.all()
+                    if not IsGlobalAdmin.has_permission(None, request, None):
+                        self.fields["owner"].queryset = (
+                            IsOrganizationMember.filter_queryset_for_user(
+                                qs, request.user, "name", admin_only=True
+                            )
+                        )
+                    else:
+                        self.fields["owner"].queryset = qs
 
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("outboundconfigurations/type_modal",

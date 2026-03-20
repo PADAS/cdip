@@ -249,4 +249,14 @@ urlpatterns = [
         views.outbound_connections_remove,
         name="outbound_connections_remove",
     ),
+    path(
+        "autocomplete/device-groups/",
+        views.device_group_autocomplete,
+        name="device_group_autocomplete",
+    ),
+    path(
+        "autocomplete/organizations/",
+        views.organization_autocomplete,
+        name="organization_autocomplete",
+    ),
 ]
