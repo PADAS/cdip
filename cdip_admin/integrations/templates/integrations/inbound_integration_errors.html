@@ -5,6 +5,11 @@
 
 {% block content %}
 
+<style>
+  .collapse-toggle .caret-icon { display: inline-block; transition: transform 0.2s; }
+  .collapse-toggle[aria-expanded="false"] .caret-icon { transform: rotate(-90deg); }
+</style>
+
 <div class="row mb-3">
     <div class="col">
         <a href="{% url 'inbound_integration_configuration_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary">&larr; Back to Inbound Integrations</a>
@@ -120,12 +125,12 @@
                 <span class="badge badge-warning mr-2">{{ configs|length }}</span>
                 <code class="text-truncate" style="max-width: 700px;" title="{{ error_msg }}">{{ error_msg }}</code>
             </div>
-            <button class="btn btn-sm btn-outline-secondary"
+            <button class="btn btn-sm btn-outline-secondary collapse-toggle"
                     type="button"
                     data-toggle="collapse"
                     data-target="#group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
                     aria-expanded="true">
-                Toggle
+                <span class="caret-icon">&#9660;</span>
             </button>
         </div>
         <div class="collapse show" id="group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
