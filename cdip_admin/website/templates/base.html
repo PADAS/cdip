@@ -5,7 +5,7 @@
 <html data-color-scheme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="csrf-token" content="{{ csrf_token }}">
+
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'website/style.css' %}">
     <link rel="stylesheet" href="{% static 'website/css/bootstrap.min.css' %}">
@@ -28,11 +28,16 @@
     <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
     <script>
         document.addEventListener('htmx:configRequest', function(evt) {
-            if (!evt.detail.headers['X-CSRFToken']) {
-                var csrfToken = document.querySelector('meta[name="csrf-token"]');
-                if (csrfToken) {
-                    evt.detail.headers['X-CSRFToken'] = csrfToken.getAttribute('content');
-                }
+            var secret = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
+            if (secret) {
+                var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                var mask = Array.from({length: 32}, function() {
+                    return chars[Math.floor(Math.random() * chars.length)];
+                }).join('');
+                var cipher = secret.split('').map(function(c, i) {
+                    return chars[(chars.indexOf(c) + chars.indexOf(mask[i])) % chars.length];
+                }).join('');
+                evt.detail.headers['X-CSRFToken'] = mask + cipher;
             }
         });
     </script>
