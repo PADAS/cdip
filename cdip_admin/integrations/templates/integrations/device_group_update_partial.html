@@ -12,7 +12,10 @@
                 class="btn btn-danger btn-sm"
                 hx-post="{% url 'device_group_delete' device_group_id=form.instance.id %}"
                 hx-swap="none"
-                _="on htmx:responseError from me
+                _="on htmx:beforeRequest
+                     set my.disabled to true
+                     set my.innerHTML to '<span class=\'spinner-border spinner-border-sm\' role=\'status\'></span> Deleting…'
+                   on htmx:responseError from me
                      if event.detail.xhr.status == 409
                        hide #delete-confirm
                        show #delete-error with display:flex

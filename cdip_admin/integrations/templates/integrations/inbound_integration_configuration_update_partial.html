@@ -11,7 +11,10 @@
         <button type="button"
                 class="btn btn-danger btn-sm"
                 hx-post="{% url 'inbound_integration_configuration_delete' configuration_id=form.instance.id %}"
-                hx-swap="none">Confirm</button>
+                hx-swap="none"
+                _="on htmx:beforeRequest
+                     set my.disabled to true
+                     set my.innerHTML to '<span class=\'spinner-border spinner-border-sm\' role=\'status\'></span> Deleting…'">Confirm</button>
         <button type="button"
                 class="btn btn-secondary btn-sm"
                 _="on click hide #delete-confirm then show #delete-btn">Cancel</button>
