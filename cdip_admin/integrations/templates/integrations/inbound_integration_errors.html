@@ -139,6 +139,7 @@
                     <thead class="thead-light">
                         <tr>
                             <th></th>
+                            <th></th>
                             <th>Name</th>
                             <th>Organization</th>
                         </tr>
@@ -149,6 +150,9 @@
                             <td>
                                 <button class="btn btn-sm btn-outline-primary js-edit-btn"
                                         data-edit-id="{{ config.id }}">Edit</button>
+                            </td>
+                            <td>
+                                <span hx-post="{% url 'inbound_toggle_enabled' configuration_id=config.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if config.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>
                             </td>
                             <td>{{ config.name }}</td>
                             <td>{{ config.owner.name }}</td>
@@ -212,6 +216,21 @@
             closePanel();
             history.replaceState(null, '', location.pathname + location.search);
             location.reload();
+        });
+
+        document.body.addEventListener('toggleFeedback', function(e) {
+            var d = e.detail;
+            var Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+            });
+            Toast.fire({
+                icon: d.enabled ? 'success' : 'info',
+                title: d.name + (d.enabled ? ' enabled' : ' disabled'),
+            });
         });
 
         document.addEventListener('keydown', function(e) {
