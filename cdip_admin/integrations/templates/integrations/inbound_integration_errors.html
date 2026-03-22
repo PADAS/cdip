@@ -362,6 +362,33 @@
                 target.style.transition = 'box-shadow .3s';
                 target.style.boxShadow = '0 0 0 3px #ffc107';
                 setTimeout(function() { target.style.boxShadow = ''; }, 2000);
+            } else {
+                Swal.mixin({
+                    toast: true, position: 'top-end',
+                    showConfirmButton: false, timer: 4000, timerProgressBar: true,
+                }).fire({ icon: 'info', title: 'The linked error group was not found — it may have been resolved.' });
+                var ghost = document.createElement('div');
+                ghost.className = 'card mb-2';
+                ghost.style.cssText = 'opacity:0.55;border-style:dashed;';
+                ghost.innerHTML = '<div class="card-header d-flex justify-content-between align-items-center bg-light">'
+                    + '<div class="d-flex align-items-center text-muted">'
+                    + '<i class="fas fa-unlink fa-sm mr-2"></i>'
+                    + '<em>Linked error group is no longer available — it may have been resolved.</em>'
+                    + '</div>'
+                    + '<button type="button" class="close ml-3" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>'
+                    + '</div>';
+                ghost.querySelector('.close').addEventListener('click', function() {
+                    ghost.parentNode.removeChild(ghost);
+                    history.replaceState(null, '', location.pathname + location.search);
+                });
+                var firstCard = document.querySelector('.error-group-card');
+                if (firstCard) {
+                    firstCard.parentNode.insertBefore(ghost, firstCard);
+                } else {
+                    var noErrors = document.querySelector('.alert-success');
+                    if (noErrors) noErrors.parentNode.insertBefore(ghost, noErrors);
+                }
+                ghost.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
 
