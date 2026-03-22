@@ -154,7 +154,15 @@
                             <td>
                                 <span hx-post="{% url 'inbound_toggle_enabled' configuration_id=config.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if config.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>
                             </td>
-                            <td>{{ config.name }}</td>
+                            <td>
+                                {{ config.name }}
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 ml-1 js-copy-link"
+                                        data-copy-path="{% url 'inbound_integration_configuration_list' %}#edit={{ config.id }}"
+                                        title="Copy link">
+                                    <i class="fas fa-link fa-xs text-muted"></i>
+                                </button>
+                            </td>
                             <td>{{ config.owner.name }}</td>
                         </tr>
                         {% endfor %}
@@ -245,7 +253,29 @@
             }
         });
 
+        function showCopied(btn) {
+            var rect = btn.getBoundingClientRect();
+            var tip = document.createElement('span');
+            tip.textContent = 'Copied!';
+            tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+            document.body.appendChild(tip);
+            setTimeout(function() { tip.style.opacity = '0'; }, 800);
+            setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+        }
+
         document.addEventListener('click', function(e) {
+            var copyBtn = e.target.closest('.js-copy-link');
+            if (copyBtn) {
+                e.stopPropagation();
+                var path = copyBtn.getAttribute('data-copy-path');
+                navigator.clipboard.writeText(window.location.origin + path);
+                showCopied(copyBtn);
+                var icon = copyBtn.querySelector('i');
+                var prev = icon.className;
+                icon.className = 'fas fa-check fa-xs text-success';
+                setTimeout(function() { icon.className = prev; }, 1500);
+                return;
+            }
             var btn = e.target.closest('.js-edit-btn');
             if (!btn) return;
             var editId = btn.getAttribute('data-edit-id');

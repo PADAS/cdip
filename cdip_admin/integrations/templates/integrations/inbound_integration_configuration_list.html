@@ -204,6 +204,29 @@
                 htmx.ajax('GET', '{% url "inbound_integration_configuration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
             }
         })();
+
+        function showCopied(btn) {
+            var rect = btn.getBoundingClientRect();
+            var tip = document.createElement('span');
+            tip.textContent = 'Copied!';
+            tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+            document.body.appendChild(tip);
+            setTimeout(function() { tip.style.opacity = '0'; }, 800);
+            setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+        }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.js-copy-link');
+            if (!btn) return;
+            e.stopPropagation();
+            var path = btn.getAttribute('data-copy-path');
+            navigator.clipboard.writeText(window.location.origin + path);
+            showCopied(btn);
+            var icon = btn.querySelector('i');
+            var prev = icon.className;
+            icon.className = 'fas fa-check fa-xs text-success';
+            setTimeout(function() { icon.className = prev; }, 1500);
+        });
     </script>
 
 {% endblock %}
