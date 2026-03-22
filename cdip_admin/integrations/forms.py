@@ -1,6 +1,5 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Row, Column, MultiField
-from crispy_forms.layout import Submit, Field
+from crispy_forms.layout import Layout, Submit, Row, Column, MultiField, Field, HTML
 from django import forms
 from django.urls import reverse_lazy
 from django_jsonform.widgets import JSONFormWidget
@@ -114,7 +113,9 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper.layout = Layout(
+        HTML(f'<h6 {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
@@ -128,10 +129,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             css_class="form-row",
         ),
         "enabled",
-        Row(
-            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
-            css_class="form-row",
-        ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Connection</h6>'),
         Row(
             Column(
                 Field("endpoint", autocomplete="off"),
@@ -147,7 +145,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             ),
             css_class="form-row",
         ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>State</h6>'),
         Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Routing</h6>'),
+        Row(
+            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
     )
 
 

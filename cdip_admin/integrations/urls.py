@@ -193,6 +193,11 @@ urlpatterns = [
         name="bridges/dropdown_restore",
     ),
     path(
+        "inboundconfigurations/<uuid:configuration_id>/test-er-connection",
+        views.inbound_test_er_connection,
+        name="inbound_test_er_connection",
+    ),
+    path(
         "inboundconfigurations/<uuid:configuration_id>/toggle-enabled",
         views.toggle_inbound_enabled,
         name="inbound_toggle_enabled",

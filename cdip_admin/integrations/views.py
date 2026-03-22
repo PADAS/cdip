@@ -5,7 +5,7 @@ import random
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
@@ -1087,6 +1087,29 @@ class InboundIntegrationConfigurationUpdateView(
 
     def get_success_url(self):
         return reverse("inbound_integration_configuration_list")
+
+
+@login_required
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def inbound_test_er_connection(request, configuration_id):
+    import requests as req
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    is_er2er = "er2er" in (config.type.slug or "")
+    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
+    if not (is_er2er or is_pamdas):
+        raise Http404
+    endpoint = request.POST.get("endpoint") or config.endpoint
+    token = request.POST.get("token") or config.token
+    url = endpoint.rstrip("/") + "/api/v1.0/user/me"
+    try:
+        resp = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=200)
+    try:
+        data = resp.json()
+    except ValueError:
+        data = resp.text
+    return JsonResponse({"ok": resp.status_code == 200, "status": resp.status_code, "data": data})
 
 
 class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
