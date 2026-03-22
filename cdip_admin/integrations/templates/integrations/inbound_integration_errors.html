@@ -119,19 +119,33 @@
         <span class="badge badge-secondary ml-1">{{ type_count }}</span>
     </h5>
     {% for error_msg, configs in err_groups %}
-    <div class="card mb-2">
+    <div class="card mb-2 error-group-card"
+         data-type-name="{{ type_name|escapejs }}"
+         data-error-msg="{{ error_msg|escapejs }}">
         <div class="card-header d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
                 <span class="badge badge-warning mr-2">{{ configs|length }}</span>
                 <code class="text-truncate" style="max-width: 700px;" title="{{ error_msg }}">{{ error_msg }}</code>
             </div>
-            <button class="btn btn-sm btn-outline-secondary collapse-toggle"
-                    type="button"
-                    data-toggle="collapse"
-                    data-target="#group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
-                    aria-expanded="true">
-                <span class="caret-icon">&#9660;</span>
-            </button>
+            <div class="d-flex align-items-center" style="gap:.4rem;">
+                <button type="button"
+                        class="btn btn-link btn-sm p-0 js-copy-group-link"
+                        title="Copy link to this group">
+                    <i class="fas fa-link fa-xs text-muted"></i>
+                </button>
+                <button type="button"
+                        class="btn btn-link btn-sm p-0 js-email-group"
+                        title="Share via email">
+                    <i class="fas fa-envelope fa-xs text-muted"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary collapse-toggle"
+                        type="button"
+                        data-toggle="collapse"
+                        data-target="#group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                        aria-expanded="true">
+                    <span class="caret-icon">&#9660;</span>
+                </button>
+            </div>
         </div>
         <div class="collapse show" id="group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
             <div class="card-body p-0">
@@ -191,6 +205,15 @@
 
 <script>
     (function() {
+        function hashStr(s) {
+            var h = 0;
+            for (var i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+            return (h >>> 0).toString(36);
+        }
+        function cardHash(card) {
+            return hashStr(card.getAttribute('data-type-name') + '||' + card.getAttribute('data-error-msg'));
+        }
+
         var overlay = document.getElementById('slide-panel-overlay');
         var panel = document.getElementById('slide-panel');
         var panelBody = document.getElementById('slide-panel-body');
@@ -264,6 +287,21 @@
         }
 
         document.addEventListener('click', function(e) {
+            var groupCopyBtn = e.target.closest('.js-copy-group-link');
+            if (groupCopyBtn) {
+                e.stopPropagation();
+                var card = groupCopyBtn.closest('.error-group-card');
+                var fragment = 'eg-' + cardHash(card);
+                var url = window.location.origin + window.location.pathname
+                          + window.location.search + '#' + fragment;
+                navigator.clipboard.writeText(url);
+                showCopied(groupCopyBtn);
+                var icon = groupCopyBtn.querySelector('i');
+                var prev = icon.className;
+                icon.className = 'fas fa-check fa-xs text-success';
+                setTimeout(function() { icon.className = prev; }, 1500);
+                return;
+            }
             var copyBtn = e.target.closest('.js-copy-link');
             if (copyBtn) {
                 e.stopPropagation();
@@ -283,6 +321,49 @@
             history.replaceState(null, '', location.pathname + location.search + '#edit=' + editId);
             htmx.ajax('GET', '{% url "inbound_integration_configuration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
         });
+
+        document.addEventListener('click', function(e) {
+            var emailBtn = e.target.closest('.js-email-group');
+            if (!emailBtn) return;
+            e.stopPropagation();
+            var card = emailBtn.closest('.error-group-card');
+            var errorMsg = card.getAttribute('data-error-msg');
+            var typeName = card.getAttribute('data-type-name');
+            var rows = card.querySelectorAll('tbody tr');
+            var configLines = [];
+            rows.forEach(function(row) {
+                var cells = row.querySelectorAll('td');
+                var name = cells[2] ? cells[2].textContent.trim() : '';
+                var org  = cells[3] ? cells[3].textContent.trim() : '';
+                if (name) configLines.push('• ' + name + ' (' + org + ')');
+            });
+            var url = window.location.origin + window.location.pathname
+                      + window.location.search + '#eg-' + cardHash(card);
+            var subject = 'Integration errors: ' + typeName + ' — '
+                          + (errorMsg.length > 80 ? errorMsg.slice(0, 80) + '…' : errorMsg);
+            var body = 'Error:\n' + errorMsg
+                     + '\n\nAffected configurations (' + configLines.length + '):\n'
+                     + configLines.join('\n')
+                     + '\n\nDirect link:\n' + url;
+            window.location.href = 'mailto:?subject=' + encodeURIComponent(subject)
+                                 + '&body=' + encodeURIComponent(body);
+        });
+
+        // Deep-link: scroll to and highlight error group card from URL fragment
+        var fragMatch = location.hash.match(/^#(eg-[a-z0-9]+)$/);
+        if (fragMatch) {
+            var targetHash = fragMatch[1].slice(3); // strip 'eg-'
+            var target = null;
+            document.querySelectorAll('.error-group-card').forEach(function(c) {
+                if (cardHash(c) === targetHash) target = c;
+            });
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.style.transition = 'box-shadow .3s';
+                target.style.boxShadow = '0 0 0 3px #ffc107';
+                setTimeout(function() { target.style.boxShadow = ''; }, 2000);
+            }
+        }
 
         // Deep-link: open edit panel from URL hash
         var hashMatch = location.hash.match(/^#edit=(.+)$/);
