@@ -1098,9 +1098,12 @@ def inbound_test_er_connection(request, configuration_id):
     is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
     if not (is_er2er or is_pamdas):
         raise Http404
+    from urllib.parse import urlparse
     endpoint = request.POST.get("endpoint") or config.endpoint
     token = request.POST.get("token") or config.token
-    url = endpoint.rstrip("/") + "/api/v1.0/user/me"
+    parsed = urlparse(endpoint)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    url = base_url + "/api/v1.0/user/me"
     try:
         resp = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
     except Exception as exc:
