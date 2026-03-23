@@ -27,9 +27,8 @@ import json
 
 
 def tooltip_labels(text):
-    return f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-    data-toggle="tooltip" data-placement="right" 
-    title="{text}">?</button>"""
+    return f""" <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
+    data-help="{text}"><i class="fas fa-question-circle fa-sm text-muted"></i></button>"""
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -115,7 +114,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
 
     _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper.layout = Layout(
-        HTML(f'<h6 {_sh}>Details</h6>'),
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
@@ -346,7 +345,7 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
     _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper = FormHelper()
     helper.layout = Layout(
-        HTML(f'<h6 {_sh}>Details</h6>'),
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
@@ -496,21 +495,20 @@ class BridgeIntegrationForm(forms.ModelForm):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper = FormHelper()
     helper.layout = Layout(
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
-            Column(Field("name", autocomplete="off"), css_class="form-group col-md-6 mb-0"),
-            Column("owner", css_class="form-group col-md-6 mb-0"),
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-md-6 mt-0"),
+            Column("type", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
-        Row(
-            Column("type", css_class="form-group col-md-12"),
-            css_class="form-row",
-        ),
+        "enabled",
         Row(
             Column("additional", css_class="form-group col-md-12"),
             css_class="form-row",

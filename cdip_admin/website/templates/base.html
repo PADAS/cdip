@@ -124,6 +124,87 @@
 
         });
     </script>
+    <style>
+    .js-field-help {
+        position: absolute;
+        right: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none !important;
+        border: none !important;
+        padding: 2px;
+        color: #6c757d;
+        line-height: 1;
+        z-index: 2;
+    }
+    .js-field-help-tip {
+        position: absolute;
+        right: -4px;
+        bottom: calc(100% + 7px);
+        background: #212529;
+        color: #fff;
+        font-size: .775rem;
+        line-height: 1.45;
+        padding: .35rem .6rem;
+        border-radius: .3rem;
+        width: max-content;
+        max-width: 220px;
+        white-space: normal;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .15s ease;
+        z-index: 1050;
+        text-align: left;
+    }
+    .js-field-help-tip::after {
+        content: '';
+        position: absolute;
+        bottom: -5px;
+        right: 7px;
+        border-width: 5px 5px 0;
+        border-style: solid;
+        border-color: #212529 transparent transparent;
+    }
+    .js-field-help-tip.visible { opacity: 1; }
+    </style>
+    <script>
+    function initFieldHelp(root) {
+        root.querySelectorAll('.js-field-help').forEach(function(btn) {
+            if (btn.dataset.helpMoved) return;
+            btn.dataset.helpMoved = '1';
+            var formGroup = btn.closest('.form-group');
+            if (!formGroup) return;
+            formGroup.style.position = 'relative';
+            formGroup.appendChild(btn);
+            var ctrl = formGroup.querySelector('.form-control, select:not(.js-field-help)');
+            if (ctrl) {
+                ctrl.style.paddingRight = '2rem';
+                requestAnimationFrame(function() {
+                    btn.style.top = (ctrl.offsetTop + ctrl.offsetHeight / 2) + 'px';
+                    btn.style.transform = 'translateY(-50%)';
+                });
+            }
+            var tip = document.createElement('div');
+            tip.className = 'js-field-help-tip';
+            tip.textContent = btn.getAttribute('data-help');
+            btn.appendChild(tip);
+            btn.addEventListener('mouseenter', function() { tip.classList.add('visible'); });
+            btn.addEventListener('mouseleave', function() { tip.classList.remove('visible'); });
+            btn.addEventListener('focus',      function() { tip.classList.add('visible'); });
+            btn.addEventListener('blur',       function() { tip.classList.remove('visible'); });
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function() { initFieldHelp(document); });
+    document.addEventListener('htmx:afterSettle', function(e) {
+        initFieldHelp(e.detail.elt);
+        var nameField = e.detail.elt.querySelector('#id_name');
+        if (nameField) {
+            nameField.focus();
+            nameField.setSelectionRange(nameField.value.length, nameField.value.length);
+        }
+    });
+    </script>
     <script>
     // Unsaved-changes guard for the slide panel.
     // Uses capture-phase listeners so this runs before any list-page handler.

@@ -213,6 +213,11 @@ urlpatterns = [
         name="inbound_toggle_enabled",
     ),
     path(
+        "inboundconfigurations/<uuid:configuration_id>/toggle-enabled-panel",
+        views.toggle_inbound_enabled_panel,
+        name="inbound_toggle_enabled_panel",
+    ),
+    path(
         "outboundconfigurations/<uuid:configuration_id>/test-er-connection",
         views.outbound_test_er_connection,
         name="outbound_test_er_connection",
@@ -223,9 +228,19 @@ urlpatterns = [
         name="outbound_toggle_enabled",
     ),
     path(
+        "outboundconfigurations/<uuid:configuration_id>/toggle-enabled-panel",
+        views.toggle_outbound_enabled_panel,
+        name="outbound_toggle_enabled_panel",
+    ),
+    path(
         "bridges/<uuid:id>/toggle-enabled",
         views.toggle_bridge_enabled,
         name="bridge_toggle_enabled",
+    ),
+    path(
+        "bridges/<uuid:id>/toggle-enabled-panel",
+        views.toggle_bridge_enabled_panel,
+        name="bridge_toggle_enabled_panel",
     ),
     # Connections
     path(

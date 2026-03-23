@@ -44,6 +44,18 @@
 
     {% include "integrations/_form_errors.html" %}
     {% crispy form %}
+    <div id="inbound-enabled-toggle" class="form-group" style="display:none">
+        <span hx-post="{% url 'inbound_toggle_enabled_panel' configuration_id=form.instance.id %}"
+              hx-target="this"
+              hx-swap="innerHTML"
+              style="cursor:pointer; display:inline-block">
+            {% if form.instance.enabled %}
+            <span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>
+            {% else %}
+            <span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>
+            {% endif %}
+        </span>
+    </div>
 
     {% if 'er2er' in form.instance.type.slug or form.instance.endpoint and 'pamdas.org' in form.instance.endpoint %}
     <div id="test-connection-wrapper" class="mt-1 d-flex align-items-center justify-content-end flex-wrap" style="gap:.5rem">
@@ -98,6 +110,20 @@
 </style>
 <script>
 (function() {
+    var heading = document.getElementById('details-section-heading');
+    var toggleDiv = document.getElementById('inbound-enabled-toggle');
+    var enabledDiv = document.getElementById('div_id_enabled');
+    if (heading && toggleDiv) {
+        heading.style.cssText += ';display:flex;justify-content:space-between;align-items:center';
+        heading.innerHTML = '<span>' + heading.textContent + '</span>';
+        var pill = toggleDiv.querySelector('span[hx-post]');
+        pill.style.cssText += ';text-transform:none;letter-spacing:normal;font-weight:normal';
+        heading.appendChild(pill);
+        htmx.process(pill);
+        toggleDiv.remove();
+    }
+    if (enabledDiv) enabledDiv.style.display = 'none';
+
     function showCopied(btn) {
         var rect = btn.getBoundingClientRect();
         var tip = document.createElement('span');

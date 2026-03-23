@@ -925,6 +925,14 @@ class InboundIntegrationConfigurationUpdateView(
         else:
             integration_type = "none"
             selected_type = "None"
+        # Skip confirmation for new integrations — no existing data to lose
+        if not InboundIntegrationConfiguration.objects.filter(pk=integration_id).exists():
+            schema_response = InboundIntegrationConfigurationUpdateView.schema(
+                request, integration_type, integration_id, update="true"
+            )
+            schema_response['HX-Retarget'] = '#div_id_state'
+            schema_response['HX-Reswap'] = 'innerHTML'
+            return schema_response
         rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
                                                                      'target': '#div_id_state',
                                                                      'proceed_button':
@@ -990,10 +998,8 @@ class InboundIntegrationConfigurationUpdateView(
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
-                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                            data-toggle="tooltip" data-placement="right" 
-                            title="Integration component that can process the data.">?
-                        </button>
+                        <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
+                            data-help="Integration component that can process the data."><i class="fas fa-question-circle fa-sm text-muted"></i></button>
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
@@ -1802,6 +1808,14 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         else:
             integration_type = "none"
             selected_type = "None"
+        # Skip confirmation for new integrations — no existing data to lose
+        if not BridgeIntegration.objects.filter(pk=integration_id).exists():
+            schema_response = BridgeIntegrationUpdateView.schema(
+                request, integration_type, integration_id, update="true"
+            )
+            schema_response['HX-Retarget'] = '#div_id_additional'
+            schema_response['HX-Reswap'] = 'innerHTML'
+            return schema_response
         rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
                                                                      'target': '#div_id_additional',
                                                                      'proceed_button': reverse("bridges/schema",
@@ -1824,10 +1838,8 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
-                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                            data-toggle="tooltip" data-placement="right" 
-                            title="Integration component that can process the data.">?
-                        </button>
+                        <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
+                            data-help="Integration component that can process the data."><i class="fas fa-question-circle fa-sm text-muted"></i></button>
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
@@ -1931,6 +1943,60 @@ def toggle_bridge_enabled(request, id):
     config.enabled = not config.enabled
     config.save(update_fields=["enabled"])
     return _enabled_icon_response(config, "bridge_toggle_enabled", {"id": config.id})
+
+
+@require_POST
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def toggle_inbound_enabled_panel(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
+
+
+@require_POST
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def toggle_outbound_enabled_panel(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
+
+
+@require_POST
+@permission_required("integrations.change_bridgeintegration", raise_exception=True)
+def toggle_bridge_enabled_panel(request, id):
+    config = get_object_or_404(BridgeIntegration, pk=id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
 
 
 ###
