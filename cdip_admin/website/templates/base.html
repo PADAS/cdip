@@ -124,6 +124,82 @@
 
         });
     </script>
+    <script>
+    // Unsaved-changes guard for the slide panel.
+    // Uses capture-phase listeners so this runs before any list-page handler.
+    document.addEventListener('DOMContentLoaded', function() {
+        var panelDirty   = false;
+        var confirmPending = false; // prevent re-entrancy while SweetAlert is open
+
+        // Mark dirty on any user input/change inside the panel body.
+        document.addEventListener('input', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && pb.contains(e.target)) panelDirty = true;
+        }, true);
+        document.addEventListener('change', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && pb.contains(e.target)) panelDirty = true;
+        }, true);
+
+        // Reset when the panel opens, a form save completes, or the panel
+        // body content is fully replaced by htmx (internal navigation).
+        document.body.addEventListener('openPanel',      function() { panelDirty = false; }, true);
+        document.body.addEventListener('panelFormSaved', function() { panelDirty = false; }, true);
+        document.addEventListener('htmx:afterSettle', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && e.detail.elt === pb) panelDirty = false;
+        });
+
+        function isPanelOpen() {
+            var p = document.getElementById('slide-panel');
+            return p && p.classList.contains('open');
+        }
+
+        function confirmLeave(onConfirmed) {
+            confirmPending = true;
+            Swal.fire({
+                html: '<div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">'
+                    + '<i class="fas fa-exclamation-triangle" style="color:#f8bb86;font-size:1rem;flex-shrink:0"></i>'
+                    + '<div style="text-align:left"><strong>Unsaved changes</strong>'
+                    + '<div style="color:#6c757d;font-size:.85rem">Leave without saving?</div></div>'
+                    + '</div>',
+                showCancelButton: true,
+                confirmButtonText: 'Leave',
+                cancelButtonText: 'Stay',
+                confirmButtonColor: '#dc3545',
+                width: '22em',
+                padding: '.75rem 1rem',
+            }).then(function(r) {
+                confirmPending = false;
+                if (r.isConfirmed) { panelDirty = false; onConfirmed(); }
+            });
+        }
+
+        // Escape key: intercept before list-page handler.
+        // When confirmPending, do nothing — SweetAlert handles its own Escape.
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Escape' || !isPanelOpen() || !panelDirty || confirmPending) return;
+            e.stopImmediatePropagation();
+            confirmLeave(function() {
+                document.body.dispatchEvent(new Event('closePanel'));
+            });
+        }, true);
+
+        // Overlay click: intercept before list-page handler.
+        document.addEventListener('click', function(e) {
+            if (!panelDirty || confirmPending) return;
+            var overlay = document.getElementById('slide-panel-overlay');
+            if (!overlay || e.target !== overlay) return;
+            e.stopImmediatePropagation();
+            confirmLeave(function() {
+                document.body.dispatchEvent(new Event('closePanel'));
+            });
+        }, true);
+
+        // Note: the Cancel button dispatches 'closePanel' and is intentionally
+        // NOT intercepted here — it should always dismiss without prompting.
+    });
+    </script>
 </head>
 <body>
     {% include "website/includes/topNavBar.html" %}

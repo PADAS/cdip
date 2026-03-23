@@ -93,6 +93,9 @@
     </div>
 </div>
 </div>
+<style>
+.auth-method-active { border: 2px solid #28a745; padding: .4rem .5rem; background: rgba(40,167,69,.05); border-radius: .375rem; }
+</style>
 <script>
 (function() {
     function showCopied(btn) {
@@ -116,7 +119,7 @@
         }
         document.querySelector('.js-er-dialog-close').addEventListener('click', hideErDialog);
         erDialog.addEventListener('click', function(e) { if (e.target === erDialog) hideErDialog(); });
-        erDialog.addEventListener('keydown', function(e) { if (e.key === 'Escape') hideErDialog(); });
+        erDialog.addEventListener('keydown', function(e) { if (e.key === 'Escape') { e.stopPropagation(); hideErDialog(); } });
     }
 
     var testBtn = document.querySelector('.js-test-er-connection');
@@ -147,6 +150,27 @@
         if (el) el.addEventListener('input', updateUnsavedNote);
     });
 
+    function updateAuthHighlight() {
+        var tokenEl = document.getElementById('id_token');
+        var loginEl = document.getElementById('id_login');
+        var passEl  = document.getElementById('id_password');
+        var tokenActive = !!(tokenEl && tokenEl.value);
+        var credActive  = !tokenActive && ((loginEl && !!loginEl.value) || (passEl && !!passEl.value));
+        var tg = document.getElementById('div_id_token');
+        if (tg) tg.classList.toggle('auth-method-active', tokenActive);
+        ['div_id_login', 'div_id_password'].forEach(function(id) {
+            var g = document.getElementById(id);
+            if (g) g.classList.toggle('auth-method-active', credActive);
+        });
+    }
+    if (testBtn) {
+        ['id_token', 'id_login', 'id_password'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateAuthHighlight);
+        });
+        updateAuthHighlight();
+    }
+
     if (testBtn) {
         testBtn.addEventListener('click', function() {
             var url = testBtn.getAttribute('data-url');
@@ -154,8 +178,10 @@
             testBtn.disabled = true;
             testBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing\u2026';
             var body = new URLSearchParams({
-                endpoint: document.getElementById('id_endpoint')?.value || '',
-                token: document.getElementById('id_token')?.value || '',
+                endpoint:  document.getElementById('id_endpoint')?.value  || '',
+                token:     document.getElementById('id_token')?.value     || '',
+                login:     document.getElementById('id_login')?.value     || '',
+                password:  document.getElementById('id_password')?.value  || '',
             });
             fetch(url, {
                 method: 'POST',

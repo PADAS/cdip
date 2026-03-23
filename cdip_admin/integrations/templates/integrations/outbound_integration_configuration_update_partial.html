@@ -1,5 +1,5 @@
 {% load crispy_forms_tags %}
-<div hx-params="not csrfmiddlewaretoken">
+<div hx-params="not csrfmiddlewaretoken" style="position:relative">
 <div class="slide-panel-toolbar">
     <span id="delete-btn">
         <button type="button"
@@ -38,6 +38,19 @@
     {% include "integrations/_form_errors.html" %}
     {% crispy form %}
 
+    {% if form.instance.endpoint and 'pamdas.org' in form.instance.endpoint %}
+    <div id="test-connection-wrapper" class="mt-1 d-flex align-items-center justify-content-end flex-wrap" style="gap:.5rem">
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm js-test-er-connection"
+                data-url="{% url 'outbound_test_er_connection' configuration_id=form.instance.id %}">
+            <i class="fas fa-plug fa-xs mr-1"></i> Test Connection
+        </button>
+        <small class="text-warning js-er-unsaved-note" style="display:none">
+            <i class="fas fa-exclamation-triangle fa-xs"></i> using unsaved values
+        </small>
+    </div>
+    {% endif %}
+
     <div id="outbound-connections-section"
          hx-get="{% url 'outbound_connections_list' configuration_id=form.instance.id %}"
          hx-trigger="load"
@@ -46,6 +59,26 @@
     </div>
 </div>
 </div>
+
+<div id="er-connection-dialog"
+     tabindex="-1"
+     style="display:none; position:absolute; top:0; right:0; bottom:0; left:0; z-index:10; background:rgba(0,0,0,0.4); align-items:flex-start; justify-content:center; padding:40px 16px;">
+    <div style="background:#fff; border-radius:.25rem; width:100%; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+            <h6 class="mb-0">EarthRanger — /api/v1.0/user/me</h6>
+            <button type="button" class="close js-er-dialog-close"><span>&times;</span></button>
+        </div>
+        <div class="p-3">
+            <textarea id="er-connection-result"
+                      class="form-control"
+                      style="font-family:monospace;font-size:.8rem;min-height:320px;"
+                      readonly></textarea>
+        </div>
+    </div>
+</div>
+<style>
+.auth-method-active { border: 2px solid #28a745; padding: .4rem .5rem; background: rgba(40,167,69,.05); border-radius: .375rem; }
+</style>
 <script>
 (function() {
     function showCopied(btn) {
@@ -66,5 +99,98 @@
         icon.className = 'fas fa-check fa-xs text-success';
         setTimeout(function() { icon.className = 'fas fa-link fa-xs'; }, 1500);
     });
+
+    var erDialog = document.getElementById('er-connection-dialog');
+    if (erDialog) {
+        function showErDialog() { erDialog.style.display = 'flex'; erDialog.focus(); }
+        function hideErDialog() { erDialog.style.display = 'none'; }
+        document.querySelector('.js-er-dialog-close').addEventListener('click', hideErDialog);
+        erDialog.addEventListener('click', function(e) { if (e.target === erDialog) hideErDialog(); });
+        erDialog.addEventListener('keydown', function(e) { if (e.key === 'Escape') { e.stopPropagation(); hideErDialog(); } });
+    }
+
+    var testBtn = document.querySelector('.js-test-er-connection');
+    var testWrapper = document.getElementById('test-connection-wrapper');
+    var passwordGroup = document.getElementById('div_id_password');
+    if (testWrapper && passwordGroup) {
+        passwordGroup.closest('.form-row').after(testWrapper);
+    }
+
+    var connectionFieldIds = ['id_endpoint', 'id_token', 'id_login', 'id_password'];
+    var initialValues = {};
+    connectionFieldIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) initialValues[id] = el.value;
+    });
+    function updateUnsavedNote() {
+        var note = document.querySelector('.js-er-unsaved-note');
+        if (note) note.style.display = connectionFieldIds.some(function(id) {
+            var el = document.getElementById(id);
+            return el && el.value !== initialValues[id];
+        }) ? '' : 'none';
+    }
+    connectionFieldIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateUnsavedNote);
+    });
+
+    function updateAuthHighlight() {
+        var tokenEl = document.getElementById('id_token');
+        var loginEl = document.getElementById('id_login');
+        var passEl  = document.getElementById('id_password');
+        var tokenActive = !!(tokenEl && tokenEl.value);
+        var credActive  = !tokenActive && ((loginEl && !!loginEl.value) || (passEl && !!passEl.value));
+        var tg = document.getElementById('div_id_token');
+        if (tg) tg.classList.toggle('auth-method-active', tokenActive);
+        ['div_id_login', 'div_id_password'].forEach(function(id) {
+            var g = document.getElementById(id);
+            if (g) g.classList.toggle('auth-method-active', credActive);
+        });
+    }
+    if (testBtn) {
+        ['id_token', 'id_login', 'id_password'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateAuthHighlight);
+        });
+        updateAuthHighlight();
+    }
+
+    if (testBtn) {
+        testBtn.addEventListener('click', function() {
+            var url = testBtn.getAttribute('data-url');
+            var origHtml = testBtn.innerHTML;
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing\u2026';
+            var body = new URLSearchParams({
+                endpoint:  document.getElementById('id_endpoint')?.value  || '',
+                token:     document.getElementById('id_token')?.value     || '',
+                login:     document.getElementById('id_login')?.value     || '',
+                password:  document.getElementById('id_password')?.value  || '',
+            });
+            fetch(url, {
+                method: 'POST',
+                headers: {'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)[1]},
+                body: body,
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    testBtn.disabled = false;
+                    testBtn.innerHTML = origHtml;
+                    if (!d.ok) {
+                        Swal.mixin({toast:true, position:'top-end', showConfirmButton:false, timer:4000, timerProgressBar:true})
+                            .fire({icon:'error', title:'Connection failed (HTTP ' + d.status + ')'});
+                        return;
+                    }
+                    document.getElementById('er-connection-result').value = JSON.stringify(d.data, null, 2);
+                    showErDialog();
+                })
+                .catch(function(err) {
+                    testBtn.disabled = false;
+                    testBtn.innerHTML = origHtml;
+                    Swal.mixin({toast:true, position:'top-end', showConfirmButton:false, timer:4000, timerProgressBar:true})
+                        .fire({icon:'error', title:'Request failed: ' + err.message});
+                });
+        });
+    }
 })();
 </script>

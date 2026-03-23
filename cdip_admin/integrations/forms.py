@@ -343,37 +343,34 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper = FormHelper()
     helper.layout = Layout(
+        HTML(f'<h6 {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            Column("type", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
+        "enabled",
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Connection</h6>'),
         Row(
-            Column("type", css_class="form-group col-lg-6"),
-            css_class="form-row",
-        ),
-        Row(
-            Column(
-                Field("endpoint", autocomplete="off"),
-                css_class="form-group col-lg-3 mb-0",
-            ),
+            Column(Field("endpoint", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
             Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
-            Column(
-                Field("password", autocomplete="off"), css_class="form-group col-md-3"
-            ),
+            Column(Field("password", autocomplete="off"), css_class="form-group col-md-3"),
             css_class="form-row",
         ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>State</h6>'),
         Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Additional</h6>'),
         Row(
             Column("additional", css_class="form-group col-lg-6"),
             css_class="form-row",

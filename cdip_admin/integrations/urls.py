@@ -203,6 +203,11 @@ urlpatterns = [
         name="inbound_toggle_enabled",
     ),
     path(
+        "outboundconfigurations/<uuid:configuration_id>/test-er-connection",
+        views.outbound_test_er_connection,
+        name="outbound_test_er_connection",
+    ),
+    path(
         "outboundconfigurations/<uuid:configuration_id>/toggle-enabled",
         views.toggle_outbound_enabled,
         name="outbound_toggle_enabled",

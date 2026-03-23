@@ -1089,20 +1089,34 @@ class InboundIntegrationConfigurationUpdateView(
         return reverse("inbound_integration_configuration_list")
 
 
-@login_required
-@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
-def inbound_test_er_connection(request, configuration_id):
+def _test_er_connection(endpoint_raw, token, login, password):
+    """Return a JsonResponse from testing an EarthRanger /api/v1.0/user/me call.
+    Prefers token; falls back to OAuth2 password grant when token is empty."""
     import requests as req
-    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
-    is_er2er = "er2er" in (config.type.slug or "")
-    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
-    if not (is_er2er or is_pamdas):
-        raise Http404
     from urllib.parse import urlparse
-    endpoint = request.POST.get("endpoint") or config.endpoint
-    token = request.POST.get("token") or config.token
-    parsed = urlparse(endpoint)
+
+    parsed = urlparse(endpoint_raw)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not token and login and password:
+        token_url = base_url + "/oauth2/token"
+        try:
+            tr = req.post(token_url, data={
+                "grant_type": "password",
+                "client_id": "das_web_client",
+                "username": login,
+                "password": password,
+            }, timeout=10)
+        except Exception as exc:
+            return JsonResponse({"ok": False, "error": str(exc)}, status=200)
+        if tr.status_code != 200:
+            try:
+                err_data = tr.json()
+            except ValueError:
+                err_data = tr.text
+            return JsonResponse({"ok": False, "status": tr.status_code, "data": err_data})
+        token = tr.json().get("access_token", "")
+
     url = base_url + "/api/v1.0/user/me"
     try:
         resp = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
@@ -1113,6 +1127,35 @@ def inbound_test_er_connection(request, configuration_id):
     except ValueError:
         data = resp.text
     return JsonResponse({"ok": resp.status_code == 200, "status": resp.status_code, "data": data})
+
+
+@login_required
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def inbound_test_er_connection(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    is_er2er = "er2er" in (config.type.slug or "")
+    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
+    if not (is_er2er or is_pamdas):
+        raise Http404
+    endpoint = request.POST.get("endpoint") or config.endpoint
+    token = request.POST.get("token") or config.token
+    login = request.POST.get("login") or config.login
+    password = request.POST.get("password") or config.password
+    return _test_er_connection(endpoint, token, login, password)
+
+
+@login_required
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def outbound_test_er_connection(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
+    if not is_pamdas:
+        raise Http404
+    endpoint = request.POST.get("endpoint") or config.endpoint
+    token = request.POST.get("token") or config.token
+    login = request.POST.get("login") or config.login
+    password = request.POST.get("password") or config.password
+    return _test_er_connection(endpoint, token, login, password)
 
 
 class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
