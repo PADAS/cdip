@@ -108,6 +108,19 @@
             });
             if (!el.value) ts.clear();
         });
+
+        var hlParams = new URLSearchParams(location.search);
+        if (hlParams.get('_hl') === 'enabled') {
+            hlParams.delete('_hl');
+            history.replaceState(null, '', location.pathname + '?' + hlParams.toString());
+            var enabledEl = document.querySelector('#inbound-filter-form select[name="enabled"]');
+            var wrapper = enabledEl && enabledEl.parentElement;
+            if (wrapper) {
+                wrapper.style.transition = 'box-shadow 1s';
+                wrapper.style.boxShadow = '0 0 0 3px #28a745';
+                setTimeout(function() { wrapper.style.boxShadow = ''; }, 1200);
+            }
+        }
     })();
 </script>
 {% endif %}

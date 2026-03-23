@@ -1196,8 +1196,8 @@ class InboundIntegrationConfigurationListView(
         base_url = reverse("inbound_integration_configuration_list")
         context["base_url"] = base_url
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
@@ -1217,6 +1217,14 @@ class InboundIntegrationConfigurationListView(
 
 class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
     template_name = "integrations/inbound_integration_errors.html"
+
+    def get(self, request, *args, **kwargs):
+        if 'enabled' not in request.GET:
+            params = request.GET.copy()
+            params['enabled'] = 'true'
+            params['_hl'] = 'enabled'
+            return redirect(request.path + '?' + params.urlencode())
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1533,8 +1541,8 @@ class OutboundIntegrationConfigurationListView(
         base_url = reverse("outbound_integration_configuration_list")
         context["base_url"] = base_url
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
@@ -1573,8 +1581,8 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
         context = super().get_context_data(**kwargs)
         context["base_url"] = reverse("bridge_integration_list")
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
