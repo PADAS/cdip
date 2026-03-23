@@ -1163,6 +1163,8 @@ class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
         configuration = get_object_or_404(
             InboundIntegrationConfiguration, pk=configuration_id
         )
+        if not request.user.has_perm("integrations.delete_inboundintegrationconfiguration"):
+            raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, request, None):
             if not IsOrganizationMember.is_object_owner(request.user, configuration):
                 raise PermissionDenied
@@ -1258,7 +1260,7 @@ class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
 
         context['filter'] = filterset
         context['error_by_type'] = error_by_type
-        context['total_error_count'] = errors_qs.count()
+        context['total_error_count'] = sum(total for _, _, total in error_by_type)
         return context
 
 
@@ -1497,6 +1499,8 @@ class OutboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
         configuration = get_object_or_404(
             OutboundIntegrationConfiguration, pk=configuration_id
         )
+        if not request.user.has_perm("integrations.delete_outboundintegrationconfiguration"):
+            raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, request, None):
             if not IsOrganizationMember.is_object_owner(request.user, configuration):
                 raise PermissionDenied

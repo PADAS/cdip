@@ -1,0 +1,31 @@
+<style>
+    #{{ filter_form_id }} .ts-wrapper { width: 100%; }
+    #{{ filter_form_id }} select,
+    #{{ filter_form_id }} input[type="text"] { width: 100%; }
+    #{{ filter_form_id }} input[name="name"] { padding-right: 1.75rem; }
+    #{{ filter_form_id }} .name-clear-btn {
+        position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+        background: none; border: none; color: #adb5bd; cursor: pointer;
+        padding: 0; font-size: 1.1rem; line-height: 1; display: none;
+    }
+    #{{ filter_form_id }} .name-clear-btn:hover { color: #343a40; }
+    #{{ filter_form_id }} .ts-wrapper.single .ts-control::after { display: none; }
+    #{{ filter_form_id }} .ts-control .item {
+        background: #e9ecef;
+        color: #343a40;
+        border-radius: 1rem;
+        padding: 0.1rem 0.5rem 0.1rem 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    #{{ filter_form_id }} .ts-control .item .remove {
+        font-size: 1rem;
+        line-height: 1;
+        color: #6c757d;
+        text-decoration: none;
+    }
+    #{{ filter_form_id }} .ts-control .item .remove:hover { color: #343a40; }
+</style>
