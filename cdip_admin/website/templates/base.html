@@ -125,6 +125,8 @@
         });
     </script>
     <style>
+    .collapse-toggle .caret-icon { display:inline-block; transition:transform .2s; }
+    .collapse-toggle[aria-expanded="false"] .caret-icon { transform:rotate(-90deg); }
     .js-field-help {
         position: absolute;
         right: 8px;

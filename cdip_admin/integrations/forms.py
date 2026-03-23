@@ -520,7 +520,7 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 class KeyAuthForm(forms.Form):
     key = forms.CharField(
-        label="API Key",
+        label="",
         max_length=100,
         widget=ReadonlyPeekabooTextInput,
         required=False,

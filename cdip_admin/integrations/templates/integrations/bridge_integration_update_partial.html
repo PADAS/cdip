@@ -35,13 +35,6 @@
     </div>
 </div>
 <div class="slide-panel-content">
-    <div id="api-key-section"
-         hx-get="{% url 'bridge_api_key_fragment' integration_id=form.instance.id %}"
-         hx-trigger="load"
-         hx-swap="innerHTML">
-        <p class="text-muted">Loading API key...</p>
-    </div>
-
     {% include "integrations/_form_errors.html" %}
     {% crispy form %}
     <div id="bridge-enabled-toggle" class="form-group" style="display:none">
@@ -55,6 +48,23 @@
             <span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>
             {% endif %}
         </span>
+    </div>
+
+    <div id="api-key-section-wrapper">
+        <h6 class="text-muted mt-4 mb-0 pb-1 border-bottom d-flex justify-content-between align-items-center collapse-toggle"
+            style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer"
+            data-toggle="collapse" data-target="#api-key-collapse" aria-expanded="false">
+            <span>API Key</span>
+            <span class="caret-icon">&#9660;</span>
+        </h6>
+        <div id="api-key-collapse" class="collapse">
+            <div id="api-key-section"
+                 hx-get="{% url 'bridge_api_key_fragment' integration_id=form.instance.id %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <p class="text-muted small">Loading...</p>
+            </div>
+        </div>
     </div>
 </div>
 </div>
@@ -73,6 +83,36 @@
         toggleDiv.remove();
     }
     if (enabledDiv) enabledDiv.style.display = 'none';
+
+    var apiKeyWrapper = document.getElementById('api-key-section-wrapper');
+    var typeDiv = document.getElementById('div_id_type');
+    if (apiKeyWrapper && typeDiv) {
+        typeDiv.closest('.form-row').after(apiKeyWrapper);
+    }
+
+    var additionalRow = document.getElementById('div_id_additional');
+    if (additionalRow && apiKeyWrapper) {
+        var additionalFormRow = additionalRow.closest('.form-row');
+        if (additionalFormRow) {
+            var additionalWrapper = document.createElement('div');
+            var addHeading = document.createElement('h6');
+            addHeading.className = 'text-muted mt-4 mb-0 pb-1 border-bottom d-flex justify-content-between align-items-center collapse-toggle';
+            addHeading.style.cssText = 'font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer';
+            addHeading.setAttribute('data-toggle', 'collapse');
+            addHeading.setAttribute('data-target', '#additional-collapse');
+            addHeading.setAttribute('aria-expanded', 'true');
+            addHeading.innerHTML = '<span>Additional</span><span class="caret-icon">&#9660;</span>';
+            var addCollapse = document.createElement('div');
+            addCollapse.id = 'additional-collapse';
+            addCollapse.className = 'collapse show';
+            var addLabel = additionalRow.querySelector('label');
+            if (addLabel) addLabel.style.display = 'none';
+            addCollapse.appendChild(additionalFormRow);
+            additionalWrapper.appendChild(addHeading);
+            additionalWrapper.appendChild(addCollapse);
+            apiKeyWrapper.after(additionalWrapper);
+        }
+    }
 
     function showCopied(btn) {
         var rect = btn.getBoundingClientRect();
