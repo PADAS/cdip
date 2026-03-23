@@ -1604,6 +1604,67 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
         ).order_by('-_has_error', 'name', 'id')
 
 
+class BridgeIntegrationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, id):
+        integration = get_object_or_404(BridgeIntegration, pk=id)
+        if not request.user.has_perm("integrations.delete_bridgeintegration"):
+            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, integration):
+                raise PermissionDenied
+        integration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
+class BridgeIntegrationErrorsView(LoginRequiredMixin, TemplateView):
+    template_name = "integrations/bridge_integration_errors.html"
+
+    def get(self, request, *args, **kwargs):
+        if 'enabled' not in request.GET:
+            params = request.GET.copy()
+            params['enabled'] = 'true'
+            params['_hl'] = 'enabled'
+            return redirect(request.path + '?' + params.urlencode())
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        qs = BridgeIntegration.objects.get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            qs = IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        filterset = BridgeIntegrationFilter(self.request.GET, queryset=qs, request=self.request)
+        errors_qs = filterset.qs.filter(state__has_key='error').select_related('type', 'owner')
+
+        def _extract_error_msg(error_val):
+            if isinstance(error_val, dict):
+                return error_val.get('message') or json.dumps(error_val)
+            if not isinstance(error_val, str):
+                return json.dumps(error_val)
+            return error_val
+
+        from collections import defaultdict
+        type_groups = defaultdict(lambda: defaultdict(list))
+        for config in errors_qs:
+            error_msg = _extract_error_msg(config.state.get('error', ''))
+            type_groups[config.type.name][error_msg].append(config)
+
+        error_by_type = []
+        for type_name, err_groups in type_groups.items():
+            sorted_groups = sorted(err_groups.items(), key=lambda x: -len(x[1]))
+            total = sum(len(v) for v in err_groups.values())
+            error_by_type.append((type_name, sorted_groups, total))
+        error_by_type.sort(key=lambda x: -x[2])
+
+        context['filter'] = filterset
+        context['error_by_type'] = error_by_type
+        context['total_error_count'] = sum(total for _, _, total in error_by_type)
+        return context
+
+
 @permission_required("integrations.view_bridgeintegration", raise_exception=True)
 def bridge_integration_view(request, module_id):
     return redirect("bridge_integration_update", id=module_id)

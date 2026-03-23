@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Bridge Integration Errors{% endblock %}
+
+{% block content %}
+
+<style>
+  .collapse-toggle .caret-icon { display: inline-block; transition: transform 0.2s; }
+  .collapse-toggle[aria-expanded="false"] .caret-icon { transform: rotate(-90deg); }
+</style>
+
+<div class="row mb-3">
+    <div class="col">
+        <a href="{% url 'bridge_integration_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary">&larr; Back to Bridge Integrations</a>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col d-flex align-items-center">
+        <h2 class="mb-0 mr-3">Bridge Integration Errors</h2>
+        <span class="badge badge-danger">{{ total_error_count }} with errors</span>
+    </div>
+</div>
+
+{% if filter %}
+<form id="bridge-filter-form" action="" method="get" class="d-flex align-items-center mb-3" style="gap: 0.5rem;">
+    <div style="flex: 2 1 150px; position: relative;">
+        {{ filter.form.name }}
+        <button type="button" class="name-clear-btn" aria-label="Clear">&times;</button>
+    </div>
+    <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+    <div style="flex: 3 1 180px;">{{ filter.form.bridge_type }}</div>
+    <div style="flex: 2 1 130px;">{{ filter.form.enabled }}</div>
+    <div style="flex: 1 1 100px;">{{ filter.form.has_errors }}</div>
+    {% if request.GET %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary" style="white-space: nowrap;">Clear All</a>{% endif %}
+</form>
+{% include "integrations/_filter_form_styles.html" with filter_form_id="bridge-filter-form" %}
+{% include "integrations/_filter_form_scripts.html" with filter_form_id="bridge-filter-form" filter_select_fields_json='[{"name":"organization","placeholder":"Owner"},{"name":"bridge_type","placeholder":"Type"},{"name":"enabled","placeholder":"Status"},{"name":"has_errors","placeholder":"Errors"}]' filter_hl_field="enabled" %}
+{% endif %}
+
+{% if error_by_type %}
+    {% for type_name, err_groups, type_count in error_by_type %}
+    <h5 class="mt-4 mb-2">
+        {{ type_name }}
+        <span class="badge badge-secondary ml-1">{{ type_count }}</span>
+    </h5>
+    {% for error_msg, configs in err_groups %}
+    <div class="card mb-2 error-group-card"
+         data-type-name="{{ type_name|escapejs }}"
+         data-error-msg="{{ error_msg|escapejs }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <span class="badge badge-warning mr-2">{{ configs|length }}</span>
+                <code class="text-truncate" style="max-width: 700px;" title="{{ error_msg }}">{{ error_msg }}</code>
+            </div>
+            <div class="d-flex align-items-center" style="gap:.4rem;">
+                <button type="button"
+                        class="btn btn-link btn-sm p-0 js-copy-group-link"
+                        title="Copy link to this group">
+                    <i class="fas fa-link fa-xs text-muted"></i>
+                </button>
+                <button type="button"
+                        class="btn btn-link btn-sm p-0 js-email-group"
+                        title="Share via email">
+                    <i class="fas fa-envelope fa-xs text-muted"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary collapse-toggle"
+                        type="button"
+                        data-toggle="collapse"
+                        data-target="#group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                        aria-expanded="true">
+                    <span class="caret-icon">&#9660;</span>
+                </button>
+            </div>
+        </div>
+        <div class="collapse show" id="group-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th></th>
+                            <th></th>
+                            <th>Name</th>
+                            <th>Organization</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for config in configs %}
+                        <tr>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary js-edit-btn"
+                                        data-edit-id="{{ config.id }}">Edit</button>
+                            </td>
+                            <td>
+                                <span hx-post="{% url 'bridge_toggle_enabled' id=config.id %}" hx-target="this" hx-swap="innerHTML" style="cursor: pointer;">{% if config.enabled %}<span class="text-success" title="Enabled">&#10003;</span>{% else %}<span class="text-muted" title="Disabled">&#10005;</span>{% endif %}</span>
+                            </td>
+                            <td>
+                                {{ config.name }}
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 ml-1 js-copy-link"
+                                        data-copy-path="{% url 'bridge_integration_list' %}#edit={{ config.id }}"
+                                        title="Copy link">
+                                    <i class="fas fa-link fa-xs text-muted"></i>
+                                </button>
+                            </td>
+                            <td>{{ config.owner.name }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="p-3 border-top bg-light">
+                    <small class="text-muted d-block mb-1">Full error message:</small>
+                    <pre class="mb-0" style="white-space: pre-wrap; word-break: break-word;">{{ error_msg }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+{% else %}
+    <div class="alert alert-success">No integration errors found.</div>
+{% endif %}
+
+<!-- Slide panel overlay -->
+<div id="slide-panel-overlay"></div>
+
+<!-- Slide panel -->
+<div id="slide-panel">
+    <div id="slide-panel-body"></div>
+</div>
+
+<script>
+    (function() {
+        function hashStr(s) {
+            var h = 0;
+            for (var i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+            return (h >>> 0).toString(36);
+        }
+        function cardHash(card) {
+            return hashStr(card.getAttribute('data-type-name') + '||' + card.getAttribute('data-error-msg'));
+        }
+
+        var overlay = document.getElementById('slide-panel-overlay');
+        var panel = document.getElementById('slide-panel');
+        var panelBody = document.getElementById('slide-panel-body');
+
+        function openPanel() {
+            panelBody.innerHTML = '<div class="slide-panel-loading"><div class="spinner-border text-success" role="status"><span class="sr-only">Loading...</span></div></div>';
+            overlay.classList.add('open');
+            panel.classList.add('open');
+        }
+
+        function closePanel() {
+            overlay.classList.remove('open');
+            panel.classList.remove('open');
+            panel.addEventListener('transitionend', function handler() {
+                panelBody.innerHTML = '';
+                panel.removeEventListener('transitionend', handler);
+            });
+        }
+
+        document.body.addEventListener('openPanel', openPanel);
+        document.body.addEventListener('closePanel', function() {
+            closePanel();
+            history.replaceState(null, '', location.pathname + location.search);
+        });
+        overlay.addEventListener('click', function() {
+            closePanel();
+            history.replaceState(null, '', location.pathname + location.search);
+        });
+
+        document.body.addEventListener('panelFormSaved', function() {
+            closePanel();
+            history.replaceState(null, '', location.pathname + location.search);
+            location.reload();
+        });
+
+        document.body.addEventListener('toggleFeedback', function(e) {
+            var d = e.detail;
+            var Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+            });
+            Toast.fire({
+                icon: d.enabled ? 'success' : 'info',
+                title: d.name + (d.enabled ? ' enabled' : ' disabled'),
+            });
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (!panel.classList.contains('open')) return;
+            if (e.key === 'Escape') {
+                closePanel();
+                history.replaceState(null, '', location.pathname + location.search);
+            } else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                var form = panelBody.querySelector('form');
+                if (form) form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
+            }
+        });
+
+        function showCopied(btn) {
+            var rect = btn.getBoundingClientRect();
+            var tip = document.createElement('span');
+            tip.textContent = 'Copied!';
+            tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+            document.body.appendChild(tip);
+            setTimeout(function() { tip.style.opacity = '0'; }, 800);
+            setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+        }
+
+        document.addEventListener('click', function(e) {
+            var groupCopyBtn = e.target.closest('.js-copy-group-link');
+            if (groupCopyBtn) {
+                e.stopPropagation();
+                var card = groupCopyBtn.closest('.error-group-card');
+                var fragment = 'eg-' + cardHash(card);
+                var url = window.location.origin + window.location.pathname
+                          + window.location.search + '#' + fragment;
+                navigator.clipboard.writeText(url);
+                showCopied(groupCopyBtn);
+                var icon = groupCopyBtn.querySelector('i');
+                var prev = icon.className;
+                icon.className = 'fas fa-check fa-xs text-success';
+                setTimeout(function() { icon.className = prev; }, 1500);
+                return;
+            }
+            var copyBtn = e.target.closest('.js-copy-link');
+            if (copyBtn) {
+                e.stopPropagation();
+                var path = copyBtn.getAttribute('data-copy-path');
+                navigator.clipboard.writeText(window.location.origin + path);
+                showCopied(copyBtn);
+                var icon = copyBtn.querySelector('i');
+                var prev = icon.className;
+                icon.className = 'fas fa-check fa-xs text-success';
+                setTimeout(function() { icon.className = prev; }, 1500);
+                return;
+            }
+            var btn = e.target.closest('.js-edit-btn');
+            if (!btn) return;
+            var editId = btn.getAttribute('data-edit-id');
+            openPanel();
+            history.replaceState(null, '', location.pathname + location.search + '#edit=' + editId);
+            htmx.ajax('GET', '{% url "bridge_integration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
+        });
+
+        document.addEventListener('click', function(e) {
+            var emailBtn = e.target.closest('.js-email-group');
+            if (!emailBtn) return;
+            e.stopPropagation();
+            var card = emailBtn.closest('.error-group-card');
+            var errorMsg = card.getAttribute('data-error-msg');
+            var typeName = card.getAttribute('data-type-name');
+            var rows = card.querySelectorAll('tbody tr');
+            var configLines = [];
+            rows.forEach(function(row) {
+                var cells = row.querySelectorAll('td');
+                var name = cells[2] ? cells[2].textContent.trim() : '';
+                var org  = cells[3] ? cells[3].textContent.trim() : '';
+                if (name) configLines.push('• ' + name + ' (' + org + ')');
+            });
+            var url = window.location.origin + window.location.pathname
+                      + window.location.search + '#eg-' + cardHash(card);
+            var subject = 'Integration errors: ' + typeName + ' — '
+                          + (errorMsg.length > 80 ? errorMsg.slice(0, 80) + '…' : errorMsg);
+            var body = 'Error:\n' + errorMsg
+                     + '\n\nAffected configurations (' + configLines.length + '):\n'
+                     + configLines.join('\n')
+                     + '\n\nDirect link:\n' + url;
+            window.location.href = 'mailto:?subject=' + encodeURIComponent(subject)
+                                 + '&body=' + encodeURIComponent(body);
+        });
+
+        // Deep-link: scroll to and highlight error group card from URL fragment
+        var fragMatch = location.hash.match(/^#(eg-[a-z0-9]+)$/);
+        if (fragMatch) {
+            var targetHash = fragMatch[1].slice(3); // strip 'eg-'
+            var target = null;
+            document.querySelectorAll('.error-group-card').forEach(function(c) {
+                if (cardHash(c) === targetHash) target = c;
+            });
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.style.transition = 'box-shadow .3s';
+                target.style.boxShadow = '0 0 0 3px #ffc107';
+                setTimeout(function() { target.style.boxShadow = ''; }, 2000);
+            } else {
+                Swal.mixin({
+                    toast: true, position: 'top-end',
+                    showConfirmButton: false, timer: 4000, timerProgressBar: true,
+                }).fire({ icon: 'info', title: 'The linked error group was not found — it may have been resolved.' });
+                var ghost = document.createElement('div');
+                ghost.className = 'card mb-2';
+                ghost.style.cssText = 'opacity:0.55;border-style:dashed;';
+                ghost.innerHTML = '<div class="card-header d-flex justify-content-between align-items-center bg-light">'
+                    + '<div class="d-flex align-items-center text-muted">'
+                    + '<i class="fas fa-unlink fa-sm mr-2"></i>'
+                    + '<em>Linked error group is no longer available — it may have been resolved.</em>'
+                    + '</div>'
+                    + '<button type="button" class="close ml-3" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>'
+                    + '</div>';
+                ghost.querySelector('.close').addEventListener('click', function() {
+                    ghost.parentNode.removeChild(ghost);
+                    history.replaceState(null, '', location.pathname + location.search);
+                });
+                var firstCard = document.querySelector('.error-group-card');
+                if (firstCard) {
+                    firstCard.parentNode.insertBefore(ghost, firstCard);
+                } else {
+                    var noErrors = document.querySelector('.alert-success');
+                    if (noErrors) noErrors.parentNode.insertBefore(ghost, noErrors);
+                }
+                ghost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        // Deep-link: open edit panel from URL hash
+        var hashMatch = location.hash.match(/^#edit=(.+)$/);
+        if (hashMatch) {
+            var editId = hashMatch[1];
+            openPanel();
+            htmx.ajax('GET', '{% url "bridge_integration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
+        }
+    })();
+</script>
+
+{% endblock %}

@@ -160,6 +160,16 @@ urlpatterns = [
         name="bridge_integration_list",
     ),
     path(
+        "bridges/errors/",
+        views.BridgeIntegrationErrorsView.as_view(),
+        name="bridge_integration_errors",
+    ),
+    path(
+        "bridges/<uuid:id>/delete",
+        views.BridgeIntegrationDeleteView.as_view(),
+        name="bridge_integration_delete",
+    ),
+    path(
         "bridges/<uuid:module_id>",
         views.bridge_integration_view,
         name="bridge_integration_view",
