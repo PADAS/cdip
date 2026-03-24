@@ -1,6 +1,45 @@
 {% load crispy_forms_tags %}
+<div hx-params="not csrfmiddlewaretoken">
 <div class="slide-panel-toolbar">
-    <h4 class="mb-0">Edit Device Group</h4>
+    <span id="delete-btn">
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                _="on click hide #delete-btn then show #delete-confirm with display:flex">Delete</button>
+    </span>
+    <span id="delete-confirm" class="align-items-center" style="display: none; gap: .4rem;">
+        <small class="text-muted">Delete {{ form.instance.name }}?</small>
+        <button type="button"
+                class="btn btn-danger btn-sm"
+                hx-post="{% url 'device_group_delete' device_group_id=form.instance.id %}"
+                hx-swap="none"
+                _="on htmx:beforeRequest
+                     set my.disabled to true
+                     set my.innerHTML to '<span class=\'spinner-border spinner-border-sm\' role=\'status\'></span> Deleting…'
+                   on htmx:responseError from me
+                     if event.detail.xhr.status == 409
+                       hide #delete-confirm
+                       show #delete-error with display:flex
+                     end">Confirm</button>
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                _="on click hide #delete-confirm then show #delete-btn">Cancel</button>
+    </span>
+    <span id="delete-error" class="align-items-center text-danger" style="display: none; gap: .4rem; font-size:.85rem;">
+        Still referenced by an inbound integration.
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                _="on click hide #delete-error then show #delete-btn">OK</button>
+    </span>
+    <span class="d-flex align-items-center text-muted"
+          style="gap:.3rem; font-size:.875rem; overflow:hidden; max-width:40%;">
+        <span class="text-truncate">{{ form.instance.name }}</span>
+        <button type="button"
+                class="btn btn-link btn-sm p-0 flex-shrink-0 js-copy-link-panel"
+                data-copy-path="{% url 'device_group_list' %}#edit={{ form.instance.id }}"
+                title="Copy link">
+            <i class="fas fa-link fa-xs"></i>
+        </button>
+    </span>
     <div>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel')); document.body.dispatchEvent(new Event('panelFormSaved'));">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>
@@ -16,3 +55,26 @@
         <p class="text-muted">Loading destinations...</p>
     </div>
 </div>
+</div>
+<script>
+(function() {
+    function showCopied(btn) {
+        var rect = btn.getBoundingClientRect();
+        var tip = document.createElement('span');
+        tip.textContent = 'Copied!';
+        tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+        document.body.appendChild(tip);
+        setTimeout(function() { tip.style.opacity = '0'; }, 800);
+        setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+    }
+
+    document.querySelector('.js-copy-link-panel').addEventListener('click', function() {
+        var path = this.getAttribute('data-copy-path');
+        navigator.clipboard.writeText(window.location.origin + path);
+        showCopied(this);
+        var icon = this.querySelector('i');
+        icon.className = 'fas fa-check fa-xs text-success';
+        setTimeout(function() { icon.className = 'fas fa-link fa-xs'; }, 1500);
+    });
+})();
+</script>

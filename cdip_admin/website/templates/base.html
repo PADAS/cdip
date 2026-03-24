@@ -5,6 +5,7 @@
 <html data-color-scheme="dark">
 <head>
     <meta charset="UTF-8">
+
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'website/style.css' %}">
     <link rel="stylesheet" href="{% static 'website/css/bootstrap.min.css' %}">
@@ -27,9 +28,16 @@
     <script src="https://unpkg.com/hyperscript.org@0.9.6"></script>
     <script>
         document.addEventListener('htmx:configRequest', function(evt) {
-            var csrfCookie = document.cookie.split('; ').find(function(c) { return c.startsWith('csrftoken='); });
-            if (csrfCookie) {
-                evt.detail.headers['X-CSRFToken'] = csrfCookie.split('=')[1];
+            var secret = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
+            if (secret) {
+                var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                var mask = Array.from(crypto.getRandomValues(new Uint8Array(32)), function(b) {
+                    return chars[b % chars.length];
+                }).join('');
+                var cipher = secret.split('').map(function(c, i) {
+                    return chars[(chars.indexOf(c) + chars.indexOf(mask[i])) % chars.length];
+                }).join('');
+                evt.detail.headers['X-CSRFToken'] = mask + cipher;
             }
         });
     </script>
@@ -43,9 +51,46 @@
     </script>
     <style>
         .ts-wrapper.destination-select { flex: 1 1 auto; min-width: 0; }
+        .ts-wrapper.lazy-select.single .ts-control:after { display: none; }
     </style>
     <script>
+        function makeLazySelect(el, url) {
+            new TomSelect(el, {
+                valueField: 'id',
+                labelField: 'name',
+                searchField: 'name',
+                preload: 'focus',
+                wrapperClass: 'form-control ts-wrapper lazy-select',
+                onItemAdd: function() { this.blur(); },
+                load: function(query, callback) {
+                    fetch(url + encodeURIComponent(query))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) { callback(data); })
+                        .catch(function() { callback(); });
+                },
+            });
+        }
+
+        function initTomSelects(root) {
+            root.querySelectorAll('select[name="owner"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    makeLazySelect(el, '/integrations/autocomplete/organizations/?q=');
+                }
+            });
+
+            root.querySelectorAll('select[name="default_devicegroup"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    makeLazySelect(el, '/integrations/autocomplete/device-groups/?q=');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initTomSelects(document);
+        });
+
         document.addEventListener('htmx:afterSettle', function(evt) {
+            initTomSelects(evt.detail.elt);
             evt.detail.elt.querySelectorAll('select[name="outbound_id"]').forEach(function(el) {
                 if (!el.tomselect) {
                     var ts = new TomSelect(el, {
@@ -76,7 +121,167 @@
                     });
                 }
             });
+
         });
+    </script>
+    <style>
+    .collapse-toggle .caret-icon { display:inline-block; transition:transform .2s; }
+    .collapse-toggle[aria-expanded="false"] .caret-icon { transform:rotate(-90deg); }
+    .js-field-help {
+        position: absolute;
+        right: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none !important;
+        border: none !important;
+        padding: 2px;
+        color: #6c757d;
+        line-height: 1;
+        z-index: 2;
+    }
+    .js-field-help-tip {
+        position: absolute;
+        right: -4px;
+        bottom: calc(100% + 7px);
+        background: #212529;
+        color: #fff;
+        font-size: .775rem;
+        line-height: 1.45;
+        padding: .35rem .6rem;
+        border-radius: .3rem;
+        width: max-content;
+        max-width: 220px;
+        white-space: normal;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .15s ease;
+        z-index: 1050;
+        text-align: left;
+    }
+    .js-field-help-tip::after {
+        content: '';
+        position: absolute;
+        bottom: -5px;
+        right: 7px;
+        border-width: 5px 5px 0;
+        border-style: solid;
+        border-color: #212529 transparent transparent;
+    }
+    .js-field-help-tip.visible { opacity: 1; }
+    </style>
+    <script>
+    function initFieldHelp(root) {
+        root.querySelectorAll('.js-field-help').forEach(function(btn) {
+            if (btn.dataset.helpMoved) return;
+            btn.dataset.helpMoved = '1';
+            var formGroup = btn.closest('.form-group');
+            if (!formGroup) return;
+            formGroup.style.position = 'relative';
+            formGroup.appendChild(btn);
+            var ctrl = formGroup.querySelector('.form-control, select:not(.js-field-help)');
+            if (ctrl) {
+                ctrl.style.paddingRight = '2rem';
+                requestAnimationFrame(function() {
+                    btn.style.top = (ctrl.offsetTop + ctrl.offsetHeight / 2) + 'px';
+                    btn.style.transform = 'translateY(-50%)';
+                });
+            }
+            var tip = document.createElement('div');
+            tip.className = 'js-field-help-tip';
+            tip.textContent = btn.getAttribute('data-help');
+            btn.appendChild(tip);
+            btn.addEventListener('mouseenter', function() { tip.classList.add('visible'); });
+            btn.addEventListener('mouseleave', function() { tip.classList.remove('visible'); });
+            btn.addEventListener('focus',      function() { tip.classList.add('visible'); });
+            btn.addEventListener('blur',       function() { tip.classList.remove('visible'); });
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function() { initFieldHelp(document); });
+    document.addEventListener('htmx:afterSettle', function(e) {
+        initFieldHelp(e.detail.elt);
+        var nameField = e.detail.elt.querySelector('#id_name');
+        if (nameField) {
+            nameField.focus();
+            nameField.setSelectionRange(nameField.value.length, nameField.value.length);
+        }
+    });
+    </script>
+    <script>
+    // Unsaved-changes guard for the slide panel.
+    // Uses capture-phase listeners so this runs before any list-page handler.
+    document.addEventListener('DOMContentLoaded', function() {
+        var panelDirty   = false;
+        var confirmPending = false; // prevent re-entrancy while SweetAlert is open
+
+        // Mark dirty on any user input/change inside the panel body.
+        document.addEventListener('input', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && pb.contains(e.target)) panelDirty = true;
+        }, true);
+        document.addEventListener('change', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && pb.contains(e.target)) panelDirty = true;
+        }, true);
+
+        // Reset when the panel opens, a form save completes, or the panel
+        // body content is fully replaced by htmx (internal navigation).
+        document.body.addEventListener('openPanel',      function() { panelDirty = false; }, true);
+        document.body.addEventListener('panelFormSaved', function() { panelDirty = false; }, true);
+        document.addEventListener('htmx:afterSettle', function(e) {
+            var pb = document.getElementById('slide-panel-body');
+            if (pb && e.detail.elt === pb) panelDirty = false;
+        });
+
+        function isPanelOpen() {
+            var p = document.getElementById('slide-panel');
+            return p && p.classList.contains('open');
+        }
+
+        function confirmLeave(onConfirmed) {
+            confirmPending = true;
+            Swal.fire({
+                html: '<div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">'
+                    + '<i class="fas fa-exclamation-triangle" style="color:#f8bb86;font-size:1rem;flex-shrink:0"></i>'
+                    + '<div style="text-align:left"><strong>Unsaved changes</strong>'
+                    + '<div style="color:#6c757d;font-size:.85rem">Leave without saving?</div></div>'
+                    + '</div>',
+                showCancelButton: true,
+                confirmButtonText: 'Leave',
+                cancelButtonText: 'Stay',
+                confirmButtonColor: '#dc3545',
+                width: '22em',
+                padding: '.75rem 1rem',
+            }).then(function(r) {
+                confirmPending = false;
+                if (r.isConfirmed) { panelDirty = false; onConfirmed(); }
+            });
+        }
+
+        // Escape key: intercept before list-page handler.
+        // When confirmPending, do nothing — SweetAlert handles its own Escape.
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Escape' || !isPanelOpen() || !panelDirty || confirmPending) return;
+            e.stopImmediatePropagation();
+            confirmLeave(function() {
+                document.body.dispatchEvent(new Event('closePanel'));
+            });
+        }, true);
+
+        // Overlay click: intercept before list-page handler.
+        document.addEventListener('click', function(e) {
+            if (!panelDirty || confirmPending) return;
+            var overlay = document.getElementById('slide-panel-overlay');
+            if (!overlay || e.target !== overlay) return;
+            e.stopImmediatePropagation();
+            confirmLeave(function() {
+                document.body.dispatchEvent(new Event('closePanel'));
+            });
+        }, true);
+
+        // Note: the Cancel button dispatches 'closePanel' and is intentionally
+        // NOT intercepted here — it should always dismiss without prompting.
+    });
     </script>
 </head>
 <body>

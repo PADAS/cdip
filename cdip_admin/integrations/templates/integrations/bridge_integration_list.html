@@ -21,20 +21,26 @@
     </div>
 
     {% if error_count > 0 %}
-    <div class="alert alert-warning mt-2">
-        <strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors
+    <div class="alert alert-warning mt-2 d-flex justify-content-between align-items-center">
+        <span><strong>{{ error_count }}</strong> of {{ total_count }} enabled configurations have errors</span>
+        <a href="{% url 'bridge_integration_errors' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-warning">View grouped errors</a>
     </div>
     {% endif %}
 
     {% if filter %}
-    <div class="row">
-        <div class="col-md-12">
-            <form action="" method="get" class="form form-inline">
-                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-                {% bootstrap_button 'Filter' extra_classes='' %}
-            </form>
+    <form id="bridge-filter-form" action="" method="get" class="d-flex align-items-center mt-3" style="gap: 0.5rem;">
+        <div style="flex: 2 1 150px; position: relative;">
+            {{ filter.form.name }}
+            <button type="button" class="name-clear-btn" aria-label="Clear">&times;</button>
         </div>
-    </div>
+        <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.bridge_type }}</div>
+        <div style="flex: 2 1 130px;">{{ filter.form.enabled }}</div>
+        <div style="flex: 1 1 100px;">{{ filter.form.has_errors }}</div>
+        {% if request.GET %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary" style="white-space: nowrap;">Clear All</a>{% endif %}
+    </form>
+    {% include "integrations/_filter_form_styles.html" with filter_form_id="bridge-filter-form" %}
+    {% include "integrations/_filter_form_scripts.html" with filter_form_id="bridge-filter-form" filter_select_fields_json='[{"name":"organization","placeholder":"Owner"},{"name":"bridge_type","placeholder":"Type"},{"name":"enabled","placeholder":"Status"},{"name":"has_errors","placeholder":"Errors"}]' %}
     {% endif %}
 
     <div id="table-container">

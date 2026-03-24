@@ -20,20 +20,26 @@
     </div>
 
     {% if error_count > 0 %}
-    <div class="alert alert-warning mt-2">
-        <strong>{{ error_count }}</strong> of {{ total_count }} configurations have errors
+    <div class="alert alert-warning mt-2 d-flex justify-content-between align-items-center">
+        <span><strong>{{ error_count }}</strong> of {{ total_count }} enabled configurations have errors</span>
+        <a href="{% url 'inbound_integration_errors' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-warning">View grouped errors</a>
     </div>
     {% endif %}
 
     {% if filter %}
-    <div class="row">
-        <div class="col-md-12">
-            <form action="" method="get" class="form form-inline">
-                {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-                {% bootstrap_button 'Filter' extra_classes='' %}
-            </form>
+    <form id="inbound-filter-form" action="" method="get" class="d-flex align-items-center mt-3" style="gap: 0.5rem;">
+        <div style="flex: 2 1 150px; position: relative;">
+            {{ filter.form.name }}
+            <button type="button" class="name-clear-btn" aria-label="Clear">&times;</button>
         </div>
-    </div>
+        <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.inbound_config_type }}</div>
+        <div style="flex: 2 1 130px;">{{ filter.form.enabled }}</div>
+        <div style="flex: 1 1 100px;">{{ filter.form.has_errors }}</div>
+        {% if request.GET %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary" style="white-space: nowrap;">Clear All</a>{% endif %}
+    </form>
+    {% include "integrations/_filter_form_styles.html" with filter_form_id="inbound-filter-form" %}
+    {% include "integrations/_filter_form_scripts.html" with filter_form_id="inbound-filter-form" filter_select_fields_json='[{"name":"organization","placeholder":"Owner"},{"name":"inbound_config_type","placeholder":"Type"},{"name":"enabled","placeholder":"Status"},{"name":"has_errors","placeholder":"Errors"}]' %}
     {% endif %}
 
     <div id="table-container">
@@ -123,6 +129,29 @@
                 htmx.ajax('GET', '{% url "inbound_integration_configuration_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
             }
         })();
+
+        function showCopied(btn) {
+            var rect = btn.getBoundingClientRect();
+            var tip = document.createElement('span');
+            tip.textContent = 'Copied!';
+            tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+            document.body.appendChild(tip);
+            setTimeout(function() { tip.style.opacity = '0'; }, 800);
+            setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+        }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.js-copy-link');
+            if (!btn) return;
+            e.stopPropagation();
+            var path = btn.getAttribute('data-copy-path');
+            navigator.clipboard.writeText(window.location.origin + path);
+            showCopied(btn);
+            var icon = btn.querySelector('i');
+            var prev = icon.className;
+            icon.className = 'fas fa-check fa-xs text-success';
+            setTimeout(function() { icon.className = prev; }, 1500);
+        });
     </script>
 
 {% endblock %}

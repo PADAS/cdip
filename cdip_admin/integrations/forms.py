@@ -1,6 +1,5 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Row, Column, MultiField
-from crispy_forms.layout import Submit, Field
+from crispy_forms.layout import Layout, Submit, Row, Column, MultiField, Field, HTML
 from django import forms
 from django.urls import reverse_lazy
 from django_jsonform.widgets import JSONFormWidget
@@ -24,13 +23,16 @@ from .models import (
 )
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
 import json
 
 
 def tooltip_labels(text):
-    return f""" <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-    data-toggle="tooltip" data-placement="right" 
-    title="{text}">?</button>"""
+    return format_html(
+        ' <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"'
+        ' data-help="{}"><i class="fas fa-question-circle fa-sm text-muted"></i></button>',
+        text,
+    )
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):
@@ -77,15 +79,26 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if request:
-                qs = Organization.objects.all()
-                if not IsGlobalAdmin.has_permission(None, request, None):
-                    self.fields[
-                        "owner"
-                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                        qs, request.user, "name", admin_only=True
+                if self.instance and self.instance.pk and not self.is_bound:
+                    self.fields["owner"].queryset = Organization.objects.filter(
+                        pk=self.instance.owner_id
                     )
                 else:
-                    self.fields["owner"].queryset = qs
+                    qs = Organization.objects.all()
+                    if not IsGlobalAdmin.has_permission(None, request, None):
+                        self.fields["owner"].queryset = (
+                            IsOrganizationMember.filter_queryset_for_user(
+                                qs, request.user, "name", admin_only=True
+                            )
+                        )
+                    else:
+                        self.fields["owner"].queryset = qs
+            if self.instance and self.instance.pk and not self.is_bound:
+                dg_id = self.instance.default_devicegroup_id
+                if dg_id:
+                    self.fields["default_devicegroup"].queryset = DeviceGroup.objects.filter(pk=dg_id)
+                else:
+                    self.fields["default_devicegroup"].queryset = DeviceGroup.objects.none()
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("inboundconfigurations/type_modal",
                                                                  kwargs={"integration_id": self.instance.id})
@@ -103,7 +116,9 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
     helper.add_input(Submit("submit", "Save", css_class="btn-primary"))
     helper.form_method = "POST"
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper.layout = Layout(
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
@@ -117,10 +132,7 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             css_class="form-row",
         ),
         "enabled",
-        Row(
-            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
-            css_class="form-row",
-        ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Connection</h6>'),
         Row(
             Column(
                 Field("endpoint", autocomplete="off"),
@@ -136,7 +148,13 @@ class InboundIntegrationConfigurationForm(forms.ModelForm):
             ),
             css_class="form-row",
         ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>State</h6>'),
         Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Routing</h6>'),
+        Row(
+            Column("default_devicegroup", css_class="form-group col-lg-3 mb-0"),
+            css_class="form-row",
+        ),
     )
 
 
@@ -158,15 +176,20 @@ class DeviceGroupForm(forms.ModelForm):
                 ].label += tooltip_labels(self.fields[field_name].help_text)
             self.fields[field_name].help_text = None
         if self.instance and request:
-            qs = Organization.objects.all()
-            if not IsGlobalAdmin.has_permission(None, request, None):
-                self.fields[
-                    "owner"
-                ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                    qs, request.user, "name"
+            if self.instance.pk and not self.is_bound:
+                self.fields["owner"].queryset = Organization.objects.filter(
+                    pk=self.instance.owner_id
                 )
             else:
-                self.fields["owner"].queryset = qs
+                qs = Organization.objects.all()
+                if not IsGlobalAdmin.has_permission(None, request, None):
+                    self.fields["owner"].queryset = (
+                        IsOrganizationMember.filter_queryset_for_user(
+                            qs, request.user, "name"
+                        )
+                    )
+                else:
+                    self.fields["owner"].queryset = qs
 
     field_order = [
         "name",
@@ -294,15 +317,20 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                     ].label += tooltip_labels(self.fields[field_name].help_text)
                 self.fields[field_name].help_text = None
             if request:
-                qs = Organization.objects.all()
-                if not IsGlobalAdmin.has_permission(None, request, None):
-                    self.fields[
-                        "owner"
-                    ].queryset = IsOrganizationMember.filter_queryset_for_user(
-                        qs, request.user, "name", admin_only=True
+                if self.instance and self.instance.pk and not self.is_bound:
+                    self.fields["owner"].queryset = Organization.objects.filter(
+                        pk=self.instance.owner_id
                     )
                 else:
-                    self.fields["owner"].queryset = qs
+                    qs = Organization.objects.all()
+                    if not IsGlobalAdmin.has_permission(None, request, None):
+                        self.fields["owner"].queryset = (
+                            IsOrganizationMember.filter_queryset_for_user(
+                                qs, request.user, "name", admin_only=True
+                            )
+                        )
+                    else:
+                        self.fields["owner"].queryset = qs
 
             # TODO: review how we trigger the warning modal
             self.fields['type'].widget.attrs['hx-get'] = reverse("outboundconfigurations/type_modal",
@@ -318,37 +346,34 @@ class OutboundIntegrationConfigurationForm(forms.ModelForm):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['state'].widget.instance = self.instance.type.id
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper = FormHelper()
     helper.layout = Layout(
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
             Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column("owner", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-lg-6 mt-0"),
+            Column("type", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
+        "enabled",
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Connection</h6>'),
         Row(
-            Column("type", css_class="form-group col-lg-6"),
-            css_class="form-row",
-        ),
-        Row(
-            Column(
-                Field("endpoint", autocomplete="off"),
-                css_class="form-group col-lg-3 mb-0",
-            ),
+            Column(Field("endpoint", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             Column(Field("token", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
             Column(Field("login", autocomplete="off"), css_class="form-group col-md-3"),
-            Column(
-                Field("password", autocomplete="off"), css_class="form-group col-md-3"
-            ),
+            Column(Field("password", autocomplete="off"), css_class="form-group col-md-3"),
             css_class="form-row",
         ),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>State</h6>'),
         Row(Column("state", css_class="form-group col-lg-6 mb-0")),
+        HTML(f'<h6 {_sh.replace("mt-2", "mt-4")}>Additional</h6>'),
         Row(
             Column("additional", css_class="form-group col-lg-6"),
             css_class="form-row",
@@ -474,21 +499,20 @@ class BridgeIntegrationForm(forms.ModelForm):
                     request.session["integration_type"] = str(self.instance.type.id)
                 self.fields['additional'].widget.instance = self.instance.type.id
 
+    _sh = 'class="text-muted mt-2 mb-2 pb-1 border-bottom" style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600"'
     helper = FormHelper()
     helper.layout = Layout(
+        HTML(f'<h6 id="details-section-heading" {_sh}>Details</h6>'),
         Row(
-            Column(Field("name", autocomplete="off"), css_class="form-group col-md-6 mb-0"),
-            Column("owner", css_class="form-group col-md-6 mb-0"),
+            Column(Field("name", autocomplete="off"), css_class="form-group col-lg-3 mb-0"),
+            Column("owner", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
         Row(
-            Column("enabled", css_class="form-group col-md-6 mt-0"),
+            Column("type", css_class="form-group col-lg-3 mb-0"),
             css_class="form-row",
         ),
-        Row(
-            Column("type", css_class="form-group col-md-12"),
-            css_class="form-row",
-        ),
+        "enabled",
         Row(
             Column("additional", css_class="form-group col-md-12"),
             css_class="form-row",
@@ -500,7 +524,7 @@ class BridgeIntegrationForm(forms.ModelForm):
 
 class KeyAuthForm(forms.Form):
     key = forms.CharField(
-        label="API Key",
+        label="",
         max_length=100,
         widget=ReadonlyPeekabooTextInput,
         required=False,

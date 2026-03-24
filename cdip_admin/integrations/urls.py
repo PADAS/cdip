@@ -24,6 +24,11 @@ urlpatterns = [
         name="device_group_update",
     ),
     path(
+        "devicegroups/<uuid:device_group_id>/delete",
+        views.DeviceGroupDeleteView.as_view(),
+        name="device_group_delete",
+    ),
+    path(
         "devicegroups/<uuid:device_group_id>/manage",
         views.DeviceGroupManagementUpdateView.as_view(),
         name="device_group_management_update",
@@ -75,6 +80,11 @@ urlpatterns = [
         name="inbound_integration_configuration_list",
     ),
     path(
+        "inboundconfigurations/errors/",
+        views.InboundIntegrationErrorsView.as_view(),
+        name="inbound_integration_errors",
+    ),
+    path(
         "inboundconfigurations/add",
         views.InboundIntegrationConfigurationAddView.as_view(),
         name="inbound_integration_configuration_add",
@@ -83,6 +93,11 @@ urlpatterns = [
         "inboundconfigurations/<uuid:configuration_id>/edit",
         views.InboundIntegrationConfigurationUpdateView.as_view(),
         name="inbound_integration_configuration_update",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/delete",
+        views.InboundIntegrationConfigurationDeleteView.as_view(),
+        name="inbound_integration_configuration_delete",
     ),
     path(
         "inboundconfigurations/<uuid:integration_id>/api-key",
@@ -120,6 +135,11 @@ urlpatterns = [
         name="outbound_integration_configuration_update",
     ),
     path(
+        "outboundconfigurations/<uuid:configuration_id>/delete",
+        views.OutboundIntegrationConfigurationDeleteView.as_view(),
+        name="outbound_integration_configuration_delete",
+    ),
+    path(
         "outboundconfigurations/type_modal/<uuid:configuration_id>/",
         views.OutboundIntegrationConfigurationUpdateView.type_modal,
         name="outboundconfigurations/type_modal",
@@ -138,6 +158,16 @@ urlpatterns = [
         "bridges",
         views.BridgeIntegrationListView.as_view(),
         name="bridge_integration_list",
+    ),
+    path(
+        "bridges/errors/",
+        views.BridgeIntegrationErrorsView.as_view(),
+        name="bridge_integration_errors",
+    ),
+    path(
+        "bridges/<uuid:id>/delete",
+        views.BridgeIntegrationDeleteView.as_view(),
+        name="bridge_integration_delete",
     ),
     path(
         "bridges/<uuid:module_id>",
@@ -173,9 +203,24 @@ urlpatterns = [
         name="bridges/dropdown_restore",
     ),
     path(
+        "inboundconfigurations/<uuid:configuration_id>/test-er-connection",
+        views.inbound_test_er_connection,
+        name="inbound_test_er_connection",
+    ),
+    path(
         "inboundconfigurations/<uuid:configuration_id>/toggle-enabled",
         views.toggle_inbound_enabled,
         name="inbound_toggle_enabled",
+    ),
+    path(
+        "inboundconfigurations/<uuid:configuration_id>/toggle-enabled-panel",
+        views.toggle_inbound_enabled_panel,
+        name="inbound_toggle_enabled_panel",
+    ),
+    path(
+        "outboundconfigurations/<uuid:configuration_id>/test-er-connection",
+        views.outbound_test_er_connection,
+        name="outbound_test_er_connection",
     ),
     path(
         "outboundconfigurations/<uuid:configuration_id>/toggle-enabled",
@@ -183,9 +228,19 @@ urlpatterns = [
         name="outbound_toggle_enabled",
     ),
     path(
+        "outboundconfigurations/<uuid:configuration_id>/toggle-enabled-panel",
+        views.toggle_outbound_enabled_panel,
+        name="outbound_toggle_enabled_panel",
+    ),
+    path(
         "bridges/<uuid:id>/toggle-enabled",
         views.toggle_bridge_enabled,
         name="bridge_toggle_enabled",
+    ),
+    path(
+        "bridges/<uuid:id>/toggle-enabled-panel",
+        views.toggle_bridge_enabled_panel,
+        name="bridge_toggle_enabled_panel",
     ),
     # Connections
     path(
@@ -228,5 +283,15 @@ urlpatterns = [
         "outboundconfigurations/<uuid:configuration_id>/connections/<uuid:inbound_id>/remove",
         views.outbound_connections_remove,
         name="outbound_connections_remove",
+    ),
+    path(
+        "autocomplete/device-groups/",
+        views.device_group_autocomplete,
+        name="device_group_autocomplete",
+    ),
+    path(
+        "autocomplete/organizations/",
+        views.organization_autocomplete,
+        name="organization_autocomplete",
     ),
 ]

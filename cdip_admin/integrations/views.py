@@ -2,14 +2,14 @@ import json
 import logging
 import random
 
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
-from django.views.generic import ListView, DetailView, UpdateView, FormView
+from django.views.generic import ListView, DetailView, UpdateView, FormView, TemplateView, View
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count, Case, When, Value, BooleanField
@@ -68,6 +68,7 @@ from django.template.loader import render_to_string
 from core.widgets import FormattedJsonFieldWidget
 from django.forms.fields import InvalidJSONInput
 from django_jsonform.widgets import JSONFormWidget
+from deployments.models import DispatcherDeployment
 
 logger = logging.getLogger(__name__)
 default_paginate_by = settings.DEFAULT_PAGINATE_BY
@@ -447,7 +448,7 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
     def get(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         self.object = self.get_object()
-        form = form_class(instance=self.object)
+        form = form_class(instance=self.object, request=request)
         if not IsGlobalAdmin.has_permission(None, self.request, None):
             form = filter_device_group_form_fields(form, self.request.user)
         context = self.get_context_data(form=form)
@@ -455,6 +456,11 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
             self._configure_htmx_helper(form, self.object.pk)
             return render(request, "integrations/device_group_update_partial.html", context)
         return self.render_to_response(context)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def form_valid(self, form):
         self.object = form.save()
@@ -498,6 +504,27 @@ class DeviceGroupUpdateView(PermissionRequiredMixin, UpdateView):
         return reverse(
             "device_group", kwargs={"module_id": self.kwargs.get("device_group_id")}
         )
+
+
+class DeviceGroupDeleteView(LoginRequiredMixin, View):
+    def post(self, request, device_group_id):
+        from django.db.models import ProtectedError
+        device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+        if not request.user.has_perm("integrations.delete_devicegroup"):
+            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, device_group.owner):
+                raise PermissionDenied
+        try:
+            device_group.delete()
+        except ProtectedError:
+            return HttpResponse(
+                "Cannot delete: this device group is still referenced by an inbound integration.",
+                status=409,
+            )
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
 
 
 class DeviceGroupManagementUpdateView(LoginRequiredMixin, UpdateView):
@@ -900,6 +927,14 @@ class InboundIntegrationConfigurationUpdateView(
         else:
             integration_type = "none"
             selected_type = "None"
+        # Skip confirmation for new integrations — no existing data to lose
+        if not InboundIntegrationConfiguration.objects.filter(pk=integration_id).exists():
+            schema_response = InboundIntegrationConfigurationUpdateView.schema(
+                request, integration_type, integration_id, update="true"
+            )
+            schema_response['HX-Retarget'] = '#div_id_state'
+            schema_response['HX-Reswap'] = 'innerHTML'
+            return schema_response
         rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
                                                                      'target': '#div_id_state',
                                                                      'proceed_button':
@@ -965,10 +1000,8 @@ class InboundIntegrationConfigurationUpdateView(
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
-                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                            data-toggle="tooltip" data-placement="right" 
-                            title="Integration component that can process the data.">?
-                        </button>
+                        <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
+                            data-help="Integration component that can process the data."><i class="fas fa-question-circle fa-sm text-muted"></i></button>
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
@@ -1064,6 +1097,105 @@ class InboundIntegrationConfigurationUpdateView(
         return reverse("inbound_integration_configuration_list")
 
 
+def _is_allowed_er_endpoint(url):
+    """Return True only if the URL's hostname is a pamdas.org domain."""
+    from urllib.parse import urlparse
+    try:
+        host = urlparse(url).hostname or ""
+        return host == "pamdas.org" or host.endswith(".pamdas.org")
+    except Exception:
+        return False
+
+
+def _test_er_connection(endpoint_raw, token, login, password):
+    """Return a JsonResponse from testing an EarthRanger /api/v1.0/user/me call.
+    Prefers token; falls back to OAuth2 password grant when token is empty."""
+    import requests as req
+    from urllib.parse import urlparse
+
+    parsed = urlparse(endpoint_raw)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not token and login and password:
+        token_url = base_url + "/oauth2/token"
+        try:
+            tr = req.post(token_url, data={
+                "grant_type": "password",
+                "client_id": "das_web_client",
+                "username": login,
+                "password": password,
+            }, timeout=10)
+        except Exception as exc:
+            return JsonResponse({"ok": False, "error": str(exc)}, status=200)
+        if tr.status_code != 200:
+            try:
+                err_data = tr.json()
+            except ValueError:
+                err_data = tr.text
+            return JsonResponse({"ok": False, "status": tr.status_code, "data": err_data})
+        token = tr.json().get("access_token", "")
+
+    url = base_url + "/api/v1.0/user/me"
+    try:
+        resp = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=200)
+    try:
+        data = resp.json()
+    except ValueError:
+        data = resp.text
+    return JsonResponse({"ok": resp.status_code == 200, "status": resp.status_code, "data": data})
+
+
+@require_POST
+@login_required
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def inbound_test_er_connection(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    is_er2er = "er2er" in (config.type.slug or "")
+    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
+    if not (is_er2er or is_pamdas):
+        raise Http404
+    endpoint_input = request.POST.get("endpoint") or config.endpoint
+    endpoint = endpoint_input if _is_allowed_er_endpoint(endpoint_input) else config.endpoint
+    token = request.POST.get("token") or config.token
+    login = request.POST.get("login") or config.login
+    password = request.POST.get("password") or config.password
+    return _test_er_connection(endpoint, token, login, password)
+
+
+@require_POST
+@login_required
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def outbound_test_er_connection(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
+    if not is_pamdas:
+        raise Http404
+    endpoint_input = request.POST.get("endpoint") or config.endpoint
+    endpoint = endpoint_input if _is_allowed_er_endpoint(endpoint_input) else config.endpoint
+    token = request.POST.get("token") or config.token
+    login = request.POST.get("login") or config.login
+    password = request.POST.get("password") or config.password
+    return _test_er_connection(endpoint, token, login, password)
+
+
+class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, configuration_id):
+        configuration = get_object_or_404(
+            InboundIntegrationConfiguration, pk=configuration_id
+        )
+        if not request.user.has_perm("integrations.delete_inboundintegrationconfiguration"):
+            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, configuration):
+                raise PermissionDenied
+        configuration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
 class InboundIntegrationConfigurationListView(
     LoginRequiredMixin, SingleTableMixin, FilterView
 ):
@@ -1088,8 +1220,8 @@ class InboundIntegrationConfigurationListView(
         base_url = reverse("inbound_integration_configuration_list")
         context["base_url"] = base_url
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
@@ -1105,6 +1237,53 @@ class InboundIntegrationConfigurationListView(
                 output_field=BooleanField(),
             )
         ).order_by('-_has_error', 'type__name', 'id')
+
+
+class InboundIntegrationErrorsView(LoginRequiredMixin, TemplateView):
+    template_name = "integrations/inbound_integration_errors.html"
+
+    def get(self, request, *args, **kwargs):
+        if 'enabled' not in request.GET:
+            params = request.GET.copy()
+            params['enabled'] = 'true'
+            params['_hl'] = 'enabled'
+            return redirect(request.path + '?' + params.urlencode())
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        qs = InboundIntegrationConfiguration.objects.get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            qs = IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        filterset = InboundIntegrationFilter(self.request.GET, queryset=qs, request=self.request)
+        errors_qs = filterset.qs.filter(state__has_key='error').select_related('type', 'owner')
+
+        def _extract_error_msg(error_val):
+            if isinstance(error_val, dict):
+                return error_val.get('message') or json.dumps(error_val)
+            if not isinstance(error_val, str):
+                return json.dumps(error_val)
+            return error_val
+
+        from collections import defaultdict
+        type_groups = defaultdict(lambda: defaultdict(list))
+        for config in errors_qs:
+            error_msg = _extract_error_msg(config.state.get('error', ''))
+            type_groups[config.type.name][error_msg].append(config)
+
+        error_by_type = []
+        for type_name, err_groups in type_groups.items():
+            sorted_groups = sorted(err_groups.items(), key=lambda x: -len(x[1]))
+            total = sum(len(v) for v in err_groups.values())
+            error_by_type.append((type_name, sorted_groups, total))
+        error_by_type.sort(key=lambda x: -x[2])
+
+        context['filter'] = filterset
+        context['error_by_type'] = error_by_type
+        context['total_error_count'] = sum(total for _, _, total in error_by_type)
+        return context
 
 
 ###
@@ -1337,6 +1516,33 @@ class OutboundIntegrationConfigurationUpdateView(PermissionRequiredMixin, Update
         return reverse("outbound_integration_configuration_list")
 
 
+class OutboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, configuration_id):
+        configuration = get_object_or_404(
+            OutboundIntegrationConfiguration, pk=configuration_id
+        )
+        if not request.user.has_perm("integrations.delete_outboundintegrationconfiguration"):
+            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, configuration):
+                raise PermissionDenied
+        try:
+            deployment = configuration.dispatcher_by_outbound
+        except OutboundIntegrationConfiguration.dispatcher_by_outbound.RelatedObjectDoesNotExist:
+            pass
+        else:
+            safe_statuses = [
+                DispatcherDeployment.Status.COMPLETE,
+                DispatcherDeployment.Status.ERROR,
+            ]
+            if deployment.integration is None and deployment.status in safe_statuses:
+                deployment.delete()
+        configuration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
 class OutboundIntegrationConfigurationListView(
     LoginRequiredMixin, SingleTableMixin, FilterView
 ):
@@ -1361,8 +1567,8 @@ class OutboundIntegrationConfigurationListView(
         base_url = reverse("outbound_integration_configuration_list")
         context["base_url"] = base_url
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
@@ -1401,8 +1607,8 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
         context = super().get_context_data(**kwargs)
         context["base_url"] = reverse("bridge_integration_list")
         qs = self.filterset.qs
-        context["error_count"] = qs.filter(state__has_key='error').count()
-        context["total_count"] = qs.count()
+        context["error_count"] = qs.filter(state__has_key='error', enabled=True).count()
+        context["total_count"] = qs.filter(enabled=True).count()
         return context
 
     def get_queryset(self):
@@ -1418,6 +1624,67 @@ class BridgeIntegrationListView(LoginRequiredMixin, SingleTableMixin, FilterView
                 output_field=BooleanField(),
             )
         ).order_by('-_has_error', 'name', 'id')
+
+
+class BridgeIntegrationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, id):
+        integration = get_object_or_404(BridgeIntegration, pk=id)
+        if not request.user.has_perm("integrations.delete_bridgeintegration"):
+            raise PermissionDenied
+        if not IsGlobalAdmin.has_permission(None, request, None):
+            if not IsOrganizationMember.is_object_owner(request.user, integration):
+                raise PermissionDenied
+        integration.delete()
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = "panelFormSaved"
+        return response
+
+
+class BridgeIntegrationErrorsView(LoginRequiredMixin, TemplateView):
+    template_name = "integrations/bridge_integration_errors.html"
+
+    def get(self, request, *args, **kwargs):
+        if 'enabled' not in request.GET:
+            params = request.GET.copy()
+            params['enabled'] = 'true'
+            params['_hl'] = 'enabled'
+            return redirect(request.path + '?' + params.urlencode())
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        qs = BridgeIntegration.objects.get_queryset()
+        if not IsGlobalAdmin.has_permission(None, self.request, None):
+            qs = IsOrganizationMember.filter_queryset_for_user(
+                qs, self.request.user, "owner__name"
+            )
+        filterset = BridgeIntegrationFilter(self.request.GET, queryset=qs, request=self.request)
+        errors_qs = filterset.qs.filter(state__has_key='error').select_related('type', 'owner')
+
+        def _extract_error_msg(error_val):
+            if isinstance(error_val, dict):
+                return error_val.get('message') or json.dumps(error_val)
+            if not isinstance(error_val, str):
+                return json.dumps(error_val)
+            return error_val
+
+        from collections import defaultdict
+        type_groups = defaultdict(lambda: defaultdict(list))
+        for config in errors_qs:
+            error_msg = _extract_error_msg(config.state.get('error', ''))
+            type_groups[config.type.name][error_msg].append(config)
+
+        error_by_type = []
+        for type_name, err_groups in type_groups.items():
+            sorted_groups = sorted(err_groups.items(), key=lambda x: -len(x[1]))
+            total = sum(len(v) for v in err_groups.values())
+            error_by_type.append((type_name, sorted_groups, total))
+        error_by_type.sort(key=lambda x: -x[2])
+
+        context['filter'] = filterset
+        context['error_by_type'] = error_by_type
+        context['total_error_count'] = sum(total for _, _, total in error_by_type)
+        return context
 
 
 @permission_required("integrations.view_bridgeintegration", raise_exception=True)
@@ -1557,6 +1824,14 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         else:
             integration_type = "none"
             selected_type = "None"
+        # Skip confirmation for new integrations — no existing data to lose
+        if not BridgeIntegration.objects.filter(pk=integration_id).exists():
+            schema_response = BridgeIntegrationUpdateView.schema(
+                request, integration_type, integration_id, update="true"
+            )
+            schema_response['HX-Retarget'] = '#div_id_additional'
+            schema_response['HX-Reswap'] = 'innerHTML'
+            return schema_response
         rendered = render_to_string('integrations/type_modal.html', {'selected_type': selected_type,
                                                                      'target': '#div_id_additional',
                                                                      'proceed_button': reverse("bridges/schema",
@@ -1579,10 +1854,8 @@ class BridgeIntegrationUpdateView(PermissionRequiredMixin, UpdateView):
         response = f"""<div id="div_id_type" class="form-group">
                         <label for="id_type" class=" requiredField">
                         Type
-                        <button type="button" class="btn btn-light btn-sm py-0 mb-0 align-top" 
-                            data-toggle="tooltip" data-placement="right" 
-                            title="Integration component that can process the data.">?
-                        </button>
+                        <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
+                            data-help="Integration component that can process the data."><i class="fas fa-question-circle fa-sm text-muted"></i></button>
                         <span class="asteriskField">*</span></label> 
                         <div class="">
                             <select name="type" hx-trigger="change" hx-target="body" hx-swap="beforeend"
@@ -1686,6 +1959,60 @@ def toggle_bridge_enabled(request, id):
     config.enabled = not config.enabled
     config.save(update_fields=["enabled"])
     return _enabled_icon_response(config, "bridge_toggle_enabled", {"id": config.id})
+
+
+@require_POST
+@permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
+def toggle_inbound_enabled_panel(request, configuration_id):
+    config = get_object_or_404(InboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
+
+
+@require_POST
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def toggle_outbound_enabled_panel(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
+
+
+@require_POST
+@permission_required("integrations.change_bridgeintegration", raise_exception=True)
+def toggle_bridge_enabled_panel(request, id):
+    config = get_object_or_404(BridgeIntegration, pk=id)
+    permission_can_view(request, config)
+    config.enabled = not config.enabled
+    config.save(update_fields=["enabled"])
+    if config.enabled:
+        pill = '<span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>'
+    else:
+        pill = '<span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>'
+    response = HttpResponse(pill)
+    response["HX-Trigger"] = json.dumps({
+        "toggleFeedback": {"enabled": config.enabled, "name": str(config.name)},
+    })
+    return response
 
 
 ###
@@ -1851,3 +2178,23 @@ def outbound_connections_remove(request, configuration_id, inbound_id):
     context = _outbound_connections_context(config)
     return render(request, "integrations/outbound_connections_partial.html", context)
 
+
+
+@login_required
+def device_group_autocomplete(request):
+    q = request.GET.get("q", "")
+    qs = DeviceGroup.objects.filter(name__icontains=q)
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, "owner__name")
+    results = [{"id": str(dg.id), "name": dg.name} for dg in qs.order_by("name")[:50]]
+    return JsonResponse(results, safe=False)
+
+
+@login_required
+def organization_autocomplete(request):
+    q = request.GET.get("q", "")
+    qs = Organization.objects.filter(name__icontains=q)
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, "name")
+    results = [{"id": str(org.id), "name": org.name} for org in qs.order_by("name")[:50]]
+    return JsonResponse(results, safe=False)

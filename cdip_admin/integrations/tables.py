@@ -46,6 +46,10 @@ class DeviceGroupTable(tables.Table):
     organization = tables.Column(
         accessor="owner", verbose_name="Organization", linkify=True
     )
+    name = tables.TemplateColumn(
+        template_code='''{{ record.name }}<button type="button" class="btn btn-link btn-sm p-0 ml-1 js-copy-link" data-copy-path="{% url 'device_group_list' %}#edit={{ record.id }}" title="Copy link"><i class="fas fa-link fa-xs text-muted"></i></button>''',
+        verbose_name="Name",
+    )
     actions = tables.TemplateColumn(
         template_code='''
         <button type="button"
@@ -104,7 +108,7 @@ class InboundIntegrationConfigurationTable(tables.Table):
         orderable=False,
     )
     name = tables.TemplateColumn(
-        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        template_code='''{{ record.name }}<button type="button" class="btn btn-link btn-sm p-0 ml-1 js-copy-link" data-copy-path="{% url 'inbound_integration_configuration_list' %}#edit={{ record.id }}" title="Copy link"><i class="fas fa-link fa-xs text-muted"></i></button><br><small class="text-muted">{{ record.type }}</small>''',
         verbose_name="Name / Type",
     )
     organization = tables.Column(
@@ -151,7 +155,7 @@ class OutboundIntegrationConfigurationTable(tables.Table):
         orderable=False,
     )
     name = tables.TemplateColumn(
-        template_code='''{{ record.name }}<br><small class="text-muted">{{ record.type }}</small>''',
+        template_code='''{{ record.name }}<button type="button" class="btn btn-link btn-sm p-0 ml-1 js-copy-link" data-copy-path="{% url 'outbound_integration_configuration_list' %}#edit={{ record.id }}" title="Copy link"><i class="fas fa-link fa-xs text-muted"></i></button><br><small class="text-muted">{{ record.type }}</small>''',
         verbose_name="Name / Type",
     )
     organization = tables.Column(

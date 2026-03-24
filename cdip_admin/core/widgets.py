@@ -90,3 +90,9 @@ class HasErrorBooleanWidget(BooleanWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.choices = (("", "All"), ("true", "Has Error"), ("false", "No Error"))
+
+
+class OrphanedBooleanWidget(BooleanWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.choices = (("", "All"), ("true", "Orphaned"), ("false", "Not Orphaned"))

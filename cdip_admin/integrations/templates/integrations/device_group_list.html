@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load render_table from django_tables2 %}
-{% load bootstrap4 %}
 {% load static %}
 
 {% block title %}Device Group List{% endblock %}
@@ -19,12 +18,92 @@
         </div>
     </div>
     {% if filter %}
-    <div>
-        <form action="" method="get" class="form form-inline">
-            {% bootstrap_form filter.form layout='inline' form_group_class='mr-2' %}
-            {% bootstrap_button 'Filter' extra_classes='' %}
-        </form>
-    </div>
+    <form id="device-group-filter-form" action="" method="get" class="d-flex align-items-center mt-3" style="gap: 0.5rem;">
+        <div style="flex: 2 1 150px; position: relative;">
+            {{ filter.form.device_group }}
+            <button type="button" class="name-clear-btn" aria-label="Clear">&times;</button>
+        </div>
+        <div style="flex: 3 1 180px;">{{ filter.form.organization }}</div>
+        <div style="flex: 3 1 180px;">{{ filter.form.destinations }}</div>
+        <div style="flex: 2 1 130px;">{{ filter.form.orphaned }}</div>
+        {% if request.GET %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary" style="white-space: nowrap;">Clear All</a>{% endif %}
+    </form>
+    <style>
+        #device-group-filter-form .ts-wrapper { width: 100%; }
+        #device-group-filter-form select,
+        #device-group-filter-form input[type="text"] { width: 100%; }
+        #device-group-filter-form input[name="device_group"] { padding-right: 1.75rem; }
+        #device-group-filter-form .name-clear-btn {
+            position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: #adb5bd; cursor: pointer;
+            padding: 0; font-size: 1.1rem; line-height: 1; display: none;
+        }
+        #device-group-filter-form .name-clear-btn:hover { color: #343a40; }
+        #device-group-filter-form .ts-wrapper.single .ts-control::after { display: none; }
+        #device-group-filter-form .ts-control .item {
+            background: #e9ecef;
+            color: #343a40;
+            border-radius: 1rem;
+            padding: 0.1rem 0.5rem 0.1rem 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        #device-group-filter-form .ts-control .item .remove {
+            font-size: 1rem;
+            line-height: 1;
+            color: #6c757d;
+            text-decoration: none;
+        }
+        #device-group-filter-form .ts-control .item .remove:hover { color: #343a40; }
+    </style>
+    <script>
+        (function() {
+            var form = document.getElementById('device-group-filter-form');
+
+            var nameInput = document.querySelector('#device-group-filter-form input[name="device_group"]');
+            var nameClearBtn = document.querySelector('#device-group-filter-form .name-clear-btn');
+            if (nameInput) {
+                nameInput.classList.add('form-control');
+                nameInput.placeholder = 'Name';
+                function syncNameClear() {
+                    nameClearBtn.style.display = nameInput.value ? 'block' : 'none';
+                }
+                syncNameClear();
+                var debounceTimer;
+                nameInput.addEventListener('input', function() {
+                    syncNameClear();
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(function() { form.submit(); }, 400);
+                });
+                nameClearBtn.addEventListener('click', function() {
+                    nameInput.value = '';
+                    syncNameClear();
+                    form.submit();
+                });
+            }
+
+            [
+                { name: 'organization', placeholder: 'Owner'       },
+                { name: 'destinations', placeholder: 'Destination' },
+                { name: 'orphaned',     placeholder: 'Orphaned'    },
+            ].forEach(function(cfg) {
+                var el = document.querySelector('#device-group-filter-form select[name="' + cfg.name + '"]');
+                if (!el || el.tomselect) return;
+                var emptyOpt = el.querySelector('option[value=""]');
+                if (emptyOpt) emptyOpt.textContent = '';
+                var ts = new TomSelect(el, {
+                    placeholder: cfg.placeholder,
+                    plugins: ['remove_button'],
+                    onItemAdd: function() { this.blur(); },
+                    onChange: function() { form.submit(); },
+                });
+                if (!el.value) ts.clear();
+            });
+        })();
+    </script>
     {% endif %}
 
     <div id="table-container">
@@ -99,6 +178,29 @@
                 htmx.ajax('GET', '{% url "device_group_list" %}' + '/' + editId + '/edit', {target: '#slide-panel-body', swap: 'innerHTML'});
             }
         })();
+
+        function showCopied(btn) {
+            var rect = btn.getBoundingClientRect();
+            var tip = document.createElement('span');
+            tip.textContent = 'Copied!';
+            tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+            document.body.appendChild(tip);
+            setTimeout(function() { tip.style.opacity = '0'; }, 800);
+            setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+        }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.js-copy-link');
+            if (!btn) return;
+            e.stopPropagation();
+            var path = btn.getAttribute('data-copy-path');
+            navigator.clipboard.writeText(window.location.origin + path);
+            showCopied(btn);
+            var icon = btn.querySelector('i');
+            var prev = icon.className;
+            icon.className = 'fas fa-check fa-xs text-success';
+            setTimeout(function() { icon.className = prev; }, 1500);
+        });
     </script>
 
 {% endblock %}

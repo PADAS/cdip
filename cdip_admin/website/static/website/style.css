@@ -193,6 +193,13 @@ ul ul a {
 	height: 100%;
 }
 
+#slide-panel-body > div {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
 .slide-panel-toolbar {
 	display: flex;
 	justify-content: space-between;

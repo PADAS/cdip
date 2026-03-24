@@ -1,0 +1,55 @@
+<script>
+    (function() {
+        var form = document.getElementById('{{ filter_form_id }}');
+
+        var nameInput = document.querySelector('#{{ filter_form_id }} input[name="name"]');
+        var nameClearBtn = document.querySelector('#{{ filter_form_id }} .name-clear-btn');
+        if (nameInput) {
+            nameInput.classList.add('form-control');
+            nameInput.placeholder = 'Name';
+            function syncNameClear() {
+                nameClearBtn.style.display = nameInput.value ? 'block' : 'none';
+            }
+            syncNameClear();
+            var debounceTimer;
+            nameInput.addEventListener('input', function() {
+                syncNameClear();
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function() { form.submit(); }, 400);
+            });
+            nameClearBtn.addEventListener('click', function() {
+                nameInput.value = '';
+                syncNameClear();
+                form.submit();
+            });
+        }
+
+        {{ filter_select_fields_json }}.forEach(function(cfg) {
+            var el = document.querySelector('#{{ filter_form_id }} select[name="' + cfg.name + '"]');
+            if (!el || el.tomselect) return;
+            var emptyOpt = el.querySelector('option[value=""]');
+            if (emptyOpt) emptyOpt.textContent = '';
+            var ts = new TomSelect(el, {
+                placeholder: cfg.placeholder,
+                plugins: ['remove_button'],
+                onItemAdd: function() { this.blur(); },
+                onChange: function() { form.submit(); },
+            });
+            if (!el.value) ts.clear();
+        });
+{% if filter_hl_field %}
+        var hlParams = new URLSearchParams(location.search);
+        if (hlParams.get('_hl') === '{{ filter_hl_field }}') {
+            hlParams.delete('_hl');
+            history.replaceState(null, '', location.pathname + '?' + hlParams.toString());
+            var hlEl = document.querySelector('#{{ filter_form_id }} select[name="{{ filter_hl_field }}"]');
+            var hlWrapper = hlEl && hlEl.parentElement;
+            if (hlWrapper) {
+                hlWrapper.style.transition = 'box-shadow 1s';
+                hlWrapper.style.boxShadow = '0 0 0 3px #28a745';
+                setTimeout(function() { hlWrapper.style.boxShadow = ''; }, 1200);
+            }
+        }
+{% endif %}
+    })();
+</script>

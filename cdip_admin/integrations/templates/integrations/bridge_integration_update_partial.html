@@ -1,19 +1,136 @@
 {% load crispy_forms_tags %}
+<div hx-params="not csrfmiddlewaretoken" style="position:relative">
 <div class="slide-panel-toolbar">
-    <h4 class="mb-0">Update Bridge Integration</h4>
+    <span id="delete-btn">
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                _="on click hide #delete-btn then show #delete-confirm with display:flex">Delete</button>
+    </span>
+    <span id="delete-confirm" class="align-items-center" style="display: none; gap: .4rem;">
+        <small class="text-muted">Delete {{ form.instance.name }}?</small>
+        <button type="button"
+                class="btn btn-danger btn-sm"
+                hx-post="{% url 'bridge_integration_delete' id=form.instance.id %}"
+                hx-swap="none"
+                _="on htmx:beforeRequest
+                     set my.disabled to true
+                     set my.innerHTML to '<span class=\'spinner-border spinner-border-sm\' role=\'status\'></span> Deleting…'">Confirm</button>
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                _="on click hide #delete-confirm then show #delete-btn">Cancel</button>
+    </span>
+    <span class="d-flex align-items-center text-muted"
+          style="gap:.3rem; font-size:.875rem; overflow:hidden; max-width:40%;">
+        <span class="text-truncate">{{ form.instance.name }}</span>
+        <button type="button"
+                class="btn btn-link btn-sm p-0 flex-shrink-0 js-copy-link-panel"
+                data-copy-path="{% url 'bridge_integration_list' %}#edit={{ form.instance.id }}"
+                title="Copy link">
+            <i class="fas fa-link fa-xs"></i>
+        </button>
+    </span>
     <div>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.body.dispatchEvent(new Event('closePanel'));">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" onclick="this.closest('#slide-panel-body').querySelector('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">Save</button>
     </div>
 </div>
 <div class="slide-panel-content">
-    <div id="api-key-section"
-         hx-get="{% url 'bridge_api_key_fragment' integration_id=form.instance.id %}"
-         hx-trigger="load"
-         hx-swap="innerHTML">
-        <p class="text-muted">Loading API key...</p>
-    </div>
-
     {% include "integrations/_form_errors.html" %}
     {% crispy form %}
+    <div id="bridge-enabled-toggle" class="form-group" style="display:none">
+        <span hx-post="{% url 'bridge_toggle_enabled_panel' id=form.instance.id %}"
+              hx-target="this"
+              hx-swap="innerHTML"
+              style="cursor:pointer; display:inline-block">
+            {% if form.instance.enabled %}
+            <span class="badge badge-success" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-check mr-1"></i>Enabled</span>
+            {% else %}
+            <span class="badge badge-secondary" style="font-size:.85rem;padding:.35em .65em"><i class="fas fa-times mr-1"></i>Disabled</span>
+            {% endif %}
+        </span>
+    </div>
+
+    <div id="api-key-section-wrapper">
+        <h6 class="text-muted mt-4 mb-0 pb-1 border-bottom d-flex justify-content-between align-items-center collapse-toggle"
+            style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer"
+            data-toggle="collapse" data-target="#api-key-collapse" aria-expanded="false">
+            <span>API Key</span>
+            <span class="caret-icon">&#9660;</span>
+        </h6>
+        <div id="api-key-collapse" class="collapse">
+            <div id="api-key-section"
+                 hx-get="{% url 'bridge_api_key_fragment' integration_id=form.instance.id %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <p class="text-muted small">Loading...</p>
+            </div>
+        </div>
+    </div>
 </div>
+</div>
+<script>
+(function() {
+    var heading = document.getElementById('details-section-heading');
+    var toggleDiv = document.getElementById('bridge-enabled-toggle');
+    var enabledDiv = document.getElementById('div_id_enabled');
+    if (heading && toggleDiv) {
+        heading.style.cssText += ';display:flex;justify-content:space-between;align-items:center';
+        heading.innerHTML = '<span>' + heading.textContent + '</span>';
+        var pill = toggleDiv.querySelector('span[hx-post]');
+        pill.style.cssText += ';text-transform:none;letter-spacing:normal;font-weight:normal';
+        heading.appendChild(pill);
+        htmx.process(pill);
+        toggleDiv.remove();
+    }
+    if (enabledDiv) enabledDiv.style.display = 'none';
+
+    var apiKeyWrapper = document.getElementById('api-key-section-wrapper');
+    var typeDiv = document.getElementById('div_id_type');
+    if (apiKeyWrapper && typeDiv) {
+        typeDiv.closest('.form-row').after(apiKeyWrapper);
+    }
+
+    var additionalRow = document.getElementById('div_id_additional');
+    if (additionalRow && apiKeyWrapper) {
+        var additionalFormRow = additionalRow.closest('.form-row');
+        if (additionalFormRow) {
+            var additionalWrapper = document.createElement('div');
+            var addHeading = document.createElement('h6');
+            addHeading.className = 'text-muted mt-4 mb-0 pb-1 border-bottom d-flex justify-content-between align-items-center collapse-toggle';
+            addHeading.style.cssText = 'font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer';
+            addHeading.setAttribute('data-toggle', 'collapse');
+            addHeading.setAttribute('data-target', '#additional-collapse');
+            addHeading.setAttribute('aria-expanded', 'true');
+            addHeading.innerHTML = '<span>Additional</span><span class="caret-icon">&#9660;</span>';
+            var addCollapse = document.createElement('div');
+            addCollapse.id = 'additional-collapse';
+            addCollapse.className = 'collapse show';
+            var addLabel = additionalRow.querySelector('label');
+            if (addLabel) addLabel.style.display = 'none';
+            addCollapse.appendChild(additionalFormRow);
+            additionalWrapper.appendChild(addHeading);
+            additionalWrapper.appendChild(addCollapse);
+            apiKeyWrapper.after(additionalWrapper);
+        }
+    }
+
+    function showCopied(btn) {
+        var rect = btn.getBoundingClientRect();
+        var tip = document.createElement('span');
+        tip.textContent = 'Copied!';
+        tip.style.cssText = 'position:fixed;left:' + (rect.right + 6) + 'px;top:' + (rect.top - 2) + 'px;background:#28a745;color:#fff;font-size:.75rem;padding:.2rem .45rem;border-radius:.25rem;pointer-events:none;z-index:9999;transition:opacity .4s';
+        document.body.appendChild(tip);
+        setTimeout(function() { tip.style.opacity = '0'; }, 800);
+        setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1200);
+    }
+
+    document.querySelector('.js-copy-link-panel').addEventListener('click', function() {
+        var path = this.getAttribute('data-copy-path');
+        navigator.clipboard.writeText(window.location.origin + path);
+        showCopied(this);
+        var icon = this.querySelector('i');
+        icon.className = 'fas fa-check fa-xs text-success';
+        setTimeout(function() { icon.className = 'fas fa-link fa-xs'; }, 1500);
+    });
+})();
+</script>
