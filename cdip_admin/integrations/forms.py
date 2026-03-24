@@ -23,12 +23,16 @@ from .models import (
 )
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
 import json
 
 
 def tooltip_labels(text):
-    return f""" <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"
-    data-help="{text}"><i class="fas fa-question-circle fa-sm text-muted"></i></button>"""
+    return format_html(
+        ' <button type="button" class="btn btn-link btn-sm p-0 js-field-help" tabindex="-1"'
+        ' data-help="{}"><i class="fas fa-question-circle fa-sm text-muted"></i></button>',
+        text,
+    )
 
 
 class InboundIntegrationConfigurationForm(forms.ModelForm):

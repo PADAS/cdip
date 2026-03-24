@@ -510,6 +510,8 @@ class DeviceGroupDeleteView(LoginRequiredMixin, View):
     def post(self, request, device_group_id):
         from django.db.models import ProtectedError
         device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+        if not request.user.has_perm("integrations.delete_devicegroup"):
+            raise PermissionDenied
         if not IsGlobalAdmin.has_permission(None, request, None):
             if not IsOrganizationMember.is_object_owner(request.user, device_group.owner):
                 raise PermissionDenied
@@ -1095,6 +1097,16 @@ class InboundIntegrationConfigurationUpdateView(
         return reverse("inbound_integration_configuration_list")
 
 
+def _is_allowed_er_endpoint(url):
+    """Return True only if the URL's hostname is a pamdas.org domain."""
+    from urllib.parse import urlparse
+    try:
+        host = urlparse(url).hostname or ""
+        return host == "pamdas.org" or host.endswith(".pamdas.org")
+    except Exception:
+        return False
+
+
 def _test_er_connection(endpoint_raw, token, login, password):
     """Return a JsonResponse from testing an EarthRanger /api/v1.0/user/me call.
     Prefers token; falls back to OAuth2 password grant when token is empty."""
@@ -1135,6 +1147,7 @@ def _test_er_connection(endpoint_raw, token, login, password):
     return JsonResponse({"ok": resp.status_code == 200, "status": resp.status_code, "data": data})
 
 
+@require_POST
 @login_required
 @permission_required("integrations.change_inboundintegrationconfiguration", raise_exception=True)
 def inbound_test_er_connection(request, configuration_id):
@@ -1143,13 +1156,15 @@ def inbound_test_er_connection(request, configuration_id):
     is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
     if not (is_er2er or is_pamdas):
         raise Http404
-    endpoint = request.POST.get("endpoint") or config.endpoint
+    endpoint_input = request.POST.get("endpoint") or config.endpoint
+    endpoint = endpoint_input if _is_allowed_er_endpoint(endpoint_input) else config.endpoint
     token = request.POST.get("token") or config.token
     login = request.POST.get("login") or config.login
     password = request.POST.get("password") or config.password
     return _test_er_connection(endpoint, token, login, password)
 
 
+@require_POST
 @login_required
 @permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
 def outbound_test_er_connection(request, configuration_id):
@@ -1157,7 +1172,8 @@ def outbound_test_er_connection(request, configuration_id):
     is_pamdas = config.endpoint and "pamdas.org" in config.endpoint
     if not is_pamdas:
         raise Http404
-    endpoint = request.POST.get("endpoint") or config.endpoint
+    endpoint_input = request.POST.get("endpoint") or config.endpoint
+    endpoint = endpoint_input if _is_allowed_er_endpoint(endpoint_input) else config.endpoint
     token = request.POST.get("token") or config.token
     login = request.POST.get("login") or config.login
     password = request.POST.get("password") or config.password
@@ -2169,7 +2185,7 @@ def device_group_autocomplete(request):
     q = request.GET.get("q", "")
     qs = DeviceGroup.objects.filter(name__icontains=q)
     if not IsGlobalAdmin.has_permission(None, request, None):
-        qs = qs.filter(owner__accountprofile__user=request.user)
+        qs = IsOrganizationMember.filter_queryset_for_user(qs, request.user, "owner__name")
     results = [{"id": str(dg.id), "name": dg.name} for dg in qs.order_by("name")[:50]]
     return JsonResponse(results, safe=False)
 

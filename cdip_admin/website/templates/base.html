@@ -31,8 +31,8 @@
             var secret = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
             if (secret) {
                 var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                var mask = Array.from({length: 32}, function() {
-                    return chars[Math.floor(Math.random() * chars.length)];
+                var mask = Array.from(crypto.getRandomValues(new Uint8Array(32)), function(b) {
+                    return chars[b % chars.length];
                 }).join('');
                 var cipher = secret.split('').map(function(c, i) {
                     return chars[(chars.indexOf(c) + chars.indexOf(mask[i])) % chars.length];
