@@ -1,0 +1,308 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgis/postgis:12-3.0
+    container_name: cdip-postgres
+    environment:
+      POSTGRES_DB: cdip_portaldb
+      POSTGRES_USER: cdip_dbuser
+      POSTGRES_PASSWORD: cdip_dbpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cdip_dbuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: cdip-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak for Authentication
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: cdip-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    command:
+      - start-dev
+      - --proxy=edge
+    ports:
+      - "8080:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # Keycloak Database
+  keycloak-db:
+    image: postgres:12-alpine
+    container_name: cdip-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kong Database
+  kong-db:
+    image: postgres:12-alpine
+    container_name: cdip-kong-db
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+    volumes:
+      - kong_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong -d kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kong Migrations
+  kong-migrations:
+    build:
+      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      dockerfile: Dockerfile.local
+    container_name: cdip-kong-migrations
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    depends_on:
+      kong-db:
+        condition: service_healthy
+    restart: on-failure
+
+  # Kong API Gateway
+  kong:
+    build:
+      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      dockerfile: Dockerfile.local
+    container_name: cdip-kong
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_ADMIN_GUI_URL: "http://localhost:8002"
+    ports:
+      - "8000:8000"  # Proxy port
+      - "8443:8443"  # Proxy SSL port
+      - "8001:8001"  # Admin API port
+      - "8444:8444"  # Admin API SSL port
+      - "8002:8002"  # Kong Manager UI
+    depends_on:
+      kong-db:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # Django Application
+  web:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: cdip-web
+    command: python3.11 manage.py runserver 0.0.0.0:8888
+    volumes:
+      - ./cdip_admin:/var/www/app
+      - static_files:/var/www/static
+    ports:
+      - "8888:8888"
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "local-dev-secret-key-change-in-production"
+      DB_NAME: cdip_portaldb
+      DB_USER: cdip_dbuser
+      DB_PASSWORD: cdip_dbpassword
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      KEYCLOAK_SERVER: "http://keycloak:8080"
+      KEYCLOAK_REALM: "cdip-dev"
+      KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
+      KEYCLOAK_CLIENT_SECRET: "local-dev-secret"
+      KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
+      KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
+      KONG_PROXY_URL: "http://kong:8001"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,web"
+      SECURE_PROXY_SSL_HEADER: ""
+      GCP_ENVIRONMENT_ENABLED: "False"
+      TRACING_ENABLED: "False"
+      PUBSUB_ENABLED: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+
+  # Celery Worker
+  celery:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: cdip-celery
+    command: celery -A cdip_admin worker -l info
+    volumes:
+      - ./cdip_admin:/var/www/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "local-dev-secret-key-change-in-production"
+      DB_NAME: cdip_portaldb
+      DB_USER: cdip_dbuser
+      DB_PASSWORD: cdip_dbpassword
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      KEYCLOAK_SERVER: "http://keycloak:8080"
+      KEYCLOAK_REALM: "cdip-dev"
+      KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
+      KEYCLOAK_CLIENT_SECRET: "local-dev-secret"
+      KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
+      KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
+      GCP_ENVIRONMENT_ENABLED: "False"
+      TRACING_ENABLED: "False"
+      PUBSUB_ENABLED: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: cdip-celery-beat
+    command: celery -A cdip_admin beat -l info
+    volumes:
+      - ./cdip_admin:/var/www/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "local-dev-secret-key-change-in-production"
+      DB_NAME: cdip_portaldb
+      DB_USER: cdip_dbuser
+      DB_PASSWORD: cdip_dbpassword
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      GCP_ENVIRONMENT_ENABLED: "False"
+      TRACING_ENABLED: "False"
+      PUBSUB_ENABLED: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Gundi Portal (React frontend)
+  portal:
+    build:
+      context: /Users/chrisdo/padas/gundi-portal
+      dockerfile: Dockerfile
+    container_name: cdip-portal
+    volumes:
+      - /Users/chrisdo/padas/gundi-portal/src:/app/src
+      - /Users/chrisdo/padas/gundi-portal/public:/app/public
+      - portal_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: "0.0.0.0"
+      REACT_APP_BASE_URL_LOCAL: "https://web.127.0.0.1.nip.io"
+      REACT_APP_OIDC_REALM: "cdip-dev"
+      REACT_APP_OIDC_CLIENT_ID: "cdip-oauth2"
+      REACT_APP_OIDC_AUTH_URL: "https://keycloak.127.0.0.1.nip.io/auth"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      - web
+      - keycloak
+
+  # Caddy Reverse Proxy with Automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: cdip-caddy
+    ports:
+      - "443:443"   # HTTPS
+      - "80:80"     # HTTP (redirects to HTTPS)
+      - "2019:2019" # Caddy admin API
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - keycloak
+      - kong
+      - web
+      - portal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  keycloak_db_data:
+  kong_db_data:
+  static_files:
+  caddy_data:
+  caddy_config:
+  portal_node_modules:
