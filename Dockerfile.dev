@@ -1,0 +1,101 @@
+FROM ubuntu:22.04
+
+LABEL maintainer="chrisdo@vulcan.com"
+LABEL description="Local development Dockerfile for CDIP Admin Portal"
+
+# Install basic tools first
+RUN apt-get update && \
+    apt-get -y upgrade && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    git \
+    vim \
+    cargo \
+    rustc \
+    && apt-get autoremove
+
+# Add PostgreSQL official repository for PostgreSQL 12
+RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | tee /etc/apt/sources.list.d/pgdg.list
+
+# Install postgresql-client-12 and other base packages
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
+    libpq-dev \
+    python3-pip \
+    python3-openssl \
+    libssl-dev \
+    libffi-dev \
+    locales locales-all \
+    postgresql-client-12 \
+    build-essential \
+    pkg-config \
+    && apt-get autoremove
+
+# Install Python 3.11
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3.11-distutils && \
+    apt-get autoremove
+
+# Install pip for Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+
+# Create symlinks for python3.11 as python3 and pip
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 1
+
+# Use ubuntugis/ppa for jammy (Ubuntu 22.04)
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 089EBE08314DF160
+RUN /bin/sh -c 'echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu jammy main" >> /etc/apt/sources.list.d/ubuntugis.list'
+
+RUN apt-get update && \
+    apt-get -y install gdal-bin libgdal-dev
+RUN export CPLUS_INCLUDE_PATH=/usr/include/gdal
+RUN export C_INCLUDE_PATH=/usr/include/gdal
+RUN python3.11 -m pip install GDAL==$(gdal-config --version)
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy requirements files
+COPY dependencies/requirements.txt /workspace/requirements.txt
+COPY dependencies/requirements-dev.txt /workspace/requirements-dev.txt
+
+# Upgrade pip and install wheel for better package support
+# Pin setuptools<71 to keep pkg_resources available for older packages like cryptography==2.9.2
+RUN python3.11 -m pip install -U "pip" "wheel" "setuptools<71"
+
+# Install Python dependencies
+# cryptography==2.9.2 in requirements.txt is incompatible with Python 3.11.
+# Remove it from requirements, install deps, then install a compatible cryptography.
+RUN sed -i '/^cryptography==/d' /workspace/requirements.txt /workspace/requirements-dev.txt && \
+    python3.11 -m pip install "cryptography==42.0.8" --no-cache-dir && \
+    python3.11 -m pip install -r /workspace/requirements.txt --no-cache-dir && \
+    python3.11 -m pip install -r /workspace/requirements-dev.txt --no-cache-dir
+
+# Set environment variables
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
+ENV DJANGO_SETTINGS_MODULE=cdip_admin.settings
+ENV PYTHONUNBUFFERED=1
+
+# Set working directory to app
+WORKDIR /var/www/app
+
+# Expose port for Django dev server
+EXPOSE 8888
+
+# Default command (can be overridden in docker-compose)
+CMD ["python3.11", "manage.py", "runserver", "0.0.0.0:8888"]
