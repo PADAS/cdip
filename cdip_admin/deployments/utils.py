@@ -1,12 +1,79 @@
 import logging
 import json
 from urllib.parse import urlparse
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import secretmanager
 from django.conf import settings
 from core.utils import generate_short_id_milliseconds
 
 
 logger = logging.getLogger(__name__)
+
+
+# Failure-reason values mirror DispatcherDeployment.FailureReason choices.
+# Kept as plain strings here to avoid a circular import from models.
+FAILURE_REASON_QUOTA_EXHAUSTED = "quota_exhausted"
+FAILURE_REASON_TRANSIENT = "transient"
+FAILURE_REASON_CONFIG_ERROR = "config_error"
+FAILURE_REASON_UNKNOWN = "unknown"
+
+
+_QUOTA_MESSAGE_MARKERS = (
+    "insufficient quota",
+    "quota exceeded",
+    "resource_exhausted",
+    "resourceexhausted",
+)
+
+_TRANSIENT_MESSAGE_MARKERS = (
+    "deadline exceeded",
+    "service unavailable",
+    "internal error",
+    "connection reset",
+    "temporarily unavailable",
+)
+
+
+def classify_deployment_error(exc):
+    """Map a deployment exception to a DispatcherDeployment.FailureReason value.
+
+    Quota failures (HTTP 429 / ResourceExhausted) come back in two shapes from
+    the GCP client libs: a typed ``google.api_core.exceptions`` instance, or a
+    plain ``Exception`` whose string contains "insufficient quota" (this is
+    what we see when an LRO ``operation.result()`` resolves to a failed
+    operation). Both are treated as ``QUOTA_EXHAUSTED`` so callers can clean
+    up orphaned topics and back off instead of thrashing.
+    """
+    message = str(exc) if exc is not None else ""
+    lowered = message.lower()
+
+    if isinstance(exc, gcp_exceptions.ResourceExhausted):
+        return FAILURE_REASON_QUOTA_EXHAUSTED
+    if isinstance(exc, gcp_exceptions.TooManyRequests):
+        return FAILURE_REASON_QUOTA_EXHAUSTED
+    if any(marker in lowered for marker in _QUOTA_MESSAGE_MARKERS):
+        return FAILURE_REASON_QUOTA_EXHAUSTED
+
+    if isinstance(exc, (
+        gcp_exceptions.InvalidArgument,
+        gcp_exceptions.FailedPrecondition,
+        gcp_exceptions.PermissionDenied,
+        gcp_exceptions.NotFound,
+        gcp_exceptions.Unauthenticated,
+    )):
+        return FAILURE_REASON_CONFIG_ERROR
+
+    if isinstance(exc, (
+        gcp_exceptions.DeadlineExceeded,
+        gcp_exceptions.ServiceUnavailable,
+        gcp_exceptions.InternalServerError,
+        gcp_exceptions.Aborted,
+    )):
+        return FAILURE_REASON_TRANSIENT
+    if any(marker in lowered for marker in _TRANSIENT_MESSAGE_MARKERS):
+        return FAILURE_REASON_TRANSIENT
+
+    return FAILURE_REASON_UNKNOWN
 
 
 class PubSubDummyClient:

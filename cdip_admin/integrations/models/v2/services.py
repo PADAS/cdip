@@ -75,12 +75,29 @@ def calculate_integration_status(integration_id):
     integration_status.status_details = "No issues detected"
     time_window = datetime.now(timezone.utc) - timedelta(minutes=healthcheck_settings.time_window_minutes)
     errors_threshold = healthcheck_settings.error_count_threshold
-    if not integration_status.integration.enabled:
+    integration = integration_status.integration
+
+    # If the dispatcher itself never reached COMPLETE, the integration cannot
+    # actually deliver. Short-circuit so a single failure (e.g. GCP quota)
+    # surfaces as UNHEALTHY immediately, instead of waiting for the activity-log
+    # error threshold to accumulate.
+    deployment = getattr(integration, "dispatcher_by_integration", None)
+    DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
+
+    if not integration.enabled:
         integration_status.status = IntegrationStatus.Status.DISABLED
         integration_status.status_details = "Integration is disabled"
+    elif deployment and deployment.status == DispatcherDeployment.Status.ERROR:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        if deployment.failure_reason == DispatcherDeployment.FailureReason.QUOTA_EXHAUSTED:
+            integration_status.status_details = (
+                "Dispatcher deployment blocked by GCP quota — Cloud Run service ceiling reached"
+            )
+        else:
+            integration_status.status_details = "Dispatcher deployment failed"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.INTEGRATION,
-        integration=integration_status.integration,
+        integration=integration,
         log_level=ActivityLog.LogLevels.ERROR,
         created_at__gte=time_window
     ).count() >= errors_threshold:
@@ -88,7 +105,7 @@ def calculate_integration_status(integration_id):
         integration_status.status_details = "Errors where detected while executing the integration"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.DISPATCHER,
-        integration=integration_status.integration,
+        integration=integration,
         log_level=ActivityLog.LogLevels.ERROR,
         created_at__gte=time_window
     ).count() >= errors_threshold:

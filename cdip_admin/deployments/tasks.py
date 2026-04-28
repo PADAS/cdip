@@ -9,6 +9,7 @@ from google.cloud.eventarc_v1.types import Trigger, Destination, CloudRun
 from google.api_core.exceptions import AlreadyExists, NotFound
 from django.apps import apps
 from django.conf import settings
+from django.utils import timezone
 from . import utils
 
 
@@ -41,6 +42,44 @@ else:
     DISPATCHER_DEFAULT_SETTINGS_SMART = {}
     DISPATCHER_DEFAULT_SETTINGS_WPSWATCH = {}
     DISPATCHER_DEFAULT_SETTINGS_TRAPTAGGER = {}
+
+
+def _log_deployment_failure(integration, error_msg, failure_reason, attempt_count, topic_name):
+    """Record a dispatcher deployment failure in the ActivityLog so it feeds
+    Connection health and shows up in the per-integration activity feed.
+
+    No-op for legacy v1 integrations: ActivityLog.integration FK is to v2
+    Integration only.
+    """
+    if integration is None:
+        return
+    ActivityLog = apps.get_model("activity_log", "ActivityLog")
+    is_quota = failure_reason == utils.FAILURE_REASON_QUOTA_EXHAUSTED
+    # SlugField max_length=40
+    value = "dispatcher_quota_exhausted" if is_quota else "dispatcher_deploy_failed"
+    title = (
+        f"Dispatcher deployment blocked by GCP quota for '{integration.name}'"
+        if is_quota
+        else f"Dispatcher deployment failed for '{integration.name}'"
+    )
+    try:
+        ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.ERROR,
+            log_type=ActivityLog.LogTypes.EVENT,
+            origin=ActivityLog.Origin.DISPATCHER,
+            integration=integration,
+            value=value,
+            title=title[:200],
+            details={
+                "failure_reason": failure_reason,
+                "attempt_count": attempt_count,
+                "topic_name": topic_name,
+                "error": error_msg,
+            },
+        )
+    except Exception as log_exc:
+        # Logging must never mask the underlying deployment error.
+        print(f"Failed to record deployment failure ActivityLog: {log_exc}")
 
 
 def get_function_subscription_request(function, topic_path, configuration):
@@ -109,7 +148,12 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
     deployment.status = DispatcherDeployment.Status.IN_PROGRESS
     deployment.status_details = ""  # Clean previous errors
+    deployment.last_error = ""
+    deployment.failure_reason = ""
+    deployment.attempt_count = (deployment.attempt_count or 0) + 1
+    deployment.last_attempt_at = timezone.now()
     deployment.save()
+    topic_created_this_run = False
 
     # Get settings from the database
     if deployment.integration:  # v2 models
@@ -139,7 +183,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
     deployment.save()
 
     try:
-        create_topic(topic_path=topic_path)
+        topic_created_this_run = create_topic(topic_path=topic_path)
 
         # Create the dispatcher
         if integration.is_er_site:  # Deploy a Cloud function
@@ -202,9 +246,29 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
         error_msg = f"Error deploying function: {e}"
         print(error_msg)
+        failure_reason = utils.classify_deployment_error(e)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
+        deployment.last_error = error_msg
+        deployment.failure_reason = failure_reason
         deployment.save()
+        _log_deployment_failure(
+            integration=deployment.integration,
+            error_msg=error_msg,
+            failure_reason=failure_reason,
+            attempt_count=deployment.attempt_count,
+            topic_name=topic,
+        )
+        # Quota failures leave us with an orphaned topic for every retry.
+        # Drop the topic we created in this run so the next attempt starts clean
+        # and we don't accumulate topics while the regional Cloud Run ceiling is full.
+        if failure_reason == utils.FAILURE_REASON_QUOTA_EXHAUSTED and topic_created_this_run:
+            try:
+                delete_topic(topic_name=topic, configuration=configuration)
+            except NotFound:
+                pass
+            except Exception as cleanup_exc:
+                print(f"Failed to clean up orphaned topic {topic}: {cleanup_exc}")
         return
 
 
@@ -271,12 +335,15 @@ def delete_serverless_dispatcher(deployment_id, topic):
 
 
 def create_topic(topic_path):
+    """Create a PubSub topic. Returns True if newly created, False if it already existed."""
     try:
         print(f"Creating Topic {topic_path}..")
         pubsub_client.create_topic(name=topic_path)
-    except AlreadyExists as e:
+        print(f"Topic {topic_path} ready.")
+        return True
+    except AlreadyExists:
         print(f"Topic {topic_path} already exists. Skipping creation.")
-    print(f"Topic {topic_path} ready.")
+        return False
 
 
 def get_function_request(configuration, function_name, topic_path):
