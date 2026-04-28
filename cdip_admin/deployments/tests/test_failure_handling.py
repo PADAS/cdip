@@ -48,9 +48,6 @@ class TestClassifyDeploymentError:
         assert classify_deployment_error(RuntimeError("???")) == FAILURE_REASON_UNKNOWN
 
 
-pytestmark_db = pytest.mark.django_db
-
-
 @pytest.mark.django_db
 def test_quota_exhausted_marks_failure_and_cleans_up_topic(
     mocker, organization, integration_type_smart, mock_get_dispatcher_defaults_from_gcp_secrets,

@@ -1,3 +1,5 @@
+import logging
+
 import google.auth
 from celery import shared_task
 from google.cloud import pubsub_v1
@@ -11,6 +13,9 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import timezone
 from . import utils
+
+
+logger = logging.getLogger(__name__)
 
 
 if settings.GCP_ENVIRONMENT_ENABLED:
@@ -79,7 +84,7 @@ def _log_deployment_failure(integration, error_msg, failure_reason, attempt_coun
         )
     except Exception as log_exc:
         # Logging must never mask the underlying deployment error.
-        print(f"Failed to record deployment failure ActivityLog: {log_exc}")
+        logger.warning(f"Failed to record deployment failure ActivityLog: {log_exc}")
 
 
 def get_function_subscription_request(function, topic_path, configuration):
@@ -268,7 +273,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
             except NotFound:
                 pass
             except Exception as cleanup_exc:
-                print(f"Failed to clean up orphaned topic {topic}: {cleanup_exc}")
+                logger.warning(f"Failed to clean up orphaned topic {topic}: {cleanup_exc}")
         return
 
 
@@ -343,6 +348,7 @@ def create_topic(topic_path):
         return True
     except AlreadyExists:
         print(f"Topic {topic_path} already exists. Skipping creation.")
+        print(f"Topic {topic_path} ready.")
         return False
 
 
