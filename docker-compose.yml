@@ -46,6 +46,9 @@ services:
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      # The portal builds Keycloak URLs as ${KEYCLOAK_SERVER}/auth/... so
+      # serve Keycloak under the /auth prefix to match.
+      KC_HTTP_RELATIVE_PATH: "/auth"
     command:
       - start-dev
       - --proxy=edge
@@ -56,7 +59,7 @@ services:
         condition: service_healthy
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -97,7 +100,7 @@ services:
   # Kong Migrations
   kong-migrations:
     build:
-      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      context: ${KONG_DIR:-../gundi-kp-dynamic-routing}
       dockerfile: Dockerfile.local
     container_name: cdip-kong-migrations
     command: kong migrations bootstrap
@@ -115,7 +118,7 @@ services:
   # Kong API Gateway
   kong:
     build:
-      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      context: ${KONG_DIR:-../gundi-kp-dynamic-routing}
       dockerfile: Dockerfile.local
     container_name: cdip-kong
     environment:
@@ -177,7 +180,7 @@ services:
       KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
       KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
       KONG_PROXY_URL: "http://kong:8001"
-      ALLOWED_HOSTS: "localhost,127.0.0.1,web"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,web,web.127.0.0.1.nip.io"
       SECURE_PROXY_SSL_HEADER: ""
       GCP_ENVIRONMENT_ENABLED: "False"
       TRACING_ENABLED: "False"
@@ -257,12 +260,12 @@ services:
   # Gundi Portal (React frontend)
   portal:
     build:
-      context: /Users/chrisdo/padas/gundi-portal
+      context: ${PORTAL_DIR:-../gundi-portal}
       dockerfile: Dockerfile
     container_name: cdip-portal
     volumes:
-      - /Users/chrisdo/padas/gundi-portal/src:/app/src
-      - /Users/chrisdo/padas/gundi-portal/public:/app/public
+      - ${PORTAL_DIR:-../gundi-portal}/src:/app/src
+      - ${PORTAL_DIR:-../gundi-portal}/public:/app/public
       - portal_node_modules:/app/node_modules
     ports:
       - "3000:3000"

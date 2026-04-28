@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 import google.auth
 from celery import shared_task
@@ -249,12 +250,14 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
         deployment.status = DispatcherDeployment.Status.COMPLETE
         deployment.save()
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
-        error_msg = f"Error deploying function: {e}"
+        error_msg = f"Error deploying dispatcher: {e}"
         print(error_msg)
         failure_reason = utils.classify_deployment_error(e)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
-        deployment.last_error = error_msg
+        # Capture the full traceback so last_error has actionable detail beyond
+        # what fits in the 500-char status_details column.
+        deployment.last_error = traceback.format_exc()
         deployment.failure_reason = failure_reason
         deployment.save()
         _log_deployment_failure(

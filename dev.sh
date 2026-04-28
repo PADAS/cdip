@@ -124,9 +124,15 @@ function initial_setup() {
     echo -e "${GREEN}Starting initial setup...${NC}"
 
     # Check if .env exists
+    local env_template="cdip_admin/cdip_admin/.env.example"
     if [ ! -f "cdip_admin/.env" ]; then
-        echo -e "${YELLOW}Copying .env.local to cdip_admin/.env${NC}"
-        cp .env.local cdip_admin/.env
+        if [ -f "${env_template}" ]; then
+            echo -e "${YELLOW}Copying ${env_template} to cdip_admin/.env${NC}"
+            cp "${env_template}" cdip_admin/.env
+        else
+            echo -e "${RED}Missing environment template: ${env_template}${NC}"
+            return 1
+        fi
     else
         echo -e "${YELLOW}.env file already exists, skipping copy${NC}"
     fi

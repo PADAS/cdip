@@ -81,8 +81,11 @@ def calculate_integration_status(integration_id):
     # actually deliver. Short-circuit so a single failure (e.g. GCP quota)
     # surfaces as UNHEALTHY immediately, instead of waiting for the activity-log
     # error threshold to accumulate.
-    deployment = getattr(integration, "dispatcher_by_integration", None)
+    # Use a queryset filter rather than the OneToOne descriptor: the descriptor
+    # raises DispatcherDeployment.DoesNotExist when no row exists yet, which is
+    # what happens for legacy/freshly-created integrations.
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
+    deployment = DispatcherDeployment.objects.filter(integration=integration).first()
 
     if not integration.enabled:
         integration_status.status = IntegrationStatus.Status.DISABLED
