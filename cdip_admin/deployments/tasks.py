@@ -284,7 +284,12 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
             except NotFound:
                 pass
             except Exception as cleanup_exc:
-                logger.warning(f"Failed to clean up orphaned topic {topic}: {cleanup_exc}")
+                logger.warning(
+                    "Failed to clean up orphaned topic %s: %s",
+                    topic,
+                    cleanup_exc,
+                    exc_info=True,
+                )
         return
 
 

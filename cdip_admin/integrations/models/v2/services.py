@@ -106,7 +106,7 @@ def calculate_integration_status(integration_id):
         created_at__gte=time_window
     ).count() >= errors_threshold:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
-        integration_status.status_details = "Errors where detected while executing the integration"
+        integration_status.status_details = "Errors were detected while executing the integration"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.DISPATCHER,
         integration=integration,
@@ -114,7 +114,7 @@ def calculate_integration_status(integration_id):
         created_at__gte=time_window
     ).count() >= errors_threshold:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
-        integration_status.status_details = "Errors where detected while pushing data to the destination"
+        integration_status.status_details = "Errors were detected while pushing data to the destination"
     integration_status.save()
     return integration_status.status
 
