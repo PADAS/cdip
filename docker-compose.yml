@@ -288,9 +288,9 @@ services:
     image: caddy:2-alpine
     container_name: cdip-caddy
     ports:
-      - "443:443"   # HTTPS
-      - "80:80"     # HTTP (redirects to HTTPS)
-      - "2019:2019" # Caddy admin API
+      - "443:443"             # HTTPS
+      - "80:80"               # HTTP (redirects to HTTPS)
+      - "127.0.0.1:2019:2019" # Caddy admin API (localhost only — exposes config rewrite)
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data

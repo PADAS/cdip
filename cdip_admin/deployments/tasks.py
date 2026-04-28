@@ -12,6 +12,7 @@ from google.cloud.eventarc_v1.types import Trigger, Destination, CloudRun
 from google.api_core.exceptions import AlreadyExists, NotFound
 from django.apps import apps
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 from . import utils
 
@@ -85,7 +86,11 @@ def _log_deployment_failure(integration, error_msg, failure_reason, attempt_coun
         )
     except Exception as log_exc:
         # Logging must never mask the underlying deployment error.
-        logger.warning(f"Failed to record deployment failure ActivityLog: {log_exc}")
+        logger.warning(
+            "Failed to record deployment failure ActivityLog: %s",
+            log_exc,
+            exc_info=True,
+        )
 
 
 def get_function_subscription_request(function, topic_path, configuration):
@@ -151,14 +156,17 @@ def get_service_subscription_request(service_response, topic_path, configuration
 @shared_task
 def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment_settings=None):
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
+    # Atomic counter bump: if multiple deploy tasks race for the same deployment
+    # (model on_commit + admin restart, etc.) F() prevents lost increments.
+    DispatcherDeployment.objects.filter(id=deployment_id).update(
+        status=DispatcherDeployment.Status.IN_PROGRESS,
+        status_details="",
+        last_error="",
+        failure_reason="",
+        attempt_count=F("attempt_count") + 1,
+        last_attempt_at=timezone.now(),
+    )
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
-    deployment.status = DispatcherDeployment.Status.IN_PROGRESS
-    deployment.status_details = ""  # Clean previous errors
-    deployment.last_error = ""
-    deployment.failure_reason = ""
-    deployment.attempt_count = (deployment.attempt_count or 0) + 1
-    deployment.last_attempt_at = timezone.now()
-    deployment.save()
     topic_created_this_run = False
 
     # Get settings from the database
