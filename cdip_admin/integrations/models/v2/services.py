@@ -77,20 +77,21 @@ def calculate_integration_status(integration_id):
     errors_threshold = healthcheck_settings.error_count_threshold
     integration = integration_status.integration
 
-    # If the dispatcher itself never reached COMPLETE, the integration cannot
-    # actually deliver. Short-circuit so a single failure (e.g. GCP quota)
-    # surfaces as UNHEALTHY immediately, instead of waiting for the activity-log
-    # error threshold to accumulate.
-    # Use a queryset filter rather than the OneToOne descriptor: the descriptor
-    # raises DispatcherDeployment.DoesNotExist when no row exists yet, which is
-    # what happens for legacy/freshly-created integrations.
-    DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
-    deployment = DispatcherDeployment.objects.filter(integration=integration).first()
-
     if not integration.enabled:
         integration_status.status = IntegrationStatus.Status.DISABLED
         integration_status.status_details = "Integration is disabled"
-    elif deployment and deployment.status == DispatcherDeployment.Status.ERROR:
+        integration_status.save()
+        return integration_status.status
+
+    # When the dispatcher is in ERROR (e.g. GCP quota exhausted), short-circuit
+    # to UNHEALTHY immediately rather than waiting for the activity-log error
+    # threshold to accumulate. Use a queryset filter rather than the OneToOne
+    # descriptor: the descriptor raises DispatcherDeployment.DoesNotExist when
+    # no row exists yet (legacy/freshly-created integrations).
+    DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
+    deployment = DispatcherDeployment.objects.filter(integration=integration).first()
+
+    if deployment and deployment.status == DispatcherDeployment.Status.ERROR:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
         if deployment.failure_reason == DispatcherDeployment.FailureReason.QUOTA_EXHAUSTED:
             integration_status.status_details = (

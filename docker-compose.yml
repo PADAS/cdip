@@ -59,7 +59,9 @@ services:
         condition: service_healthy
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
+      # CMD-SHELL routes through /bin/sh which doesn't support /dev/tcp; invoke
+      # bash explicitly so the redirection works in the Keycloak (Quarkus) image.
+      test: ["CMD", "bash", "-lc", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
       interval: 30s
       timeout: 10s
       retries: 10
