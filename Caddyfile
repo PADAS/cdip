@@ -1,0 +1,36 @@
+# Caddyfile for local development with automatic HTTPS
+
+# Keycloak
+keycloak.127.0.0.1.nip.io {
+    reverse_proxy keycloak:8080
+    tls internal
+}
+
+# Kong Proxy
+kong.127.0.0.1.nip.io {
+    reverse_proxy kong:8000
+    tls internal
+}
+
+# Django Web App — routed through Kong so the kong-oidc plugin terminates
+# auth and injects X-Userinfo, matching the prod ingress→kong→service flow.
+# Caddy retains TLS termination + the public hostname.
+web.127.0.0.1.nip.io {
+    reverse_proxy kong:8000 {
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Host {host}
+    }
+    tls internal
+}
+
+# Kong Admin API
+kong-admin.127.0.0.1.nip.io {
+    reverse_proxy kong:8001
+    tls internal
+}
+
+# Gundi Portal (React frontend)
+portal.127.0.0.1.nip.io {
+    reverse_proxy portal:3000
+    tls internal
+}

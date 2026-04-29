@@ -11,6 +11,13 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         ERROR = "err", "Failed"
         COMPLETE = "com", "Deployment Complete"
         DELETING = "del", "Deleting"
+
+    class FailureReason(models.TextChoices):
+        QUOTA_EXHAUSTED = "quota_exhausted", "Quota Exhausted"
+        TRANSIENT = "transient", "Transient Error"
+        CONFIG_ERROR = "config_error", "Configuration Error"
+        UNKNOWN = "unknown", "Unknown"
+
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -21,6 +28,23 @@ class DispatcherDeployment(UUIDAbstractModel, TimestampedModel):
         default="",
         blank=True,
         null=True
+    )
+    failure_reason = models.CharField(
+        max_length=32,
+        choices=FailureReason.choices,
+        blank=True,
+        default="",
+    )
+    last_error = models.TextField(
+        blank=True,
+        default="",
+    )
+    attempt_count = models.PositiveIntegerField(
+        default=0,
+    )
+    last_attempt_at = models.DateTimeField(
+        blank=True,
+        null=True,
     )
     name = models.CharField(
         max_length=63,

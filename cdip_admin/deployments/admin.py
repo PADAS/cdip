@@ -59,6 +59,9 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "status",
+        "failure_reason",
+        "attempt_count",
+        "last_attempt_at",
         "status_details",
         "integration",
         "topic_name",
@@ -68,9 +71,15 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "status",
+        "failure_reason",
         OrphanedFilter,
         "integration__type",
         "legacy_integration__type",
+    )
+    readonly_fields = (
+        "attempt_count",
+        "last_attempt_at",
+        "last_error",
     )
     actions = [restart_deployments, recreate_dispatchers, delete_orphaned_dispatchers]
     search_fields = (
