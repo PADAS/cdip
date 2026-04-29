@@ -17,6 +17,37 @@ in the request path; Django trusts what Kong forwards.
 ./dev.sh start     # docker compose up -d
 ```
 
+## Opt-in services
+
+Two services are sibling-repo dependent and **can't start without local
+clones of those repos**. They're env-var-configurable and (where possible)
+profile-gated so the default stack always comes up cleanly.
+
+| Service | Sibling repo | Override | Profile-gated? |
+|---|---|---|---|
+| `kong` | `gundi-kp-dynamic-routing` | `KONG_DIR=/abs/path` | No (kong is required for the auth flow) |
+| `portal` | `gundi-portal` (React) | `PORTAL_DIR=/abs/path` | Yes — `--profile portal` |
+
+Set the paths in a `.env` file at the worktree root (already gitignored):
+
+```bash
+cat >> .env <<EOF
+KONG_DIR=/Users/me/padas/gundi-kp-dynamic-routing
+PORTAL_DIR=/Users/me/padas/gundi-portal
+EOF
+```
+
+Bring up the portal explicitly when you want it:
+
+```bash
+docker compose --profile portal up -d portal
+# or set the env once for the whole shell:
+COMPOSE_PROFILES=portal ./dev.sh start
+```
+
+Without the profile, `https://portal.127.0.0.1.nip.io` will return 502 from
+Caddy — informative, not broken.
+
 The `kong-bootstrap` one-shot service runs after Kong + Keycloak are healthy
 and registers the `cdip-web` service, the `cdip-web-route` route, and the
 `oidc` plugin via Kong's Admin API. Idempotent — re-run with:

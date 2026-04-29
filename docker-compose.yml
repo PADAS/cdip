@@ -291,8 +291,16 @@ services:
       redis:
         condition: service_healthy
 
-  # Gundi Portal (React frontend)
+  # Gundi Portal (React frontend) — opt-in.
+  # Lives in a separate sibling repo (gundi-portal). Default-disabled so the
+  # stack still comes up cleanly when that repo isn't checked out next to this
+  # one. To enable, point PORTAL_DIR at your local clone (in .env or env) and
+  # opt into the profile:
+  #   COMPOSE_PROFILES=portal docker compose up -d portal
+  # or:
+  #   docker compose --profile portal up -d portal
   portal:
+    profiles: ["portal"]
     build:
       context: ${PORTAL_DIR:-../gundi-portal}
       dockerfile: Dockerfile
@@ -331,7 +339,9 @@ services:
       - keycloak
       - kong
       - web
-      - portal
+      # portal is opt-in via the "portal" profile — leaving it out of
+      # depends_on so caddy comes up regardless. The portal.* Caddy block
+      # will 502 until you start the portal explicitly.
     restart: unless-stopped
 
 volumes:
