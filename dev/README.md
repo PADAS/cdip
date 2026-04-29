@@ -12,10 +12,24 @@ in the request path; Django trusts what Kong forwards.
 
 ## First run
 
+The kong-oidc plugin needs a base64-encoded 32-byte session secret. Generate
+one and drop it in `.env` at the worktree root (already gitignored, never
+committed):
+
+```bash
+echo "OIDC_SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+```
+
+Then bring up the stack:
+
 ```bash
 ./dev.sh setup     # builds, migrates, seeds the dev superuser
 ./dev.sh start     # docker compose up -d
 ```
+
+If `OIDC_SESSION_SECRET` isn't set, the `kong-bootstrap` container exits
+immediately with a clear error (`OIDC_SESSION_SECRET is required (see
+dev/README.md)`) — that's the prompt to do the step above.
 
 ## Opt-in services
 
@@ -72,15 +86,16 @@ portal home logged in.
 | `../docker-compose.yml` (`keycloak`) | `KC_HOSTNAME_URL=https://keycloak.127.0.0.1.nip.io/auth` (browser-facing); `--import-realm` mounts the dev realm. |
 | `../docker-compose.yml` (`kong-bootstrap`) | One-shot init container, runs `bootstrap-kong.sh`. |
 | `bootstrap-kong.sh` | Idempotent — upserts service, route, and `oidc` plugin via Admin API. Uses a stable plugin id so PUT acts as upsert. |
-| `../keycloak/cdip-dev-realm.json` | Realm `cdip-dev` + clients (`cdip-kong-gateway` confidential, `cdip-admin-portal` legacy) + userinfo mapper for `username ← preferred_username` + test user `dev/dev`. |
+| `../keycloak/cdip-dev-realm.json` | Realm `cdip-dev` + clients (`cdip-kong-gateway` confidential for the kong-oidc plugin, `cdip-admin-portal` legacy Django client, `cdip-oauth2` public SPA client for the React portal) + userinfo mapper that adds a `username` claim sourced from the User's `username` property (matches what `SimpleUserInfoBackend` reads — Keycloak's default userinfo response only includes `preferred_username`) + test user `dev/dev`. |
 
 ## Gotchas (worth knowing before debugging)
 
 1. **`session_secret` must be base64-encoded 32 raw bytes.** kong-oidc uses
-   lua-resty-session which decodes it. The bootstrap script hardcodes a fixed
-   dev value (`D5+sOKjh/...=`) that contains `+`/`/`/`=` characters, so the
-   curls use **`--data-urlencode`** rather than `--data` — the latter would
-   form-encode `+` as space and corrupt the secret on Kong's side. Symptom:
+   lua-resty-session which decodes it. The bootstrap script reads
+   `OIDC_SESSION_SECRET` from the environment (sourced from `.env` via
+   compose) and passes it to Kong with **`--data-urlencode`** rather than
+   `--data` — the latter would form-encode `+`/`/`/`=` characters in the
+   base64 string and corrupt the secret on Kong's side. Symptom:
    `[oidc] Invalid plugin configuration, session secret could not be decoded`.
 
 2. **`KC_HOSTNAME_URL` is what makes the OIDC discovery doc advertise the
@@ -127,7 +142,11 @@ plugin config), the cheapest reset is:
 
 ```bash
 docker compose down keycloak keycloak-db
-docker volume rm dispatcher-deployments_keycloak_db_data   # forces realm re-import
+# Drop the keycloak DB volume so realm import re-runs on next boot.
+# Volume name is <project>_keycloak_db_data — project = the directory name
+# (or $COMPOSE_PROJECT_NAME if set), so we discover it by suffix instead of
+# hardcoding it.
+docker volume ls -q | grep '_keycloak_db_data$' | xargs -r docker volume rm
 docker compose up -d keycloak
 docker compose restart kong
 docker compose run --rm kong-bootstrap

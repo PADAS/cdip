@@ -82,13 +82,23 @@ COPY dependencies/requirements-dev.txt /workspace/requirements-dev.txt
 # Pin setuptools<71 to keep pkg_resources available for older packages like cryptography==2.9.2
 RUN python3.11 -m pip install -U "pip" "wheel" "setuptools<71"
 
-# Install Python dependencies
-# cryptography==2.9.2 in requirements.txt is incompatible with Python 3.11.
-# Remove it from requirements, install deps, then install a compatible cryptography.
-RUN sed -i '/^cryptography==/d' /workspace/requirements.txt /workspace/requirements-dev.txt && \
+# Install Python dependencies.
+#
+# cryptography==2.9.2 (pinned in the tracked requirements) is incompatible with
+# Python 3.11. To avoid this dev image, work around the pin without mutating
+# the tracked requirements files: copy them to /tmp, drop the cryptography
+# pin from the copies, install a 3.11-compatible cryptography first, then
+# install everything else from the temp files. /workspace keeps the original
+# pins so the image build doesn't disagree with what CI/prod read.
+#
+# This is a dev-only override; the right long-term fix is bumping
+# cryptography in the tracked requirements (out of scope for this PR).
+RUN cp /workspace/requirements.txt /tmp/requirements.txt && \
+    cp /workspace/requirements-dev.txt /tmp/requirements-dev.txt && \
+    sed -i '/^cryptography==/d' /tmp/requirements.txt /tmp/requirements-dev.txt && \
     python3.11 -m pip install "cryptography==42.0.8" --no-cache-dir && \
-    python3.11 -m pip install -r /workspace/requirements.txt --no-cache-dir && \
-    python3.11 -m pip install -r /workspace/requirements-dev.txt --no-cache-dir
+    python3.11 -m pip install -r /tmp/requirements.txt --no-cache-dir && \
+    python3.11 -m pip install -r /tmp/requirements-dev.txt --no-cache-dir
 
 # Set environment variables
 ENV LC_ALL=C.UTF-8

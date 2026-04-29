@@ -17,9 +17,10 @@ KEYCLOAK_DISCOVERY="${KEYCLOAK_DISCOVERY:-http://keycloak:8080/auth/realms/cdip-
 OIDC_CLIENT_ID="${OIDC_CLIENT_ID:-cdip-kong-gateway}"
 OIDC_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-dev-kong-oidc-secret}"
 # kong-oidc requires session_secret to be base64-encoded 32 raw bytes
-# (lua-resty-session decodes it). This is a fixed dev secret — never reused
-# anywhere with real auth value.
-OIDC_SESSION_SECRET="${OIDC_SESSION_SECRET:-D5+sOKjh/60/ysGpZoiGsyUSicdU8+UXQP3L1v2GiAA=}"
+# (lua-resty-session decodes it). Required from the environment — never
+# committed to the repo so secret-scanning hooks (detect-secrets / ggshield)
+# stay quiet. See dev/README.md for how to generate one and put it in .env.
+: "${OIDC_SESSION_SECRET:?OIDC_SESSION_SECRET is required (see dev/README.md)}"
 WEB_HOST="${WEB_HOST:-web.127.0.0.1.nip.io}"
 WEB_UPSTREAM_URL="${WEB_UPSTREAM_URL:-http://web:8888}"
 

@@ -181,7 +181,11 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
         print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
-        deployment.save()
+        # update_fields= is critical here and below: never .save() attempt_count /
+        # last_attempt_at, since the F() update at task entry is the only atomic
+        # writer of those columns. Saving them via this in-memory instance can
+        # clobber a concurrent task's increment.
+        deployment.save(update_fields=["status", "status_details"])
         return
     function_name = deployment.name or utils.get_default_dispatcher_name(integration=integration, gundi_version=gundi_version)
     if not deployment.configuration:  # Use default settings
@@ -194,7 +198,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
     topic = integration.additional.get("topic", utils.get_default_topic_name(integration=integration, gundi_version=gundi_version))
     topic_path = f'projects/{project_id}/topics/{topic}'
     deployment.topic_name = topic  # Save the topic for retries or deletions
-    deployment.save()
+    deployment.save(update_fields=["topic_name"])
 
     try:
         topic_created_this_run = create_topic(topic_path=topic_path)
@@ -216,7 +220,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
                     print(f"Error deleting function {function_name}: {e}")
                     deployment.status = DispatcherDeployment.Status.ERROR
                     deployment.status_details = f"Error deleting function {function_name}: {e}"
-                    deployment.save()
+                    deployment.save(update_fields=["status", "status_details"])
                     return
             function_response = create_or_update_function(
                 function_request=function_request,
@@ -235,7 +239,7 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
                     print(f"Error deleting Cloudrun service {function_name}: {e}")
                     deployment.status = DispatcherDeployment.Status.ERROR
                     deployment.status_details = f"Error deleting Cloudrun service {function_name}: {e}"
-                    deployment.save()
+                    deployment.save(update_fields=["status", "status_details"])
                     return
 
             service_response = create_or_update_cloud_run_service(
@@ -252,11 +256,11 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
             print(error_msg)
             deployment.status = DispatcherDeployment.Status.ERROR
             deployment.status_details = error_msg[:500]
-            deployment.save()
+            deployment.save(update_fields=["status", "status_details"])
             return
         print(f"Deploy complete.")
         deployment.status = DispatcherDeployment.Status.COMPLETE
-        deployment.save()
+        deployment.save(update_fields=["status"])
     except Exception as e:  # ToDo: Catch more specific errors like validation errors?
         error_msg = f"Error deploying dispatcher: {e}"
         print(error_msg)
@@ -267,7 +271,9 @@ def deploy_serverless_dispatcher(deployment_id, force_recreate=False, deployment
         # what fits in the 500-char status_details column.
         deployment.last_error = traceback.format_exc()
         deployment.failure_reason = failure_reason
-        deployment.save()
+        deployment.save(
+            update_fields=["status", "status_details", "last_error", "failure_reason"]
+        )
         _log_deployment_failure(
             integration=deployment.integration,
             error_msg=error_msg,

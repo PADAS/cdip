@@ -81,6 +81,28 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "protocol": "openid-connect"
+    },
+    {
+      "clientId": "cdip-oauth2",
+      "name": "CDIP React Portal",
+      "description": "Public SPA client used by the React portal (REACT_APP_OIDC_CLIENT_ID).",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://portal.127.0.0.1.nip.io/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "https://portal.127.0.0.1.nip.io",
+        "http://localhost:3000"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://portal.127.0.0.1.nip.io/*##http://localhost:3000/*"
+      }
     }
   ],
   "users": [

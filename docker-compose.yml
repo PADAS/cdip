@@ -179,6 +179,10 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    environment:
+      # Kong-oidc session_secret — required, base64 of 32 random bytes.
+      # Set in .env at the worktree root; never committed.
+      OIDC_SESSION_SECRET: ${OIDC_SESSION_SECRET}
     volumes:
       - ./dev/bootstrap-kong.sh:/bootstrap-kong.sh:ro
     entrypoint: ["sh", "/bootstrap-kong.sh"]
