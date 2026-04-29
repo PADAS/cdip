@@ -12,9 +12,14 @@ kong.127.0.0.1.nip.io {
     tls internal
 }
 
-# Django Web App
+# Django Web App — routed through Kong so the kong-oidc plugin terminates
+# auth and injects X-Userinfo, matching the prod ingress→kong→service flow.
+# Caddy retains TLS termination + the public hostname.
 web.127.0.0.1.nip.io {
-    reverse_proxy web:8888
+    reverse_proxy kong:8000 {
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Host {host}
+    }
     tls internal
 }
 
