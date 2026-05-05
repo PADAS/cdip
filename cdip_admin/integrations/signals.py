@@ -4,7 +4,8 @@ from django.db import transaction
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
-from .models.v2 import Integration, IntegrationAction, IntegrationConfiguration
+from .models.v2 import IntegrationAction, IntegrationConfiguration
+from .tasks import backfill_action_configurations_for_type
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +20,14 @@ def on_integration_config_delete(sender, **kwargs):
 @receiver(post_save, sender=IntegrationAction)
 def backfill_configurations_for_new_action(sender, instance, created, **kwargs):
     # When a new IntegrationAction is added to an IntegrationType, every existing
-    # Integration of that type is missing a configuration row for it. Backfill
-    # them so admins don't have to repair by hand.
+    # Integration of that type is missing a configuration row for it. Dispatch
+    # the backfill to a Celery worker so action creation isn't blocked by an
+    # O(integrations × actions) loop in the request thread.
     if not created:
         return
 
     integration_type_id = instance.integration_type_id
 
-    def _backfill():
-        integrations = Integration.objects.filter(type_id=integration_type_id)
-        for integration in integrations.iterator():
-            integration.create_missing_configurations()
-
-    transaction.on_commit(_backfill)
+    transaction.on_commit(
+        lambda: backfill_action_configurations_for_type.delay(str(integration_type_id))
+    )

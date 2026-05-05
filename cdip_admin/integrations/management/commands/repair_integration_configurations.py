@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from integrations.models import Integration, IntegrationType
 
@@ -21,6 +21,15 @@ class Command(BaseCommand):
             help="Repair all integrations of a given type (by slug value).",
         )
         parser.add_argument(
+            "--all",
+            action="store_true",
+            help=(
+                "Repair every integration in the database. Required to opt in "
+                "explicitly when neither --integration nor --integration-type is "
+                "given, since this mutates production data globally."
+            ),
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Report what would be created without writing.",
@@ -29,7 +38,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         integration_id = options.get("integration")
         integration_type_slug = options.get("integration_type")
+        repair_all = options.get("all", False)
         dry_run = options.get("dry_run", False)
+
+        if not (integration_id or integration_type_slug or repair_all):
+            raise CommandError(
+                "Refusing to run without a target. Pass --integration <uuid>, "
+                "--integration-type <slug>, or --all to repair every integration."
+            )
 
         qs = Integration.objects.all().select_related("type")
         if integration_id:

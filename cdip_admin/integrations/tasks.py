@@ -419,3 +419,20 @@ def calculate_integration_metrics_in_batches(batch_size=20):
     for i in range(0, len(integration_ids), batch_size):
         batch = integration_ids[i:i + batch_size]
         calculate_integration_metrics.delay(integration_ids=batch)
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={"max_retries": 3})
+def backfill_action_configurations_for_type(integration_type_id):
+    # Run by the post_save IntegrationAction signal so action creation
+    # doesn't block on the per-Integration repair loop. Idempotent —
+    # create_missing_configurations() uses get_or_create against the
+    # (integration, action) unique constraint.
+    Integration = apps.get_model("integrations", "Integration")
+    integrations = Integration.objects.filter(type_id=integration_type_id)
+    for integration in integrations.iterator():
+        try:
+            integration.create_missing_configurations()
+        except Exception as e:
+            logger.exception(
+                f"Error backfilling configurations for integration {integration.id}: {e}"
+            )

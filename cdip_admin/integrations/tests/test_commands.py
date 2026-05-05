@@ -1,6 +1,7 @@
 import json
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from integrations.models import IntegrationAction, IntegrationConfiguration
 
@@ -87,6 +88,24 @@ def test_repair_integration_configurations_is_idempotent(
     count_after_second = integration.configurations.count()
 
     assert count_after_first == count_after_second
+
+
+def test_repair_integration_configurations_refuses_without_selector():
+    with pytest.raises(CommandError, match="Refusing to run without a target"):
+        call_command("repair_integration_configurations")
+
+
+def test_repair_integration_configurations_with_all_flag(
+    er_destination_without_show_permissions_config, er_action_show_permissions,
+):
+    integration = er_destination_without_show_permissions_config
+    assert not integration.configurations.filter(action=er_action_show_permissions).exists()
+
+    call_command("repair_integration_configurations", "--all")
+
+    assert integration.configurations.filter(action=er_action_show_permissions).exists()
+
+
 def test_call_set_action_configs_command_with_integration_type(
     er_destination_without_show_permissions_config, er_action_show_permissions
 ):

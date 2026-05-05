@@ -366,12 +366,15 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     def create_missing_configurations(self):
         for action in self.type.actions.all():
-            if not self.configurations.filter(action=action).exists():
-                IntegrationConfiguration.objects.create(
-                    integration=self,
-                    action=action,
-                    data={}  # Empty configuration by default
-                )
+            # get_or_create is race-safe in combination with the unique
+            # constraint on (integration, action). Two concurrent backfills
+            # — e.g. the post_save signal and the repair management command
+            # firing at the same time — won't insert duplicate rows.
+            IntegrationConfiguration.objects.get_or_create(
+                integration=self,
+                action=action,
+                defaults={"data": {}},
+            )
 
     def _clean_detached_activity_log_references(self):
         from django.db import connection
@@ -430,6 +433,12 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
     class Meta:
         ordering = ("-updated_at", )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["integration", "action"],
+                name="unique_integration_action_configuration",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.data}"

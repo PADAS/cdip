@@ -8,14 +8,25 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def run_on_commit_immediately(mocker):
+def run_backfill_inline(mocker):
     # The post_save signal schedules backfill via transaction.on_commit, which
-    # does not fire inside django_db's nested transaction. Run it inline in tests.
+    # then dispatches to a Celery task. Tests don't run on_commit and don't
+    # have a worker, so:
+    #   1. Run on_commit callbacks immediately.
+    #   2. Make .delay() invoke the task body inline so we can assert on the
+    #      resulting database state.
+    from integrations.tasks import backfill_action_configurations_for_type
+
     mocker.patch("integrations.signals.transaction.on_commit", lambda fn: fn())
+    mocker.patch.object(
+        backfill_action_configurations_for_type,
+        "delay",
+        side_effect=backfill_action_configurations_for_type,
+    )
 
 
 def test_new_action_backfills_existing_integrations(
-    run_on_commit_immediately, er_destination_without_show_permissions_config, integration_type_er,
+    run_backfill_inline, er_destination_without_show_permissions_config, integration_type_er,
 ):
     integration = er_destination_without_show_permissions_config
     config_count_before = integration.configurations.count()
@@ -36,7 +47,7 @@ def test_new_action_backfills_existing_integrations(
 
 
 def test_new_periodic_action_creates_periodic_task(
-    run_on_commit_immediately, er_destination_without_show_permissions_config, integration_type_er,
+    run_backfill_inline, er_destination_without_show_permissions_config, integration_type_er,
 ):
     integration = er_destination_without_show_permissions_config
 
@@ -56,7 +67,7 @@ def test_new_periodic_action_creates_periodic_task(
 
 
 def test_updating_existing_action_does_not_recreate_configs(
-    run_on_commit_immediately, er_destination_without_show_permissions_config,
+    run_backfill_inline, er_destination_without_show_permissions_config,
     er_action_push_positions,
 ):
     integration = er_destination_without_show_permissions_config
@@ -69,7 +80,7 @@ def test_updating_existing_action_does_not_recreate_configs(
 
 
 def test_new_action_does_not_duplicate_existing_configs(
-    run_on_commit_immediately, er_destination_without_show_permissions_config,
+    run_backfill_inline, er_destination_without_show_permissions_config,
     integration_type_er, er_action_push_positions,
 ):
     integration = er_destination_without_show_permissions_config
@@ -88,3 +99,23 @@ def test_new_action_does_not_duplicate_existing_configs(
         action=er_action_push_positions,
     ).count()
     assert push_positions_configs_before == push_positions_configs_after
+
+
+def test_signal_dispatches_async_does_not_block(
+    mocker, er_destination_without_show_permissions_config, integration_type_er,
+):
+    # Without the on_commit + .delay() mocks, the task should be enqueued
+    # rather than run inline. We verify the signal calls .delay() exactly once.
+    mocker.patch("integrations.signals.transaction.on_commit", lambda fn: fn())
+    mock_delay = mocker.patch(
+        "integrations.signals.backfill_action_configurations_for_type.delay"
+    )
+
+    IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.GENERIC,
+        name="Async Dispatch Action",
+        value="async_dispatch_action",
+    )
+
+    mock_delay.assert_called_once_with(str(integration_type_er.id))
