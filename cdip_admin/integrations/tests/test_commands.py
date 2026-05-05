@@ -111,6 +111,24 @@ def test_repair_integration_configurations_unknown_type_raises():
         )
 
 
+def test_repair_integration_configurations_rejects_combined_selectors():
+    with pytest.raises(CommandError, match="exactly one of"):
+        call_command(
+            "repair_integration_configurations",
+            "--integration", "00000000-0000-0000-0000-000000000000",
+            "--integration-type", "earth_ranger",
+        )
+
+
+def test_repair_integration_configurations_rejects_all_with_other_selector():
+    with pytest.raises(CommandError, match="exactly one of"):
+        call_command(
+            "repair_integration_configurations",
+            "--all",
+            "--integration-type", "earth_ranger",
+        )
+
+
 def test_repair_integration_configurations_with_all_flag(
     er_destination_without_show_permissions_config, er_action_show_permissions,
 ):

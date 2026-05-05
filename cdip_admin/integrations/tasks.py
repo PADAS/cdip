@@ -429,7 +429,13 @@ def backfill_action_configurations_for_type(integration_type_id):
     # (integration, action) unique constraint, so a whole-task retry
     # after a transient error reprocesses already-handled integrations
     # safely. Errors propagate so Celery's autoretry_for fires.
+    IntegrationType = apps.get_model("integrations", "IntegrationType")
     Integration = apps.get_model("integrations", "Integration")
-    integrations = Integration.objects.filter(type_id=integration_type_id)
-    for integration in integrations.iterator():
-        integration.create_missing_configurations()
+    integration_type = IntegrationType.objects.filter(id=integration_type_id).first()
+    if integration_type is None:
+        return
+    # Fetch the action list once — every integration in this loop shares the
+    # same type, so re-querying actions per integration is wasted work.
+    actions = list(integration_type.actions.all())
+    for integration in Integration.objects.filter(type_id=integration_type_id).iterator():
+        integration.create_missing_configurations(actions=actions)

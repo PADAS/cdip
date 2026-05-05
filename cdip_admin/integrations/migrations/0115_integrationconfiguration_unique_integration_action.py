@@ -39,12 +39,33 @@ def dedupe_integration_configurations(apps, schema_editor):
             )
 
         winner = max(rows, key=winner_score)
+
+        # If the winner has no PeriodicTask but a loser does, that's the only
+        # live schedule for this (integration, action) pair — move it onto the
+        # winner before the delete loop runs, so we don't drop a periodic
+        # action's scheduler. The OneToOne constraint requires we null the
+        # donor's FK first.
+        if not winner.periodic_task_id:
+            donor = next(
+                (r for r in rows if r.pk != winner.pk and r.periodic_task_id),
+                None,
+            )
+            if donor:
+                task_id = donor.periodic_task_id
+                donor.periodic_task_id = None
+                donor.save(update_fields=["periodic_task"])
+                winner.periodic_task_id = task_id
+                winner.save(update_fields=["periodic_task"])
+
         for row in rows:
             if row.pk == winner.pk:
                 continue
+            row.refresh_from_db()
             if row.periodic_task_id:
                 # pre_delete on the historical IntegrationConfiguration is not
-                # wired up, so clean its PeriodicTask explicitly.
+                # wired up, so clean its PeriodicTask explicitly. Any loser
+                # task remaining here is a stale duplicate (the winner already
+                # took its preferred schedule above).
                 PeriodicTask.objects.filter(pk=row.periodic_task_id).delete()
             row.delete()
 

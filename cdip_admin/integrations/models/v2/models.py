@@ -364,8 +364,13 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def has_push_data_support(self):
         return self.type.actions.filter(type=IntegrationAction.ActionTypes.PUSH_DATA).exists()
 
-    def create_missing_configurations(self):
-        for action in self.type.actions.all():
+    def create_missing_configurations(self, actions=None):
+        # Pass `actions` to skip the per-call type.actions query when a caller
+        # is iterating many integrations of the same type (Celery backfill
+        # task, repair management command).
+        if actions is None:
+            actions = self.type.actions.all()
+        for action in actions:
             # get_or_create is race-safe in combination with the unique
             # constraint on (integration, action). Two concurrent backfills
             # — e.g. the post_save signal and the repair management command

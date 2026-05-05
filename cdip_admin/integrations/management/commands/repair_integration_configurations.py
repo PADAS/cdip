@@ -41,10 +41,19 @@ class Command(BaseCommand):
         repair_all = options.get("all", False)
         dry_run = options.get("dry_run", False)
 
-        if not (integration_id or integration_type_slug or repair_all):
+        selector_count = sum(
+            1 for sel in (integration_id, integration_type_slug, repair_all) if sel
+        )
+        if selector_count == 0:
             raise CommandError(
                 "Refusing to run without a target. Pass --integration <uuid>, "
                 "--integration-type <slug>, or --all to repair every integration."
+            )
+        if selector_count > 1:
+            raise CommandError(
+                "Pass exactly one of --integration, --integration-type, or --all. "
+                "Combining selectors is rejected so a mistyped flag can't silently "
+                "mutate a different scope than intended."
             )
 
         qs = Integration.objects.all().select_related("type")
@@ -61,17 +70,22 @@ class Command(BaseCommand):
                 )
             qs = qs.filter(type=integration_type)
 
+        # Cache actions per type so iterating across many integrations of the
+        # same type doesn't re-query the action set every time. The
+        # configurations query is per-integration by necessity (each row is
+        # unique to that integration), but type.actions is shared.
+        actions_by_type = {}
         total_created = 0
         integrations_touched = 0
         for integration in qs.iterator():
+            if integration.type_id not in actions_by_type:
+                actions_by_type[integration.type_id] = list(integration.type.actions.all())
+            actions = actions_by_type[integration.type_id]
+
             existing_action_ids = set(
                 integration.configurations.values_list("action_id", flat=True)
             )
-            missing = [
-                action
-                for action in integration.type.actions.all()
-                if action.id not in existing_action_ids
-            ]
+            missing = [a for a in actions if a.id not in existing_action_ids]
             if not missing:
                 continue
             integrations_touched += 1
@@ -80,7 +94,7 @@ class Command(BaseCommand):
                 f"{[a.value for a in missing]}"
             )
             if not dry_run:
-                integration.create_missing_configurations()
+                integration.create_missing_configurations(actions=actions)
             total_created += len(missing)
 
         verb = "Would create" if dry_run else "Created"
