@@ -51,14 +51,14 @@ class Command(BaseCommand):
         if integration_id:
             qs = qs.filter(id=integration_id)
             if not qs.exists():
-                self.stderr.write(f"Integration '{integration_id}' not found.")
-                return
+                raise CommandError(f"Integration '{integration_id}' not found.")
         elif integration_type_slug:
             try:
                 integration_type = IntegrationType.objects.get(value=integration_type_slug)
             except IntegrationType.DoesNotExist:
-                self.stderr.write(f"Integration type '{integration_type_slug}' not found.")
-                return
+                raise CommandError(
+                    f"Integration type '{integration_type_slug}' not found."
+                )
             qs = qs.filter(type=integration_type)
 
         total_created = 0

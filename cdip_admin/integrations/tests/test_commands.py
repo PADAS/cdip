@@ -95,6 +95,22 @@ def test_repair_integration_configurations_refuses_without_selector():
         call_command("repair_integration_configurations")
 
 
+def test_repair_integration_configurations_unknown_integration_raises():
+    with pytest.raises(CommandError, match="not found"):
+        call_command(
+            "repair_integration_configurations",
+            "--integration", "00000000-0000-0000-0000-000000000000",
+        )
+
+
+def test_repair_integration_configurations_unknown_type_raises():
+    with pytest.raises(CommandError, match="not found"):
+        call_command(
+            "repair_integration_configurations",
+            "--integration-type", "definitely-not-a-real-type",
+        )
+
+
 def test_repair_integration_configurations_with_all_flag(
     er_destination_without_show_permissions_config, er_action_show_permissions,
 ):
