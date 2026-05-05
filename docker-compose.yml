@@ -266,6 +266,51 @@ services:
       redis:
         condition: service_healthy
 
+  # Pytest runner — opt-in via the "test" profile so it never starts on `up`.
+  # Reuses the dev image (which installs requirements-dev.txt) and the same
+  # postgres service. Django creates a separate `test_cdip_portaldb` for tests
+  # so the dev DB is untouched. pytest.ini's `--reuse-db` keeps subsequent
+  # runs fast.
+  #
+  # Usage:
+  #   docker compose run --rm pytest                                       # full suite
+  #   docker compose run --rm pytest integrations/tests/test_signals.py -v
+  #   docker compose run --rm pytest -k test_repair
+  pytest:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: cdip-pytest
+    entrypoint: ["pytest"]
+    volumes:
+      - ./cdip_admin:/var/www/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "local-dev-secret-key-change-in-production"
+      DB_NAME: cdip_portaldb
+      DB_USER: cdip_dbuser
+      DB_PASSWORD: cdip_dbpassword
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      KEYCLOAK_SERVER: "http://keycloak:8080"
+      KEYCLOAK_REALM: "cdip-dev"
+      KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
+      KEYCLOAK_CLIENT_SECRET: "local-dev-secret"
+      KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
+      KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
+      GCP_ENVIRONMENT_ENABLED: "False"
+      TRACING_ENABLED: "False"
+      PUBSUB_ENABLED: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # Celery Beat (Scheduler)
   celery-beat:
     build:
