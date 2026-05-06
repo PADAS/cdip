@@ -9,15 +9,15 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def run_backfill_inline(mocker):
-    # The post_save signal schedules backfill via transaction.on_commit, which
-    # then dispatches to a Celery task. Tests don't run on_commit and don't
-    # have a worker, so:
+    # IntegrationAction._post_save schedules backfill via transaction.on_commit,
+    # which then dispatches to a Celery task. Tests don't run on_commit and
+    # don't have a worker, so:
     #   1. Run on_commit callbacks immediately.
     #   2. Make .delay() invoke the task body inline so we can assert on the
     #      resulting database state.
     from integrations.tasks import backfill_action_configurations_for_type
 
-    mocker.patch("integrations.signals.transaction.on_commit", lambda fn: fn())
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
     mocker.patch.object(
         backfill_action_configurations_for_type,
         "delay",
@@ -101,14 +101,14 @@ def test_new_action_does_not_duplicate_existing_configs(
     assert push_positions_configs_before == push_positions_configs_after
 
 
-def test_signal_dispatches_async_does_not_block(
+def test_post_save_dispatches_async_does_not_block(
     mocker, er_destination_without_show_permissions_config, integration_type_er,
 ):
     # Without the on_commit + .delay() mocks, the task should be enqueued
-    # rather than run inline. We verify the signal calls .delay() exactly once.
-    mocker.patch("integrations.signals.transaction.on_commit", lambda fn: fn())
+    # rather than run inline. We verify _post_save calls .delay() exactly once.
+    mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
     mock_delay = mocker.patch(
-        "integrations.signals.backfill_action_configurations_for_type.delay"
+        "integrations.models.v2.models.backfill_action_configurations_for_type.delay"
     )
 
     IntegrationAction.objects.create(
