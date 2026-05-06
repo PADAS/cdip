@@ -21,7 +21,8 @@ from model_utils import FieldTracker
 from integrations.tasks import (
     update_mb_permissions_for_group,
     recreate_and_send_movebank_permissions_csv_file,
-    calculate_integration_statuses
+    calculate_integration_statuses,
+    backfill_action_configurations_for_type,
 )
 from deployments.models import DispatcherDeployment
 from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
@@ -98,6 +99,8 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         null=True
     )
 
+    tracker = FieldTracker()
+
     class Meta:
         ordering = ("name",)
 
@@ -133,6 +136,29 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         )
         response.raise_for_status()
         return response.json()
+
+    def _pre_save(self, *args, **kwargs):
+        pass
+
+    def _post_save(self, *args, **kwargs):
+        # When a new IntegrationAction is added to an IntegrationType, every
+        # existing Integration of that type is missing a configuration row for
+        # it. Dispatch the backfill to a Celery worker so action creation isn't
+        # blocked by an O(integrations × actions) loop in the request thread.
+        if not kwargs.get("created"):
+            return
+        integration_type_id = str(self.integration_type_id)
+        transaction.on_commit(
+            lambda: backfill_action_configurations_for_type.delay(integration_type_id)
+        )
+
+    def save(self, *args, **kwargs):
+        with self.tracker:
+            self._pre_save(self, *args, **kwargs)
+            created = self._state.adding
+            super().save(*args, **kwargs)
+            kwargs["created"] = created
+            self._post_save(self, *args, **kwargs)
 
 
 class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
@@ -364,14 +390,22 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def has_push_data_support(self):
         return self.type.actions.filter(type=IntegrationAction.ActionTypes.PUSH_DATA).exists()
 
-    def create_missing_configurations(self):
-        for action in self.type.actions.all():
-            if not self.configurations.filter(action=action).exists():
-                IntegrationConfiguration.objects.create(
-                    integration=self,
-                    action=action,
-                    data={}  # Empty configuration by default
-                )
+    def create_missing_configurations(self, actions=None):
+        # Pass `actions` to skip the per-call type.actions query when a caller
+        # is iterating many integrations of the same type (Celery backfill
+        # task, repair management command).
+        if actions is None:
+            actions = self.type.actions.all()
+        for action in actions:
+            # get_or_create is race-safe in combination with the unique
+            # constraint on (integration, action). Two concurrent backfills
+            # — e.g. the post_save signal and the repair management command
+            # firing at the same time — won't insert duplicate rows.
+            IntegrationConfiguration.objects.get_or_create(
+                integration=self,
+                action=action,
+                defaults={"data": {}},
+            )
 
     def _clean_detached_activity_log_references(self):
         from django.db import connection
@@ -430,6 +464,12 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
 
     class Meta:
         ordering = ("-updated_at", )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["integration", "action"],
+                name="unique_integration_action_configuration",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.data}"

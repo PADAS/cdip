@@ -419,3 +419,34 @@ def calculate_integration_metrics_in_batches(batch_size=20):
     for i in range(0, len(integration_ids), batch_size):
         batch = integration_ids[i:i + batch_size]
         calculate_integration_metrics.delay(integration_ids=batch)
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={"max_retries": 3})
+def backfill_action_configurations_for_type(integration_type_id):
+    # Run by IntegrationAction._post_save so action creation doesn't block on
+    # the per-Integration repair loop. Idempotent — create_missing_configurations()
+    # uses get_or_create against the (integration, action) unique constraint, so
+    # a whole-task retry after a transient error reprocesses already-handled
+    # integrations safely. Errors propagate so Celery's autoretry_for fires.
+    IntegrationType = apps.get_model("integrations", "IntegrationType")
+    Integration = apps.get_model("integrations", "Integration")
+    integration_type = IntegrationType.objects.filter(id=integration_type_id).first()
+    if integration_type is None:
+        # Most likely the type was deleted between the action's save committing
+        # and the worker picking up this task. Surface the skip so operators
+        # can correlate "no configs were created" with this log line.
+        logger.warning(
+            "backfill_action_configurations_for_type: IntegrationType %s no longer "
+            "exists; skipping backfill.",
+            integration_type_id,
+        )
+        return
+    # Fetch the action list once — every integration in this loop shares the
+    # same type, so re-querying actions per integration is wasted work.
+    actions = list(integration_type.actions.all())
+    logger.info(
+        "Backfilling configurations for IntegrationType %s (value=%s, actions=%d)",
+        integration_type_id, integration_type.value, len(actions),
+    )
+    for integration in Integration.objects.filter(type_id=integration_type_id).iterator():
+        integration.create_missing_configurations(actions=actions)
