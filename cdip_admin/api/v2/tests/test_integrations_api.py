@@ -1499,6 +1499,34 @@ def test_update_or_create_integration_config_as_org_admin(
     )
 
 
+def test_patch_integration_config_with_portal_payload_shape(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # The portal omits `integration` from each configuration item (it is
+    # implied by the URL). Regression test for the UniqueTogetherValidator
+    # auto-generated from the model's UniqueConstraint(integration, action)
+    # rejecting the request with `{"integration": ["This field is required."]}`.
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "id": str(lotek_auth_config.id),
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "user@lotek.com", "password": "NewPassword"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    lotek_auth_config.refresh_from_db()
+    assert lotek_auth_config.data == {"username": "user@lotek.com", "password": "NewPassword"}
+
+
 def _test_get_integration_api_key(
         api_client, user, integration
 ):

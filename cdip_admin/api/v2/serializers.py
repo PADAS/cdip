@@ -487,6 +487,14 @@ class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer
     class Meta:
         model = IntegrationConfiguration
         fields = ["id", "integration", "action", "data"]
+        # The model's UniqueConstraint(fields=["integration", "action"]) makes
+        # DRF auto-generate a UniqueTogetherValidator, which enforces both
+        # fields as required regardless of the explicit required=False above.
+        # The parent IntegrationCreateUpdateSerializer injects `integration`
+        # from the URL after validation, and `update_or_create(id=...)`
+        # plus the DB-level UniqueConstraint enforce uniqueness, so the
+        # serializer-level check is redundant.
+        validators = []
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
