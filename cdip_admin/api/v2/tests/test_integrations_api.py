@@ -1499,6 +1499,80 @@ def test_update_or_create_integration_config_as_org_admin(
     )
 
 
+def test_patch_integration_config_with_portal_payload_shape(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # The portal omits `integration` from each configuration item (it is
+    # implied by the URL). Regression test for the UniqueTogetherValidator
+    # auto-generated from the model's UniqueConstraint(integration, action)
+    # rejecting the request with `{"integration": ["This field is required."]}`.
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "id": str(lotek_auth_config.id),
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "user@lotek.com", "password": "NewPassword"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    lotek_auth_config.refresh_from_db()
+    assert lotek_auth_config.data == {"username": "user@lotek.com", "password": "NewPassword"}
+
+
+def test_patch_integration_config_rejects_new_item_for_existing_action(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # A PATCH that adds a new (no-id) configuration for an action that
+    # already has a config would otherwise hit the (integration, action)
+    # DB UniqueConstraint mid-update and surface as a 500. Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "x", "password": "y"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "already exists" in str(response.json())
+
+
+def test_patch_integration_config_rejects_duplicate_actions_in_payload(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_list_devices,
+):
+    # Two items targeting the same action in one request would silently
+    # last-write-wins (in the natural-key sense) or hit IntegrityError.
+    # Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "1"}},
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "2"}},
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Duplicate" in str(response.json())
+
+
 def _test_get_integration_api_key(
         api_client, user, integration
 ):
