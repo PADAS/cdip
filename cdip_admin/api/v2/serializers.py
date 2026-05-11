@@ -525,6 +525,7 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
+        seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
                 action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
@@ -532,6 +533,24 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 if "action" not in configuration:
                     raise drf_exceptions.ValidationError("The action id is required.")
                 action = configuration["action"]
+                # On PATCH, a new (no-id) item for an action that already
+                # has a configuration would collide with the (integration,
+                # action) UniqueConstraint at the DB layer and surface as
+                # a 500. Surface it as a friendly 400 here. The validator-
+                # level UniqueTogetherValidator that would normally catch
+                # this is disabled in IntegrationConfigurationCreateUpdate
+                # Serializer.Meta because it incorrectly required the
+                # `integration` field that the URL implies.
+                if self.instance and self.instance.configurations.filter(action=action).exists():
+                    raise drf_exceptions.ValidationError(
+                        f"A configuration for action '{action.value}' already exists on this "
+                        f"integration. Include 'id' in the payload to update it."
+                    )
+            if action.id in seen_action_ids:
+                raise drf_exceptions.ValidationError(
+                    f"Duplicate configurations for action '{action.value}' in the request."
+                )
+            seen_action_ids.add(action.id)
             configuration_schema = action.schema
             if configuration_schema and not configuration:  # Blank or None
                 raise drf_exceptions.ValidationError("The configuration can't be null or empty")

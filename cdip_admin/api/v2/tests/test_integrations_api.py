@@ -1527,6 +1527,52 @@ def test_patch_integration_config_with_portal_payload_shape(
     assert lotek_auth_config.data == {"username": "user@lotek.com", "password": "NewPassword"}
 
 
+def test_patch_integration_config_rejects_new_item_for_existing_action(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # A PATCH that adds a new (no-id) configuration for an action that
+    # already has a config would otherwise hit the (integration, action)
+    # DB UniqueConstraint mid-update and surface as a 500. Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "x", "password": "y"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "already exists" in str(response.json())
+
+
+def test_patch_integration_config_rejects_duplicate_actions_in_payload(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_list_devices,
+):
+    # Two items targeting the same action in one request would silently
+    # last-write-wins (in the natural-key sense) or hit IntegrityError.
+    # Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "1"}},
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "2"}},
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Duplicate" in str(response.json())
+
+
 def _test_get_integration_api_key(
         api_client, user, integration
 ):
