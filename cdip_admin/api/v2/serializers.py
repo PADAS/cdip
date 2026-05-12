@@ -528,7 +528,17 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
-                action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
+                # Scope the lookup to this integration's configurations so
+                # an id from a different integration doesn't get repointed
+                # (and a missing id surfaces as a 400, not a 500 from
+                # DoesNotExist).
+                try:
+                    existing_config = self.instance.configurations.get(id=configuration["id"])
+                except IntegrationConfiguration.DoesNotExist:
+                    raise drf_exceptions.ValidationError(
+                        f"Configuration '{configuration['id']}' was not found on this integration."
+                    )
+                action = existing_config.action
             else:  # Create a new integration or new config
                 if "action" not in configuration:
                     raise drf_exceptions.ValidationError("The action id is required.")
@@ -597,6 +607,14 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         # Update or Create nested configurations if provided
         for config_data in configurations:  # Usually less than 5-10 configs
             config_data["integration"] = self.instance
+            if config_data.get("id"):
+                # When updating by id, the row's `action` is immutable —
+                # repointing it would (a) collide with the (integration,
+                # action) UniqueConstraint, and (b) bypass the schema
+                # validation in validate() which keyed off the existing
+                # action. The portal sometimes echoes `action` back for
+                # client convenience; ignore it on id-updates.
+                config_data.pop("action", None)
             IntegrationConfiguration.objects.update_or_create(
                 id=config_data.get("id"),
                 defaults=config_data
