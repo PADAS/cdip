@@ -30,8 +30,11 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
+    # Disabled: gundi-dev migrated to ArgoCD via DASOPS-1995.
+    # Image bumps for dev now go through a values commit in
+    # PADAS/serca-argocd-apps:gundi/admin-portal/values-gundi-dev.yaml.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v7
-    if: startsWith(github.ref, 'refs/heads/main')
+    if: false
     needs: [vars, build]
     with:
       environment: dev
