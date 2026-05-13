@@ -14,12 +14,14 @@ jobs:
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
       repository: ${{ steps.vars.outputs.repository }}
+      serca_repository: ${{ steps.vars.outputs.serca_repository }}
     steps:
       - uses: actions/checkout@v4
       - id: vars
         run: |
           echo "tag=${{ github.head_ref || github.ref_name }}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
+          echo "serca_repository=europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
     uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v7
@@ -29,17 +31,25 @@ jobs:
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
+  build_serca:
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v9
+    needs: vars
+    with:
+      workload_identity_provider: "projects/563316706574/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+      repository: ${{ needs.vars.outputs.serca_repository }}
+      tag: ${{ needs.vars.outputs.tag }}
+
   deploy_dev:
     # gundi-dev is reconciled by ArgoCD. This job bumps the image tag in
     # PADAS/serca-argocd-apps:gundi/admin-portal/values-gundi-dev.yaml and lets
     # ArgoCD's automated selfHeal pick up the change.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
     if: startsWith(github.ref, 'refs/heads/main')
-    needs: [vars, build]
+    needs: [vars, build_serca]
     with:
       app-name: admin-portal
       environment: gundi-dev
-      image-repository: ${{ needs.vars.outputs.repository }}
+      image-repository: ${{ needs.vars.outputs.serca_repository }}
       image-tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit
 
