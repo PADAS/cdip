@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM europe-west3-docker.pkg.dev/serca-artifact-registry/virtual-docker/ubuntu:22.04
 MAINTAINER chrisdo@vulcan.com
 
 # Install basic tools first
