@@ -523,6 +523,8 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
 
 @admin.register(GundiTrace)
 class GundiTraceAdmin(SimpleHistoryAdmin):
+    show_full_result_count = False
+    list_select_related = True
     list_display = (
         "pk",
         "object_id",

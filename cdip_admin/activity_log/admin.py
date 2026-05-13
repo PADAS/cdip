@@ -12,6 +12,8 @@ revert_selected.short_description = "Revert selected"
 
 @admin.register(ActivityLog)
 class ActivityLogAdmin(admin.ModelAdmin):
+    show_full_result_count = False
+    list_select_related = True
     list_display = (
         "created_at",
         "log_level",
