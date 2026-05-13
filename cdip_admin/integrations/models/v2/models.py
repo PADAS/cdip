@@ -24,8 +24,7 @@ from integrations.tasks import (
     calculate_integration_statuses,
     backfill_action_configurations_for_type,
 )
-from deployments.models import DispatcherDeployment
-from deployments.utils import get_dispatcher_defaults_from_gcp_secrets, get_default_dispatcher_name
+from deployments.utils import create_dispatcher_for_integration
 from activity_log.mixins import ChangeLogMixin
 
 
@@ -279,19 +278,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             if settings.GCP_ENVIRONMENT_ENABLED and any(
                     [self.is_er_site, self.is_smart_site, self.is_wpswatch_site, self.is_traptagger_site]
             ):
-                if self.is_smart_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
-                elif self.is_wpswatch_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
-                elif self.is_traptagger_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
-                else:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
-                DispatcherDeployment.objects.create(
-                    name=get_default_dispatcher_name(integration=self),
-                    integration=self,
-                    configuration=get_dispatcher_defaults_from_gcp_secrets(secret_id=secret_id)
-                )
+                create_dispatcher_for_integration(self)
 
             # Create default healthcheck settings and status
             IntegrationStatus.objects.get_or_create(integration=self)

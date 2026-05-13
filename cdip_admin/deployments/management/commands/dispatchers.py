@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.conf import settings
 from deployments.models import DispatcherDeployment
 from deployments.utils import (
+    create_dispatcher_for_integration,
     get_dispatcher_defaults_from_gcp_secrets,
     get_default_dispatcher_name,
 )
@@ -208,16 +209,16 @@ class Command(BaseCommand):
                 self.stdout.write(f"Deploying dispatcher for {integration.name}...")
 
                 # Create the topic and the dispatcher
-                if integration.is_smart_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
-                elif integration.is_wpswatch_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
-                elif integration.is_traptagger_site:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
-                else:
-                    secret_id = settings.DISPATCHER_DEFAULTS_SECRET
                 if isinstance(integration, OutboundIntegrationConfiguration):
                     version = "v1"
+                    if integration.is_smart_site:
+                        secret_id = settings.DISPATCHER_DEFAULTS_SECRET_SMART
+                    elif integration.is_wpswatch_site:
+                        secret_id = settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+                    elif integration.is_traptagger_site:
+                        secret_id = settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
+                    else:
+                        secret_id = settings.DISPATCHER_DEFAULTS_SECRET
                     with transaction.atomic():  # Update the integration and create the dispatcher, both or none
                         topic_name = get_dispatcher_topic_default_name(
                             integration=integration, gundi_version=version
@@ -245,15 +246,7 @@ class Command(BaseCommand):
                             {"topic": topic_name, "broker": "gcp_pubsub"}
                         )
                         integration.save()
-                        DispatcherDeployment.objects.create(
-                            name=get_default_dispatcher_name(
-                                integration=integration, gundi_version=version
-                            ),
-                            integration=integration,
-                            configuration=get_dispatcher_defaults_from_gcp_secrets(
-                                secret_id=secret_id
-                            ),
-                        )
+                        create_dispatcher_for_integration(integration)
                 else:
                     self.stdout.write(
                         f"Unknown integration type: {integration}. Skipped"

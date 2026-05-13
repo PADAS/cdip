@@ -245,8 +245,11 @@ def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAU
 
 def get_default_dispatcher_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
-    base_url = urlparse(str(integration_url).lower())
-    subdomain = base_url.netloc.split(".")[0][:8]
+    parsed = urlparse(str(integration_url).lower())
+    # urlparse only populates netloc when the URL has a scheme; fall back to
+    # path so bare hostnames (e.g. "foo.example.org") still yield a subdomain.
+    host = parsed.netloc or parsed.path
+    subdomain = host.split(".")[0][:8] or "int"
     integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
     integration_type = integration_type_id.replace("_", "").lower().strip()[:5]
     integration_id = str(integration.id)
@@ -255,9 +258,38 @@ def get_default_dispatcher_name(integration, gundi_version="v2"):
 
 def get_default_topic_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
-    base_url = urlparse(str(integration_url).lower())
-    subdomain = base_url.netloc.split(".")[0]
+    parsed = urlparse(str(integration_url).lower())
+    host = parsed.netloc or parsed.path
+    subdomain = host.split(".")[0] or "int"
     integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
     integration_type = integration_type_id.replace("_", "").lower().strip()[:8]
     unique_suffix = generate_short_id_milliseconds()
     return "-".join([subdomain, integration_type, unique_suffix, "topic"])[:255]
+
+
+def _dispatcher_secret_id_for(integration):
+    if integration.is_smart_site:
+        return settings.DISPATCHER_DEFAULTS_SECRET_SMART
+    if integration.is_wpswatch_site:
+        return settings.DISPATCHER_DEFAULTS_SECRET_WPSWATCH
+    if integration.is_traptagger_site:
+        return settings.DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER
+    return settings.DISPATCHER_DEFAULTS_SECRET
+
+
+def create_dispatcher_for_integration(integration):
+    """Create a DispatcherDeployment for a v2 Integration.
+
+    Saving the row fires deploy_serverless_dispatcher.delay() via the
+    DispatcherDeployment._post_save hook, so no explicit task call is needed.
+    """
+    # Local import to avoid a circular import (models -> tasks -> utils).
+    from deployments.models import DispatcherDeployment
+
+    return DispatcherDeployment.objects.create(
+        name=get_default_dispatcher_name(integration=integration),
+        integration=integration,
+        configuration=get_dispatcher_defaults_from_gcp_secrets(
+            secret_id=_dispatcher_secret_id_for(integration)
+        ),
+    )
