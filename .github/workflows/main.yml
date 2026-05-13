@@ -14,29 +14,19 @@ jobs:
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
       repository: ${{ steps.vars.outputs.repository }}
-      serca_repository: ${{ steps.vars.outputs.serca_repository }}
     steps:
       - uses: actions/checkout@v4
       - id: vars
         run: |
           echo "tag=${{ github.head_ref || github.ref_name }}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "repository=us-central1-docker.pkg.dev/cdip-78ca/gundi/admin-portal" >> $GITHUB_OUTPUT
-          echo "serca_repository=europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/admin-portal" >> $GITHUB_OUTPUT
+          echo "repository=europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
-    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v7
-    needs: vars
-    with:
-      environment: stage
-      repository: ${{ needs.vars.outputs.repository }}
-      tag: ${{ needs.vars.outputs.tag }}
-
-  build_serca:
     uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v11
     needs: vars
     with:
-      workload_identity_provider: "projects/563316706574/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
-      repository: ${{ needs.vars.outputs.serca_repository }}
+      workload_identity_provider: "projects/563316706574/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"  # pragma: allowlist secret
+      repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
       build-args: BASE_REGISTRY=europe-west3-docker.pkg.dev/serca-artifact-registry/virtual-docker/
 
@@ -46,11 +36,11 @@ jobs:
     # ArgoCD's automated selfHeal pick up the change.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
     if: startsWith(github.ref, 'refs/heads/main')
-    needs: [vars, build_serca]
+    needs: [vars, build]
     with:
       app-name: admin-portal
       environment: gundi-dev
-      image-repository: ${{ needs.vars.outputs.serca_repository }}
+      image-repository: ${{ needs.vars.outputs.repository }}
       image-tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit
 
@@ -75,7 +65,7 @@ jobs:
     needs: [vars, build]
     strategy:
       matrix:
-        deployment: 
+        deployment:
           - cdip-portal
           - celery-beat
           - celery-deployments-worker
@@ -110,7 +100,7 @@ jobs:
     needs: [vars, build, deploy_stage]
     strategy:
       matrix:
-        deployment: 
+        deployment:
           - cdip-portal
           - celery-beat
           - celery-deployments-worker
