@@ -243,13 +243,33 @@ def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAU
     return json.loads(response.payload.data.decode('UTF-8'))
 
 
+def _leading_subdomain(host, max_len=None):
+    """Extract a GCP-valid leading segment from a hostname.
+
+    GCP Cloud Run service IDs and Pub/Sub topic IDs must start with a letter.
+    Falls back to ``int`` for empty input and prefixes with ``i`` when the
+    first character is not a letter (e.g. numeric-leading hostnames like
+    ``8fa1d0b7.fake-traptagger.org``).
+    """
+    seg = host.split(".")[0] if host else ""
+    if max_len is not None:
+        seg = seg[:max_len]
+    if not seg:
+        return "int"
+    if not seg[0].isalpha():
+        seg = "i" + seg
+        if max_len is not None:
+            seg = seg[:max_len]
+    return seg
+
+
 def get_default_dispatcher_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     parsed = urlparse(str(integration_url).lower())
     # urlparse only populates netloc when the URL has a scheme; fall back to
     # path so bare hostnames (e.g. "foo.example.org") still yield a subdomain.
     host = parsed.netloc or parsed.path
-    subdomain = host.split(".")[0][:8] or "int"
+    subdomain = _leading_subdomain(host, max_len=8)
     integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
     integration_type = integration_type_id.replace("_", "").lower().strip()[:5]
     integration_id = str(integration.id)
@@ -260,7 +280,7 @@ def get_default_topic_name(integration, gundi_version="v2"):
     integration_url = integration.base_url if gundi_version == "v2" else integration.endpoint
     parsed = urlparse(str(integration_url).lower())
     host = parsed.netloc or parsed.path
-    subdomain = host.split(".")[0] or "int"
+    subdomain = _leading_subdomain(host)
     integration_type_id = integration.type.value if gundi_version == "v2" else integration.type.slug
     integration_type = integration_type_id.replace("_", "").lower().strip()[:8]
     unique_suffix = generate_short_id_milliseconds()
