@@ -48,8 +48,7 @@ class TestGetDefaultTopicName:
         integration = _integration("8fa1d0b7.fake-traptagger.org", "traptagger")
         result = get_default_topic_name(integration)
         assert not result.startswith("-")
-        assert result.startswith("8fa1d0b7.fake-traptagger-traptagg-") or \
-               result.startswith("8fa1d0b7-traptagg-")
+        assert result.startswith("8fa1d0b7-traptagg-")
         assert result.endswith("-topic")
 
     def test_smart_bare_hostname_does_not_lead_with_hyphen(self):
