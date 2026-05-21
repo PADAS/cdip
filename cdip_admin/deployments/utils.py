@@ -244,22 +244,24 @@ def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAU
 
 
 def _leading_subdomain(host, max_len=None):
-    """Return the leading hostname segment with a guaranteed letter prefix.
+    """Return the leading hostname segment with a guaranteed ASCII-letter prefix.
 
     GCP Cloud Run service IDs and Pub/Sub topic IDs must start with a
-    lowercase letter. This helper enforces only that leading-character rule:
-    it falls back to ``int`` for empty input and prefixes ``i`` when the
-    first character is not a letter (e.g. numeric-leading hostnames like
-    ``8fa1d0b7.fake-traptagger.org``). Callers are responsible for ensuring
-    the rest of the constructed name uses only ``[a-z0-9-]`` — hostnames
-    already satisfy that, so no additional normalization is applied here.
+    lowercase ASCII letter (``[a-z]``). This helper enforces only that
+    leading-character rule: it falls back to ``int`` for empty input and
+    prefixes ``i`` when the first character is not in ``[a-z]`` (e.g.
+    numeric-leading hostnames like ``8fa1d0b7.fake-traptagger.org``, or
+    the unicode-letter case that ``str.isalpha()`` would otherwise accept).
+    Callers are responsible for ensuring the rest of the constructed name
+    uses only ``[a-z0-9-]`` — hostnames already satisfy that, so no
+    additional normalization is applied here.
     """
     seg = host.split(".")[0] if host else ""
     if max_len is not None:
         seg = seg[:max_len]
     if not seg:
         return "int"
-    if not seg[0].isalpha():
+    if not ("a" <= seg[0] <= "z"):
         seg = "i" + seg
         if max_len is not None:
             seg = seg[:max_len]
