@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
 
-from django.contrib import admin
 from django.contrib.admin.filters import DateFieldListFilter
 from django.core.paginator import Paginator
 from django.db import connection
