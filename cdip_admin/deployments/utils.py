@@ -244,19 +244,27 @@ def get_dispatcher_defaults_from_gcp_secrets(secret_id=settings.DISPATCHER_DEFAU
 
 
 def _leading_subdomain(host, max_len=None):
-    """Return the leading hostname segment with a guaranteed ASCII-letter prefix.
+    """Return a GCP-valid leading segment for a dispatcher / topic name.
 
     GCP Cloud Run service IDs and Pub/Sub topic IDs must start with a
-    lowercase ASCII letter (``[a-z]``). This helper enforces only that
-    leading-character rule: it falls back to ``int`` for empty input and
-    prefixes ``i`` when the first character is not in ``[a-z]`` (e.g.
-    numeric-leading hostnames like ``8fa1d0b7.fake-traptagger.org``, or
-    the unicode-letter case that ``str.isalpha()`` would otherwise accept).
-    Callers are responsible for ensuring the rest of the constructed name
-    uses only ``[a-z0-9-]`` — hostnames already satisfy that, so no
-    additional normalization is applied here.
+    lowercase ASCII letter (``[a-z]``) and use only ``[a-z0-9-]``. This
+    helper enforces both invariants for the leading segment:
+
+    - Splits ``host`` on ``.`` and takes the first segment.
+    - Strips any character outside ``[a-z0-9-]``. This drops ``@``, ``/``,
+      non-ASCII letters (e.g. Cyrillic) and other characters that can leak
+      in via the ``parsed.path`` fallback used when ``base_url`` has no
+      URL scheme.
+    - Falls back to ``int`` for empty input (including segments that were
+      wholly non-ASCII).
+    - Prepends ``i`` when the first surviving character is not in
+      ``[a-z]`` (e.g. numeric-leading hostnames like
+      ``8fa1d0b7.fake-traptagger.org``).
     """
     seg = host.split(".")[0] if host else ""
+    seg = "".join(
+        c for c in seg if "a" <= c <= "z" or "0" <= c <= "9" or c == "-"
+    )
     if max_len is not None:
         seg = seg[:max_len]
     if not seg:
@@ -307,9 +315,21 @@ def create_dispatcher_for_integration(integration):
 
     Saving the row fires deploy_serverless_dispatcher.delay() via the
     DispatcherDeployment._post_save hook, so no explicit task call is needed.
+
+    Raises ``TypeError`` if ``integration`` is not a v2 ``Integration`` —
+    this helper sets the v2 ``integration`` FK; v1 callers must build the
+    row inline with ``legacy_integration`` and ``gundi_version='v1'``.
     """
-    # Local import to avoid a circular import (models -> tasks -> utils).
+    # Local imports to avoid a circular import
+    # (models -> tasks -> utils -> models / v2 models -> utils).
     from deployments.models import DispatcherDeployment
+    from integrations.models.v2.models import Integration
+
+    if not isinstance(integration, Integration):
+        raise TypeError(
+            "create_dispatcher_for_integration is v2-only; "
+            f"got {type(integration).__name__}"
+        )
 
     return DispatcherDeployment.objects.create(
         name=get_default_dispatcher_name(integration=integration),
