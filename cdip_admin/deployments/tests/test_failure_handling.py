@@ -68,7 +68,7 @@ def test_quota_exhausted_marks_failure_and_cleans_up_topic(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 
@@ -129,7 +129,7 @@ def test_quota_exhausted_skips_topic_cleanup_when_topic_preexisted(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 
@@ -174,7 +174,7 @@ def test_quota_failure_records_activity_log(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 
@@ -229,7 +229,7 @@ def test_non_quota_failure_records_generic_activity_log(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 
@@ -280,7 +280,7 @@ def test_calculate_integration_status_unhealthy_when_dispatcher_quota_exhausted(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 
@@ -321,7 +321,7 @@ def test_calculate_integration_status_healthy_when_dispatcher_complete(
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: None)
     mocker.patch(
-        "integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+        "deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
         mock_get_dispatcher_defaults_from_gcp_secrets,
     )
 

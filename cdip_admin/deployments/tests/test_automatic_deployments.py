@@ -63,7 +63,7 @@ def test_automatic_dispatcher_deployments_v2(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets", mock_get_dispatcher_defaults_from_gcp_secrets)
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets", mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
     mocker.patch("integrations.models.v2.models.transaction.on_commit", lambda fn: fn())
