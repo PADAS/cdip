@@ -487,6 +487,14 @@ class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer
     class Meta:
         model = IntegrationConfiguration
         fields = ["id", "integration", "action", "data"]
+        # The model's UniqueConstraint(fields=["integration", "action"]) makes
+        # DRF auto-generate a UniqueTogetherValidator, which enforces both
+        # fields as required regardless of the explicit required=False above.
+        # The parent IntegrationCreateUpdateSerializer injects `integration`
+        # from the URL after validation, and `update_or_create(id=...)`
+        # plus the DB-level UniqueConstraint enforce uniqueness, so the
+        # serializer-level check is redundant.
+        validators = []
 
 
 class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
@@ -517,13 +525,42 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
+        seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
-                action = IntegrationConfiguration.objects.get(id=configuration["id"]).action
+                # Scope the lookup to this integration's configurations so
+                # an id from a different integration doesn't get repointed
+                # (and a missing id surfaces as a 400, not a 500 from
+                # DoesNotExist).
+                try:
+                    existing_config = self.instance.configurations.get(id=configuration["id"])
+                except IntegrationConfiguration.DoesNotExist:
+                    raise drf_exceptions.ValidationError(
+                        f"Configuration '{configuration['id']}' was not found on this integration."
+                    )
+                action = existing_config.action
             else:  # Create a new integration or new config
                 if "action" not in configuration:
                     raise drf_exceptions.ValidationError("The action id is required.")
                 action = configuration["action"]
+                # On PATCH, a new (no-id) item for an action that already
+                # has a configuration would collide with the (integration,
+                # action) UniqueConstraint at the DB layer and surface as
+                # a 500. Surface it as a friendly 400 here. The validator-
+                # level UniqueTogetherValidator that would normally catch
+                # this is disabled in IntegrationConfigurationCreateUpdate
+                # Serializer.Meta because it incorrectly required the
+                # `integration` field that the URL implies.
+                if self.instance and self.instance.configurations.filter(action=action).exists():
+                    raise drf_exceptions.ValidationError(
+                        f"A configuration for action '{action.value}' already exists on this "
+                        f"integration. Include 'id' in the payload to update it."
+                    )
+            if action.id in seen_action_ids:
+                raise drf_exceptions.ValidationError(
+                    f"Duplicate configurations for action '{action.value}' in the request."
+                )
+            seen_action_ids.add(action.id)
             configuration_schema = action.schema
             if configuration_schema and not configuration:  # Blank or None
                 raise drf_exceptions.ValidationError("The configuration can't be null or empty")
@@ -570,6 +607,14 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         # Update or Create nested configurations if provided
         for config_data in configurations:  # Usually less than 5-10 configs
             config_data["integration"] = self.instance
+            if config_data.get("id"):
+                # When updating by id, the row's `action` is immutable —
+                # repointing it would (a) collide with the (integration,
+                # action) UniqueConstraint, and (b) bypass the schema
+                # validation in validate() which keyed off the existing
+                # action. The portal sometimes echoes `action` back for
+                # client convenience; ignore it on id-updates.
+                config_data.pop("action", None)
             IntegrationConfiguration.objects.update_or_create(
                 id=config_data.get("id"),
                 defaults=config_data
