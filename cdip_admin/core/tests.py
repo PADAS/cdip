@@ -85,3 +85,54 @@ def test_pg_class_estimate_returns_none_on_exception(mocker):
     # admin page.
     mocker.patch("core.admin.connection.cursor", side_effect=RuntimeError("boom"))
     assert EstimatedCountPaginator._pg_class_estimate("activity_log_activitylog") is None
+
+
+def test_pg_class_estimate_uses_pg_partition_tree(mocker):
+    # The SQL must sum over pg_partition_tree leaves so it works for both
+    # partitioned tables (ActivityLog) and non-partitioned tables
+    # (GundiTrace) in a single query.
+    mock_cursor = mocker.MagicMock()
+    mock_cursor.fetchone.return_value = (123_456,)
+    mock_cm = mocker.MagicMock()
+    mock_cm.__enter__.return_value = mock_cursor
+    mock_cm.__exit__.return_value = False
+    mocker.patch("core.admin.connection.cursor", return_value=mock_cm)
+
+    result = EstimatedCountPaginator._pg_class_estimate("activity_log_activitylog")
+
+    assert result == 123_456
+    sql, params = mock_cursor.execute.call_args.args
+    # Sanity-check the query shape so a future refactor that drops the
+    # partition-aware sum is caught here, not by an ActivityLog-shaped
+    # incident in prod.
+    assert "pg_partition_tree" in sql
+    assert "isleaf" in sql
+    assert "SUM(c.reltuples)" in sql
+    assert params == ["activity_log_activitylog"]
+
+
+def test_count_uses_estimate_through_baseline_filter_when_flag_is_set(mocker):
+    # ActivityLogManager.get_queryset() injects a baseline created_at filter,
+    # so query.where is always truthy on the ActivityLog changelist. A
+    # subclass that flips ``estimate_through_baseline_filter`` must still
+    # reach the estimate path despite the WHERE clause.
+    class _BaselineFilteredPaginator(EstimatedCountPaginator):
+        estimate_through_baseline_filter = True
+
+    mocker.patch("core.admin.connection.vendor", "postgresql")
+    mocker.patch.object(
+        _BaselineFilteredPaginator, "_pg_class_estimate", return_value=42_000
+    )
+
+    paginator = _BaselineFilteredPaginator(
+        _ordered_users().filter(is_staff=True), 20
+    )
+    assert paginator.count == 42_000
+
+
+def test_activity_log_paginator_has_baseline_filter_flag():
+    # Lock the flag in so a future refactor that drops it doesn't silently
+    # reintroduce the COUNT(*) lock-up on the partitioned ActivityLog.
+    from activity_log.admin import ActivityLogPaginator
+
+    assert ActivityLogPaginator.estimate_through_baseline_filter is True
