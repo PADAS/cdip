@@ -1482,7 +1482,7 @@ def integrations_list_er(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1545,7 +1545,7 @@ def integrations_list_smart(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets_smart)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1594,7 +1594,7 @@ def integrations_list_wpswatch(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1634,7 +1634,7 @@ def integrations_list_traptagger_dest(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets_wps_watch)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1679,7 +1679,7 @@ def er_destination_healthy(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1741,7 +1741,7 @@ def er_destination_without_show_permissions_config(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1804,7 +1804,7 @@ def er_destination_unhealthy(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
@@ -1863,7 +1863,7 @@ def er_destination_disabled(
         "deployments.models.deploy_serverless_dispatcher", mocked_deployment_task
     )
     # Mock calls to external services
-    mocker.patch("integrations.models.v2.models.get_dispatcher_defaults_from_gcp_secrets",
+    mocker.patch("deployments.utils.get_dispatcher_defaults_from_gcp_secrets",
                  mock_get_dispatcher_defaults_from_gcp_secrets)
     # Patch on_commit to execute the function immediately
     mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
