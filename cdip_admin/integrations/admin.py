@@ -436,10 +436,15 @@ class WebhookConfigurationAdmin(admin.ModelAdmin):
 
 class RouteProviderInline(admin.TabularInline):
     model = Route.data_providers.through
+    # Without this, every inline row renders a <select> of *every* Integration,
+    # and Integration.__str__ touches owner.name/type.name (not select_related),
+    # making the Route change page an N+1 storm that times out in production.
+    autocomplete_fields = ("integration",)
 
 
 class RouteDestinationInline(admin.TabularInline):
     model = Route.destinations.through
+    autocomplete_fields = ("integration",)
 
 
 @admin.register(Route)
