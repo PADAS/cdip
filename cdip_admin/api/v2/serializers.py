@@ -25,9 +25,21 @@ from .utils import send_events_to_routing, send_attachments_to_routing, send_obs
 User = get_user_model()
 
 
+class UserWorkspaceSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="organization.name")
+    workspace_id = serializers.UUIDField(source="organization.id")
+    role = serializers.CharField()
+
+    class Meta:
+        model = AccountProfileOrganization
+        fields = ("id", "workspace_id", "name", "role")
+
+
 class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     accepted_eula = serializers.SerializerMethodField()
+    contact_email = serializers.SerializerMethodField()
+    workspaces = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -35,9 +47,13 @@ class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "email",
+            "first_name",
+            "last_name",
             "full_name",
             "is_superuser",
             "accepted_eula",
+            "contact_email",
+            "workspaces",
         )
 
     def get_full_name(self, obj):
@@ -50,6 +66,48 @@ class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
             return False
         else:
             return agreement.accept
+
+    def get_contact_email(self, obj):
+        profile = getattr(obj, "accountprofile", None)
+        return profile.contact_email if profile else None
+
+    def get_workspaces(self, obj):
+        profile = getattr(obj, "accountprofile", None)
+        if not profile:
+            return []
+        memberships = (
+            profile.accountprofileorganization_set
+            .select_related("organization")
+            .all()
+        )
+        return UserWorkspaceSerializer(memberships, many=True).data
+
+
+class UserDetailsUpdateSerializer(serializers.Serializer):
+    USER_FIELDS = ("first_name", "last_name")
+
+    first_name = serializers.CharField(required=False, max_length=150, allow_blank=True)
+    last_name = serializers.CharField(required=False, max_length=150, allow_blank=True)
+    contact_email = serializers.EmailField(required=False, allow_null=True)
+
+    def update(self, instance, validated_data):
+        user_fields = {
+            k: v for k, v in validated_data.items() if k in self.USER_FIELDS
+        }
+        if user_fields:
+            for k, v in user_fields.items():
+                setattr(instance, k, v)
+            instance.save(update_fields=list(user_fields.keys()))
+
+        if "contact_email" in validated_data:
+            profile, _ = AccountProfile.objects.get_or_create(user=instance)
+            profile.contact_email = validated_data["contact_email"]
+            profile.save(update_fields=["contact_email"])
+
+        return instance
+
+    def to_representation(self, instance):
+        return UserDetailsRetrieveSerializer(instance, context=self.context).data
 
 
 class OrganizationSerializer(serializers.ModelSerializer):

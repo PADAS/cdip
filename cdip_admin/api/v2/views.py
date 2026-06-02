@@ -24,12 +24,18 @@ from . import filters as custom_filters
 
 class UsersView(
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for retrieving the details of the logged-in user
+    An endpoint for retrieving and updating the details of the logged-in user
     """
-    serializer_class = v2_serializers.UserDetailsRetrieveSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return v2_serializers.UserDetailsUpdateSerializer
+        return v2_serializers.UserDetailsRetrieveSerializer
 
     def get_object(self):
         return self.request.user

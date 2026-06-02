@@ -47,6 +47,7 @@ urlpatterns = [
         view=views.UsersView.as_view(
              {
                  'get': 'retrieve',
+                 'patch': 'partial_update',
              }
         ),
         name="user-details"
