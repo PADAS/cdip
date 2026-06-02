@@ -9,7 +9,7 @@ class OrganzationMemberInline(admin.TabularInline):
 @admin.register(AccountProfile)
 class AccountProfile(admin.ModelAdmin):
 
-    list_display = ("username",)
+    list_display = ("username", "contact_email",)
 
     inlines = [
         OrganzationMemberInline,
@@ -22,9 +22,12 @@ class AccountProfile(admin.ModelAdmin):
     search_fields = (
         "user__username",
         "organizations__name",
+        "contact_email",
     )
 
-    fieldsets = ((None, {"classes": ("wide",), "fields": (("user",))}),)
+    fieldsets = (
+        (None, {"classes": ("wide",), "fields": ("user", "contact_email")}),
+    )
 
 
 @admin.register(EULA)
