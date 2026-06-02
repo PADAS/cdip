@@ -456,6 +456,12 @@ class RouteAdmin(admin.ModelAdmin):
     list_filter = (
         "owner",
     )
+    # Render owner/configuration as AJAX search boxes instead of dropdowns that
+    # eagerly load every Organization/RouteConfiguration on the change page.
+    autocomplete_fields = (
+        "owner",
+        "configuration",
+    )
     inlines = (
         RouteProviderInline,
         RouteDestinationInline,
@@ -465,6 +471,11 @@ class RouteAdmin(admin.ModelAdmin):
 @admin.register(RouteConfiguration)
 class RouteConfigAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
+        "name",
+    )
+    # Required so RouteAdmin can use ``configuration`` in autocomplete_fields.
+    search_fields = (
         "id",
         "name",
     )
