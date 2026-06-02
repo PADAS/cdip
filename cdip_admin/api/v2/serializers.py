@@ -26,6 +26,14 @@ User = get_user_model()
 
 
 class UserWorkspaceSerializer(serializers.ModelSerializer):
+    """One workspace a user belongs to.
+
+    ``id`` is the membership id (``AccountProfileOrganization.id``) and is
+    what future membership-scoped actions (e.g. leave-workspace) target.
+    ``workspace_id`` is the organization id and is what the frontend uses
+    to link to the workspace itself.
+    """
+
     name = serializers.CharField(source="organization.name")
     workspace_id = serializers.UUIDField(source="organization.id")
     role = serializers.CharField()
@@ -84,6 +92,11 @@ class UserDetailsRetrieveSerializer(serializers.ModelSerializer):
 
 
 class UserDetailsUpdateSerializer(serializers.Serializer):
+    """PATCH /v2/users/me/ — splits writes between User (first/last name)
+    and AccountProfile (contact_email), atomically. Response uses the
+    retrieve serializer shape so the frontend can refresh from one call.
+    """
+
     USER_FIELDS = ("first_name", "last_name")
 
     first_name = serializers.CharField(required=False, max_length=150, allow_blank=True)
@@ -91,18 +104,19 @@ class UserDetailsUpdateSerializer(serializers.Serializer):
     contact_email = serializers.EmailField(required=False, allow_null=True)
 
     def update(self, instance, validated_data):
-        user_fields = {
-            k: v for k, v in validated_data.items() if k in self.USER_FIELDS
-        }
-        if user_fields:
-            for k, v in user_fields.items():
-                setattr(instance, k, v)
-            instance.save(update_fields=list(user_fields.keys()))
+        with transaction.atomic():
+            user_fields = {
+                k: v for k, v in validated_data.items() if k in self.USER_FIELDS
+            }
+            if user_fields:
+                for k, v in user_fields.items():
+                    setattr(instance, k, v)
+                instance.save(update_fields=list(user_fields.keys()))
 
-        if "contact_email" in validated_data:
-            profile, _ = AccountProfile.objects.get_or_create(user=instance)
-            profile.contact_email = validated_data["contact_email"]
-            profile.save(update_fields=["contact_email"])
+            if "contact_email" in validated_data:
+                profile, _ = AccountProfile.objects.get_or_create(user=instance)
+                profile.contact_email = validated_data["contact_email"]
+                profile.save(update_fields=["contact_email"])
 
         return instance
 

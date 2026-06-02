@@ -18,42 +18,29 @@ def add_or_create_user_in_org(org_id, role, user_data):
     email = user_data["email"]
     first_name = user_data["first_name"]
     last_name = user_data["last_name"]
-    username = email
     user_created = False
+    org_members_group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+
     try:
         user = User.objects.get(Q(username=email) | Q(email=email))
-        if not user.groups.filter(
-                name=DjangoGroups.ORGANIZATION_MEMBER.value
-        ).exists():
-            group_id = Group.objects.get(
-                name=DjangoGroups.ORGANIZATION_MEMBER
-            ).id
-            user.groups.add(group_id)
+        if not user.groups.filter(name=DjangoGroups.ORGANIZATION_MEMBER.value).exists():
+            user.groups.add(org_members_group_id)
 
     except User.DoesNotExist:
-        # create keycloak user
-        response = add_account(user_data)
-        # create django user
-        if response:
-            user = User.objects.create(
-                email=email,
-                username=username,
-                first_name=first_name,
-                last_name=last_name,
-            )
-            group_id = Group.objects.get(
-                name=DjangoGroups.ORGANIZATION_MEMBER
-            ).id
-            user.groups.add(group_id)
-            user_created = True
-        else:
+        if not add_account(user_data):
             raise SuspiciousOperation
+        user = User.objects.create(
+            email=email,
+            username=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        user.groups.add(org_members_group_id)
+        user_created = True
 
-    account_profile, created = AccountProfile.objects.get_or_create(
-        user_id=user.id,
-    )
-    apo, created = AccountProfileOrganization.objects.get_or_create(
-        accountprofile_id=account_profile.id, organization_id=org_id, role=role
+    account_profile, _ = AccountProfile.objects.get_or_create(user_id=user.id)
+    AccountProfileOrganization.objects.get_or_create(
+        accountprofile_id=account_profile.id, organization_id=org_id, role=role,
     )
     return user, user_created
 

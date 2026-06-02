@@ -7,9 +7,10 @@ class OrganzationMemberInline(admin.TabularInline):
 
 
 @admin.register(AccountProfile)
-class AccountProfile(admin.ModelAdmin):
+class AccountProfileAdmin(admin.ModelAdmin):
 
     list_display = ("username", "contact_email",)
+    list_select_related = ("user",)
 
     inlines = [
         OrganzationMemberInline,

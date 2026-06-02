@@ -27,8 +27,9 @@ class UsersView(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
-    """
-    An endpoint for retrieving and updating the details of the logged-in user
+    """Self-service endpoint: always operates on the authenticated user
+    (``get_object`` returns ``request.user``). Not for admin lookups of
+    arbitrary users.
     """
     permission_classes = [IsAuthenticated]
 

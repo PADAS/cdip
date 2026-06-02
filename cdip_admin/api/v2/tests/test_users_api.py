@@ -179,6 +179,9 @@ def test_retrieve_user_details_does_not_n_plus_1_on_workspaces(
     )
     api_client.force_authenticate(org_admin_user)
 
+    # Budget: ~5 baseline queries (active EULA, UserAgreement, accountprofile,
+    # memberships+orgs via select_related, plus auth/session). Headroom for
+    # shared fixtures. Must not scale with the number of workspaces.
     with django_assert_max_num_queries(10):
         response = api_client.get(reverse("user-details"))
 
