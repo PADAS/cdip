@@ -11,6 +11,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='accountprofile',
             name='contact_email',
-            field=models.EmailField(blank=True, max_length=254, null=True),
+            field=models.EmailField(
+                blank=True,
+                help_text='User-controlled contact email, independent of the auth provider email.',
+                max_length=254,
+                null=True,
+            ),
         ),
     ]

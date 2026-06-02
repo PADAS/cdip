@@ -19,7 +19,7 @@ def add_or_create_user_in_org(org_id, role, user_data):
     first_name = user_data["first_name"]
     last_name = user_data["last_name"]
     user_created = False
-    org_members_group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER).id
+    org_members_group_id = Group.objects.get(name=DjangoGroups.ORGANIZATION_MEMBER.value).id
 
     try:
         user = User.objects.get(Q(username=email) | Q(email=email))

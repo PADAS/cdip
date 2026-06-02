@@ -54,7 +54,7 @@ def add_account(user):
         logger.error(f"Keycloak add_account network error: {exc}")
         return False
 
-    if response.ok:
+    if 200 <= response.status_code < 300:
         logger.info("User created successfully")
         return True
     if response.status_code == 409:
