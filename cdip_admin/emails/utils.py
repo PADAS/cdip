@@ -1,7 +1,7 @@
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.core.mail import send_mail
-from accounts.utils import get_password_reset_link
+from accounts.keycloak import get_password_reset_link
 
 
 def send_invite_email(user, organization, is_new_user):
