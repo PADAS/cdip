@@ -7,7 +7,7 @@ from django.db.models import Q
 from core.enums import DjangoGroups
 from organizations.models import Organization
 
-from .keycloak import add_account
+from . import keycloak
 from .models import AccountProfile, AccountProfileOrganization
 
 
@@ -27,7 +27,7 @@ def add_or_create_user_in_org(org_id, role, user_data):
             user.groups.add(org_members_group_id)
 
     except User.DoesNotExist:
-        if not add_account(user_data):
+        if not keycloak.add_account(user_data):
             raise SuspiciousOperation
         user = User.objects.create(
             email=email,

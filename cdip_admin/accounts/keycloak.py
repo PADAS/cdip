@@ -50,8 +50,8 @@ def add_account(user):
         response = requests.post(
             url=url, headers=headers, json=user_data, timeout=KEYCLOAK_HTTP_TIMEOUT,
         )
-    except requests.RequestException as exc:
-        logger.error(f"Keycloak add_account network error: {exc}")
+    except requests.RequestException:
+        logger.exception("Keycloak add_account network error")
         return False
 
     if 200 <= response.status_code < 300:
