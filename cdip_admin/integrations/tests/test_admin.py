@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.admin.widgets import AutocompleteSelect, RelatedFieldWidgetWrapper
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -51,3 +52,22 @@ def test_route_change_page_does_not_scale_with_integration_count(
         f"{baseline} queries -> {after} queries after adding 100 integrations. "
         "Inline FK fields should use autocomplete_fields."
     )
+
+
+def test_route_change_page_owner_and_configuration_use_autocomplete(
+    admin_client, route_2
+):
+    """owner/configuration must render as autocomplete widgets rather than
+    dropdowns that eagerly load every Organization/RouteConfiguration."""
+    url = reverse("admin:integrations_route_change", args=[route_2.pk])
+    response = admin_client.get(url)
+    assert response.status_code == 200
+
+    form = response.context["adminform"].form
+
+    def unwrap(widget):
+        # Admin wraps FK widgets in RelatedFieldWidgetWrapper (the +/edit icons).
+        return widget.widget if isinstance(widget, RelatedFieldWidgetWrapper) else widget
+
+    assert isinstance(unwrap(form.fields["owner"].widget), AutocompleteSelect)
+    assert isinstance(unwrap(form.fields["configuration"].widget), AutocompleteSelect)
