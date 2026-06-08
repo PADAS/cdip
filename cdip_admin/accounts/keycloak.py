@@ -8,7 +8,6 @@ from core.utils import get_admin_access_token
 
 KEYCLOAK_SERVER = settings.KEYCLOAK_SERVER
 KEYCLOAK_REALM = settings.KEYCLOAK_REALM
-KEYCLOAK_CLIENT = settings.KEYCLOAK_CLIENT_ID
 
 KEYCLOAK_ADMIN_API = f"{KEYCLOAK_SERVER}/auth/admin/realms/{KEYCLOAK_REALM}/"
 
@@ -63,7 +62,3 @@ def add_account(user):
 
     logger.error(f"Error adding account: {response.status_code}, {response.text}")
     return False
-
-
-def get_password_reset_link():
-    return f"{KEYCLOAK_SERVER}/auth/realms/{KEYCLOAK_REALM}/login-actions/reset-credentials?client_id={KEYCLOAK_CLIENT}"
