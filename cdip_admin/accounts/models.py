@@ -24,6 +24,10 @@ class AccountProfile(models.Model):
     organizations = models.ManyToManyField(
         Organization, through=AccountProfileOrganization
     )
+    contact_email = models.EmailField(
+        max_length=254, null=True, blank=True,
+        help_text=_("User-controlled contact email, independent of the auth provider email."),
+    )
 
     def __str__(self):
         return self.user.username
