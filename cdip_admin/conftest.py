@@ -2872,6 +2872,27 @@ def status_update_request_data():
         "status": "resolved"
     }
 
+
+@pytest.fixture
+def priority_update_request_data():
+    return {
+        "priority": 200
+    }
+
+
+@pytest.fixture
+def notes_update_request_data():
+    return {
+        "notes": [
+            {
+                "id": "note-uuid-1",
+                "text": "Ranger spotted fresh tracks.",
+                "author": "ranger1",
+                "created_at": "2026-06-09T10:00:00+00:00"
+            }
+        ]
+    }
+
 ########################################################################################################################
 # GUNDI 1.0
 ########################################################################################################################
