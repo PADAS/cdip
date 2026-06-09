@@ -275,6 +275,8 @@ def test_create_single_event_with_status(api_client, mocker, mock_publisher, moc
 @pytest.mark.parametrize("request_data", [
     ("species_update_request_data"),
     ("status_update_request_data"),
+    ("priority_update_request_data"),
+    ("notes_update_request_data"),
 ])
 def test_update_event(api_client, mocker, request, request_data, trap_tagger_event_trace, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies

@@ -1061,6 +1061,12 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     event_details = serializers.JSONField(write_only=True, required=False)
     annotations = serializers.JSONField(write_only=True, required=False)
     status = serializers.CharField(write_only=True, required=False)
+    # Pass-through fields: not persisted on the GundiTrace, but accepted on PATCH
+    # so they flow through to the EventUpdate.changes dict for downstream routing.
+    # Used by provider runners that need to forward field-level edits and per-note
+    # additions to destination integrations (e.g. ER → CMORE comments).
+    priority = serializers.IntegerField(write_only=True, required=False)
+    notes = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
         list_serializer_class = EventBulkCreateUpdateSerializer
