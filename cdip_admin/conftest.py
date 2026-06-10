@@ -2893,6 +2893,15 @@ def notes_update_request_data():
         ]
     }
 
+
+@pytest.fixture
+def provider_metadata_update_request_data():
+    return {
+        "provider_metadata": {
+            "source_event_url": "https://gundi-er.pamdas.org/events/907a54b9-808b-45a6-919c-b6dd204c32c6"
+        }
+    }
+
 ########################################################################################################################
 # GUNDI 1.0
 ########################################################################################################################
