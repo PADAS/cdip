@@ -1067,6 +1067,12 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     # additions to destination integrations (e.g. ER → CMORE comments).
     priority = serializers.IntegerField(write_only=True, required=False)
     notes = serializers.JSONField(write_only=True, required=False)
+    # Provider-injected origin metadata (gundi-core 1.12.0+). Lets a provider
+    # runner attach things like a deep-link URL back to the source system's UI
+    # so destination integrations can render a cross-reference click-through.
+    # Distinct from event_details (which holds the event's domain data); the
+    # field is pass-through only and not persisted on GundiTrace.
+    provider_metadata = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
         list_serializer_class = EventBulkCreateUpdateSerializer
