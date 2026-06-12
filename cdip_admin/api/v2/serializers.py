@@ -1458,6 +1458,13 @@ class ActivityLogDetailsSerializer(ActivityLogBaseSerializer):
 class ActionTriggerSerializer(serializers.Serializer):
     run_in_background = serializers.BooleanField(required=False, default=False)
     config_overrides = serializers.JSONField(required=False)
+    # How the run was initiated. This endpoint is an explicit, operator-driven
+    # invocation, so it defaults to "manual" — the action runner keeps strict
+    # error behavior (4xx) for manual runs and skips quietly for "auto"
+    # (scheduled) runs. See GUNDI-5400.
+    triggered_by = serializers.ChoiceField(
+        choices=["auto", "manual"], required=False, default="manual"
+    )
 
 
 class UserAgreementSerializer(serializers.ModelSerializer):

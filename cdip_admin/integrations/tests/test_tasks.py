@@ -10,8 +10,32 @@ from ..models import (
     Device,
     Source
 )
-from ..tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group
+import json
+
+from ..tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group, run_integration
 from ..utils import build_mb_tag_id
+
+
+@pytest.mark.django_db
+def test_run_integration_marks_scheduled_runs_as_auto(
+        mocker, provider_lotek_panthera, lotek_action_pull_positions
+):
+    # The scheduler path must stamp triggered_by="auto" on the PubSub message
+    # so the action runner skips quietly (rather than erroring) when a
+    # scheduled pull has no usable config. See GUNDI-5400.
+    mock_publish = mocker.patch("integrations.tasks.send_message_to_gcp_pubsub")
+
+    run_integration(
+        integration_id=str(provider_lotek_panthera.id),
+        action_id=lotek_action_pull_positions.value,
+        pubsub_topic="some-actions-topic",
+    )
+
+    assert mock_publish.called
+    published_payload = json.loads(mock_publish.call_args.args[0])
+    assert published_payload["triggered_by"] == "auto"
+    assert published_payload["integration_id"] == str(provider_lotek_panthera.id)
+    assert published_payload["action_id"] == lotek_action_pull_positions.value
 
 
 @pytest.mark.django_db
