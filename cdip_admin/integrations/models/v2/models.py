@@ -110,7 +110,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
-    def execute(self, integration, config_overrides=None, run_in_background=False):
+    def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):
         service_url = integration.type.service_url
         if not service_url:
             raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
@@ -130,6 +130,10 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
                 "integration_id": str(integration.id),
                 "action_id": self.value,
                 "run_in_background": run_in_background,
+                # Direct execute() calls are operator-initiated; default to
+                # "manual" so the action runner keeps strict error behavior.
+                # See GUNDI-5400.
+                "triggered_by": triggered_by,
                 "config_overrides": config_overrides,
             }
         )

@@ -564,6 +564,7 @@ class ActionTriggerView(
         response_data = integration_action.execute(
             integration=integration,
             run_in_background=serializer.data.get("run_in_background", False),
-            config_overrides=serializer.data.get("config_overrides")
+            config_overrides=serializer.data.get("config_overrides"),
+            triggered_by=serializer.data.get("triggered_by", "manual"),
         )
         return Response(response_data, status=status.HTTP_200_OK)

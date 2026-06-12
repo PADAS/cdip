@@ -45,7 +45,11 @@ def run_integration(integration_id=None, action_id=None, pubsub_topic=None):
     pubsub_topic_clean = convert_legacy_topic_name(pubsub_topic)
     data = {
         "integration_id": integration_id,
-        "action_id": action_id
+        "action_id": action_id,
+        # This task is the scheduler path, so mark the run as automated. The
+        # action runner uses this to skip quietly (rather than error) when a
+        # scheduled pull has no usable config. See GUNDI-5400.
+        "triggered_by": "auto",
     }
     # Send pubsub message to GCP
     send_message_to_gcp_pubsub(json.dumps(data), pubsub_topic_clean)

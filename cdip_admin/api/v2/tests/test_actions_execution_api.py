@@ -11,7 +11,8 @@ pytestmark = pytest.mark.django_db
 def _test_execute_action(
         api_client, mocker, requests_mock,
         user, integration, action, action_response, expected_response,
-        run_in_background=False, config_overrides=None
+        run_in_background=False, config_overrides=None, triggered_by=None,
+        expected_triggered_by="manual",
 ):
     mocker.patch("integrations.models.v2.models.google.auth.transport.requests.Request", mocker.MagicMock())
     mocker.patch("integrations.models.v2.models.google.oauth2.id_token.fetch_id_token", mocker.MagicMock(return_value="fake_id_token"))
@@ -24,6 +25,8 @@ def _test_execute_action(
         request_data["config_overrides"] = config_overrides
     if run_in_background:
         request_data["run_in_background"] = True
+    if triggered_by:
+        request_data["triggered_by"] = triggered_by
     api_client.force_authenticate(user)
 
     response = api_client.post(
@@ -36,6 +39,9 @@ def _test_execute_action(
     assert response.json() == expected_response
     if config_overrides:
         assert gcp_request_mock.last_request.json().get("config_overrides") == config_overrides
+    # The portal forwards how the run was initiated; direct API calls default
+    # to "manual" so the action runner stays strict (GUNDI-5400).
+    assert gcp_request_mock.last_request.json().get("triggered_by") == expected_triggered_by
 
 
 def _test_cannot_execute_action(
@@ -130,4 +136,24 @@ def test_execute_action_with_config_overrides(
         action_response=cellstop_action_auth_response,
         expected_response=cellstop_action_auth_response,
         config_overrides={"username": "test_user", "password": "test_password"}  # pragma: allowlist secret
+    )
+
+
+def test_execute_action_forwards_explicit_triggered_by(
+        api_client, mocker, requests_mock, superuser, organization,
+        cellstop_integration, cellstop_action_auth, cellstop_action_auth_response
+):
+    # A caller may override the default and declare the run automated; the
+    # portal forwards it verbatim to the action runner.
+    _test_execute_action(
+        mocker=mocker,
+        api_client=api_client,
+        requests_mock=requests_mock,
+        user=superuser,
+        integration=cellstop_integration,
+        action=cellstop_action_auth,
+        action_response=cellstop_action_auth_response,
+        expected_response=cellstop_action_auth_response,
+        triggered_by="auto",
+        expected_triggered_by="auto",
     )
