@@ -364,6 +364,22 @@ class RoutesView(viewsets.ModelViewSet):
         # Returns a list with the routes that the user is allowed to see
         return get_user_routes_qs(user=self.request.user)
 
+    @action(detail=True, methods=["delete"], url_path="configuration")
+    def delete_configuration(self, request, pk=None):
+        # Detach the RouteConfiguration from this route and hard-delete the row
+        # when no other route still references it. Matches Django admin's
+        # delete-when-empty intent without orphaning configurations that are
+        # shared across routes.
+        route = self.get_object()
+        config = route.configuration
+        if config is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        route.configuration = None
+        route.save(update_fields=["configuration"])
+        if not Route.objects.filter(configuration=config).exists():
+            config.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
 

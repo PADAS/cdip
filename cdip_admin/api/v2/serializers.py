@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 import jsonschema
@@ -836,12 +837,129 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
 
 
+FIELD_MAPPING_ACTION_TYPES = {"ev", "evu", "obv"}
+
+
+def _validate_field_mapping_rule(rule, path, errors):
+    if not isinstance(rule, dict):
+        errors[path] = "must be an object"
+        return
+    destination_field = rule.get("destination_field")
+    if not isinstance(destination_field, str) or not destination_field:
+        errors[f"{path}.destination_field"] = "is required and must be a non-empty string"
+    provider_field = rule.get("provider_field")
+    if provider_field is not None and not isinstance(provider_field, str):
+        errors[f"{path}.provider_field"] = "must be a string"
+    default = rule.get("default")
+    if default is not None and not isinstance(default, str):
+        errors[f"{path}.default"] = "must be a string"
+    map_ = rule.get("map")
+    if map_ is not None:
+        if not isinstance(map_, dict):
+            errors[f"{path}.map"] = "must be an object"
+        else:
+            if any(not isinstance(k, str) or not isinstance(v, str) for k, v in map_.items()):
+                errors[f"{path}.map"] = "keys and values must be strings"
+            if provider_field is None:
+                errors[f"{path}.provider_field"] = "is required when 'map' is present"
+    if default is None and map_ is None:
+        errors[path] = "must define at least one of 'default' or 'map'"
+
+
+def _validate_field_mappings_schema(field_mappings):
+    """Validate the shape of ``RouteConfiguration.data['field_mappings']``.
+
+    Shape: ``{PROVIDER_UUID: {ACTION_TYPE: {DESTINATION_UUID: rule}}}`` where
+    ``ACTION_TYPE`` is one of ``ev``/``evu``/``obv``. See Confluence "Field Mappings".
+    Raises ``serializers.ValidationError`` if the structure or any rule is invalid,
+    or if any UUID does not reference an existing ``Integration``.
+    """
+    if not isinstance(field_mappings, dict):
+        raise serializers.ValidationError({"field_mappings": "must be an object"})
+
+    errors = {}
+    referenced_ids = set()
+
+    for provider_id, by_action in field_mappings.items():
+        try:
+            uuid.UUID(str(provider_id))
+        except (ValueError, TypeError):
+            errors[f"field_mappings.{provider_id}"] = "key must be a valid UUID"
+            continue
+        referenced_ids.add(str(provider_id))
+        if not isinstance(by_action, dict):
+            errors[f"field_mappings.{provider_id}"] = "must be an object keyed by action type"
+            continue
+        for action_type, by_destination in by_action.items():
+            if action_type not in FIELD_MAPPING_ACTION_TYPES:
+                errors[f"field_mappings.{provider_id}.{action_type}"] = (
+                    f"must be one of {sorted(FIELD_MAPPING_ACTION_TYPES)}"
+                )
+                continue
+            if not isinstance(by_destination, dict):
+                errors[f"field_mappings.{provider_id}.{action_type}"] = (
+                    "must be an object keyed by destination UUID"
+                )
+                continue
+            for dest_id, rule in by_destination.items():
+                try:
+                    uuid.UUID(str(dest_id))
+                except (ValueError, TypeError):
+                    errors[f"field_mappings.{provider_id}.{action_type}.{dest_id}"] = (
+                        "key must be a valid UUID"
+                    )
+                    continue
+                referenced_ids.add(str(dest_id))
+                _validate_field_mapping_rule(
+                    rule, f"field_mappings.{provider_id}.{action_type}.{dest_id}", errors
+                )
+
+    if not errors and referenced_ids:
+        existing = {
+            str(pk)
+            for pk in Integration.objects.filter(id__in=referenced_ids).values_list("id", flat=True)
+        }
+        missing = referenced_ids - existing
+        if missing:
+            errors["field_mappings"] = f"unknown Integration IDs: {sorted(missing)}"
+
+    if errors:
+        raise serializers.ValidationError(errors)
+
+
+def _validate_field_mappings_in_route_context(field_mappings, provider_ids, destination_ids):
+    """Ensure every provider/destination referenced in ``field_mappings`` belongs
+    to the route's ``data_providers`` / ``destinations``."""
+    errors = {}
+    for provider_id, by_action in field_mappings.items():
+        if str(provider_id) not in provider_ids:
+            errors[f"field_mappings.{provider_id}"] = (
+                "provider is not in this route's data_providers"
+            )
+            continue
+        for action_type, by_destination in (by_action or {}).items():
+            for dest_id in (by_destination or {}):
+                if str(dest_id) not in destination_ids:
+                    errors[f"field_mappings.{provider_id}.{action_type}.{dest_id}"] = (
+                        "destination is not in this route's destinations"
+                    )
+    if errors:
+        raise serializers.ValidationError({"configuration": {"data": errors}})
+
+
 class RouteConfigurationSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = RouteConfiguration
         fields = ["id", "name", "data"]
+
+    def validate_data(self, value):
+        if isinstance(value, dict):
+            field_mappings = value.get("field_mappings")
+            if field_mappings:
+                _validate_field_mappings_schema(field_mappings)
+        return value
 
 
 class PKRelatedOrNestedField(serializers.PrimaryKeyRelatedField):
@@ -907,14 +1025,60 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return self._validate_integrations_selection(integration_ids=value)
 
     def validate_configuration(self, value):
-        # We support sending an id or a nested configuration object
+        # Accept either an existing RouteConfiguration (UUID) or a nested dict.
+        # For dicts we run the full nested validation (incl. field_mappings schema)
+        # and defer the save to create/update so the global validate() can do
+        # route-context checks before any DB write happens.
         if isinstance(value, dict):
-            # Create the configuration
-            configuration = RouteConfigurationSerializer(data=value)
-            configuration.is_valid()
-            configuration.save()
-            return configuration.instance
+            existing = self.instance.configuration if self.instance else None
+            nested = RouteConfigurationSerializer(
+                instance=existing, data=value, partial=existing is not None
+            )
+            nested.is_valid(raise_exception=True)
+            return nested
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        nested = attrs.get("configuration")
+        if isinstance(nested, RouteConfigurationSerializer):
+            data = nested.validated_data.get("data") or {}
+            field_mappings = data.get("field_mappings")
+            if field_mappings:
+                providers = attrs.get("data_providers")
+                if providers is None and self.instance is not None:
+                    providers = list(self.instance.data_providers.all())
+                destinations = attrs.get("destinations")
+                if destinations is None and self.instance is not None:
+                    destinations = list(self.instance.destinations.all())
+                _validate_field_mappings_in_route_context(
+                    field_mappings,
+                    provider_ids={str(p.id) for p in (providers or [])},
+                    destination_ids={str(d.id) for d in (destinations or [])},
+                )
+        return attrs
+
+    def _materialize_configuration(self, value):
+        # Save the nested RouteConfigurationSerializer (create or update in-place)
+        # and return the resulting model instance for the FK assignment.
+        if isinstance(value, RouteConfigurationSerializer):
+            value.save()
+            return value.instance
+        return value
+
+    def create(self, validated_data):
+        if "configuration" in validated_data:
+            validated_data["configuration"] = self._materialize_configuration(
+                validated_data["configuration"]
+            )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if "configuration" in validated_data:
+            validated_data["configuration"] = self._materialize_configuration(
+                validated_data["configuration"]
+            )
+        return super().update(instance, validated_data)
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
