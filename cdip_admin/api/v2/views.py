@@ -365,20 +365,24 @@ class RoutesView(viewsets.ModelViewSet):
         return get_user_routes_qs(user=self.request.user)
 
     @action(detail=True, methods=["delete"], url_path="configuration")
-    def delete_configuration(self, request, pk=None):
-        # Detach the RouteConfiguration from this route and hard-delete the row
-        # when no other route still references it. Matches Django admin's
-        # delete-when-empty intent without orphaning configurations that are
-        # shared across routes.
-        route = self.get_object()
+    def delete_configuration(self, request, pk: str | None = None) -> Response:
+        """Detach this route's RouteConfiguration and hard-delete the row when
+        no other route still references it. Matches the Django admin's delete
+        intent without orphaning configurations shared across routes.
+        """
+        self._detach_route_configuration(self.get_object())
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @staticmethod
+    def _detach_route_configuration(route: Route) -> None:
         config = route.configuration
         if config is None:
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return
         route.configuration = None
         route.save(update_fields=["configuration"])
-        if not Route.objects.filter(configuration=config).exists():
+        is_still_referenced = Route.objects.filter(configuration=config).exists()
+        if not is_still_referenced:
             config.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
