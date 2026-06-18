@@ -1,8 +1,10 @@
+import uuid
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 from integrations.models import (
-    Route, get_user_routes_qs
+    Route, RouteConfiguration, get_user_routes_qs
 )
 
 
@@ -737,3 +739,336 @@ def test_global_search_routes_by_destination_url_as_org_admin(
         },
         expected_routes=[route_1]
     )
+
+
+# ---------------------------------------------------------------------------
+# Field mappings — schema validation + update-in-place of RouteConfiguration
+# ---------------------------------------------------------------------------
+#
+# ``RouteConfiguration.data["field_mappings"]`` is a 3-level nested dict:
+#     { PROVIDER_UUID: { action_type: { DESTINATION_UUID: rule } } }
+# where action_type ∈ {ev, evu, obv} and rule has the shape of VALID_RULE
+# below. These tests cover the schema validation introduced in the serializer
+# and the update-in-place behavior on PATCH.
+
+
+VALID_RULE = {
+    "destination_field": "event_type",
+    "provider_field": "event_details__species",
+    "default": "animal_detected",
+    "map": {"lion": "lion_sighting"},
+}
+
+
+def _build_field_mappings(provider_id, destination_id, *, rule=None, action_type="ev"):
+    """Build a single-entry field_mappings dict for one (provider, action, destination)."""
+    return {
+        str(provider_id): {
+            action_type: {str(destination_id): rule or dict(VALID_RULE)}
+        }
+    }
+
+
+def _post_route_with_field_mappings(
+    api_client, user, organization, provider, destination, field_mappings
+):
+    api_client.force_authenticate(user)
+    return api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Field mappings test route",
+            "owner": str(organization.id),
+            "data_providers": [str(provider.id)],
+            "destinations": [str(destination.id)],
+            "configuration": {
+                "name": "config",
+                "data": {"field_mappings": field_mappings},
+            },
+            "additional": {},
+        },
+        format="json",
+    )
+
+
+# -- Happy path ------------------------------------------------------------
+
+
+def test_create_route_with_valid_field_mappings(
+    api_client, superuser, organization, integrations_list_er, provider_lotek_panthera
+):
+    destination = integrations_list_er[0]
+    field_mappings = _build_field_mappings(provider_lotek_panthera.id, destination.id)
+
+    response = _post_route_with_field_mappings(
+        api_client, superuser, organization,
+        provider_lotek_panthera, destination, field_mappings,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    route = Route.objects.get(id=response.json()["id"])
+    stored_rule = (
+        route.configuration.data["field_mappings"]
+        [str(provider_lotek_panthera.id)]["ev"][str(destination.id)]
+    )
+    assert stored_rule["destination_field"] == "event_type"
+
+
+# -- Schema validation -----------------------------------------------------
+
+
+def _fm_with_invalid_action_type(provider_id, destination_id):
+    return {str(provider_id): {"xx": {str(destination_id): VALID_RULE}}}
+
+
+def _fm_missing_destination_field(provider_id, destination_id):
+    return {str(provider_id): {"ev": {str(destination_id): {
+        "provider_field": "x",
+        "map": {"a": "b"},
+    }}}}
+
+
+def _fm_map_without_provider_field(provider_id, destination_id):
+    return {str(provider_id): {"ev": {str(destination_id): {
+        "destination_field": "event_type",
+        "map": {"a": "b"},
+    }}}}
+
+
+def _fm_missing_default_and_map(provider_id, destination_id):
+    return {str(provider_id): {"ev": {str(destination_id): {
+        "destination_field": "event_type",
+    }}}}
+
+
+def _fm_with_non_uuid_provider_key(provider_id, destination_id):
+    return {"not-a-uuid": {"ev": {str(destination_id): VALID_RULE}}}
+
+
+INVALID_FIELD_MAPPING_CASES = [
+    pytest.param(_fm_with_invalid_action_type, "xx", id="invalid-action-type"),
+    pytest.param(_fm_missing_destination_field, "destination_field", id="missing-destination-field"),
+    pytest.param(_fm_map_without_provider_field, "provider_field", id="map-without-provider-field"),
+    pytest.param(_fm_missing_default_and_map, "default", id="missing-default-and-map"),
+    pytest.param(_fm_with_non_uuid_provider_key, "not-a-uuid", id="provider-key-not-uuid"),
+]
+
+
+@pytest.mark.parametrize("build_field_mappings, error_fragment", INVALID_FIELD_MAPPING_CASES)
+def test_create_route_rejects_invalid_field_mappings(
+    api_client,
+    superuser,
+    organization,
+    integrations_list_er,
+    provider_lotek_panthera,
+    build_field_mappings,
+    error_fragment,
+):
+    destination = integrations_list_er[0]
+    field_mappings = build_field_mappings(provider_lotek_panthera.id, destination.id)
+
+    response = _post_route_with_field_mappings(
+        api_client, superuser, organization,
+        provider_lotek_panthera, destination, field_mappings,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert error_fragment in response.content.decode()
+
+
+def test_create_route_rejects_unknown_integration_uuid(
+    api_client, superuser, organization, integrations_list_er, provider_lotek_panthera
+):
+    destination = integrations_list_er[0]
+    unknown_destination_id = uuid.uuid4()
+    field_mappings = _build_field_mappings(provider_lotek_panthera.id, unknown_destination_id)
+
+    response = _post_route_with_field_mappings(
+        api_client, superuser, organization,
+        provider_lotek_panthera, destination, field_mappings,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "unknown Integration" in response.content.decode()
+
+
+# -- Route-context cross-check --------------------------------------------
+
+
+def test_create_route_rejects_provider_not_in_data_providers(
+    api_client,
+    superuser,
+    organization,
+    integrations_list_er,
+    provider_lotek_panthera,
+    provider_movebank_ewt,
+):
+    # provider_movebank_ewt is a valid Integration but isn't attached to this route
+    destination = integrations_list_er[0]
+    field_mappings = _build_field_mappings(provider_movebank_ewt.id, destination.id)
+
+    response = _post_route_with_field_mappings(
+        api_client, superuser, organization,
+        provider_lotek_panthera, destination, field_mappings,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "data_providers" in response.content.decode()
+
+
+# -- Update-in-place of the RouteConfiguration row -------------------------
+
+
+def test_patch_route_updates_existing_configuration_in_place(
+    api_client, superuser, route_2, provider_movebank_ewt
+):
+    # route_2 already has er_route_configuration_elephants attached — we expect
+    # the PATCH to update that same row in place instead of creating a new one.
+    original_config_id = route_2.configuration.id
+    destination = route_2.destinations.first()
+    new_configuration = {
+        "name": route_2.configuration.name,
+        "data": {
+            "subject_type": "elephant",
+            "field_mappings": _build_field_mappings(
+                provider_movebank_ewt.id, destination.id
+            ),
+        },
+    }
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": new_configuration},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    route_2.refresh_from_db()
+    assert route_2.configuration.id == original_config_id, (
+        "expected the existing RouteConfiguration row to be updated in place"
+    )
+    assert "field_mappings" in route_2.configuration.data
+    assert RouteConfiguration.objects.filter(id=original_config_id).count() == 1
+
+
+def test_patch_route_configuration_without_field_mappings_passes(
+    api_client, superuser, route_2
+):
+    # data without field_mappings: the schema validator must not run
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={
+            "configuration": {
+                "name": "still elephants",
+                "data": {"subject_type": "elephant"},
+            }
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+
+
+# ---------------------------------------------------------------------------
+# DELETE /v2/routes/{id}/configuration/ — unlink + hard-delete the config row
+# ---------------------------------------------------------------------------
+#
+# Mirrors the Django admin's "delete row" behavior for a RouteConfiguration but
+# is safe when the same configuration is shared between routes: in that case
+# the row is only detached from the current route, never destroyed.
+
+
+def test_delete_route_configuration_as_superuser_removes_the_row(
+    api_client, superuser, route_2
+):
+    config_id = route_2.configuration.id
+
+    api_client.force_authenticate(superuser)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    route_2.refresh_from_db()
+    assert route_2.configuration is None
+    assert not RouteConfiguration.objects.filter(id=config_id).exists()
+
+
+def test_delete_route_configuration_as_org_admin_removes_the_row(
+    api_client, org_admin_user_2, route_2
+):
+    config_id = route_2.configuration.id
+
+    api_client.force_authenticate(org_admin_user_2)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    route_2.refresh_from_db()
+    assert route_2.configuration is None
+    assert not RouteConfiguration.objects.filter(id=config_id).exists()
+
+
+def test_delete_route_configuration_keeps_row_when_shared_with_another_route(
+    api_client, superuser, route_1, route_2
+):
+    # Share the same RouteConfiguration between route_1 and route_2
+    shared_config = route_2.configuration
+    route_1.configuration = shared_config
+    route_1.save()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    route_2.refresh_from_db()
+    route_1.refresh_from_db()
+    assert route_2.configuration is None
+    # The row still exists because route_1 keeps referencing it
+    assert RouteConfiguration.objects.filter(id=shared_config.id).exists()
+    assert route_1.configuration_id == shared_config.id
+
+
+def test_delete_route_configuration_is_idempotent_when_already_empty(
+    api_client, superuser, route_1
+):
+    assert route_1.configuration is None  # sanity
+
+    api_client.force_authenticate(superuser)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_1.id})
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+def test_cannot_delete_route_configuration_as_org_viewer(
+    api_client, org_viewer_user_2, route_2
+):
+    api_client.force_authenticate(org_viewer_user_2)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    # The configuration is still attached to the route
+    route_2.refresh_from_db()
+    assert route_2.configuration is not None
+
+
+def test_cannot_delete_unrelated_route_configuration_as_org_admin(
+    api_client, org_admin_user, route_2
+):
+    # org_admin_user belongs to `organization`, not to `other_organization` (which owns route_2)
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.delete(
+        reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    route_2.refresh_from_db()
+    assert route_2.configuration is not None
