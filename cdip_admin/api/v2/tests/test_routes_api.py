@@ -921,8 +921,8 @@ def test_create_route_rejects_provider_not_in_data_providers(
 def test_patch_route_updates_existing_configuration_in_place(
     api_client, superuser, route_2, provider_movebank_ewt
 ):
-    # route_2 ya tiene er_route_configuration_elephants attached — esperamos
-    # que el PATCH actualice esa misma fila en lugar de crear una nueva.
+    # route_2 already has er_route_configuration_elephants attached — we expect
+    # the PATCH to update that same row in place instead of creating a new one.
     original_config_id = route_2.configuration.id
     destination = route_2.destinations.first()
     new_configuration = {
@@ -954,7 +954,7 @@ def test_patch_route_updates_existing_configuration_in_place(
 def test_patch_route_configuration_without_field_mappings_passes(
     api_client, superuser, route_2
 ):
-    # data sin field_mappings: el validador de schema no debe activarse
+    # data without field_mappings: the schema validator must not run
     api_client.force_authenticate(superuser)
     response = api_client.patch(
         reverse("routes-detail", kwargs={"pk": route_2.id}),
@@ -1014,7 +1014,7 @@ def test_delete_route_configuration_as_org_admin_removes_the_row(
 def test_delete_route_configuration_keeps_row_when_shared_with_another_route(
     api_client, superuser, route_1, route_2
 ):
-    # Comparte la misma RouteConfiguration entre route_1 y route_2
+    # Share the same RouteConfiguration between route_1 and route_2
     shared_config = route_2.configuration
     route_1.configuration = shared_config
     route_1.save()
@@ -1028,7 +1028,7 @@ def test_delete_route_configuration_keeps_row_when_shared_with_another_route(
     route_2.refresh_from_db()
     route_1.refresh_from_db()
     assert route_2.configuration is None
-    # La fila sigue existiendo porque route_1 todavía la referencia
+    # The row still exists because route_1 keeps referencing it
     assert RouteConfiguration.objects.filter(id=shared_config.id).exists()
     assert route_1.configuration_id == shared_config.id
 
@@ -1055,7 +1055,7 @@ def test_cannot_delete_route_configuration_as_org_viewer(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    # La configuration sigue ligada al route
+    # The configuration is still attached to the route
     route_2.refresh_from_db()
     assert route_2.configuration is not None
 
@@ -1063,7 +1063,7 @@ def test_cannot_delete_route_configuration_as_org_viewer(
 def test_cannot_delete_unrelated_route_configuration_as_org_admin(
     api_client, org_admin_user, route_2
 ):
-    # org_admin_user pertenece a `organization`, no a `other_organization` (dueña de route_2)
+    # org_admin_user belongs to `organization`, not to `other_organization` (which owns route_2)
     api_client.force_authenticate(org_admin_user)
     response = api_client.delete(
         reverse("routes-delete-configuration", kwargs={"pk": route_2.id})
