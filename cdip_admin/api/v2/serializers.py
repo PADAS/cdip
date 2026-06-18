@@ -1016,7 +1016,10 @@ class RouteConfigurationSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "data"]
 
     def validate_data(self, value: Any) -> Any:
-        if isinstance(value, dict) and value.get("field_mappings"):
+        # The presence of the key — not its truthiness — determines whether the
+        # schema check runs. This way ``{"field_mappings": null}`` or
+        # ``{"field_mappings": []}`` get rejected instead of silently passing.
+        if isinstance(value, dict) and "field_mappings" in value:
             _validate_field_mappings_schema(value["field_mappings"])
         return value
 
@@ -1114,10 +1117,18 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _extract_field_mappings(attrs: dict) -> dict[str, Any] | None:
+        # Configuration can arrive either as a nested (unsaved) serializer or
+        # as an already-resolved ``RouteConfiguration`` instance (when the
+        # client passes a UUID). Both paths must trigger the route-context
+        # cross-check; otherwise an existing config with mismatched UUIDs
+        # could be attached and bypass validation.
         nested = attrs.get("configuration")
-        if not isinstance(nested, RouteConfigurationSerializer):
+        if isinstance(nested, RouteConfigurationSerializer):
+            data = nested.validated_data.get("data") or {}
+        elif isinstance(nested, RouteConfiguration):
+            data = nested.data or {}
+        else:
             return None
-        data = nested.validated_data.get("data") or {}
         return data.get("field_mappings")
 
     def _resolve_relation_ids(self, attrs: dict, field_name: str) -> set[str]:

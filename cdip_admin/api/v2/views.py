@@ -1,4 +1,5 @@
 import django_filters
+from django.db import transaction
 from django.db.models import Subquery
 from rest_framework.permissions import IsAuthenticated
 
@@ -375,14 +376,23 @@ class RoutesView(viewsets.ModelViewSet):
 
     @staticmethod
     def _detach_route_configuration(route: Route) -> None:
-        config = route.configuration
-        if config is None:
-            return
-        route.configuration = None
-        route.save(update_fields=["configuration"])
-        is_still_referenced = Route.objects.filter(configuration=config).exists()
-        if not is_still_referenced:
-            config.delete()
+        # ``Route.configuration`` uses ``on_delete=SET_NULL``, so a concurrent
+        # request attaching the same config between the existence check and
+        # ``config.delete()`` could silently null that other route's FK. The
+        # atomic block + row-level lock on the config narrows the window: any
+        # concurrent transaction touching the same config must wait until ours
+        # commits, so the "still referenced?" decision and the subsequent
+        # delete observe a consistent snapshot.
+        with transaction.atomic():
+            config = route.configuration
+            if config is None:
+                return
+            locked_config = type(config).objects.select_for_update().get(pk=config.pk)
+            route.configuration = None
+            route.save(update_fields=["configuration"])
+            is_still_referenced = Route.objects.filter(configuration=locked_config).exists()
+            if not is_still_referenced:
+                locked_config.delete()
 
 
 class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):

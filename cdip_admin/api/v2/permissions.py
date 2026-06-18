@@ -51,7 +51,7 @@ def get_user_org(request, view) -> str:
         integration_id = request.data.get("provider")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
     elif view.basename == "routes":
-        if view.action in ["retrieve", "update", "partial_update", "destroy"]:
+        if view.action in ["retrieve", "update", "partial_update", "destroy", "delete_configuration"]:
             route_id = context.get("pk")
             org_id = str(Route.objects.get(id=route_id).owner.id) if route_id else None
         elif request.data.get("owner"):
