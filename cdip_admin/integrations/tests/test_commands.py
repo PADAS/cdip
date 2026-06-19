@@ -3,7 +3,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from integrations.models import IntegrationAction, IntegrationConfiguration
+from integrations.models import IntegrationAction, IntegrationConfiguration, IntegrationStatus
 
 
 pytestmark = pytest.mark.django_db
@@ -138,6 +138,38 @@ def test_repair_integration_configurations_with_all_flag(
     call_command("repair_integration_configurations", "--all")
 
     assert integration.configurations.filter(action=er_action_show_permissions).exists()
+
+
+def test_recalculate_integration_statuses_command_for_single_integration(
+    provider_lotek_panthera,
+    pull_observations_action_started_activity_log,
+    pull_observations_action_failed_activity_log,
+    pull_observations_action_failed_activity_log_2,
+    pull_observations_action_failed_activity_log_3,
+):
+    # Start from a stale healthy status; the command must recompute it from the error logs.
+    provider_lotek_panthera.status.status = IntegrationStatus.Status.HEALTHY
+    provider_lotek_panthera.status.save()
+
+    call_command(
+        "recalculate_integration_statuses",
+        "--integration-id", str(provider_lotek_panthera.id),
+    )
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+
+
+def test_recalculate_integration_statuses_command_async_enqueues_task(mocker, provider_lotek_panthera):
+    mocked_task = mocker.patch("integrations.tasks.calculate_integration_statuses.delay")
+
+    call_command(
+        "recalculate_integration_statuses",
+        "--integration-id", str(provider_lotek_panthera.id),
+        "--async",
+    )
+
+    mocked_task.assert_called_once_with(integration_ids=[str(provider_lotek_panthera.id)])
 
 
 def test_call_set_action_configs_command_with_integration_type(
