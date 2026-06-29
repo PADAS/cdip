@@ -867,3 +867,25 @@ def test_device_group_list_organization_member_viewer(
     assert list(response.context["filter"].qs) == list(
         DeviceGroup.objects.filter(owner=org1)
     )
+
+
+def test_device_group_devices_list_renders_group_devices(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]
+    d1 = setup_data["d1"]
+
+    client.force_login(global_admin_user.user)
+
+    response = client.get(
+        reverse("device_group_devices_list", kwargs={"device_group_id": dg1.id}),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    # The group's devices are listed.
+    assert list(response.context["devices"]) == list(dg1.devices.all())
+    content = response.content.decode()
+    assert d1.external_id in content
+    # Each device links to its own config, swapped into the same slide panel.
+    assert reverse("device_update", kwargs={"module_id": d1.id}) in content

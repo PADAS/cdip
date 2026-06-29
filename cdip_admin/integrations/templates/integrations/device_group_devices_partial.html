@@ -1,0 +1,30 @@
+<div id="device-group-devices-section" class="mt-4">
+    <h5>Devices in group</h5>
+    {% if devices %}
+    <div style="max-height: 240px; overflow-y: auto;">
+        <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+                <tr>
+                    <th>External ID</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dev in devices %}
+                <tr>
+                    <td>
+                        <a href="#"
+                           hx-get="{% url 'device_update' module_id=dev.id %}"
+                           hx-target="#slide-panel-body"
+                           hx-swap="innerHTML">{{ dev.external_id|default:dev }}</a>
+                    </td>
+                    <td class="text-muted">{{ dev.created_at|date:"M j, Y" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No devices in this group.</p>
+    {% endif %}
+</div>

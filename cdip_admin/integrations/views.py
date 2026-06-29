@@ -2103,6 +2103,16 @@ def _device_group_destinations_context(device_group, request):
 
 @require_GET
 @permission_required("integrations.view_devicegroup", raise_exception=True)
+def device_group_devices_list(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    context = {
+        "devices": device_group.devices.all(),
+        "device_group_id": device_group_id,
+    }
+    return render(request, "integrations/device_group_devices_partial.html", context)
+
+
 def device_group_destinations_list(request, device_group_id):
     device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
     permission_can_view(request, device_group)
