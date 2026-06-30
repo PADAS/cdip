@@ -48,4 +48,16 @@
     {% else %}
     <p class="text-muted">No devices in this group.</p>
     {% endif %}
+    <form hx-post="{% url 'device_group_devices_add' device_group_id=device_group_id %}"
+          hx-target="#device-group-devices-section"
+          hx-swap="outerHTML"
+          class="form-inline mb-1">
+        {% csrf_token %}
+        <select name="device_id"
+                class="form-control form-control-sm mr-2 device-select"
+                data-autocomplete-url="{% url 'device_group_devices_autocomplete' device_group_id=device_group_id %}?q="
+                required>
+        </select>
+        <button type="submit" class="btn btn-outline-primary btn-sm">Add device</button>
+    </form>
 </div>

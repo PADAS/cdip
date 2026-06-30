@@ -1059,3 +1059,21 @@ def test_device_group_devices_autocomplete_returns_eligible(
     assert str(d1.id) not in ids        # already in group
     assert str(d2.id) not in ids        # other org
     assert all("id" in r and "name" in r for r in results)
+
+
+def test_device_group_devices_list_shows_add_form(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("device_group_devices_list", kwargs={"device_group_id": dg1.id}),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'name="device_id"' in content
+    assert reverse("device_group_devices_add", kwargs={"device_group_id": dg1.id}) in content
+    assert reverse("device_group_devices_autocomplete", kwargs={"device_group_id": dg1.id}) in content

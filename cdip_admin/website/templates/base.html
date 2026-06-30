@@ -83,6 +83,12 @@
                     makeLazySelect(el, '/integrations/autocomplete/device-groups/?q=');
                 }
             });
+
+            root.querySelectorAll('select[name="device_id"]').forEach(function(el) {
+                if (!el.tomselect) {
+                    makeLazySelect(el, el.dataset.autocompleteUrl);
+                }
+            });
         }
 
         document.addEventListener('DOMContentLoaded', function() {
