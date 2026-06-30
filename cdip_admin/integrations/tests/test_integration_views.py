@@ -1,3 +1,4 @@
+import base64
 import json
 from typing import List
 from django.http import QueryDict
@@ -921,9 +922,6 @@ def test_device_group_devices_remove_unlinks_device(
 def test_device_group_devices_remove_requires_change_permission(
         client, django_user_model, setup_data
 ):
-    import base64
-    import json
-
     dg1 = setup_data["dg1"]
     d1 = setup_data["d1"]
 

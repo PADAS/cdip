@@ -2107,7 +2107,7 @@ def device_group_devices_list(request, device_group_id):
     device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
     permission_can_view(request, device_group)
     context = {
-        "devices": device_group.devices.all(),
+        "devices": device_group.devices.select_related("inbound_configuration__type"),
         "device_group_id": device_group_id,
     }
     return render(request, "integrations/device_group_devices_partial.html", context)
@@ -2152,7 +2152,7 @@ def device_group_devices_remove(request, device_group_id, device_id):
     device = get_object_or_404(Device, pk=device_id)
     device_group.devices.remove(device)
     context = {
-        "devices": device_group.devices.all(),
+        "devices": device_group.devices.select_related("inbound_configuration__type"),
         "device_group_id": device_group_id,
     }
     return render(request, "integrations/device_group_devices_partial.html", context)
