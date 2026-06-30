@@ -1,5 +1,5 @@
 import pytest
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 
 from core.admin import EstimatedCountPaginator
 
@@ -136,3 +136,14 @@ def test_activity_log_paginator_has_baseline_filter_flag():
     from activity_log.admin import ActivityLogPaginator
 
     assert ActivityLogPaginator.estimate_through_baseline_filter is True
+
+
+
+@pytest.mark.django_db
+def test_access_groups_created_by_migration():
+    names = set(
+        Group.objects.filter(
+            name__in=["GlobalAdmin", "OrganizationMember"]
+        ).values_list("name", flat=True)
+    )
+    assert names == {"GlobalAdmin", "OrganizationMember"}

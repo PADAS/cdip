@@ -12,24 +12,27 @@ in the request path; Django trusts what Kong forwards.
 
 ## First run
 
-The kong-oidc plugin needs a base64-encoded 32-byte session secret. Generate
-one and drop it in `.env` at the worktree root (already gitignored, never
-committed):
+The Kong gateway image builds from a sibling repo. Clone it next to this one
+(or set `KONG_DIR`):
 
 ```bash
-echo "OIDC_SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+git clone git@github.com:PADAS/gundi-kp-dynamic-routing.git ../gundi-kp-dynamic-routing
 ```
 
-Then bring up the stack:
+Then run the one-command setup:
 
 ```bash
-./dev.sh setup     # builds, migrates, seeds the dev superuser
-./dev.sh start     # docker compose up -d
+./dev.sh setup
 ```
 
-If `OIDC_SESSION_SECRET` isn't set, the `kong-bootstrap` container exits
-immediately with a clear error (`OIDC_SESSION_SECRET is required (see
-dev/README.md)`) — that's the prompt to do the step above.
+This generates `OIDC_SESSION_SECRET` (in the root `.env`), builds, waits for the
+services to be healthy, runs migrations (which create the `GlobalAdmin` /
+`OrganizationMember` groups), registers the Kong service/route/oidc plugin, and
+seeds the local `dev` user as a Django superuser. It is idempotent — safe to
+re-run. For a clean slate, `./dev.sh clean` first.
+
+Then browse to <https://web.127.0.0.1.nip.io/> (accept Caddy's self-signed cert)
+and sign in as `dev` / `dev`.
 
 ## Opt-in services
 
