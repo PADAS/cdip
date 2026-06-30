@@ -40,7 +40,7 @@ function print_help() {
     echo "  createsuperuser - Create Django superuser"
     echo "  clean           - Stop and remove all containers and volumes"
     echo "  status          - Show status of all services"
-    echo "  setup           - Initial setup (copy env, build, migrate, createsuperuser)"
+    echo "  setup           - One-command setup: secret, build, wait, migrate, kong routes, dev admin"
     echo ""
 }
 
@@ -134,48 +134,60 @@ function show_status() {
 function initial_setup() {
     echo -e "${GREEN}Starting initial setup...${NC}"
 
-    # Check if .env exists
-    local env_template="cdip_admin/cdip_admin/.env.example"
-    if [ ! -f "cdip_admin/.env" ]; then
-        if [ -f "${env_template}" ]; then
-            echo -e "${YELLOW}Copying ${env_template} to cdip_admin/.env${NC}"
-            cp "${env_template}" cdip_admin/.env
-        else
-            echo -e "${RED}Missing environment template: ${env_template}${NC}"
-            return 1
-        fi
-    else
-        echo -e "${YELLOW}.env file already exists, skipping copy${NC}"
+    # 1. Kong's image builds from a sibling repo; fail early with guidance if absent.
+    local kong_dir="${KONG_DIR:-../gundi-kp-dynamic-routing}"
+    if [ ! -d "${kong_dir}" ]; then
+        echo -e "${RED}Kong repo not found at ${kong_dir}.${NC}" >&2
+        echo -e "${YELLOW}Clone it (or set KONG_DIR), then re-run ./dev.sh setup:${NC}" >&2
+        echo "  git clone <gundi-kp-dynamic-routing repo> ../gundi-kp-dynamic-routing" >&2
+        return 1
     fi
 
-    # Build containers
+    # 2. Root .env (compose interpolation): ensure OIDC_SESSION_SECRET exists.
+    touch .env
+    if ! grep -q '^OIDC_SESSION_SECRET=' .env; then
+        echo -e "${YELLOW}Generating OIDC_SESSION_SECRET in .env${NC}"
+        echo "OIDC_SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+    fi
+
+    # Secondary Django app env template (retained as-is; stack runs off compose env).
+    local env_template="cdip_admin/cdip_admin/.env.example"
+    if [ ! -f "cdip_admin/.env" ] && [ -f "${env_template}" ]; then
+        echo -e "${YELLOW}Copying ${env_template} to cdip_admin/.env${NC}"
+        cp "${env_template}" cdip_admin/.env
+    fi
+
+    # 3. Build (Kong builds from the verified sibling repo).
     echo -e "${GREEN}Building containers...${NC}"
     $DC build
 
-    # Start services
+    # 4. Start everything, then block until the core services are healthy.
     echo -e "${GREEN}Starting services...${NC}"
     $DC up -d
+    echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
+    $DC up -d --wait postgres redis keycloak kong web caddy
 
-    # Wait for services to be ready
-    echo -e "${YELLOW}Waiting for services to be ready...${NC}"
-    sleep 10
-
-    # Run migrations
+    # 5. Migrations (also creates the GlobalAdmin / OrganizationMember groups).
     echo -e "${GREEN}Running migrations...${NC}"
-    $DC exec web python3.11 manage.py migrate
+    $DC exec -T web python3.11 manage.py migrate
 
-    # Create superuser
-    echo -e "${GREEN}Let's create a superuser...${NC}"
-    $DC exec web python3.11 manage.py createsuperuser
+    # 6. Register Kong's service/route/oidc plugin (idempotent; needs the secret above).
+    echo -e "${GREEN}Registering Kong routes...${NC}"
+    $DC run --rm kong-bootstrap
+
+    # 7. Seed the local dev admin (idempotent; matches the Keycloak dev/dev user).
+    echo -e "${GREEN}Seeding dev admin...${NC}"
+    $DC exec -T web python3.11 manage.py seed_dev_admin
 
     echo -e "${GREEN}Setup complete!${NC}"
     echo ""
-    echo "You can now access:"
-    echo "  - Django app: http://localhost:8888"
-    echo "  - Django admin: http://localhost:8888/admin"
-    echo "  - Keycloak: http://localhost:8080 (admin/admin)"
-    echo "  - Kong Admin: http://localhost:8001"
-    echo "  - Kong Manager: http://localhost:8002"
+    echo "Portal (through Caddy + Kong, with auth):"
+    echo "  https://web.127.0.0.1.nip.io   (accept the self-signed cert; log in dev / dev)"
+    echo ""
+    echo "Other endpoints:"
+    echo "  http://localhost:8888                    - Django direct (bypasses Kong/auth)"
+    echo "  https://keycloak.127.0.0.1.nip.io/auth   - Keycloak (admin / admin)"
+    echo "  http://localhost:8001                    - Kong Admin API"
 }
 
 # Main script logic
