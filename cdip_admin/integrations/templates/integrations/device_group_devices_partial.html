@@ -7,6 +7,7 @@
                 <tr>
                     <th>External ID</th>
                     <th>Created</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -19,6 +20,25 @@
                            hx-swap="innerHTML">{{ dev.external_id|default:dev }}</a>
                     </td>
                     <td class="text-muted">{{ dev.created_at|date:"M j, Y" }}</td>
+                    <td class="text-right">
+                        <span class="remove-device-btn-{{ dev.id }}">
+                            <button class="btn btn-outline-danger btn-sm"
+                                    title="Remove from group"
+                                    _="on click hide .remove-device-btn-{{ dev.id }} then show .confirm-remove-device-{{ dev.id }} with display:flex">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </span>
+                        <span class="confirm-remove-device-{{ dev.id }} align-items-center justify-content-end"
+                              style="display: none; gap: .4rem;">
+                            <small class="text-muted">Remove {{ dev.external_id|default:dev }}?</small>
+                            <button class="btn btn-danger btn-sm"
+                                    hx-post="{% url 'device_group_devices_remove' device_group_id=device_group_id device_id=dev.id %}"
+                                    hx-target="#device-group-devices-section"
+                                    hx-swap="outerHTML">Confirm</button>
+                            <button class="btn btn-secondary btn-sm"
+                                    _="on click hide .confirm-remove-device-{{ dev.id }} then show .remove-device-btn-{{ dev.id }}">Cancel</button>
+                        </span>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
