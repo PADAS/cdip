@@ -963,8 +963,8 @@ def test_device_group_devices_list_shows_remove_control(
 
     assert response.status_code == 200
     content = response.content.decode()
-    # Trash icon present...
-    assert "fa-trash" in content
+    # Remove (minus-circle) icon present...
+    assert "fa-minus-circle" in content
     # ...wired to the remove endpoint for this device.
     assert reverse(
         "device_group_devices_remove",
