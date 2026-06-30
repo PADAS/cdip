@@ -970,3 +970,92 @@ def test_device_group_devices_list_shows_remove_control(
         "device_group_devices_remove",
         kwargs={"device_group_id": dg1.id, "device_id": d1.id},
     ) in content
+
+
+def test_device_group_devices_add_adds_eligible_device(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]
+    ii1 = setup_data["ii1"]  # owned by org1, same as dg1
+    new_device = Device.objects.create(external_id="new-org1-device", inbound_configuration=ii1)
+    assert new_device not in dg1.devices.all()
+
+    client.force_login(global_admin_user.user)
+    response = client.post(
+        reverse("device_group_devices_add", kwargs={"device_group_id": dg1.id}),
+        data={"device_id": str(new_device.id)},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    dg1.refresh_from_db()
+    assert new_device in dg1.devices.all()
+    assert new_device.external_id in response.content.decode()
+
+
+def test_device_group_devices_add_rejects_other_org_device(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]   # owned by org1
+    d2 = setup_data["d2"]     # device whose inbound integration is owned by org2
+
+    client.force_login(global_admin_user.user)
+    response = client.post(
+        reverse("device_group_devices_add", kwargs={"device_group_id": dg1.id}),
+        data={"device_id": str(d2.id)},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200      # no-op re-render, not an error
+    dg1.refresh_from_db()
+    assert d2 not in dg1.devices.all()
+
+
+def test_device_group_devices_add_requires_change_permission(
+        client, django_user_model, setup_data
+):
+    dg1 = setup_data["dg1"]
+    ii1 = setup_data["ii1"]
+    new_device = Device.objects.create(external_id="perm-test-device", inbound_configuration=ii1)
+
+    user = django_user_model.objects.create_user(
+        username="addviewer@example.com", email="addviewer@example.com"
+    )
+    user_info = base64.b64encode(
+        json.dumps({"sub": str(user.id), "username": user.username, "email": user.email}).encode("utf-8")
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("device_group_devices_add", kwargs={"device_group_id": dg1.id}),
+        data={"device_id": str(new_device.id)},
+        HTTP_X_USERINFO=user_info,
+    )
+
+    assert response.status_code == 403
+    dg1.refresh_from_db()
+    assert new_device not in dg1.devices.all()
+
+
+def test_device_group_devices_autocomplete_returns_eligible(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]
+    d1 = setup_data["d1"]   # already in dg1
+    d2 = setup_data["d2"]   # other org
+    ii1 = setup_data["ii1"]
+    eligible = Device.objects.create(external_id="autocomplete-eligible", inbound_configuration=ii1)
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("device_group_devices_autocomplete", kwargs={"device_group_id": dg1.id}),
+        data={"q": ""},
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+    ids = {r["id"] for r in results}
+    assert str(eligible.id) in ids      # same org, not in group
+    assert str(d1.id) not in ids        # already in group
+    assert str(d2.id) not in ids        # other org
+    assert all("id" in r and "name" in r for r in results)

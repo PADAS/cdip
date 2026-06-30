@@ -2158,6 +2158,48 @@ def device_group_devices_remove(request, device_group_id, device_id):
     return render(request, "integrations/device_group_devices_partial.html", context)
 
 
+def _eligible_devices_for_group(device_group, q=""):
+    """Devices addable to this group: same owning org, matching external_id,
+    not already in the group."""
+    return (
+        Device.objects
+        .filter(inbound_configuration__owner=device_group.owner)
+        .filter(external_id__icontains=q)
+        .exclude(id__in=device_group.devices.values_list("id", flat=True))
+        .select_related("inbound_configuration__type")
+        .order_by("external_id")
+    )
+
+
+@require_GET
+@permission_required("integrations.view_devicegroup", raise_exception=True)
+def device_group_devices_autocomplete(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    q = request.GET.get("q", "")
+    devices = _eligible_devices_for_group(device_group, q)[:50]
+    results = [
+        {"id": str(d.id), "name": f"{d.external_id} — {d.inbound_configuration.type.name}"}
+        for d in devices
+    ]
+    return JsonResponse(results, safe=False)
+
+
+@require_POST
+@permission_required("integrations.change_devicegroup", raise_exception=True)
+def device_group_devices_add(request, device_group_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    device_id = request.POST.get("device_id")
+    if device_id and _eligible_devices_for_group(device_group).filter(pk=device_id).exists():
+        device_group.devices.add(Device.objects.get(pk=device_id))
+    context = {
+        "devices": device_group.devices.select_related("inbound_configuration__type"),
+        "device_group_id": device_group_id,
+    }
+    return render(request, "integrations/device_group_devices_partial.html", context)
+
+
 def _outbound_connections_context(config):
     """Build context dict for the outbound connections partial."""
     # Inbound configs whose default_devicegroup routes to this outbound
