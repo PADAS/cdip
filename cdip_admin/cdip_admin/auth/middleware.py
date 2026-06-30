@@ -80,18 +80,29 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
         if request.user.is_authenticated:
             if request.user.get_username() == username:
                 return
-            else:
-                # An authenticated user is associated with the request, but
-                # it does not match the authorized user in the header.
-                self._remove_invalid_user(request)
-        # We are seeing this user for the first time in this session, attempt
-        # to authenticate the user.
+            # Otherwise fall through and re-resolve: the stored Django username
+            # may simply differ from the `username` claim. The backend matches
+            # users by email, not username, so a username comparison is not a
+            # reliable identity check -- compare the resolved user below.
+        # Remember who (if anyone) is already authenticated so we only re-login
+        # when the session user actually changes.
+        current_user_pk = request.user.pk if request.user.is_authenticated else None
+        # Attempt to authenticate the user from the header.
         user = auth.authenticate(request, user_info=user_info)
         if user:
-            # User is valid.  Set request.user and persist user in the session
-            # by logging the user in.
             request.user = user
-            auth.login(request, user)
+            if user.pk != current_user_pk:
+                # New or changed session user. auth.login() calls
+                # rotate_token(); calling it on every request -- as happens when
+                # the stored username differs from the `username` claim -- keeps
+                # regenerating the CSRF secret, so an already-rendered form
+                # fails on submit with "CSRF token from POST incorrect."
+                # Only rotate when the user genuinely changes.
+                auth.login(request, user)
+        elif current_user_pk is not None:
+            # Header user could not be authenticated but a stale user remains in
+            # the session -- drop it.
+            self._remove_invalid_user(request)
 
     def clean_username(self, username, request):
         """
