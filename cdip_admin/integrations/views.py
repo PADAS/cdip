@@ -2144,6 +2144,20 @@ def device_group_destinations_remove(request, device_group_id, outbound_id):
     return render(request, "integrations/device_group_destinations_partial.html", context)
 
 
+@require_POST
+@permission_required("integrations.change_devicegroup", raise_exception=True)
+def device_group_devices_remove(request, device_group_id, device_id):
+    device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
+    permission_can_view(request, device_group)
+    device = get_object_or_404(Device, pk=device_id)
+    device_group.devices.remove(device)
+    context = {
+        "devices": device_group.devices.all(),
+        "device_group_id": device_group_id,
+    }
+    return render(request, "integrations/device_group_devices_partial.html", context)
+
+
 def _outbound_connections_context(config):
     """Build context dict for the outbound connections partial."""
     # Inbound configs whose default_devicegroup routes to this outbound

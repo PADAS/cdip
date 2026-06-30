@@ -264,6 +264,11 @@ urlpatterns = [
         views.device_group_devices_list,
         name="device_group_devices_list",
     ),
+    path(
+        "devicegroups/<uuid:device_group_id>/devices/<uuid:device_id>/remove",
+        views.device_group_devices_remove,
+        name="device_group_devices_remove",
+    ),
     # Device Group Destinations
     path(
         "devicegroups/<uuid:device_group_id>/destinations",

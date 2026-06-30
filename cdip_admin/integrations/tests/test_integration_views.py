@@ -889,3 +889,62 @@ def test_device_group_devices_list_renders_group_devices(
     assert d1.external_id in content
     # Each device links to its own config, swapped into the same slide panel.
     assert reverse("device_update", kwargs={"module_id": d1.id}) in content
+
+
+def test_device_group_devices_remove_unlinks_device(
+        client, global_admin_user, setup_data
+):
+    dg1 = setup_data["dg1"]
+    d1 = setup_data["d1"]
+    assert d1 in dg1.devices.all()
+
+    client.force_login(global_admin_user.user)
+
+    response = client.post(
+        reverse(
+            "device_group_devices_remove",
+            kwargs={"device_group_id": dg1.id, "device_id": d1.id},
+        ),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    dg1.refresh_from_db()
+    # Unlinked from the group...
+    assert d1 not in dg1.devices.all()
+    # ...but the Device row still exists.
+    assert Device.objects.filter(pk=d1.id).exists()
+    # dg1 had only d1, so the refreshed partial shows the empty state.
+    assert "No devices in this group." in response.content.decode()
+
+
+def test_device_group_devices_remove_requires_change_permission(
+        client, django_user_model, setup_data
+):
+    import base64
+    import json
+
+    dg1 = setup_data["dg1"]
+    d1 = setup_data["d1"]
+
+    # Plain user (no perms) -- create_user, NOT create_superuser.
+    user = django_user_model.objects.create_user(
+        username="viewer@example.com", email="viewer@example.com"
+    )
+    user_info = base64.b64encode(
+        json.dumps(
+            {"sub": str(user.id), "username": user.username, "email": user.email}
+        ).encode("utf-8")
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse(
+            "device_group_devices_remove",
+            kwargs={"device_group_id": dg1.id, "device_id": d1.id},
+        ),
+        HTTP_X_USERINFO=user_info,
+    )
+
+    assert response.status_code == 403
+    assert d1 in dg1.devices.all()  # unchanged
