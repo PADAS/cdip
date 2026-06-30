@@ -139,7 +139,7 @@ function initial_setup() {
     if [ ! -d "${kong_dir}" ]; then
         echo -e "${RED}Kong repo not found at ${kong_dir}.${NC}" >&2
         echo -e "${YELLOW}Clone it (or set KONG_DIR), then re-run ./dev.sh setup:${NC}" >&2
-        echo "  git clone <gundi-kp-dynamic-routing repo> ../gundi-kp-dynamic-routing" >&2
+        echo "  git clone git@github.com:PADAS/gundi-kp-dynamic-routing.git ../gundi-kp-dynamic-routing" >&2
         return 1
     fi
 

@@ -16,7 +16,7 @@ The Kong gateway image builds from a sibling repo. Clone it next to this one
 (or set `KONG_DIR`):
 
 ```bash
-git clone <gundi-kp-dynamic-routing repo> ../gundi-kp-dynamic-routing
+git clone git@github.com:PADAS/gundi-kp-dynamic-routing.git ../gundi-kp-dynamic-routing
 ```
 
 Then run the one-command setup:
