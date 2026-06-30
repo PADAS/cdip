@@ -13,6 +13,8 @@ Keycloak (auth), Postgres, Redis, Celery, and Caddy (TLS) — with one command.
   ```
 
   Keep the two repos as siblings, or point `KONG_DIR` at wherever you cloned it.
+  (No credentials needed — `./dev.sh setup` auto-generates the placeholder
+  `application_default_credentials.json` the Kong image expects.)
 
 ## Bring it up
 
@@ -65,6 +67,9 @@ real path: browser → Caddy (TLS) → Kong (auth) → Django.
 - **`Cannot connect to the Docker daemon`** — start Docker Desktop, then re-run.
 - **`Kong repo not found at ...`** — clone `gundi-kp-dynamic-routing` as a sibling
   (see Prerequisites), or run with `KONG_DIR=/abs/path/to/gundi-kp-dynamic-routing ./dev.sh setup`.
+- **Kong build fails on `COPY application_default_credentials.json`** — a fresh
+  Kong clone lacks that gitignored file; `./dev.sh setup` generates a local
+  placeholder automatically, so just re-run setup.
 - **Browser certificate warning** at `web.127.0.0.1.nip.io` — expected; Caddy
   uses a local CA. Accept/proceed (or trust Caddy's root CA to silence it).
 - **Re-running `./dev.sh setup`** is always safe — every step is idempotent.
