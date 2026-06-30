@@ -52,6 +52,7 @@
     <style>
         .ts-wrapper.destination-select { flex: 1 1 auto; min-width: 0; }
         .ts-wrapper.lazy-select.single .ts-control:after { display: none; }
+        #device-group-devices-section .ts-wrapper { flex: 1 1 auto; min-width: 0; }
     </style>
     <script>
         function makeLazySelect(el, url) {
@@ -81,6 +82,12 @@
             root.querySelectorAll('select[name="default_devicegroup"]').forEach(function(el) {
                 if (!el.tomselect) {
                     makeLazySelect(el, '/integrations/autocomplete/device-groups/?q=');
+                }
+            });
+
+            root.querySelectorAll('select[name="device_id"]').forEach(function(el) {
+                if (!el.tomselect && el.dataset.autocompleteUrl) {
+                    makeLazySelect(el, el.dataset.autocompleteUrl);
                 }
             });
         }

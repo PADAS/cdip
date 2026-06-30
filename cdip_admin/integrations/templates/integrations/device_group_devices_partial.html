@@ -1,0 +1,63 @@
+<div id="device-group-devices-section" class="mt-4">
+    <h5>Devices in group</h5>
+    {% if devices %}
+    <div style="max-height: 240px; overflow-y: auto;">
+        <table class="table table-sm table-bordered">
+            <thead class="thead-light">
+                <tr>
+                    <th>External ID</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dev in devices %}
+                <tr>
+                    <td>
+                        <a href="#"
+                           hx-get="{% url 'device_update' module_id=dev.id %}"
+                           hx-target="#slide-panel-body"
+                           hx-swap="innerHTML">{{ dev.external_id|default:dev }}</a>
+                    </td>
+                    <td class="text-muted">{{ dev.created_at|date:"M j, Y" }}</td>
+                    <td class="text-right">
+                        <span class="remove-device-btn-{{ dev.id }}">
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    title="Remove from group"
+                                    aria-label="Remove from group"
+                                    _="on click hide .remove-device-btn-{{ dev.id }} then show .confirm-remove-device-{{ dev.id }} with display:flex">
+                                <i class="fas fa-minus-circle"></i>
+                            </button>
+                        </span>
+                        <span class="confirm-remove-device-{{ dev.id }} align-items-center justify-content-end"
+                              style="display: none; gap: .4rem;">
+                            <small class="text-muted">Remove {{ dev.external_id|default:dev }}?</small>
+                            <button class="btn btn-danger btn-sm"
+                                    hx-post="{% url 'device_group_devices_remove' device_group_id=device_group_id device_id=dev.id %}"
+                                    hx-target="#device-group-devices-section"
+                                    hx-swap="outerHTML">Confirm</button>
+                            <button class="btn btn-secondary btn-sm"
+                                    _="on click hide .confirm-remove-device-{{ dev.id }} then show .remove-device-btn-{{ dev.id }}">Cancel</button>
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No devices in this group.</p>
+    {% endif %}
+    <form hx-post="{% url 'device_group_devices_add' device_group_id=device_group_id %}"
+          hx-target="#device-group-devices-section"
+          hx-swap="outerHTML"
+          class="form-inline mb-1">
+        {% csrf_token %}
+        <select name="device_id"
+                class="form-control form-control-sm mr-2 device-select"
+                data-autocomplete-url="{% url 'device_group_devices_autocomplete' device_group_id=device_group_id %}?q="
+                required>
+        </select>
+        <button type="submit" class="btn btn-outline-primary btn-sm">Add device</button>
+    </form>
+</div>

@@ -48,6 +48,12 @@
 <div class="slide-panel-content">
     {% include "integrations/_form_errors.html" %}
     {% crispy form %}
+    <div id="device-group-devices-section"
+         hx-get="{% url 'device_group_devices_list' device_group_id=form.instance.id %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <p class="text-muted">Loading devices...</p>
+    </div>
     <div id="device-group-destinations-section"
          hx-get="{% url 'device_group_destinations_list' device_group_id=form.instance.id %}"
          hx-trigger="load"
