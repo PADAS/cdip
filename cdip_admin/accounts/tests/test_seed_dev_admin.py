@@ -40,6 +40,6 @@ def test_seed_dev_admin_elevates_existing_user(settings):
 @pytest.mark.django_db
 def test_seed_dev_admin_refuses_when_not_debug(settings):
     settings.DEBUG = False
-    with pytest.raises(CommandError):
+    with pytest.raises(CommandError, match="refuses to run"):
         call_command("seed_dev_admin")
     assert not get_user_model().objects.filter(email="dev@local.dev").exists()

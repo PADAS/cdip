@@ -147,7 +147,7 @@ function initial_setup() {
     touch .env
     if ! grep -q '^OIDC_SESSION_SECRET=' .env; then
         echo -e "${YELLOW}Generating OIDC_SESSION_SECRET in .env${NC}"
-        echo "OIDC_SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+        echo "OIDC_SESSION_SECRET=$(openssl rand -base64 32 | tr -d '\n')" >> .env
     fi
 
     # Secondary Django app env template (retained as-is; stack runs off compose env).
@@ -155,6 +155,8 @@ function initial_setup() {
     if [ ! -f "cdip_admin/.env" ] && [ -f "${env_template}" ]; then
         echo -e "${YELLOW}Copying ${env_template} to cdip_admin/.env${NC}"
         cp "${env_template}" cdip_admin/.env
+    elif [ ! -f "cdip_admin/.env" ]; then
+        echo -e "${YELLOW}Note: ${env_template} not found; skipping cdip_admin/.env copy (stack uses compose env).${NC}"
     fi
 
     # 3. Build (Kong builds from the verified sibling repo).
@@ -163,6 +165,7 @@ function initial_setup() {
 
     # 4. Start everything, then block until the core services are healthy.
     echo -e "${GREEN}Starting services...${NC}"
+    # Start the full stack (incl. celery, kong-bootstrap); --wait below gates on the core services.
     $DC up -d
     echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
     $DC up -d --wait postgres redis keycloak kong web caddy

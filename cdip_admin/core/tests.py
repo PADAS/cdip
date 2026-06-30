@@ -1,5 +1,5 @@
 import pytest
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 
 from core.admin import EstimatedCountPaginator
 
@@ -137,8 +137,6 @@ def test_activity_log_paginator_has_baseline_filter_flag():
 
     assert ActivityLogPaginator.estimate_through_baseline_filter is True
 
-
-from django.contrib.auth.models import Group
 
 
 @pytest.mark.django_db
