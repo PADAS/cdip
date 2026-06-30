@@ -2,11 +2,47 @@ import pytest
 import json
 from django_celery_beat.models import  PeriodicTask
 
-from integrations.models import Integration
+from integrations.models import Integration, Route, RouteProvider
 from ..models import IntegrationConfiguration
 
 
 pytestmark = pytest.mark.django_db
+
+
+def test_pull_task_disabled_when_integration_no_longer_a_provider(
+        provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions
+):
+    # The fixture wires the integration as a provider in its default route, so
+    # its periodic pull task starts enabled.
+    periodic_task = PeriodicTask.objects.get(task="integrations.tasks.run_integration")
+    assert periodic_task.enabled
+
+    # Remove it as a provider from every route (e.g. route edited/deleted).
+    RouteProvider.objects.filter(integration=provider_lotek_panthera).delete()
+
+    assert not provider_lotek_panthera.is_used_as_provider
+    periodic_task.refresh_from_db()
+    assert not periodic_task.enabled  # GUNDI-5400: paused, no longer a provider
+
+
+def test_pull_task_stays_enabled_if_still_a_provider_in_another_route(
+        organization, provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions
+):
+    periodic_task = PeriodicTask.objects.get(task="integrations.tasks.run_integration")
+    assert periodic_task.enabled
+
+    # The integration is also a provider in a second route.
+    second_route = Route.objects.create(owner=organization, name="Second Route")
+    RouteProvider.objects.create(integration=provider_lotek_panthera, route=second_route)
+
+    # Removing only the default-route provider link must NOT disable the task.
+    RouteProvider.objects.filter(
+        integration=provider_lotek_panthera, route=provider_lotek_panthera.default_route
+    ).delete()
+
+    assert provider_lotek_panthera.is_used_as_provider
+    periodic_task.refresh_from_db()
+    assert periodic_task.enabled
 
 
 def test_periodic_task_is_created_for_periodic_actions(provider_lotek_panthera, lotek_action_auth, lotek_action_pull_positions):

@@ -7,7 +7,7 @@ from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
 from simple_history.admin import SimpleHistoryAdmin
 from django.contrib import messages
-from core.admin import CustomDateFilter
+from core.admin import CustomDateFilter, EstimatedCountPaginator
 import deployments.models
 from .models import (
     OutboundIntegrationType,
@@ -436,10 +436,15 @@ class WebhookConfigurationAdmin(admin.ModelAdmin):
 
 class RouteProviderInline(admin.TabularInline):
     model = Route.data_providers.through
+    # Without this, every inline row renders a <select> of *every* Integration,
+    # and Integration.__str__ touches owner.name/type.name (not select_related),
+    # making the Route change page an N+1 storm that times out in production.
+    autocomplete_fields = ("integration",)
 
 
 class RouteDestinationInline(admin.TabularInline):
     model = Route.destinations.through
+    autocomplete_fields = ("integration",)
 
 
 @admin.register(Route)
@@ -451,6 +456,12 @@ class RouteAdmin(admin.ModelAdmin):
     list_filter = (
         "owner",
     )
+    # Render owner/configuration as AJAX search boxes instead of dropdowns that
+    # eagerly load every Organization/RouteConfiguration on the change page.
+    autocomplete_fields = (
+        "owner",
+        "configuration",
+    )
     inlines = (
         RouteProviderInline,
         RouteDestinationInline,
@@ -460,6 +471,11 @@ class RouteAdmin(admin.ModelAdmin):
 @admin.register(RouteConfiguration)
 class RouteConfigAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
+        "name",
+    )
+    # Required so RouteAdmin can use ``configuration`` in autocomplete_fields.
+    search_fields = (
         "id",
         "name",
     )
@@ -523,6 +539,17 @@ class SourceConfigurationAdmin(SimpleHistoryAdmin):
 
 @admin.register(GundiTrace)
 class GundiTraceAdmin(SimpleHistoryAdmin):
+    # GundiTrace grows roughly proportionally to delivered observations.
+    # The default admin paginator runs COUNT(*) on every changelist render,
+    # which is the incident this PR was opened to fix. EstimatedCountPaginator
+    # uses pg_class.reltuples for the unfiltered changelist (cheap planner
+    # read) and falls back to the exact count when filters are applied.
+    paginator = EstimatedCountPaginator
+    # Suppresses the *secondary* full-table total shown next to a filtered
+    # count. Doesn't replace the paginator's primary count — that's the
+    # job of ``paginator`` above.
+    show_full_result_count = False
+    list_select_related = True
     list_display = (
         "pk",
         "object_id",

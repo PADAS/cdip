@@ -44,19 +44,33 @@ services:
       KC_DB_PASSWORD: keycloak
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
+      # Public URL the browser hits (via Caddy). Without this, Keycloak's
+      # discovery doc advertises authorization_endpoint as http://keycloak:8080
+      # (the internal docker hostname) and the browser-side redirect from kong-oidc
+      # fails to resolve.
+      KC_HOSTNAME_URL: "https://keycloak.127.0.0.1.nip.io/auth"
+      KC_HOSTNAME_ADMIN_URL: "https://keycloak.127.0.0.1.nip.io/auth"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      # The portal builds Keycloak URLs as ${KEYCLOAK_SERVER}/auth/... so
+      # serve Keycloak under the /auth prefix to match.
+      KC_HTTP_RELATIVE_PATH: "/auth"
     command:
       - start-dev
       - --proxy=edge
+      - --import-realm
     ports:
       - "8080:8080"
+    volumes:
+      - ./keycloak/cdip-dev-realm.json:/opt/keycloak/data/import/cdip-dev-realm.json:ro
     depends_on:
       keycloak-db:
         condition: service_healthy
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
+      # CMD-SHELL routes through /bin/sh which doesn't support /dev/tcp; invoke
+      # bash explicitly so the redirection works in the Keycloak (Quarkus) image.
+      test: ["CMD", "bash", "-lc", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -m 1 '\"status\": *\"UP\"' <&3"]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -97,7 +111,7 @@ services:
   # Kong Migrations
   kong-migrations:
     build:
-      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      context: ${KONG_DIR:-../gundi-kp-dynamic-routing}
       dockerfile: Dockerfile.local
     container_name: cdip-kong-migrations
     command: kong migrations bootstrap
@@ -115,7 +129,7 @@ services:
   # Kong API Gateway
   kong:
     build:
-      context: /Users/chrisdo/padas/gundi-kp-dynamic-routing
+      context: ${KONG_DIR:-../gundi-kp-dynamic-routing}
       dockerfile: Dockerfile.local
     container_name: cdip-kong
     environment:
@@ -130,6 +144,13 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
       KONG_ADMIN_GUI_URL: "http://localhost:8002"
+      # Caddy sits in front and terminates TLS. Trust its X-Forwarded-* so
+      # kong-oidc builds redirect URIs against the public https host the
+      # browser actually used (https://web.127.0.0.1.nip.io) — not the
+      # internal http://kong:8000.
+      KONG_TRUSTED_IPS: "0.0.0.0/0,::/0"
+      KONG_REAL_IP_HEADER: "X-Forwarded-For"
+      KONG_REAL_IP_RECURSIVE: "on"
     ports:
       - "8000:8000"  # Proxy port
       - "8443:8443"  # Proxy SSL port
@@ -146,6 +167,26 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+
+  # One-shot: registers cdip-web service/route and the oidc plugin on Kong
+  # via the Admin API. Idempotent — safe to restart this service to re-apply
+  # config from dev/bootstrap-kong.sh.
+  kong-bootstrap:
+    image: curlimages/curl:8.10.1
+    container_name: cdip-kong-bootstrap
+    depends_on:
+      kong:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      # Kong-oidc session_secret — required, base64 of 32 random bytes.
+      # Set in .env at the worktree root; never committed.
+      OIDC_SESSION_SECRET: ${OIDC_SESSION_SECRET}
+    volumes:
+      - ./dev/bootstrap-kong.sh:/bootstrap-kong.sh:ro
+    entrypoint: ["sh", "/bootstrap-kong.sh"]
+    restart: "no"
 
   # Django Application
   web:
@@ -177,7 +218,7 @@ services:
       KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
       KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
       KONG_PROXY_URL: "http://kong:8001"
-      ALLOWED_HOSTS: "localhost,127.0.0.1,web"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,web,web.127.0.0.1.nip.io"
       SECURE_PROXY_SSL_HEADER: ""
       GCP_ENVIRONMENT_ENABLED: "False"
       TRACING_ENABLED: "False"
@@ -197,6 +238,51 @@ services:
       dockerfile: ./Dockerfile.dev
     container_name: cdip-celery
     command: celery -A cdip_admin worker -l info
+    volumes:
+      - ./cdip_admin:/var/www/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "local-dev-secret-key-change-in-production"
+      DB_NAME: cdip_portaldb
+      DB_USER: cdip_dbuser
+      DB_PASSWORD: cdip_dbpassword
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      KEYCLOAK_SERVER: "http://keycloak:8080"
+      KEYCLOAK_REALM: "cdip-dev"
+      KEYCLOAK_CLIENT_ID: "cdip-admin-portal"
+      KEYCLOAK_CLIENT_SECRET: "local-dev-secret"
+      KEYCLOAK_ADMIN_CLIENT_ID: "admin-cli"
+      KEYCLOAK_ADMIN_CLIENT_SECRET: "local-dev-admin-secret"
+      GCP_ENVIRONMENT_ENABLED: "False"
+      TRACING_ENABLED: "False"
+      PUBSUB_ENABLED: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Pytest runner — opt-in via the "test" profile so it never starts on `up`.
+  # Reuses the dev image (which installs requirements-dev.txt) and the same
+  # postgres service. Django creates a separate `test_cdip_portaldb` for tests
+  # so the dev DB is untouched. pytest.ini's `--reuse-db` keeps subsequent
+  # runs fast.
+  #
+  # Usage:
+  #   docker compose run --rm pytest                                       # full suite
+  #   docker compose run --rm pytest integrations/tests/test_signals.py -v
+  #   docker compose run --rm pytest -k test_repair
+  pytest:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    container_name: cdip-pytest
+    entrypoint: ["pytest"]
     volumes:
       - ./cdip_admin:/var/www/app
     environment:
@@ -254,15 +340,23 @@ services:
       redis:
         condition: service_healthy
 
-  # Gundi Portal (React frontend)
+  # Gundi Portal (React frontend) — opt-in.
+  # Lives in a separate sibling repo (gundi-portal). Default-disabled so the
+  # stack still comes up cleanly when that repo isn't checked out next to this
+  # one. To enable, point PORTAL_DIR at your local clone (in .env or env) and
+  # opt into the profile:
+  #   COMPOSE_PROFILES=portal docker compose up -d portal
+  # or:
+  #   docker compose --profile portal up -d portal
   portal:
+    profiles: ["portal"]
     build:
-      context: /Users/chrisdo/padas/gundi-portal
+      context: ${PORTAL_DIR:-../gundi-portal}
       dockerfile: Dockerfile
     container_name: cdip-portal
     volumes:
-      - /Users/chrisdo/padas/gundi-portal/src:/app/src
-      - /Users/chrisdo/padas/gundi-portal/public:/app/public
+      - ${PORTAL_DIR:-../gundi-portal}/src:/app/src
+      - ${PORTAL_DIR:-../gundi-portal}/public:/app/public
       - portal_node_modules:/app/node_modules
     ports:
       - "3000:3000"
@@ -283,9 +377,9 @@ services:
     image: caddy:2-alpine
     container_name: cdip-caddy
     ports:
-      - "443:443"   # HTTPS
-      - "80:80"     # HTTP (redirects to HTTPS)
-      - "2019:2019" # Caddy admin API
+      - "443:443"             # HTTPS
+      - "80:80"               # HTTP (redirects to HTTPS)
+      - "127.0.0.1:2019:2019" # Caddy admin API (localhost only — exposes config rewrite)
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -294,7 +388,9 @@ services:
       - keycloak
       - kong
       - web
-      - portal
+      # portal is opt-in via the "portal" profile — leaving it out of
+      # depends_on so caddy comes up regardless. The portal.* Caddy block
+      # will 502 until you start the portal explicitly.
     restart: unless-stopped
 
 volumes:

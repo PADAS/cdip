@@ -10,6 +10,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Use Compose v2 (the `docker compose` plugin) when available; fall back to
+# the legacy `docker-compose` standalone binary if a host only has v1.
+if docker compose version >/dev/null 2>&1; then
+    DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    DC="docker-compose"
+else
+    echo -e "${RED}Neither 'docker compose' (v2 plugin) nor 'docker-compose' (v1) found on PATH.${NC}" >&2
+    exit 1
+fi
+
 function print_help() {
     echo "CDIP Admin Portal - Development Helper Script"
     echo ""
@@ -35,71 +46,71 @@ function print_help() {
 
 function start_services() {
     echo -e "${GREEN}Starting all services...${NC}"
-    docker-compose up -d
+    $DC up -d
     echo -e "${GREEN}Services started!${NC}"
     echo ""
-    docker-compose ps
+    $DC ps
 }
 
 function stop_services() {
     echo -e "${YELLOW}Stopping all services...${NC}"
-    docker-compose stop
+    $DC stop
     echo -e "${GREEN}Services stopped!${NC}"
 }
 
 function restart_services() {
     echo -e "${YELLOW}Restarting all services...${NC}"
-    docker-compose restart
+    $DC restart
     echo -e "${GREEN}Services restarted!${NC}"
 }
 
 function build_containers() {
     echo -e "${GREEN}Building containers...${NC}"
-    docker-compose build
+    $DC build
     echo -e "${GREEN}Build complete!${NC}"
 }
 
 function view_logs() {
     if [ -z "$2" ]; then
-        docker-compose logs -f
+        $DC logs -f
     else
-        docker-compose logs -f "$2"
+        $DC logs -f "$2"
     fi
 }
 
 function django_shell() {
     echo -e "${GREEN}Opening Django shell...${NC}"
-    docker-compose exec web python3.11 manage.py shell
+    $DC exec web python3.11 manage.py shell
 }
 
 function db_shell() {
     echo -e "${GREEN}Opening database shell...${NC}"
-    docker-compose exec postgres psql -U cdip_dbuser -d cdip_portaldb
+    $DC exec postgres psql -U cdip_dbuser -d cdip_portaldb
 }
 
 function run_migrate() {
     echo -e "${GREEN}Running migrations...${NC}"
-    docker-compose exec web python3.11 manage.py migrate
+    $DC exec web python3.11 manage.py migrate
     echo -e "${GREEN}Migrations complete!${NC}"
 }
 
 function make_migrations() {
     echo -e "${GREEN}Creating migrations...${NC}"
-    docker-compose exec web python3.11 manage.py makemigrations
+    $DC exec web python3.11 manage.py makemigrations
 }
 
 function run_tests() {
     echo -e "${GREEN}Running tests...${NC}"
     if [ -z "$2" ]; then
-        docker-compose exec web pytest
+        $DC exec web pytest
     else
-        docker-compose exec web pytest "$2"
+        $DC exec web pytest "$2"
     fi
 }
 
 function create_superuser() {
     echo -e "${GREEN}Creating superuser...${NC}"
-    docker-compose exec web python3.11 manage.py createsuperuser
+    $DC exec web python3.11 manage.py createsuperuser
 }
 
 function clean_all() {
@@ -108,7 +119,7 @@ function clean_all() {
     echo
     if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
         echo -e "${YELLOW}Cleaning up...${NC}"
-        docker-compose down -v
+        $DC down -v
         echo -e "${GREEN}Cleanup complete!${NC}"
     else
         echo -e "${YELLOW}Cancelled.${NC}"
@@ -117,27 +128,33 @@ function clean_all() {
 
 function show_status() {
     echo -e "${GREEN}Service status:${NC}"
-    docker-compose ps
+    $DC ps
 }
 
 function initial_setup() {
     echo -e "${GREEN}Starting initial setup...${NC}"
 
     # Check if .env exists
+    local env_template="cdip_admin/cdip_admin/.env.example"
     if [ ! -f "cdip_admin/.env" ]; then
-        echo -e "${YELLOW}Copying .env.local to cdip_admin/.env${NC}"
-        cp .env.local cdip_admin/.env
+        if [ -f "${env_template}" ]; then
+            echo -e "${YELLOW}Copying ${env_template} to cdip_admin/.env${NC}"
+            cp "${env_template}" cdip_admin/.env
+        else
+            echo -e "${RED}Missing environment template: ${env_template}${NC}"
+            return 1
+        fi
     else
         echo -e "${YELLOW}.env file already exists, skipping copy${NC}"
     fi
 
     # Build containers
     echo -e "${GREEN}Building containers...${NC}"
-    docker-compose build
+    $DC build
 
     # Start services
     echo -e "${GREEN}Starting services...${NC}"
-    docker-compose up -d
+    $DC up -d
 
     # Wait for services to be ready
     echo -e "${YELLOW}Waiting for services to be ready...${NC}"
@@ -145,11 +162,11 @@ function initial_setup() {
 
     # Run migrations
     echo -e "${GREEN}Running migrations...${NC}"
-    docker-compose exec web python3.11 manage.py migrate
+    $DC exec web python3.11 manage.py migrate
 
     # Create superuser
     echo -e "${GREEN}Let's create a superuser...${NC}"
-    docker-compose exec web python3.11 manage.py createsuperuser
+    $DC exec web python3.11 manage.py createsuperuser
 
     echo -e "${GREEN}Setup complete!${NC}"
     echo ""

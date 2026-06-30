@@ -1,4 +1,5 @@
 import django_filters
+from django.db import transaction
 from django.db.models import Subquery
 from rest_framework.permissions import IsAuthenticated
 
@@ -24,12 +25,19 @@ from . import filters as custom_filters
 
 class UsersView(
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
+    """Self-service endpoint: always operates on the authenticated user
+    (``get_object`` returns ``request.user``). Not for admin lookups of
+    arbitrary users.
     """
-    An endpoint for retrieving the details of the logged-in user
-    """
-    serializer_class = v2_serializers.UserDetailsRetrieveSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return v2_serializers.UserDetailsUpdateSerializer
+        return v2_serializers.UserDetailsRetrieveSerializer
 
     def get_object(self):
         return self.request.user
@@ -357,6 +365,35 @@ class RoutesView(viewsets.ModelViewSet):
         # Returns a list with the routes that the user is allowed to see
         return get_user_routes_qs(user=self.request.user)
 
+    @action(detail=True, methods=["delete"], url_path="configuration")
+    def delete_configuration(self, request, pk: str | None = None) -> Response:
+        """Detach this route's RouteConfiguration and hard-delete the row when
+        no other route still references it. Matches the Django admin's delete
+        intent without orphaning configurations shared across routes.
+        """
+        self._detach_route_configuration(self.get_object())
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @staticmethod
+    def _detach_route_configuration(route: Route) -> None:
+        # ``Route.configuration`` uses ``on_delete=SET_NULL``, so a concurrent
+        # request attaching the same config between the existence check and
+        # ``config.delete()`` could silently null that other route's FK. The
+        # atomic block + row-level lock on the config narrows the window: any
+        # concurrent transaction touching the same config must wait until ours
+        # commits, so the "still referenced?" decision and the subsequent
+        # delete observe a consistent snapshot.
+        with transaction.atomic():
+            config = route.configuration
+            if config is None:
+                return
+            locked_config = type(config).objects.select_for_update().get(pk=config.pk)
+            route.configuration = None
+            route.save(update_fields=["configuration"])
+            is_still_referenced = Route.objects.filter(configuration=locked_config).exists()
+            if not is_still_referenced:
+                locked_config.delete()
+
 
 class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
 
@@ -557,6 +594,7 @@ class ActionTriggerView(
         response_data = integration_action.execute(
             integration=integration,
             run_in_background=serializer.data.get("run_in_background", False),
-            config_overrides=serializer.data.get("config_overrides")
+            config_overrides=serializer.data.get("config_overrides"),
+            triggered_by=serializer.data.get("triggered_by", "manual"),
         )
         return Response(response_data, status=status.HTTP_200_OK)

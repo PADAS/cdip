@@ -75,25 +75,46 @@ def calculate_integration_status(integration_id):
     integration_status.status_details = "No issues detected"
     time_window = datetime.now(timezone.utc) - timedelta(minutes=healthcheck_settings.time_window_minutes)
     errors_threshold = healthcheck_settings.error_count_threshold
-    if not integration_status.integration.enabled:
+    integration = integration_status.integration
+
+    if not integration.enabled:
         integration_status.status = IntegrationStatus.Status.DISABLED
         integration_status.status_details = "Integration is disabled"
+        integration_status.save()
+        return integration_status.status
+
+    # When the dispatcher is in ERROR (e.g. GCP quota exhausted), short-circuit
+    # to UNHEALTHY immediately rather than waiting for the activity-log error
+    # threshold to accumulate. Use a queryset filter rather than the OneToOne
+    # descriptor: the descriptor raises DispatcherDeployment.DoesNotExist when
+    # no row exists yet (legacy/freshly-created integrations).
+    DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
+    deployment = DispatcherDeployment.objects.filter(integration=integration).first()
+
+    if deployment and deployment.status == DispatcherDeployment.Status.ERROR:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        if deployment.failure_reason == DispatcherDeployment.FailureReason.QUOTA_EXHAUSTED:
+            integration_status.status_details = (
+                "Dispatcher deployment blocked by GCP quota — Cloud Run service ceiling reached"
+            )
+        else:
+            integration_status.status_details = "Dispatcher deployment failed"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.INTEGRATION,
-        integration=integration_status.integration,
+        integration=integration,
         log_level=ActivityLog.LogLevels.ERROR,
         created_at__gte=time_window
     ).count() >= errors_threshold:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
-        integration_status.status_details = "Errors where detected while executing the integration"
+        integration_status.status_details = "Errors were detected while executing the integration"
     elif ActivityLog.objects.filter(
         origin=ActivityLog.Origin.DISPATCHER,
-        integration=integration_status.integration,
+        integration=integration,
         log_level=ActivityLog.LogLevels.ERROR,
         created_at__gte=time_window
     ).count() >= errors_threshold:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
-        integration_status.status_details = "Errors where detected while pushing data to the destination"
+        integration_status.status_details = "Errors were detected while pushing data to the destination"
     integration_status.save()
     return integration_status.status
 

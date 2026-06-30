@@ -253,7 +253,7 @@ def _test_invite_user(
 
     api_client.force_authenticate(inviter)
     # Mock external dependencies
-    mocker.patch("accounts.utils.add_account", mock_add_account)  # mock user creation in Keycloak
+    mocker.patch("accounts.keycloak.add_account", mock_add_account)  # mock user creation in Keycloak
     mocker.patch("api.v2.views.send_invite_email_task", mock_send_invite_email_task)  # mock email sending
     response = api_client.put(
         reverse("members-invite", kwargs={"organization_pk": organization.id}),
@@ -292,7 +292,7 @@ def _test_cannot_invite_user(
 
     api_client.force_authenticate(inviter)
     # Mock external dependencies
-    mocker.patch("accounts.utils.add_account", mock_add_account)  # mock user creation in Keycloak
+    mocker.patch("accounts.keycloak.add_account", mock_add_account)  # mock user creation in Keycloak
     mocker.patch("api.v2.views.send_invite_email_task", mock_send_invite_email_task)  # mock email sending
     response = api_client.put(
         reverse("members-invite", kwargs={"organization_pk": organization.id}),

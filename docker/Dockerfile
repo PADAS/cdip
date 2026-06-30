@@ -1,4 +1,5 @@
-FROM ubuntu:22.04
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}ubuntu:22.04
 MAINTAINER chrisdo@vulcan.com
 
 # Install basic tools first

@@ -272,9 +272,45 @@ def test_create_single_event_with_status(api_client, mocker, mock_publisher, moc
     assert data_kwarg.get("payload", {}).get("status") == "active"
 
 
+def test_create_single_event_with_provider_metadata(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    provider_metadata = {
+        "source_event_url": "https://gundi-er.pamdas.org/events/907a54b9-808b-45a6-919c-b6dd204c32c6"
+    }
+    _test_create_event(
+        api_client=api_client,
+        mock_publisher=mock_publisher,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        data={
+            "source": "camera123",
+            "title": "Animal Detected",
+            "event_type": "animals",
+            "recorded_at": "2024-08-22 13:01:26-0300",
+            "location": {
+                "lon": -109.239682,
+                "lat": -27.104423
+            },
+            "event_details": {
+                "species": "lion"
+            },
+            "provider_metadata": provider_metadata
+        }
+    )
+    # provider_metadata must survive the create -> routing path so downstream
+    # integrations (e.g. ER -> CMORE deep-link) receive the source_event_url.
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    assert data_kwarg.get("payload")
+    assert data_kwarg.get("payload", {}).get("provider_metadata") == provider_metadata
+
+
 @pytest.mark.parametrize("request_data", [
     ("species_update_request_data"),
     ("status_update_request_data"),
+    ("priority_update_request_data"),
+    ("notes_update_request_data"),
+    ("provider_metadata_update_request_data"),
 ])
 def test_update_event(api_client, mocker, request, request_data, trap_tagger_event_trace, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies

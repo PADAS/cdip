@@ -1499,6 +1499,157 @@ def test_update_or_create_integration_config_as_org_admin(
     )
 
 
+def test_patch_integration_config_with_portal_payload_shape(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # The portal omits `integration` from each configuration item (it is
+    # implied by the URL). Regression test for the UniqueTogetherValidator
+    # auto-generated from the model's UniqueConstraint(integration, action)
+    # rejecting the request with `{"integration": ["This field is required."]}`.
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "id": str(lotek_auth_config.id),
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "user@lotek.com", "password": "NewPassword"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    lotek_auth_config.refresh_from_db()
+    assert lotek_auth_config.data == {"username": "user@lotek.com", "password": "NewPassword"}
+
+
+def test_patch_integration_config_rejects_new_item_for_existing_action(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth,
+):
+    # A PATCH that adds a new (no-id) configuration for an action that
+    # already has a config would otherwise hit the (integration, action)
+    # DB UniqueConstraint mid-update and surface as a 500. Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "action": str(lotek_action_auth.id),
+                    "data": {"username": "x", "password": "y"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "already exists" in response.json()["non_field_errors"][0]
+
+
+def test_patch_integration_config_rejects_duplicate_actions_in_payload(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_list_devices,
+):
+    # Two items targeting the same action in one request would silently
+    # last-write-wins (in the natural-key sense) or hit IntegrityError.
+    # Should be a 400.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "1"}},
+                {"action": str(lotek_action_list_devices.id), "data": {"group_id": "2"}},
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Duplicate" in response.json()["non_field_errors"][0]
+
+
+def test_patch_integration_config_rejects_unknown_config_id(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+):
+    # A PATCH referencing a configuration id that doesn't exist on this
+    # integration should return 400, not 500 from DoesNotExist.
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "data": {"username": "x", "password": "y"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "not found" in response.json()["non_field_errors"][0]
+
+
+def test_patch_integration_config_rejects_id_from_different_integration(
+        api_client, org_admin_user, organization, provider_lotek_panthera, provider_ats,
+):
+    # A PATCH referencing a configuration id that belongs to a different
+    # integration must not repoint that row — it should 400 cleanly.
+    other_config = provider_ats.configurations.first()
+    assert other_config is not None
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {"id": str(other_config.id), "data": {"hijacked": True}},
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "not found" in response.json()["non_field_errors"][0]
+    # The other integration's config must remain untouched.
+    other_config.refresh_from_db()
+    assert other_config.integration_id == provider_ats.id
+    assert other_config.data != {"hijacked": True}
+
+
+def test_patch_integration_config_ignores_action_on_id_update(
+        api_client, org_admin_user, organization, provider_lotek_panthera,
+        lotek_action_auth, lotek_action_pull_positions,
+):
+    # The portal sometimes echoes back `action` alongside `id` for client
+    # convenience. The row's action must not be repointed via update_or_create
+    # defaults — that would collide with the (integration, action) constraint.
+    lotek_auth_config = lotek_action_auth.configurations_by_action.get(integration=provider_lotek_panthera)
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": provider_lotek_panthera.id}),
+        data={
+            "configurations": [
+                {
+                    "id": str(lotek_auth_config.id),
+                    # Try to repoint at a different action — must be ignored.
+                    "action": str(lotek_action_pull_positions.id),
+                    "data": {"username": "u", "password": "p"},
+                },
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    lotek_auth_config.refresh_from_db()
+    # The row's action stayed put; only data updated.
+    assert lotek_auth_config.action_id == lotek_action_auth.id
+    assert lotek_auth_config.data == {"username": "u", "password": "p"}
+
+
 def _test_get_integration_api_key(
         api_client, user, integration
 ):

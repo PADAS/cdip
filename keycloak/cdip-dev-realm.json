@@ -1,0 +1,128 @@
+{
+  "realm": "cdip-dev",
+  "enabled": true,
+  "displayName": "CDIP Dev",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "accessTokenLifespan": 1800,
+  "ssoSessionIdleTimeout": 43200,
+  "ssoSessionMaxLifespan": 86400,
+  "clients": [
+    {
+      "clientId": "cdip-kong-gateway",
+      "name": "CDIP Kong Gateway",
+      "description": "OIDC client used by the kong-oidc plugin to authenticate browser sessions and validate API bearer tokens.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-kong-oidc-secret",
+      "redirectUris": [
+        "https://web.127.0.0.1.nip.io/*",
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "https://web.127.0.0.1.nip.io"
+      ],
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://web.127.0.0.1.nip.io/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "username",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "client_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientId",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "client_id",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "cdip-admin-portal",
+      "name": "CDIP Admin Portal (legacy direct-Django client)",
+      "description": "Kept for the legacy social-auth path referenced in settings; the active flow goes through cdip-kong-gateway.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-dev-secret",
+      "redirectUris": [
+        "https://web.127.0.0.1.nip.io/*"
+      ],
+      "webOrigins": [
+        "https://web.127.0.0.1.nip.io"
+      ],
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "cdip-oauth2",
+      "name": "CDIP React Portal",
+      "description": "Public SPA client used by the React portal (REACT_APP_OIDC_CLIENT_ID).",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://portal.127.0.0.1.nip.io/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "https://portal.127.0.0.1.nip.io",
+        "http://localhost:3000"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://portal.127.0.0.1.nip.io/*##http://localhost:3000/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "dev",
+      "email": "dev@local.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-cdip-dev"
+      ]
+    }
+  ]
+}
