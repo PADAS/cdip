@@ -1077,3 +1077,21 @@ def test_device_group_devices_list_shows_add_form(
     assert 'name="device_id"' in content
     assert reverse("device_group_devices_add", kwargs={"device_group_id": dg1.id}) in content
     assert reverse("device_group_devices_autocomplete", kwargs={"device_group_id": dg1.id}) in content
+
+
+def test_device_group_devices_add_form_renders_in_empty_group(
+        client, global_admin_user, setup_data
+):
+    org1 = setup_data["org1"]
+    empty_group = DeviceGroup.objects.create(name="empty add-form group", owner=org1)
+
+    client.force_login(global_admin_user.user)
+    response = client.get(
+        reverse("device_group_devices_list", kwargs={"device_group_id": empty_group.id}),
+        HTTP_X_USERINFO=global_admin_user.user_info,
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "No devices in this group." in content   # empty-state branch
+    assert 'name="device_id"' in content            # add form still shown

@@ -85,7 +85,7 @@
             });
 
             root.querySelectorAll('select[name="device_id"]').forEach(function(el) {
-                if (!el.tomselect) {
+                if (!el.tomselect && el.dataset.autocompleteUrl) {
                     makeLazySelect(el, el.dataset.autocompleteUrl);
                 }
             });

@@ -2191,8 +2191,10 @@ def device_group_devices_add(request, device_group_id):
     device_group = get_object_or_404(DeviceGroup, pk=device_group_id)
     permission_can_view(request, device_group)
     device_id = request.POST.get("device_id")
-    if device_id and _eligible_devices_for_group(device_group).filter(pk=device_id).exists():
-        device_group.devices.add(Device.objects.get(pk=device_id))
+    if device_id:
+        device = _eligible_devices_for_group(device_group).filter(pk=device_id).first()
+        if device:
+            device_group.devices.add(device)
     context = {
         "devices": device_group.devices.select_related("inbound_configuration__type"),
         "device_group_id": device_group_id,
