@@ -31,12 +31,28 @@ def test_rejected_observation_logs_validation_detail(
     assert record.detail  # the serializer error detail is captured
 
 
-def test_successful_request_is_not_logged_as_rejected(caplog):
-    """The handler must only fire for 4xx responses, not successful ones."""
+def test_unhandled_exception_passes_through_without_logging(caplog):
+    """When DRF's handler returns None (exception it doesn't turn into a response),
+    ours must pass the None through untouched and emit no log line."""
     from api.v2.exception_handler import logging_exception_handler
 
-    # No exception path exercised here; a None response (nothing to handle)
-    # must be passed through untouched and produce no log line.
     with caplog.at_level(logging.WARNING, logger="api.v2.exception_handler"):
         assert logging_exception_handler(Exception("boom"), {"request": None}) is None
     assert [r for r in caplog.records if r.name == "api.v2.exception_handler"] == []
+
+
+def test_summarize_detail_skips_valid_items_and_caps_large_batches():
+    """Bulk error detail must surface only error-bearing items (by index) without
+    stringifying the whole batch, and stay bounded."""
+    from api.v2 import exception_handler as eh
+
+    # A large batch that is valid except for two items.
+    batch = [{} for _ in range(5000)]
+    batch[3] = {"recorded_at": ["This field is required."]}
+    batch[4] = {"location": ["Invalid location."]}
+
+    summary = eh._summarize_detail(batch)
+
+    assert "5000" in summary  # item_count reported
+    assert "recorded_at" in summary and "location" in summary  # the real errors
+    assert len(summary) <= eh._MAX_DETAIL_CHARS + len("…(truncated)")

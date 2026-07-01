@@ -9,10 +9,29 @@ logger = logging.getLogger(__name__)
 # diagnosable. Django's default `django.request` "Bad Request" line carries none.
 _V2_PREFIX = "/v2/"
 _MAX_DETAIL_CHARS = 2000
+_MAX_DETAIL_ITEMS = 20
 
 
-def _truncate(value):
-    text = str(value)
+def _summarize_detail(value):
+    """Render the error detail compactly.
+
+    Bulk endpoints (``SingleOrBulkCreateModelMixin``) return a per-item list that
+    is mostly empty ``{}`` for the valid items; a big batch would make
+    ``str(value)`` huge and pointless. Pull out just the error-bearing entries
+    (keyed by their index), capped, so we never stringify the whole batch, then
+    bound the final string length as a backstop.
+    """
+    if isinstance(value, list):
+        errors = {}
+        for index, item in enumerate(value):
+            if not item:  # valid items serialize to an empty {} — skip them
+                continue
+            errors[index] = item
+            if len(errors) >= _MAX_DETAIL_ITEMS:
+                break
+        text = str({"item_count": len(value), "errors": errors})
+    else:
+        text = str(value)
     if len(text) > _MAX_DETAIL_CHARS:
         return text[:_MAX_DETAIL_CHARS] + "…(truncated)"
     return text
@@ -39,8 +58,8 @@ def logging_exception_handler(exc, context):
                 "path": path,
                 "integration_id": getattr(request, "integration_id", None),
                 # response.data holds the serializer/parse error detail. It is
-                # field names + messages, not the raw payload; truncated for safety.
-                "detail": _truncate(getattr(response, "data", None)),
+                # field names + messages, not the raw payload; summarized+truncated.
+                "detail": _summarize_detail(getattr(response, "data", None)),
             },
         )
     return response
