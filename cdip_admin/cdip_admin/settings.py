@@ -147,7 +147,7 @@ AUTHENTICATION_BACKENDS = {
 
 # TTL (seconds) for caching identity lookups (user + client profile) done on
 # every authenticated request by SimpleUserInfoBackend. Keeps the high-volume
-# ingestion path off the database. 0 disables the cache.
+# ingestion path off the database. 0 (or any non-positive value) disables it.
 AUTH_IDENTITY_CACHE_TTL = env.int("AUTH_IDENTITY_CACHE_TTL", 300)
 
 MIDDLEWARE = [

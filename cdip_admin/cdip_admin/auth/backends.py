@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _cache_key(prefix, value):
-    digest = hashlib.md5(str(value).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
     return f"auth:{prefix}:{digest}"
 
 
@@ -59,7 +59,7 @@ class SimpleUserInfoBackend(ModelBackend):
         if not email:
             return None
         ttl = getattr(settings, "AUTH_IDENTITY_CACHE_TTL", 0)
-        cache_key = _cache_key("user", email) if ttl else None
+        cache_key = _cache_key("user", email) if ttl > 0 else None
         if cache_key:
             user = cache.get(cache_key)
             if user is not None:
@@ -73,7 +73,7 @@ class SimpleUserInfoBackend(ModelBackend):
 
     def _client_profile_exists(self, client_id):
         ttl = getattr(settings, "AUTH_IDENTITY_CACHE_TTL", 0)
-        cache_key = _cache_key("client_profile_exists", client_id) if ttl else None
+        cache_key = _cache_key("client_profile_exists", client_id) if ttl > 0 else None
         if cache_key:
             exists = cache.get(cache_key)
             if exists is not None:

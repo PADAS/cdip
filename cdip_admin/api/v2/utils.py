@@ -191,7 +191,8 @@ def send_event_update_to_routing(event_trace, event_changes):
             related_to=str(event_trace.related_to),
             data_provider_id=str(integration.id),
             source_id=str(source.id if source else None),  # ToDo: Can be null?
-            external_source_id=str(source.external_id if source else None),                    owner=str(integration.owner_id),
+            external_source_id=str(source.external_id if source else None),
+            owner=str(integration.owner_id),
             changes=event_changes,
         )
         # Log info for traffic anomaly detection.
