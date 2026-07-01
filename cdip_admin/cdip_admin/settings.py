@@ -199,6 +199,7 @@ DATABASES = {
         "PASSWORD": env.str("DB_PASSWORD", "cdip_dbpassword"),
         "HOST": env.str("DB_HOST", "cdip_dbhost"),
         "PORT": env.str("DB_PORT", "5432"),
+        "CONN_MAX_AGE": env.int("DB_CONN_MAX_AGE", 60),
         "OPTIONS": {
             "application_name": env.str("DB_APP_NAME", "portal"),
         }
