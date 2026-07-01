@@ -145,6 +145,11 @@ AUTHENTICATION_BACKENDS = {
     "cdip_admin.auth.backends.SimpleUserInfoBackend",
 }
 
+# TTL (seconds) for caching identity lookups (user + client profile) done on
+# every authenticated request by SimpleUserInfoBackend. Keeps the high-volume
+# ingestion path off the database. 0 disables the cache.
+AUTH_IDENTITY_CACHE_TTL = env.int("AUTH_IDENTITY_CACHE_TTL", 300)
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -199,6 +204,11 @@ DATABASES = {
         "PASSWORD": env.str("DB_PASSWORD", "cdip_dbpassword"),
         "HOST": env.str("DB_HOST", "cdip_dbhost"),
         "PORT": env.str("DB_PORT", "5432"),
+        # Reuse DB connections across requests instead of opening/closing one per
+        # request (CONN_MAX_AGE=0 default). CONN_HEALTH_CHECKS avoids handing a
+        # request a persistent connection that the server has since dropped.
+        "CONN_MAX_AGE": env.int("DB_CONN_MAX_AGE", 60),
+        "CONN_HEALTH_CHECKS": env.bool("DB_CONN_HEALTH_CHECKS", True),
         "OPTIONS": {
             "application_name": env.str("DB_APP_NAME", "portal"),
         }

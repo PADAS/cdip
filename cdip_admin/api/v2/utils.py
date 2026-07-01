@@ -112,7 +112,7 @@ def send_events_to_routing(events, gundi_ids):
                 data_provider_id=str(integration.id),
                 source_id=str(source.id),
                 external_source_id=str(source.external_id),
-                owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                owner=str(integration.owner_id),  # owner_id reads the FK value directly, no extra query
                 recorded_at=event.get("recorded_at"),  # ToDo: Convet to "2021-03-21 12:01:02-0700"
                 location=location,
                 annotations=event.get("annotations", {}),
@@ -191,7 +191,7 @@ def send_event_update_to_routing(event_trace, event_changes):
             related_to=str(event_trace.related_to),
             data_provider_id=str(integration.id),
             source_id=str(source.id if source else None),  # ToDo: Can be null?
-            external_source_id=str(source.external_id if source else None),                    owner=str(integration.owner.id),
+            external_source_id=str(source.external_id if source else None),                    owner=str(integration.owner_id),
             changes=event_changes,
         )
         # Log info for traffic anomaly detection.
@@ -342,7 +342,7 @@ def send_observations_to_routing(observations, gundi_ids):
             observation_obj = Observation(
                 gundi_id=str(gundi_id),
                 related_to=observation.get("related_to"),
-                owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                owner=str(integration.owner_id),  # owner_id reads the FK value directly, no extra query
                 data_provider_id=str(integration.id),
                 annotations=observation.get("annotations", {}),
                 source_id=str(source.id),
@@ -463,7 +463,7 @@ def send_text_messages_to_routing(text_messages, gundi_ids):
             text_message_obj = TextMessage(
                 gundi_id=str(gundi_id),
                 related_to=text_message.get("related_to"),
-                owner=str(integration.owner.id),  # Warning this can lead to the n+1 queries problem
+                owner=str(integration.owner_id),  # owner_id reads the FK value directly, no extra query
                 data_provider_id=str(integration.id),
                 source_id=str(source.id),
                 external_source_id=str(source.external_id),

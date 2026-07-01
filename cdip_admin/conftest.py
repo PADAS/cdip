@@ -58,6 +58,19 @@ def async_return(result):
     return f
 
 
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """
+    The default cache is a per-process LocMemCache that outlives individual
+    tests. SimpleUserInfoBackend now caches resolved users / client profiles,
+    so without this a User cached in one test (whose row is rolled back with
+    the test transaction) would be served to a later test. Clear before each.
+    """
+    from django.core.cache import cache
+    cache.clear()
+    yield
+
+
 @pytest.fixture
 def api_client():
     """
