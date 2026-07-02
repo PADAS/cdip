@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Iterable
 
 import jsonschema
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
@@ -25,6 +25,11 @@ from .utils import send_events_to_routing, send_attachments_to_routing, send_obs
     send_event_update_to_routing, send_text_messages_to_routing
 
 User = get_user_model()
+
+
+class DuplicateIntegrationError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
 
 
 class UserWorkspaceSerializer(serializers.ModelSerializer):
@@ -599,6 +604,16 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
+        name = data.get("name", getattr(self.instance, "name", None))
+        integration_type = data.get("type", getattr(self.instance, "type", None))
+        if name and integration_type:
+            duplicates_qs = Integration.objects.filter(name=name, type=integration_type)
+            if self.instance is not None:
+                duplicates_qs = duplicates_qs.exclude(pk=self.instance.pk)
+            if duplicates_qs.exists():
+                raise DuplicateIntegrationError(detail={
+                    "name": ["A connection with this name already exists for this integration type."]
+                })
         seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
@@ -650,27 +665,28 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         webhook_configuration = validated_data.pop("webhook_configuration", {})
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
-        # Create the integration
-        integration = Integration.objects.create(**validated_data)
-        # Create configurations if provided
-        for configuration in configurations:  # Usually less than 5-10 configs
-            IntegrationConfiguration.objects.create(
-                integration=integration,
-                **configuration
-            )
-        # Create other missing configurations
-        if create_configurations:
-            integration.create_missing_configurations()
-        # Create a default route as needed
-        if create_default_route:
-            ensure_default_route(integration=integration)
-        # Create webhook configuration if provided
-        if webhook_configuration and integration.type.webhook:
-            WebhookConfiguration.objects.create(
-                integration=integration,
-                webhook=integration.type.webhook,
-                data=webhook_configuration.get("data", {})
-            )
+        with transaction.atomic():
+            # Create the integration
+            integration = Integration.objects.create(**validated_data)
+            # Create configurations if provided
+            for configuration in configurations:  # Usually less than 5-10 configs
+                IntegrationConfiguration.objects.create(
+                    integration=integration,
+                    **configuration
+                )
+            # Create other missing configurations
+            if create_configurations:
+                integration.create_missing_configurations()
+            # Create a default route as needed
+            if create_default_route:
+                ensure_default_route(integration=integration)
+            # Create webhook configuration if provided
+            if webhook_configuration and integration.type.webhook:
+                WebhookConfiguration.objects.create(
+                    integration=integration,
+                    webhook=integration.type.webhook,
+                    data=webhook_configuration.get("data", {})
+                )
         return integration
 
     def update(self, instance, validated_data):
