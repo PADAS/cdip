@@ -110,3 +110,8 @@ def test_health_status_matches_integration_disabled_on_creation(integration_type
         enabled=False
     )
     assert integration.status.status == IntegrationStatus.Status.DISABLED.value
+
+
+def test_health_check_settings_have_retriable_error_threshold(provider_lotek_panthera):
+    settings = provider_lotek_panthera.health_check_settings
+    assert settings.retriable_error_count_threshold == 30

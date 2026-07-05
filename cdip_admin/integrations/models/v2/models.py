@@ -599,6 +599,14 @@ class HealthCheckSettings(UUIDAbstractModel, TimestampedModel):
     )
     error_count_threshold = models.PositiveIntegerField(default=3)
     time_window_minutes = models.PositiveIntegerField(default=60)
+    retriable_error_count_threshold = models.PositiveIntegerField(
+        default=30,
+        help_text=(
+            "Number of retriable (warning-level) delivery failures within the time window "
+            "before the integration is marked unhealthy. Retriable failures are transient "
+            "destination errors that PubSub retries; a sustained volume indicates an outage."
+        ),
+    )
 
     class Meta:
         ordering = ("-updated_at",)
