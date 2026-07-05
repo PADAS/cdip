@@ -191,6 +191,27 @@ def test_error_threshold_takes_precedence_over_warning_threshold(
     )
 
 
+def test_dispatcher_error_threshold_takes_precedence_over_warning_threshold(
+        provider_lotek_panthera, destination_movebank,
+        observation_delivery_to_movebank_failed_activity_log,
+        observation_delivery_to_movebank_failed_activity_log_2,
+        observation_delivery_to_movebank_failed_activity_log_3
+):
+    # DISPATCHER-origin ERROR logs (the branch directly above the new WARNING
+    # branch) must win when both thresholds are crossed.
+    destination_movebank.health_check_settings.retriable_error_count_threshold = 3
+    destination_movebank.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(destination_movebank, count=3)
+
+    calculate_integration_status(integration_id=destination_movebank.id)
+
+    destination_movebank.status.refresh_from_db()
+    assert destination_movebank.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert destination_movebank.status.status_details == (
+        "Errors were detected while pushing data to the destination"
+    )
+
+
 def test_retriable_update_failures_count_toward_sustained_errors(provider_lotek_panthera):
     provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 4
     provider_lotek_panthera.health_check_settings.save()
