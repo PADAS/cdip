@@ -1,5 +1,6 @@
 import pytest
 from integrations.models import IntegrationStatus, Integration
+from activity_log.models import ActivityLog
 from ..models.v2 import calculate_integration_status
 
 
@@ -115,3 +116,88 @@ def test_health_status_matches_integration_disabled_on_creation(integration_type
 def test_health_check_settings_have_retriable_error_threshold(provider_lotek_panthera):
     settings = provider_lotek_panthera.health_check_settings
     assert settings.retriable_error_count_threshold == 30
+
+
+def _make_retriable_delivery_warning_logs(integration, count, value="observation_delivery_failed"):
+    return [
+        ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.WARNING,
+            log_type=ActivityLog.LogTypes.EVENT,
+            origin=ActivityLog.Origin.DISPATCHER,
+            integration=integration,
+            value=value,
+            title="Error Delivering Observation to 'https://fake-site.pamdas.org'",
+            details={"server_response_status": 503},
+            is_reversible=False,
+        )
+        for _ in range(count)
+    ]
+
+
+def test_sustained_retriable_delivery_errors_mark_integration_unhealthy(provider_lotek_panthera):
+    provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 3
+    provider_lotek_panthera.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=3)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == (
+        "Sustained delivery errors - destination may be down or overloaded"
+    )
+
+
+def test_few_retriable_delivery_errors_keep_integration_healthy(provider_lotek_panthera):
+    # Below the threshold (default 30), retriable warnings must not alarm
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=5)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.HEALTHY
+
+
+def test_unrelated_warnings_do_not_count_toward_sustained_errors(provider_lotek_panthera):
+    provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 3
+    provider_lotek_panthera.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=3, value="custom_dispatcher_log")
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.HEALTHY
+
+
+def test_error_threshold_takes_precedence_over_warning_threshold(
+        provider_lotek_panthera,
+        pull_observations_action_started_activity_log,
+        pull_observations_action_failed_activity_log,
+        pull_observations_action_failed_activity_log_2,
+        pull_observations_action_failed_activity_log_3
+):
+    # When both thresholds are crossed, the ERROR branch runs first and its
+    # status_details wins (the elif chain in calculate_integration_status).
+    provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 3
+    provider_lotek_panthera.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=3)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details != (
+        "Sustained delivery errors - destination may be down or overloaded"
+    )
+
+
+def test_retriable_update_failures_count_toward_sustained_errors(provider_lotek_panthera):
+    provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 4
+    provider_lotek_panthera.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=2)
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=2, value="observation_update_failed")
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
