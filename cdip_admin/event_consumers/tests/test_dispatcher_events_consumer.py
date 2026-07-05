@@ -1,5 +1,6 @@
 import pytest
 import json
+from unittest.mock import MagicMock
 
 from activity_log.models import ActivityLog
 from event_consumers.dispatcher_events_consumer import process_event, data_type_str_map, \
@@ -428,3 +429,140 @@ def test_409_delivery_errors_are_logged_as_warnings(
     assert log_details.get("server_response_status") == event_payload.get("server_response_status")
     assert log_details.get("server_response_body") == event_payload.get("server_response_body")
     assert activity_log.details.get("source_external_id") == observation_data["source_external_id"]
+
+
+def _make_er_delivery_failed_message(trace, destination, error, server_response_status=None,
+                                     server_response_body=""):
+    message = MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v2",
+        "event_type": "ObservationDeliveryFailed",
+        "payload": {
+            "error": error,
+            "error_traceback": "Traceback (most recent call last): ...",
+            "server_response_status": server_response_status,
+            "server_response_body": server_response_body,
+            "observation": {
+                "gundi_id": str(trace.object_id),
+                "related_to": None,
+                "data_provider_id": str(trace.data_provider.id),
+                "destination_id": str(destination.id),
+                "delivered_at": "2025-01-23 16:54:19.215015+00:00",
+            },
+        }
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message
+
+
+@pytest.mark.parametrize("server_response_status", [409, 429, 502, 503, 504])
+def test_retriable_status_delivery_errors_are_logged_as_warnings(
+        lotek_observation_trace, integrations_list_er, server_response_status
+):
+    message = _make_er_delivery_failed_message(
+        trace=lotek_observation_trace,
+        destination=integrations_list_er[0],
+        error=f"ERClientException: ER error ON POST https://fake-site.pamdas.org/api/v1.0/sensors/",
+        server_response_status=server_response_status,
+        server_response_body='{"status": {"message": "err"}}',
+    )
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(lotek_observation_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.WARNING
+    assert activity_log.value == "observation_delivery_failed"
+
+
+@pytest.mark.parametrize("error", [
+    # erclient wraps httpx.RequestError (timeouts, connection errors) into an
+    # ERClientException with no status code and the "Request to ER failed" prefix.
+    "ERClientException: Request to ER failed: Connection timeout to host https://fake-site.pamdas.org",
+    "ERClientServiceUnreachable: ER Service Unavailable ON POST https://fake-site.pamdas.org/api/v1.0/sensors/",
+    "ERClientRateLimitExceeded: ER Too Many Requests ON POST https://fake-site.pamdas.org/api/v1.0/sensors/",
+    "ClientConnectorError: Cannot connect to host fake-site.pamdas.org:443 ssl:default",
+    "ServerTimeoutError: Timeout on reading data from socket",
+    "ServerDisconnectedError: Server disconnected",
+    "ClientOSError: [Errno 104] Connection reset by peer",
+    "ConnectionResetError: [Errno 104] Connection reset by peer",
+    "TimeoutError: Request timed out",
+])
+def test_transient_errors_without_status_are_logged_as_warnings(
+        lotek_observation_trace, integrations_list_er, error
+):
+    message = _make_er_delivery_failed_message(
+        trace=lotek_observation_trace,
+        destination=integrations_list_er[0],
+        error=error,
+        server_response_status=None,
+    )
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(lotek_observation_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.WARNING
+
+
+def test_retries_exhausted_failures_are_logged_as_errors(
+        lotek_observation_trace, integrations_list_er
+):
+    # The dispatcher publishes this event when it dead-letters a message whose
+    # retries are exhausted (Task 5). It must land as ERROR: "we gave up" is
+    # the real alarm.
+    message = _make_er_delivery_failed_message(
+        trace=lotek_observation_trace,
+        destination=integrations_list_er[0],
+        error="Delivery retries exhausted (message older than 86400 seconds). Message sent to dead-letter queue.",
+        server_response_status=None,
+    )
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(lotek_observation_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+
+
+@pytest.mark.parametrize("server_response_status,error", [
+    (500, "ERClientInternalError: ER Internal Server Error ON POST https://fake-site.pamdas.org/api/v1.0/sensors/"),
+    (401, "ERClientBadCredentials: ER Unauthorized ON POST https://fake-site.pamdas.org/api/v1.0/sensors/"),
+    (400, "ERClientBadRequest: ER Bad Request ON POST https://fake-site.pamdas.org/api/v1.0/sensors/"),
+    (404, "ERClientNotFound: ER Not Found ON POST https://fake-site.pamdas.org/api/v1.0/sensors/"),
+])
+def test_non_retriable_delivery_errors_are_logged_as_errors(
+        lotek_observation_trace, integrations_list_er, server_response_status, error
+):
+    message = _make_er_delivery_failed_message(
+        trace=lotek_observation_trace,
+        destination=integrations_list_er[0],
+        error=error,
+        server_response_status=server_response_status,
+    )
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(lotek_observation_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+
+
+def test_retriable_errors_from_non_er_destinations_stay_errors(
+        trap_tagger_to_movebank_observation_trace, destination_movebank
+):
+    # Classification is scoped to EarthRanger destinations only.
+    message = _make_er_delivery_failed_message(
+        trace=trap_tagger_to_movebank_observation_trace,
+        destination=destination_movebank,
+        error="Exception: Service Unavailable",
+        server_response_status=503,
+    )
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(trap_tagger_to_movebank_observation_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.ERROR
