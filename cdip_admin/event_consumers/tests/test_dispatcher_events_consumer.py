@@ -350,7 +350,12 @@ def test_process_observation_update_failed_event(
     activity_log = ActivityLog.objects.filter(integration_id=observation_data["data_provider_id"]).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
-    assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+    if schema_version == "v1":
+        # v1 events carry no status/error detail; current behavior is preserved
+        assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+    else:
+        # The v2 fixture is a "Will retry later" reference-data wait — retriable
+        assert activity_log.log_level == ActivityLog.LogLevels.WARNING
     assert activity_log.origin == ActivityLog.Origin.DISPATCHER
     assert activity_log.value == "observation_update_failed"
     assert activity_log.title == f"Error Updating Event {trap_tagger_event_update_trace.object_id} in '{trap_tagger_event_update_trace.destination.base_url}'"
@@ -566,3 +571,36 @@ def test_retriable_errors_from_non_er_destinations_stay_errors(
     ).first()
     assert activity_log
     assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+
+
+def test_non_retriable_update_failures_are_logged_as_errors(
+        trap_tagger_event_update_trace, integrations_list_er
+):
+    message = MagicMock()
+    event_dict = {
+        "event_id": "605535df-1b9b-412b-9fd5-e29b09582999",
+        "timestamp": "2023-07-11 18:19:19.215459+00:00",
+        "schema_version": "v2",
+        "event_type": "ObservationUpdateFailed",
+        "payload": {
+            "error": "ERClientBadRequest: ER Bad Request ON PATCH https://fake-site.pamdas.org/api/v1.0/activity/event/1234",
+            "error_traceback": "",
+            "server_response_status": 400,
+            "server_response_body": '{"status": {"code": 400}}',
+            "observation": {
+                "gundi_id": str(trap_tagger_event_update_trace.object_id),
+                "related_to": None,
+                "data_provider_id": str(trap_tagger_event_update_trace.data_provider.id),
+                "destination_id": str(integrations_list_er[0].id),
+                "updated_at": "2024-07-25 12:25:44.442696+00:00",
+            },
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    process_event(message)
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(trap_tagger_event_update_trace.data_provider.id)
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.ERROR
+    assert activity_log.value == "observation_update_failed"
