@@ -218,7 +218,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
-    destination = Integration.objects.filter(id=str(observation.destination_id)).first()
+    destination = trace.destination
     if is_retriable_er_error(
         error=event.payload.error,
         server_response_status=event.payload.server_response_status,
@@ -333,7 +333,7 @@ def handle_observation_update_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
-    destination = Integration.objects.filter(id=destination_id).first()
+    destination = trace.destination
     if is_retriable_er_error(
         error=event_data.error,
         server_response_status=getattr(event_data, "server_response_status", None),
