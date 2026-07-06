@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='healthchecksettings',
             name='retriable_error_count_threshold',
-            field=models.PositiveIntegerField(default=30, help_text='Number of retriable (warning-level) delivery failures within the time window before the integration is marked unhealthy. Retriable failures are transient destination errors that PubSub retries; a sustained volume indicates an outage.'),
+            field=models.PositiveIntegerField(default=30, help_text='Number of retriable (warning-level) delivery failures within the time window before the integration is marked unhealthy. Retriable failures are transient destination errors that PubSub retries; a sustained volume indicates an outage. Set to 0 to disable this check.'),
         ),
     ]

@@ -158,6 +158,18 @@ def test_few_retriable_delivery_errors_keep_integration_healthy(provider_lotek_p
     assert provider_lotek_panthera.status.status == IntegrationStatus.Status.HEALTHY
 
 
+def test_zero_retriable_threshold_disables_sustained_error_check(provider_lotek_panthera):
+    # A threshold of 0 must disable the check, not make count() >= 0 always true
+    provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 0
+    provider_lotek_panthera.health_check_settings.save()
+    _make_retriable_delivery_warning_logs(provider_lotek_panthera, count=5)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.HEALTHY
+
+
 def test_unrelated_warnings_do_not_count_toward_sustained_errors(provider_lotek_panthera):
     provider_lotek_panthera.health_check_settings.retriable_error_count_threshold = 3
     provider_lotek_panthera.health_check_settings.save()
