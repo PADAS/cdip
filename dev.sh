@@ -143,6 +143,31 @@ function initial_setup() {
         return 1
     fi
 
+    # 1b. The Kong image COPYs a GCP service-account creds file that is gitignored
+    # in the Kong repo, so a fresh clone lacks it and the build fails. The local
+    # stack only needs a well-formed placeholder (the upstream-google-id-token
+    # plugin isn't exercised by the local OIDC route). Generate one if missing —
+    # the throwaway key is generated here at runtime, so nothing key-shaped is
+    # ever committed to this repo.
+    local kong_creds="${kong_dir}/application_default_credentials.json"
+    if [ ! -f "${kong_creds}" ]; then
+        echo -e "${YELLOW}Generating placeholder application_default_credentials.json for the Kong build${NC}"
+        local kong_key
+        kong_key=$(openssl genrsa 2048 2>/dev/null | awk '{printf "%s\\n", $0}')
+        cat > "${kong_creds}" <<EOF
+{
+  "type": "service_account",
+  "project_id": "local-dev",
+  "private_key_id": "local-dev-key-id",
+  "private_key": "${kong_key}",
+  "client_email": "local-dev@local-dev.iam.gserviceaccount.com",
+  "client_id": "000000000000000000000",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token"
+}
+EOF
+    fi
+
     # 2. Root .env (compose interpolation): ensure OIDC_SESSION_SECRET exists.
     touch .env
     if ! grep -q '^OIDC_SESSION_SECRET=' .env; then
