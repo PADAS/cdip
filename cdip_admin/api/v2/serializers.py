@@ -666,6 +666,18 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
         with transaction.atomic():
+            # Serialize concurrent creates for this IntegrationType and re-check
+            # (name, type) inside the transaction. validate() catches most
+            # duplicates upfront (better UX), but two concurrent POSTs could
+            # both pass that check; without a DB UniqueConstraint this closes
+            # the race.
+            integration_type = validated_data["type"]
+            IntegrationType.objects.select_for_update().get(pk=integration_type.pk)
+            name = validated_data.get("name")
+            if name and Integration.objects.filter(name=name, type=integration_type).exists():
+                raise DuplicateIntegrationError(detail={
+                    "name": ["A connection with this name already exists for this integration type."]
+                })
             # Create the integration
             integration = Integration.objects.create(**validated_data)
             # Create configurations if provided
