@@ -521,3 +521,47 @@ def test_filter_logs_by_integration_type_as_superuser(
             integration__type__value__iexact="lotek"
         )[:20],
     )
+
+
+def test_filter_logs_by_integration_type_is_case_insensitive(
+        api_client, superuser, provider_lotek_panthera,
+):
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_started",
+        title="lotek log",
+        details={},
+        is_reversible=False,
+    )
+    _test_list_activity_logs(
+        api_client=api_client,
+        user=superuser,
+        params={"integration_type": "LOTEK"},  # uppercase must still match
+        expected_logs=ActivityLog.objects.filter(
+            integration__type__value__iexact="lotek"
+        )[:20],
+    )
+
+
+def test_filter_logs_by_unknown_integration_type_returns_empty(
+        api_client, superuser, provider_lotek_panthera,
+):
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_started",
+        title="lotek log",
+        details={},
+        is_reversible=False,
+    )
+    _test_list_activity_logs(
+        api_client=api_client,
+        user=superuser,
+        params={"integration_type": "does_not_exist"},
+        expected_logs=[],  # no type matches -> empty subquery -> no rows
+    )
