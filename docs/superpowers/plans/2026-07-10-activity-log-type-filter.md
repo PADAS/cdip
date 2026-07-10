@@ -245,15 +245,22 @@ def test_filter_logs_by_integration_type_composes_with_log_level(
 
 Add to `cdip_admin/api/v2/tests/test_activity_logs_api.py`:
 
+Note: `integrations_list_er` creates FIVE earth_ranger integrations owned by the
+user's `organization` (indices 0–4) and five owned by `other_organization`
+(5–9), and fixture setup emits activity logs for several of them. So the user
+legitimately has many earth_ranger logs — do NOT assert an exact count against a
+single integration. Assert scoping by presence/absence of specific logs and by
+checking every returned log belongs to the user's own integrations.
+
 ```python
 def test_filter_logs_by_integration_type_preserves_org_scoping(
         api_client, org_admin_user, integrations_list_er,
 ):
     # integrations_list_er[0..4] belong to `organization` (org_admin_user's org);
-    # [5..9] belong to `other_organization`. Both are type earth_ranger.
+    # [5..9] belong to `other_organization`. All are type earth_ranger.
     owned = integrations_list_er[0]
     not_owned = integrations_list_er[5]
-    ActivityLog.objects.create(
+    owned_log = ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.INFO,
         log_type=ActivityLog.LogTypes.EVENT,
         origin=ActivityLog.Origin.INTEGRATION,
@@ -261,7 +268,7 @@ def test_filter_logs_by_integration_type_preserves_org_scoping(
         value="integration_action_started", title="owned ER log",
         details={}, is_reversible=False,
     )
-    ActivityLog.objects.create(
+    not_owned_log = ActivityLog.objects.create(
         log_level=ActivityLog.LogLevels.INFO,
         log_type=ActivityLog.LogTypes.EVENT,
         origin=ActivityLog.Origin.INTEGRATION,
@@ -269,20 +276,33 @@ def test_filter_logs_by_integration_type_preserves_org_scoping(
         value="integration_action_started", title="other org ER log",
         details={}, is_reversible=False,
     )
-    # As a non-admin, filtering by earth_ranger must return ONLY the owned
-    # integration's log — org scoping is not widened by the type filter.
-    _test_list_activity_logs(
-        api_client=api_client,
-        user=org_admin_user,
-        params={"integration_type": "earth_ranger"},
-        expected_logs=ActivityLog.objects.filter(integration=owned)[:20],
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(
+        reverse("logs-list"), {"integration_type": "earth_ranger"}
     )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    titles = {log["title"] for log in results}
+    # The user's own earth_ranger log is visible; the other org's is not.
+    assert "owned ER log" in titles
+    assert "other org ER log" not in titles
+    # Every returned log belongs to one of the user's own integrations —
+    # the type filter did not widen visibility beyond org scoping.
+    visible_ids = {
+        str(i) for i in get_user_integrations_qs(
+            user=org_admin_user
+        ).values_list("id", flat=True)
+    }
+    for log in results:
+        assert log["integration"]["id"] in visible_ids
+    # Sanity: the not-owned log exists but is scoped out.
+    assert str(not_owned_log.id) != str(owned_log.id)
 ```
 
 - [ ] **Step 3: Run both tests to verify they pass**
 
 Run: `pytest cdip_admin/api/v2/tests/test_activity_logs_api.py -k "composes_with_log_level or preserves_org_scoping" -v`
-Expected: PASS. The org-scoping test proves the `integration__in` (viewset) and `integration__in` (filter) compose to an intersection; if it fails showing the other org's log, the filter is bypassing scoping — fix the filter, not the test.
+Expected: PASS. The org-scoping test proves the `integration__in` (viewset) and `integration__in` (filter) compose to an intersection; if `"other org ER log"` appears in `titles`, the filter is bypassing scoping — fix the filter, not the test.
 
 - [ ] **Step 4: Run the whole file (no regressions)**
 
