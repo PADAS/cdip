@@ -692,6 +692,7 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
         field_name="integration__id",
         lookup_expr="in",
     )
+    integration_type = django_filters_rest.CharFilter(method="filter_by_integration_type")
     value = django_filters_rest.CharFilter(
         field_name="value",
         lookup_expr="exact",
@@ -706,3 +707,12 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
 
     def filter_by_log_level(self, queryset, name, value):
         return queryset.filter(log_level__gte=int(value))
+
+    def filter_by_integration_type(self, queryset, name, value):
+        # Expand the type slug to its integration ids and filter with
+        # integration__in=Subquery(...). This rides the (integration, -created_at)
+        # composite index — the same shape the viewset uses for org scoping —
+        # instead of a join on integration__type__value, which the partitioned
+        # table has no index for. See GUNDI-5409.
+        integrations = Integration.objects.filter(type__value__iexact=value)
+        return queryset.filter(integration__in=Subquery(integrations.values("id")))

@@ -486,3 +486,38 @@ def test_get_activity_log_details(
     assert response_data.get("title") == log.title
     # Check details are retrieved too
     assert response_data.get("details") == log.details
+
+
+def test_filter_logs_by_integration_type_as_superuser(
+        api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
+):
+    # One log on a lotek-type integration, one on a movebank-type integration.
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_started",
+        title="lotek log",
+        details={},
+        is_reversible=False,
+    )
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_movebank_ewt,
+        value="integration_action_started",
+        title="movebank log",
+        details={},
+        is_reversible=False,
+    )
+    # Filtering by the lotek slug returns only the lotek log, excluding movebank.
+    _test_list_activity_logs(
+        api_client=api_client,
+        user=superuser,
+        params={"integration_type": "lotek"},
+        expected_logs=ActivityLog.objects.filter(
+            integration__type__value__iexact="lotek"
+        )[:20],
+    )
