@@ -565,3 +565,88 @@ def test_filter_logs_by_unknown_integration_type_returns_empty(
         params={"integration_type": "does_not_exist"},
         expected_logs=[],  # no type matches -> empty subquery -> no rows
     )
+
+
+def test_filter_logs_by_integration_type_composes_with_log_level(
+        api_client, superuser, provider_lotek_panthera, provider_movebank_ewt,
+):
+    # lotek: one INFO + one ERROR; movebank: one ERROR (must be excluded by type).
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_started", title="lotek info",
+        details={}, is_reversible=False,
+    )
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_lotek_panthera,
+        value="integration_action_failed", title="lotek error",
+        details={}, is_reversible=False,
+    )
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.ERROR,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=provider_movebank_ewt,
+        value="integration_action_failed", title="movebank error",
+        details={}, is_reversible=False,
+    )
+    # type=lotek AND log_level>=ERROR -> only the lotek error log.
+    _test_list_activity_logs(
+        api_client=api_client,
+        user=superuser,
+        params={
+            "integration_type": "lotek",
+            "log_level": ActivityLog.LogLevels.ERROR.value,
+        },
+        expected_logs=ActivityLog.objects.filter(
+            integration__type__value__iexact="lotek",
+            log_level__gte=ActivityLog.LogLevels.ERROR.value,
+        )[:20],
+    )
+
+
+def test_filter_logs_by_integration_type_preserves_org_scoping(
+        api_client, org_admin_user, integrations_list_er,
+):
+    # integrations_list_er[0..4] belong to `organization` (org_admin_user's org);
+    # [5..9] belong to `other_organization`. All are type earth_ranger.
+    owned = integrations_list_er[0]
+    not_owned = integrations_list_er[5]
+    owned_log = ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=owned,
+        value="integration_action_started", title="owned ER log",
+        details={}, is_reversible=False,
+    )
+    not_owned_log = ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.INTEGRATION,
+        integration=not_owned,
+        value="integration_action_started", title="other org ER log",
+        details={}, is_reversible=False,
+    )
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(
+        reverse("logs-list"), {"integration_type": "earth_ranger"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    titles = {log["title"] for log in results}
+    assert "owned ER log" in titles
+    assert "other org ER log" not in titles
+    visible_ids = {
+        str(i) for i in get_user_integrations_qs(
+            user=org_admin_user
+        ).values_list("id", flat=True)
+    }
+    for log in results:
+        assert log["integration"]["id"] in visible_ids
+    assert str(not_owned_log.id) != str(owned_log.id)
