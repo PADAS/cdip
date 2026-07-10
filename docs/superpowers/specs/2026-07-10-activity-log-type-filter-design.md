@@ -72,8 +72,11 @@ logic needed.
   **case-insensitively** (`type__value__iexact`). Chosen over UUID so the CLI
   can pass `--type` straight through with zero client-side resolution.
 - **Single value only.** No `__in` variant (YAGNI — the CLI needs one type).
-- **Unknown / empty slug → empty result set**, no error (the subquery yields no
-  ids). Consistent with the other `ActivityLogFilter` filters.
+- **Unknown (non-empty) slug → empty result set**, no error (the subquery yields
+  no ids). An **empty** param (`?integration_type=`) is treated as *no filter*
+  (django-filter skips empty values), equivalent to omitting it — org-scoping
+  still applies. The CLI only ever sends a real slug, so this distinction is
+  academic in practice.
 - **Composes** with the existing `from_date`, `to_date`, `log_level`, `origin`,
   `integration`, `value` filters (all ANDed).
 
