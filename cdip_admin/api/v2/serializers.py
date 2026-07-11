@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Iterable
@@ -326,6 +327,26 @@ class IntegrationWebhookFullSerializer(serializers.ModelSerializer):
         )
 
 
+# Integration slug charset, shared by the API and gundi-core's schemas
+# (IntegrationType/Action/Webhook `.value` all use regex="^[a-z0-9_]+$").
+# Enforced here so the API rejects slugs the client cannot parse, rather than
+# silently storing them via update_or_create (which bypasses the model
+# SlugField validators).
+SLUG_VALUE_REGEX = re.compile(r"[a-z0-9_]+")
+
+
+def validate_slug_value(value):
+    # fullmatch, not match: `match` against a `...$` pattern would accept a
+    # trailing newline (e.g. "tech_x\n"), since Python's `$` matches just before
+    # a final \n. fullmatch requires the ENTIRE string to be the slug.
+    if not SLUG_VALUE_REGEX.fullmatch(value or ""):
+        raise serializers.ValidationError(
+            "Must contain only lowercase letters, digits, and underscores "
+            "(matching ^[a-z0-9_]+$)."
+        )
+    return value
+
+
 class IntegrationWebhookCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegrationWebhook
@@ -336,6 +357,9 @@ class IntegrationWebhookCreateUpdateSerializer(serializers.ModelSerializer):
             "schema",
             "ui_schema",
         )
+
+    def validate_value(self, value):
+        return validate_slug_value(value)
 
 
 class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
@@ -353,6 +377,9 @@ class IntegrationActionCreateUpdateSerializer(serializers.ModelSerializer):
             "is_periodic_action",
             "crontab_schedule"
         )
+
+    def validate_value(self, value):
+        return validate_slug_value(value)
 
 
 class IntegrationTypeFullSerializer(serializers.ModelSerializer):
@@ -391,8 +418,9 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
         )
 
     def validate_value(self, value):
-        # Skip uniqueness validation for idempotent creation
-        return value
+        # Skip uniqueness validation for idempotent creation, but enforce the
+        # slug charset (matches gundi-core's IntegrationType.value regex).
+        return validate_slug_value(value)
 
     def validate(self, data):
         """
