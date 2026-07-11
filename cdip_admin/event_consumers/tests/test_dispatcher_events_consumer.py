@@ -604,3 +604,22 @@ def test_non_retriable_update_failures_are_logged_as_errors(
     assert activity_log
     assert activity_log.log_level == ActivityLog.LogLevels.ERROR
     assert activity_log.value == "observation_update_failed"
+
+
+def test_is_retriable_er_error_uses_normalized_er_type_check():
+    # The classifier must scope via Integration.is_er_site (which normalizes
+    # case/underscores), not an exact "earth_ranger" string match — a type
+    # stored as "EarthRanger" is still an ER destination.
+    from integrations.models import Integration, IntegrationType
+    from event_consumers.dispatcher_events_consumer import is_retriable_er_error
+
+    for type_value in ("earth_ranger", "EarthRanger", "earthranger"):
+        destination = Integration(type=IntegrationType(value=type_value))
+        assert is_retriable_er_error(
+            error=None, server_response_status=503, destination=destination,
+        ), f"type value {type_value!r} should classify as ER"
+
+    non_er = Integration(type=IntegrationType(value="movebank"))
+    assert not is_retriable_er_error(
+        error=None, server_response_status=503, destination=non_er,
+    )

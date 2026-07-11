@@ -52,7 +52,7 @@ def is_retriable_er_error(error, server_response_status, destination):
     # so temporary outages don't mark the connection unhealthy. Sustained
     # volumes of these warnings are caught by a separate threshold in
     # calculate_integration_status.
-    if not destination or destination.type.value != "earth_ranger":
+    if not destination or not destination.is_er_site:
         return False
     if server_response_status in RETRIABLE_ER_STATUS_CODES:
         return True
