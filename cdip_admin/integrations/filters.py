@@ -692,6 +692,7 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
         field_name="integration__id",
         lookup_expr="in",
     )
+    integration_type = django_filters_rest.CharFilter(method="filter_by_integration_type")
     value = django_filters_rest.CharFilter(
         field_name="value",
         lookup_expr="exact",
@@ -706,3 +707,29 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
 
     def filter_by_log_level(self, queryset, name, value):
         return queryset.filter(log_level__gte=int(value))
+
+    def filter_by_integration_type(self, queryset, name, value):
+        # Materialize the ids instead of passing a Subquery: behind an opaque
+        # subquery the planner gets a type-blind row estimate and picks a
+        # newest-first created_at walk for every slug — unbounded for quiet
+        # types and non-terminating for unknown slugs (which are user
+        # supplied). With literal ids it has real per-id statistics and uses
+        # the (integration, -created_at) composite index where it matters.
+        # See docs/superpowers/runbooks/2026-07-10-gundi-5409-explain-validation.md.
+        integrations = Integration.objects.filter(type__value__iexact=value)
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        if user is not None and not user.is_superuser:
+            # Mirror the viewset's org scoping (get_user_integrations_qs) so
+            # the id list stays small and a type owned entirely by other orgs
+            # short-circuits here. Scoping-wise this is redundant with the
+            # viewset (which already prevents leakage) - it only prunes ids.
+            integrations = integrations.filter(
+                id__in=Subquery(get_user_integrations_qs(user=user).values("id"))
+            )
+        integration_ids = list(integrations.values_list("id", flat=True))
+        if not integration_ids:
+            # Unknown/typo'd slug, or no integrations of this type visible to
+            # this user: empty result, no query against the partitioned table
+            return queryset.none()
+        return queryset.filter(integration__in=integration_ids)
