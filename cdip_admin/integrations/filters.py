@@ -21,7 +21,6 @@ from integrations.models import (
     get_user_integrations_qs,
     Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
-from integrations.models import get_user_integrations_qs
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, OrphanedBooleanWidget, LenientModelChoiceFilter
 from django.db.models import Q
 from django.contrib.postgres.aggregates import ArrayAgg
