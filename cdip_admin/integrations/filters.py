@@ -709,10 +709,18 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
         return queryset.filter(log_level__gte=int(value))
 
     def filter_by_integration_type(self, queryset, name, value):
-        # Expand the type slug to its integration ids and filter with
-        # integration__in=Subquery(...). This rides the (integration, -created_at)
-        # composite index — the same shape the viewset uses for org scoping —
-        # instead of a join on integration__type__value, which the partitioned
-        # table has no index for. See GUNDI-5409.
-        integrations = Integration.objects.filter(type__value__iexact=value)
-        return queryset.filter(integration__in=Subquery(integrations.values("id")))
+        # Materialize the ids instead of passing a Subquery: behind an opaque
+        # subquery the planner gets a type-blind row estimate and picks a
+        # newest-first created_at walk for every slug — unbounded for quiet
+        # types and non-terminating for unknown slugs (which are user
+        # supplied). With literal ids it has real per-id statistics and uses
+        # the (integration, -created_at) composite index where it matters.
+        # See docs/superpowers/runbooks/2026-07-10-gundi-5409-explain-validation.md.
+        integration_ids = list(
+            Integration.objects.filter(type__value__iexact=value).values_list("id", flat=True)
+        )
+        if not integration_ids:
+            # Unknown/typo'd slug: empty result, no query against the
+            # partitioned table
+            return queryset.none()
+        return queryset.filter(integration__in=integration_ids)

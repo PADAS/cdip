@@ -27,6 +27,11 @@ print(type_logs("spidertracks").explain(analyze=True, buffers=True))
 print(type_logs("<rare_type_slug>").explain(analyze=True, buffers=True))
 ```
 
+> **Caution:** verify the slug matches existing integrations BEFORE running
+> `explain(analyze=True)` — for the Subquery form, a slug with zero matches
+> makes the LIMIT unable to terminate the scan and the "explain" runs a
+> full-table walk (see Results, case c). Plain `.explain()` is always safe.
+
 ## Acceptance criteria
 
 - [ ] Plan shows an **Index Scan / Index-Only Scan** (or per-partition
@@ -48,9 +53,43 @@ print(type_logs("<rare_type_slug>").explain(analyze=True, buffers=True))
 2. If still unacceptable, escalate to **Option 2** (denormalize `integration_type`
    onto `ActivityLog` + `(integration_type, -created_at)` index) as separate work.
 
-## Results (fill in before merge)
+## Results
 
-- Date / environment:
-- (a) spidertracks plan summary + verdict:
-- (b) rare type (slug used) plan summary + verdict:
-- Decision: [ship as-is | switch to materialized ids | escalate to Option 2]
+- **Date / environment:** 2026-07-11 (UTC), staging
+- **(a) spidertracks (Subquery form):** Merge Append walk over per-partition
+  `created_at DESC` indexes + Nested Loop Semi Join against the id subquery
+  (composite index NOT used). Walked 1,864 rows for 20 hits; 2,209 buffers;
+  42ms exec / 119ms plan (cold catalog). PASS — but only because spidertracks
+  matches are dense in recent history.
+- **(b) tracpoint (materialized ids, 1 integration):** per-partition Index
+  Scans on the `(integration_id, created_at)` composite
+  (`Index Cond: integration_id = <id> AND created_at <= now`), merged in
+  order. 46 buffers; **4.4ms exec / 2.7ms plan**. PASS — bounded regardless
+  of how stale the type's newest rows are.
+- **(c) nonexistent slug (discovered accidentally via "awt"):** Subquery form
+  produced the identical walk plan with ZERO possible matches → the LIMIT can
+  never terminate the scan → full-table walk across all partitions; query had
+  to be killed. **FAIL — and user-triggerable via `?integration_type=<typo>`
+  on the API.** The materialized-ids form short-circuits (`__in=[]` → Django
+  emits no query).
+- **Estimation finding:** the Subquery form gets a near-identical ~12.1M-row
+  estimate for every slug (spidertracks 12,155,810 vs nonexistent "awt"
+  12,160,386) — the planner is blind behind the opaque subquery, so plan
+  choice is type-independent and the outcome depends entirely on where the
+  type's rows sit in `created_at` order.
+
+## Decision: switch to materialized ids
+
+Do not ship the `Subquery` form. In the filter/view:
+
+1. Resolve `ids = list(Integration.objects.filter(type__value__iexact=slug).values_list("id", flat=True))` in Python.
+2. If `ids` is empty (unknown or typo'd slug), return an empty page early —
+   sane API semantics and no DB round trip.
+3. Pass the literal list to `integration__in` — with real per-id statistics
+   the planner picks the composite index for sparse types (measured: 4.4ms)
+   and remains free to choose the newest-first walk where it genuinely wins
+   (dense types).
+
+Option 2 (denormalized `integration_type` on ActivityLog) is NOT required.
+Residual note: revisit the IN-list size if any type ever accumulates
+thousands of integrations (today's max is low hundreds).
