@@ -1809,3 +1809,59 @@ def test_filter_integrations_by_is_used_as_provider(
         },
         expected_integrations=providers if is_used_as_provider else destinations
     )
+
+
+def _minimal_type_payload(value="tech_x", action_value="auth"):
+    return {
+        "name": "Technology X",
+        "value": value,
+        "description": "Default type for Technology X",
+        "service_url": "https://techx.example.com",
+        "actions": [
+            {
+                "type": IntegrationAction.ActionTypes.AUTHENTICATION.value,
+                "name": "Authenticate",
+                "value": action_value,
+                "description": "auth",
+                "schema": {"type": "object", "properties": {}},
+                "is_periodic_action": False,
+            }
+        ],
+    }
+
+
+def test_register_integration_type_rejects_invalid_type_slug(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    payload = _minimal_type_payload(value="tech-x")  # hyphen violates ^[a-z0-9_]+$
+    response = api_client.post(
+        reverse("integration-types-list"), data=payload, format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert not IntegrationType.objects.filter(value="tech-x").exists()
+
+
+def test_register_integration_type_rejects_invalid_action_slug(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    payload = _minimal_type_payload(value="tech_x", action_value="pull-data")  # hyphen
+    response = api_client.post(
+        reverse("integration-types-list"), data=payload, format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert not IntegrationType.objects.filter(value="tech_x").exists()
+
+
+def test_register_integration_type_rejects_invalid_webhook_slug(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    payload = _minimal_type_payload(value="tech_x")
+    payload["register_webhook_in_kong"] = False
+    payload["webhook"] = {
+        "name": "Webhook",
+        "value": "bad-webhook",  # hyphen violates ^[a-z0-9_]+$
+        "description": "wh",
+        "schema": {"type": "object", "properties": {}},
+    }
+    response = api_client.post(
+        reverse("integration-types-list"), data=payload, format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert not IntegrationType.objects.filter(value="tech_x").exists()
