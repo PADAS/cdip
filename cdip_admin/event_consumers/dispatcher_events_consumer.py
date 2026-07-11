@@ -21,6 +21,46 @@ data_type_str_map = {
 }
 
 
+# HTTP statuses from EarthRanger that indicate a transient condition. The
+# dispatcher re-raises on failure so PubSub retries the message; these
+# failures usually resolve on retry and must not count toward the
+# unhealthy threshold in the health calculator.
+RETRIABLE_ER_STATUS_CODES = {409, 429, 502, 503, 504}
+
+# Markers of transient failures that carry no HTTP status code. The dispatcher
+# formats errors as f"{type(e).__name__}: {e}", so exception class names appear
+# in the error string. "Request to ER failed" is the message erclient uses when
+# wrapping network errors and timeouts (httpx.RequestError). "Will retry later"
+# is the dispatcher's message when an event update arrives before its parent
+# event was delivered.
+TRANSIENT_ER_ERROR_MARKERS = (
+    "Request to ER failed",
+    "ERClientServiceUnreachable",
+    "ERClientRateLimitExceeded",
+    "ClientConnectorError",
+    "ServerTimeoutError",
+    "ServerDisconnectedError",
+    "ClientOSError",
+    "ConnectionResetError",
+    "TimeoutError",
+    "Will retry later",
+)
+
+
+def is_retriable_er_error(error, server_response_status, destination):
+    # Retriable failures against EarthRanger destinations are logged as WARNING
+    # so temporary outages don't mark the connection unhealthy. Sustained
+    # volumes of these warnings are caught by a separate threshold in
+    # calculate_integration_status.
+    if not destination or not destination.is_er_site:
+        return False
+    if server_response_status in RETRIABLE_ER_STATUS_CODES:
+        return True
+    if server_response_status is None and error:
+        return any(marker in error for marker in TRANSIENT_ER_ERROR_MARKERS)
+    return False
+
+
 def handle_observation_delivered_event(event_dict: dict):
     event = system_events.ObservationDelivered.parse_obj(event_dict)
     # Update the status and save the external id
@@ -178,8 +218,12 @@ def handle_observation_delivery_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
-    # Flag the error as a warning if ER returns a 409 conflict error. Those are retried.
-    if "pamdas.org" in event.payload.error and event.payload.server_response_status == 409:
+    destination = trace.destination
+    if is_retriable_er_error(
+        error=event.payload.error,
+        server_response_status=event.payload.server_response_status,
+        destination=destination,
+    ):
         level = ActivityLog.LogLevels.WARNING
     else:
         level = ActivityLog.LogLevels.ERROR
@@ -289,8 +333,17 @@ def handle_observation_update_failed_event(event_dict: dict):
     }
     # Workaround to serialize complex types until upgrading to pydantic v2
     log_data_cleaned = json.loads(json.dumps(log_data, default=str))
+    destination = trace.destination
+    if is_retriable_er_error(
+        error=event_data.error,
+        server_response_status=getattr(event_data, "server_response_status", None),
+        destination=destination,
+    ):
+        level = ActivityLog.LogLevels.WARNING
+    else:
+        level = ActivityLog.LogLevels.ERROR
     ActivityLog.objects.create(
-        log_level=ActivityLog.LogLevels.ERROR,
+        log_level=level,
         log_type=ActivityLog.LogTypes.EVENT,
         origin=ActivityLog.Origin.DISPATCHER,
         integration=trace.data_provider,

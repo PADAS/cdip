@@ -115,6 +115,22 @@ def calculate_integration_status(integration_id):
     ).count() >= errors_threshold:
         integration_status.status = IntegrationStatus.Status.UNHEALTHY
         integration_status.status_details = "Errors were detected while pushing data to the destination"
+    elif healthcheck_settings.retriable_error_count_threshold and ActivityLog.objects.filter(
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=integration,
+        log_level=ActivityLog.LogLevels.WARNING,
+        value__in=("observation_delivery_failed", "observation_update_failed"),
+        created_at__gte=time_window
+        # Existence at offset N-1 instead of COUNT(*): warning volume is
+        # unbounded during exactly the outages this branch detects
+    )[healthcheck_settings.retriable_error_count_threshold - 1:].exists():
+        # Retriable (transient) delivery failures are logged as warnings and don't
+        # count toward the error threshold above. But a sustained volume of them
+        # means the destination is down or overloaded, which must still alarm.
+        # A threshold of 0 disables this check (guarded above; the N-1 offset
+        # requires N >= 1).
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = "Sustained delivery errors - destination may be down or overloaded"
     integration_status.save()
     return integration_status.status
 
