@@ -56,7 +56,7 @@ def is_retriable_er_error(error, server_response_status, destination):
         return False
     if server_response_status in RETRIABLE_ER_STATUS_CODES:
         return True
-    if not server_response_status and error:
+    if server_response_status is None and error:
         return any(marker in error for marker in TRANSIENT_ER_ERROR_MARKERS)
     return False
 
