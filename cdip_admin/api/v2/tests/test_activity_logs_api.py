@@ -4,7 +4,7 @@ from rest_framework import status
 from activity_log.models import (
     ActivityLog
 )
-from integrations.models import get_user_integrations_qs
+from integrations.models import Integration, get_user_integrations_qs
 
 pytestmark = pytest.mark.django_db
 
@@ -563,7 +563,7 @@ def test_filter_logs_by_unknown_integration_type_returns_empty(
         api_client=api_client,
         user=superuser,
         params={"integration_type": "does_not_exist"},
-        expected_logs=[],  # no type matches -> empty subquery -> no rows
+        expected_logs=[],  # no type matches -> empty id list -> queryset.none(), no query
     )
 
 
@@ -650,3 +650,26 @@ def test_filter_logs_by_integration_type_preserves_org_scoping(
     for log in results:
         assert log["integration"]["id"] in visible_ids
     assert str(not_owned_log.id) != str(owned_log.id)
+
+
+def test_foreign_org_type_short_circuits_for_non_superusers(
+        api_client, org_admin_user, other_organization, integration_type_lotek,
+):
+    # A type whose integrations ALL belong to another org: the filter's
+    # org-scoped id resolution yields no visible ids for this user, so the
+    # request returns an empty page via queryset.none() without querying the
+    # partitioned activity_log table.
+    Integration.objects.create(
+        type=integration_type_lotek,
+        name="Foreign Lotek Provider",
+        owner=other_organization,
+        base_url="api.foreign.lotek.com",
+    )
+    # Guard against a vacuous pass: the slug must genuinely resolve to ids
+    assert Integration.objects.filter(type__value__iexact="lotek").exists()
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(reverse("logs-list"), {"integration_type": "lotek"})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["results"] == []

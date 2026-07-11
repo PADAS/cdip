@@ -2,6 +2,13 @@
 
 **Status:** Design approved · **Ticket:** [GUNDI-5409](https://allenai.atlassian.net/browse/GUNDI-5409) · **Date:** 2026-07-10
 
+> **IMPLEMENTATION NOTE (2026-07-11):** the shipped code deviates from the
+> `Subquery` sketch below on the runbook's EXPLAIN evidence: it materializes
+> the ids in Python (scoped to the requesting user's orgs for non-superusers)
+> and short-circuits to `queryset.none()` when no ids match. See
+> `docs/superpowers/runbooks/2026-07-10-gundi-5409-explain-validation.md`
+> (Results/Decision) for why the Subquery form must not be used.
+
 ## Problem
 
 The `gundi` CLI's `gundi integrations logs --type <slug>` reads the latest

@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **SUPERSEDED IN PART (2026-07-11):** staging EXPLAIN validation (see the
+> runbook's Results/Decision) flipped the query strategy: the shipped filter
+> materializes the integration ids in Python (org-scoped for non-superusers)
+> and returns `queryset.none()` for empty id lists, instead of passing a
+> `Subquery`. The Subquery "MUST" below is retained as written history only —
+> the opaque subquery gives the planner a type-blind estimate and degenerates
+> (non-terminating for unknown slugs). Do not re-introduce it.
+
 **Goal:** Add a server-side `integration_type` filter to `GET /v2/logs/` so activity logs can be filtered by integration type slug, using an index-friendly subquery.
 
 **Architecture:** Add one method filter to `ActivityLogFilter` that expands the type slug to its integration ids via a `Subquery` and filters `integration__in=…` — the same shape `ActivityLogsViewSet.get_queryset` already uses for non-superuser scoping, so it rides the existing `(integration, -created_at)` composite index. No schema change, no migration. A separate `EXPLAIN (ANALYZE, BUFFERS)` runbook gates the merge.

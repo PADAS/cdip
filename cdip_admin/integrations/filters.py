@@ -21,6 +21,7 @@ from integrations.models import (
     get_user_integrations_qs,
     Source, Route, GundiTrace, IntegrationAction, IntegrationStatus, ConnectionStatus, filter_connections_by_status
 )
+from integrations.models import get_user_integrations_qs
 from core.widgets import CustomBooleanWidget, HasErrorBooleanWidget, OrphanedBooleanWidget, LenientModelChoiceFilter
 from django.db.models import Q
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -716,11 +717,20 @@ class ActivityLogFilter(django_filters_rest.FilterSet):
         # supplied). With literal ids it has real per-id statistics and uses
         # the (integration, -created_at) composite index where it matters.
         # See docs/superpowers/runbooks/2026-07-10-gundi-5409-explain-validation.md.
-        integration_ids = list(
-            Integration.objects.filter(type__value__iexact=value).values_list("id", flat=True)
-        )
+        integrations = Integration.objects.filter(type__value__iexact=value)
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        if user is not None and not user.is_superuser:
+            # Mirror the viewset's org scoping (get_user_integrations_qs) so
+            # the id list stays small and a type owned entirely by other orgs
+            # short-circuits here. Scoping-wise this is redundant with the
+            # viewset (which already prevents leakage) - it only prunes ids.
+            integrations = integrations.filter(
+                id__in=Subquery(get_user_integrations_qs(user=user).values("id"))
+            )
+        integration_ids = list(integrations.values_list("id", flat=True))
         if not integration_ids:
-            # Unknown/typo'd slug: empty result, no query against the
-            # partitioned table
+            # Unknown/typo'd slug, or no integrations of this type visible to
+            # this user: empty result, no query against the partitioned table
             return queryset.none()
         return queryset.filter(integration__in=integration_ids)

@@ -10,15 +10,18 @@ filter builds, in **superuser context** (no org pre-scoping — the worst case):
 ```python
 from activity_log.models import ActivityLog
 from integrations.models import Integration
-from django.db.models import Subquery
 
 def type_logs(slug, limit=20):
-    ints = Integration.objects.filter(type__value__iexact=slug)
+    # Mirrors the SHIPPED filter: materialized ids (see Decision below).
+    ids = list(Integration.objects.filter(type__value__iexact=slug).values_list("id", flat=True))
     return (
         ActivityLog.objects
-        .filter(integration__in=Subquery(ints.values("id")))
+        .filter(integration__in=ids)
         .order_by("-created_at")[:limit]
     )
+
+# Historical Subquery form — do NOT run with analyze=True (see Results, case c):
+# ActivityLog.objects.filter(integration__in=Subquery(ints.values("id")))
 
 # (a) High-volume type — many integrations, many rows
 print(type_logs("spidertracks").explain(analyze=True, buffers=True))
@@ -34,10 +37,13 @@ print(type_logs("<rare_type_slug>").explain(analyze=True, buffers=True))
 
 ## Acceptance criteria
 
-- [ ] Plan shows an **Index Scan / Index-Only Scan** (or per-partition
-      Append of index scans) on `activity_lo_integra_258066_idx`
-      (the `(integration, -created_at)` composite) — **not** a Seq Scan of a
-      partition.
+- [x] **No Seq Scan of any partition**, and no unbounded scan: either
+      per-partition scans on the `(integration, -created_at)` composite
+      index (expected for sparse types with materialized ids), or a
+      newest-first `created_at` walk **that terminates quickly because
+      matches are dense** (acceptable for high-volume types). The exact
+      index name varies per partition; what matters is the shape and that
+      it is bounded.
 - [ ] No sort step over a large row set for the `-created_at` ordering (the
       index provides order).
 - [ ] Buffer counts and total time are bounded and comparable to the
