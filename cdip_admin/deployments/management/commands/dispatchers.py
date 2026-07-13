@@ -47,6 +47,12 @@ class Command(BaseCommand):
             help="List integrations using legacy dispatchers",
         )
         parser.add_argument(
+            "--list-unused",
+            action="store_true",
+            default=False,
+            help="List deployments not linked to any integration and whose topic is not used by any integration",
+        )
+        parser.add_argument(
             "--deploy",
             type=str,
             help="Deploy serverless dispatcher for the specified integration by ID",
@@ -86,6 +92,8 @@ class Command(BaseCommand):
             self.list_deployments(options=options)
         elif options["list_missing"]:
             self.list_integrations_using_kafka_dispatchers(options=options)
+        elif options["list_unused"]:
+            self.list_unused_deployments(options=options)
         elif integration_id := options.get("deploy"):
             integration = self._get_integration_by_id(integration_id=integration_id, options=options)
             self.deploy_dispatchers([integration])
@@ -188,6 +196,39 @@ class Command(BaseCommand):
                 )
         else:
             self.stdout.write("No deployments found")
+
+    def list_unused_deployments(self, options):
+        used_topics = set(
+            Integration.objects.filter(additional__has_key="topic").values_list(
+                "additional__topic", flat=True
+            )
+        )
+        used_topics |= set(
+            OutboundIntegrationConfiguration.objects.filter(
+                additional__has_key="topic"
+            ).values_list("additional__topic", flat=True)
+        )
+        used_topics.discard(None)
+        used_topics.discard("")
+        orphaned_deployments = DispatcherDeployment.objects.filter(
+            integration__isnull=True, legacy_integration__isnull=True
+        )
+        # Filter in Python: a SQL exclude(topic_name__in=...) would silently drop
+        # rows with a NULL topic_name, which are precisely unused deployments.
+        unused_deployments = [
+            deployment
+            for deployment in orphaned_deployments
+            if not deployment.topic_name or deployment.topic_name not in used_topics
+        ]
+        self.stdout.write(f"{len(unused_deployments)} unused deployments:")
+        if unused_deployments:
+            for deployment in unused_deployments:
+                topic = deployment.topic_name or "no topic"
+                self.stdout.write(
+                    f"{deployment.name} - {topic} - {deployment.status} - {deployment.id}"
+                )
+        else:
+            self.stdout.write("No unused deployments found")
 
     def deploy_dispatchers(self, integrations):
         for integration in integrations:

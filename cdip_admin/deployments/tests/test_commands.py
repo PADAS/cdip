@@ -2,6 +2,8 @@ import pytest
 from django.core.management import call_command
 from django.test import override_settings
 
+from deployments.models import DispatcherDeployment
+
 
 pytestmark = pytest.mark.django_db
 
@@ -32,6 +34,44 @@ def test_call_dispatchers_command_list_missing(
         f"({integration.type.slug}) - {integration.name} - {str(integration.id)}"
         in captured.out
     )
+
+
+def test_call_dispatchers_command_list_unused(
+    mocker,
+    capsys,
+    organization,
+    integrations_list_er,
+):
+    # Mock the celery task triggered when deployments are created
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocker.MagicMock()
+    )
+    # Orphaned deployment whose topic isn't referenced by any integration -> unused
+    unused_deployment = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher", topic_name="orphan-topic"
+    )
+    # Orphaned deployment with no topic recorded -> unused
+    unused_deployment_no_topic = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher-no-topic", topic_name=None
+    )
+    # Orphaned deployment whose topic is still used by an integration -> in use
+    integration = integrations_list_er[0]
+    shared_topic_deployment = DispatcherDeployment.objects.create(
+        name="orphan-shared-topic-dispatcher",
+        topic_name=integration.additional["topic"],
+    )
+    # Deployments created by the fixture are linked by FK -> in use
+    linked_deployment = integration.dispatcher_by_integration
+
+    call_command("dispatchers", "--list-unused")
+    captured = capsys.readouterr()
+
+    assert "2 unused deployments:" in captured.out
+    assert unused_deployment.name in captured.out
+    assert unused_deployment_no_topic.name in captured.out
+    assert shared_topic_deployment.name not in captured.out
+    assert linked_deployment.name not in captured.out
 
 
 def test_call_dispatchers_command_deploy_missing_for_earthranger(
