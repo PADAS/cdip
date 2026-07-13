@@ -107,7 +107,8 @@ class Command(BaseCommand):
         elif options["list_unused"]:
             self.list_unused_deployments(options=options)
         elif options["delete_unused"]:
-            self.delete_unused_deployments(options=options)
+            if not self.delete_unused_deployments(options=options):
+                return  # Aborted; don't report success below
         elif integration_id := options.get("deploy"):
             integration = self._get_integration_by_id(integration_id=integration_id, options=options)
             self.deploy_dispatchers([integration])
@@ -250,22 +251,24 @@ class Command(BaseCommand):
         self._print_unused_deployments(self._get_unused_deployments())
 
     def delete_unused_deployments(self, options):
+        """Returns False when the user aborts at the prompt, True otherwise."""
         unused_deployments = self._get_unused_deployments()
         self._print_unused_deployments(unused_deployments)
         if not unused_deployments:
-            return
+            return True
         if not options["yes"]:
             answer = input(
                 f"Delete these {len(unused_deployments)} deployments and their GCP resources? [y/N]: "
             )
             if answer.lower().strip() not in ("y", "yes"):
                 self.stdout.write("Aborted.")
-                return
+                return False
         for deployment in unused_deployments:
             # Triggers the delete_serverless_dispatcher task, which tears down
             # the GCP resources and then removes the row.
             deployment.delete()
             self.stdout.write(f"Deletion triggered for {deployment.name} ({deployment.id})")
+        return True
 
     def deploy_dispatchers(self, integrations):
         for integration in integrations:

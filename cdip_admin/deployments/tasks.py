@@ -304,6 +304,16 @@ def delete_serverless_dispatcher(deployment_id, topic):
     print(f"Deleting dispatcher deployment {deployment_id}...")
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
+    project_id = (deployment.configuration or {}).get("env_vars", {}).get("GCP_PROJECT_ID")
+    if not project_id:
+        # Stop before unlinking integrations or changing status: the deletion
+        # helpers would otherwise build invalid paths like projects/None/...
+        error_msg = "Cannot delete dispatcher: GCP_PROJECT_ID is missing from the deployment configuration"
+        print(error_msg)
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg[:500]
+        deployment.save(update_fields=["status", "status_details"])
+        return
     if deployment.integration:
         is_er_site = deployment.integration.is_er_site
     elif deployment.legacy_integration:
@@ -354,7 +364,7 @@ def delete_serverless_dispatcher(deployment_id, topic):
     except NotFound as e:
         print(f"Function or Service {deployment.name} not found. Skipping deletion.")
     except Exception as e:
-        error_msg = f"Error deleting function: {e}"
+        error_msg = f"Error deleting dispatcher {deployment.name}: {e}"
         print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]

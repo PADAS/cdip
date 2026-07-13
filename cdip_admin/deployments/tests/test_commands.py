@@ -133,6 +133,7 @@ def test_call_dispatchers_command_delete_unused_aborts_without_confirmation(
     captured = capsys.readouterr()
 
     assert "Aborted." in captured.out
+    assert "Done." not in captured.out
     mock_delete_task.delay.assert_not_called()
     assert DispatcherDeployment.objects.filter(id=unused_deployment.id).exists()
 
