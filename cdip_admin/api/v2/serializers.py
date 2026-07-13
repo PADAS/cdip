@@ -604,16 +604,22 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
-        name = data.get("name", getattr(self.instance, "name", None))
-        integration_type = data.get("type", getattr(self.instance, "type", None))
-        if name and integration_type:
-            duplicates_qs = Integration.objects.filter(name=name, type=integration_type)
-            if self.instance is not None:
-                duplicates_qs = duplicates_qs.exclude(pk=self.instance.pk)
-            if duplicates_qs.exists():
-                raise DuplicateIntegrationError(detail={
-                    "name": ["A connection with this name already exists for this integration type."]
-                })
+        # Enforce (name, type) uniqueness globally. On updates, only run this
+        # check when the request is attempting to set/change `name` or `type`,
+        # so legacy duplicates don't block unrelated PATCHes.
+        if self.instance is not None and "name" not in data and "type" not in data:
+            pass
+        else:
+            name = data.get("name", getattr(self.instance, "name", None))
+            integration_type = data.get("type", getattr(self.instance, "type", None))
+            if name and integration_type:
+                duplicates_qs = Integration.objects.filter(name=name, type=integration_type)
+                if self.instance is not None:
+                    duplicates_qs = duplicates_qs.exclude(pk=self.instance.pk)
+                if duplicates_qs.exists():
+                    raise DuplicateIntegrationError(detail={
+                        "name": ["A connection with this name already exists for this integration type."]
+                    })
         seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
