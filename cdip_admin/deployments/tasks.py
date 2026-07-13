@@ -343,6 +343,10 @@ def delete_serverless_dispatcher(deployment_id, topic):
                 deployment.status = DispatcherDeployment.Status.ERROR
                 deployment.status_details = error_msg[:500]
                 deployment.save()
+                # Stop here: keep the pub/sub resources and the row in place for
+                # investigation/manual retry, and avoid the final delete()
+                # re-queueing this task in a loop on persistent errors.
+                return
         elif is_er_site:
             response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
         else:  # SMART or others will use Cloud Run
@@ -355,6 +359,10 @@ def delete_serverless_dispatcher(deployment_id, topic):
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
         deployment.save()
+        # Same as the orphan branch: don't tear down pub/sub while the compute
+        # resource may still exist, and don't reach the final delete() which
+        # would re-queue this task in a loop.
+        return
     else:
         print(response)
         print("Function or Service deletion complete.")
