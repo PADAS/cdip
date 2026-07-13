@@ -304,7 +304,14 @@ def delete_serverless_dispatcher(deployment_id, topic):
     print(f"Deleting dispatcher deployment {deployment_id}...")
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
-    is_er_site = deployment.integration.is_er_site if deployment.integration else False
+    if deployment.integration:
+        is_er_site = deployment.integration.is_er_site
+    elif deployment.legacy_integration:
+        is_er_site = deployment.legacy_integration.is_er_site
+    else:
+        # Orphaned deployment: the dispatcher kind can't be determined,
+        # so try deleting both a function (ER) and a Cloud Run service.
+        is_er_site = None
     deployment.integration = None  # Unlink from integrations as they might be being deleted
     deployment.legacy_integration = None
     deployment.status = DispatcherDeployment.Status.DELETING
@@ -312,7 +319,17 @@ def delete_serverless_dispatcher(deployment_id, topic):
     deployment.save()
 
     try:
-        if is_er_site:
+        if is_er_site is None:
+            response = None
+            try:
+                response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
+            except NotFound:
+                print(f"Function {deployment.name} not found. Skipping deletion.")
+            try:
+                response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
+            except NotFound:
+                print(f"Cloud Run service {deployment.name} not found. Skipping deletion.")
+        elif is_er_site:
             response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
         else:  # SMART or others will use Cloud Run
             response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
@@ -328,18 +345,21 @@ def delete_serverless_dispatcher(deployment_id, topic):
         print(response)
         print("Function or Service deletion complete.")
 
-    try:
-        delete_topic(topic_name=topic, configuration=deployment.configuration)
-    except NotFound as e:
-        print(f"Topic {topic} not found. Skipping deletion.")
-    except Exception as e:
-        print(f"Error deleting topic {topic}: {e}")
-        deployment.status = DispatcherDeployment.Status.ERROR
-        deployment.status_details = f"Error deleting topic {topic}: {e}"
-        deployment.save()
-        return
+    if topic:
+        try:
+            delete_topic(topic_name=topic, configuration=deployment.configuration)
+        except NotFound as e:
+            print(f"Topic {topic} not found. Skipping deletion.")
+        except Exception as e:
+            print(f"Error deleting topic {topic}: {e}")
+            deployment.status = DispatcherDeployment.Status.ERROR
+            deployment.status_details = f"Error deleting topic {topic}: {e}"
+            deployment.save()
+            return
+        else:
+            print("Topic deletion complete.")
     else:
-        print("Topic deletion complete.")
+        print("No topic recorded for this deployment. Skipping topic deletion.")
 
     try:
         subscription_name = f"{deployment.name[:250]}-sub".replace("--", "-")

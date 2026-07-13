@@ -54,7 +54,7 @@ def test_delete_task_for_orphaned_deployment_tries_function_and_service(
 def test_delete_task_for_orphaned_deployment_tolerates_not_found(
     mocker, orphaned_deployment
 ):
-    mocker.patch(
+    mock_delete_function = mocker.patch(
         "deployments.tasks.delete_function", side_effect=NotFound("no function")
     )
     mock_delete_service = mocker.patch(
@@ -68,5 +68,30 @@ def test_delete_task_for_orphaned_deployment_tolerates_not_found(
         deployment_id=str(orphaned_deployment.id), topic="orphan-topic"
     )
 
+    mock_delete_function.assert_called_once()
     mock_delete_service.assert_called_once()
     assert not DispatcherDeployment.objects.filter(id=orphaned_deployment.id).exists()
+
+
+def test_delete_task_skips_topic_deletion_when_no_topic_recorded(mocker):
+    """--delete-unused can target rows with a NULL/empty topic_name; the task
+    must not try to build a Pub/Sub path from it (e.g. .../topics/None).
+    """
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: None)
+    mocker.patch("deployments.tasks.delete_function", side_effect=NotFound("x"))
+    mocker.patch("deployments.tasks.delete_cloudrun_service", side_effect=NotFound("x"))
+    mock_delete_topic = mocker.patch("deployments.tasks.delete_topic")
+    mocker.patch("deployments.tasks.delete_subscription")
+    deployment = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher-no-topic",
+        topic_name=None,
+        configuration={
+            "env_vars": {"GCP_PROJECT_ID": "test-project"},
+            "deployment_settings": {"region": "us-central1"},
+        },
+    )
+
+    delete_serverless_dispatcher(deployment_id=str(deployment.id), topic=None)
+
+    mock_delete_topic.assert_not_called()
+    assert not DispatcherDeployment.objects.filter(id=deployment.id).exists()
