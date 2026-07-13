@@ -304,7 +304,24 @@ def delete_serverless_dispatcher(deployment_id, topic):
     print(f"Deleting dispatcher deployment {deployment_id}...")
     DispatcherDeployment = apps.get_model("deployments", "DispatcherDeployment")
     deployment = DispatcherDeployment.objects.get(id=deployment_id)
-    is_er_site = deployment.integration.is_er_site if deployment.integration else False
+    project_id = (deployment.configuration or {}).get("env_vars", {}).get("GCP_PROJECT_ID")
+    if not project_id:
+        # Stop before unlinking integrations or changing status: the deletion
+        # helpers would otherwise build invalid paths like projects/None/...
+        error_msg = "Cannot delete dispatcher: GCP_PROJECT_ID is missing from the deployment configuration"
+        print(error_msg)
+        deployment.status = DispatcherDeployment.Status.ERROR
+        deployment.status_details = error_msg[:500]
+        deployment.save(update_fields=["status", "status_details"])
+        return
+    if deployment.integration:
+        is_er_site = deployment.integration.is_er_site
+    elif deployment.legacy_integration:
+        is_er_site = deployment.legacy_integration.is_er_site
+    else:
+        # Orphaned deployment: the dispatcher kind can't be determined,
+        # so try deleting both a function (ER) and a Cloud Run service.
+        is_er_site = None
     deployment.integration = None  # Unlink from integrations as they might be being deleted
     deployment.legacy_integration = None
     deployment.status = DispatcherDeployment.Status.DELETING
@@ -312,34 +329,69 @@ def delete_serverless_dispatcher(deployment_id, topic):
     deployment.save()
 
     try:
-        if is_er_site:
+        if is_er_site is None:
+            # Each attempt handles its own errors so a failure in one path
+            # never prevents trying the other.
+            response = None
+            errors = []
+            try:
+                response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
+            except NotFound:
+                print(f"Function {deployment.name} not found. Skipping deletion.")
+            except Exception as e:
+                print(f"Error deleting function {deployment.name}: {e}")
+                errors.append(f"function: {e}")
+            try:
+                response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
+            except NotFound:
+                print(f"Cloud Run service {deployment.name} not found. Skipping deletion.")
+            except Exception as e:
+                print(f"Error deleting Cloud Run service {deployment.name}: {e}")
+                errors.append(f"service: {e}")
+            if errors:
+                error_msg = f"Error deleting dispatcher {deployment.name}: " + "; ".join(errors)
+                deployment.status = DispatcherDeployment.Status.ERROR
+                deployment.status_details = error_msg[:500]
+                deployment.save()
+                # Stop here: keep the pub/sub resources and the row in place for
+                # investigation/manual retry, and avoid the final delete()
+                # re-queueing this task in a loop on persistent errors.
+                return
+        elif is_er_site:
             response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
         else:  # SMART or others will use Cloud Run
             response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
     except NotFound as e:
         print(f"Function or Service {deployment.name} not found. Skipping deletion.")
     except Exception as e:
-        error_msg = f"Error deleting function: {e}"
+        error_msg = f"Error deleting dispatcher {deployment.name}: {e}"
         print(error_msg)
         deployment.status = DispatcherDeployment.Status.ERROR
         deployment.status_details = error_msg[:500]
         deployment.save()
+        # Same as the orphan branch: don't tear down pub/sub while the compute
+        # resource may still exist, and don't reach the final delete() which
+        # would re-queue this task in a loop.
+        return
     else:
         print(response)
         print("Function or Service deletion complete.")
 
-    try:
-        delete_topic(topic_name=topic, configuration=deployment.configuration)
-    except NotFound as e:
-        print(f"Topic {topic} not found. Skipping deletion.")
-    except Exception as e:
-        print(f"Error deleting topic {topic}: {e}")
-        deployment.status = DispatcherDeployment.Status.ERROR
-        deployment.status_details = f"Error deleting topic {topic}: {e}"
-        deployment.save()
-        return
+    if topic:
+        try:
+            delete_topic(topic_name=topic, configuration=deployment.configuration)
+        except NotFound as e:
+            print(f"Topic {topic} not found. Skipping deletion.")
+        except Exception as e:
+            print(f"Error deleting topic {topic}: {e}")
+            deployment.status = DispatcherDeployment.Status.ERROR
+            deployment.status_details = f"Error deleting topic {topic}: {e}"
+            deployment.save()
+            return
+        else:
+            print("Topic deletion complete.")
     else:
-        print("Topic deletion complete.")
+        print("No topic recorded for this deployment. Skipping topic deletion.")
 
     try:
         subscription_name = f"{deployment.name[:250]}-sub".replace("--", "-")

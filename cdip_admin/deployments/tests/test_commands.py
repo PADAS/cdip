@@ -2,6 +2,8 @@ import pytest
 from django.core.management import call_command
 from django.test import override_settings
 
+from deployments.models import DispatcherDeployment
+
 
 pytestmark = pytest.mark.django_db
 
@@ -32,6 +34,108 @@ def test_call_dispatchers_command_list_missing(
         f"({integration.type.slug}) - {integration.name} - {str(integration.id)}"
         in captured.out
     )
+
+
+def test_call_dispatchers_command_list_unused(
+    mocker,
+    capsys,
+    organization,
+    integrations_list_er,
+):
+    # Mock the celery task triggered when deployments are created
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocker.MagicMock()
+    )
+    # Orphaned deployment whose topic isn't referenced by any integration -> unused
+    unused_deployment = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher", topic_name="orphan-topic"
+    )
+    # Orphaned deployment with no topic recorded -> unused
+    unused_deployment_no_topic = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher-no-topic", topic_name=None
+    )
+    # Orphaned deployment whose topic is still used by an integration -> in use
+    integration = integrations_list_er[0]
+    shared_topic_deployment = DispatcherDeployment.objects.create(
+        name="orphan-shared-topic-dispatcher",
+        topic_name=integration.additional["topic"],
+    )
+    # Deployments created by the fixture are linked by FK -> in use
+    linked_deployment = integration.dispatcher_by_integration
+
+    call_command("dispatchers", "--list-unused")
+    captured = capsys.readouterr()
+
+    assert "2 unused deployments:" in captured.out
+    assert unused_deployment.name in captured.out
+    assert unused_deployment_no_topic.name in captured.out
+    assert shared_topic_deployment.name not in captured.out
+    assert linked_deployment.name not in captured.out
+
+
+def test_call_dispatchers_command_delete_unused_with_yes(
+    mocker,
+    capsys,
+    organization,
+    integrations_list_er,
+):
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocker.MagicMock()
+    )
+    mock_delete_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.delete_serverless_dispatcher", mock_delete_task
+    )
+    unused_deployment = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher", topic_name="orphan-topic"
+    )
+    integration = integrations_list_er[0]
+    shared_topic_deployment = DispatcherDeployment.objects.create(
+        name="orphan-shared-topic-dispatcher",
+        topic_name=integration.additional["topic"],
+    )
+    linked_deployment = integration.dispatcher_by_integration
+
+    call_command("dispatchers", "--delete-unused", "--yes")
+    captured = capsys.readouterr()
+
+    assert f"Deletion triggered for {unused_deployment.name}" in captured.out
+    # The deletion task tears down GCP resources and then removes the row
+    mock_delete_task.delay.assert_called_once_with(
+        deployment_id=str(unused_deployment.id), topic="orphan-topic"
+    )
+    # In-use deployments are untouched
+    assert DispatcherDeployment.objects.filter(id=shared_topic_deployment.id).exists()
+    assert DispatcherDeployment.objects.filter(id=linked_deployment.id).exists()
+
+
+def test_call_dispatchers_command_delete_unused_aborts_without_confirmation(
+    mocker,
+    capsys,
+    organization,
+):
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mocker.MagicMock()
+    )
+    mock_delete_task = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.delete_serverless_dispatcher", mock_delete_task
+    )
+    mocker.patch("builtins.input", return_value="n")
+    unused_deployment = DispatcherDeployment.objects.create(
+        name="orphan-dispatcher", topic_name="orphan-topic"
+    )
+
+    call_command("dispatchers", "--delete-unused")
+    captured = capsys.readouterr()
+
+    assert "Aborted." in captured.out
+    assert "Done." not in captured.out
+    mock_delete_task.delay.assert_not_called()
+    assert DispatcherDeployment.objects.filter(id=unused_deployment.id).exists()
 
 
 def test_call_dispatchers_command_deploy_missing_for_earthranger(
