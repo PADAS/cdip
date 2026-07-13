@@ -53,6 +53,18 @@ class Command(BaseCommand):
             help="List deployments not linked to any integration and whose topic is not used by any integration",
         )
         parser.add_argument(
+            "--delete-unused",
+            action="store_true",
+            default=False,
+            help="Delete unused deployments (as listed by --list-unused), tearing down their GCP resources",
+        )
+        parser.add_argument(
+            "--yes",
+            action="store_true",
+            default=False,
+            help="Skip the confirmation prompt when deleting",
+        )
+        parser.add_argument(
             "--deploy",
             type=str,
             help="Deploy serverless dispatcher for the specified integration by ID",
@@ -94,6 +106,8 @@ class Command(BaseCommand):
             self.list_integrations_using_kafka_dispatchers(options=options)
         elif options["list_unused"]:
             self.list_unused_deployments(options=options)
+        elif options["delete_unused"]:
+            self.delete_unused_deployments(options=options)
         elif integration_id := options.get("deploy"):
             integration = self._get_integration_by_id(integration_id=integration_id, options=options)
             self.deploy_dispatchers([integration])
@@ -197,7 +211,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write("No deployments found")
 
-    def list_unused_deployments(self, options):
+    def _get_unused_deployments(self):
         used_topics = set(
             Integration.objects.filter(additional__has_key="topic").values_list(
                 "additional__topic", flat=True
@@ -215,11 +229,13 @@ class Command(BaseCommand):
         )
         # Filter in Python: a SQL exclude(topic_name__in=...) would silently drop
         # rows with a NULL topic_name, which are precisely unused deployments.
-        unused_deployments = [
+        return [
             deployment
             for deployment in orphaned_deployments
             if not deployment.topic_name or deployment.topic_name not in used_topics
         ]
+
+    def _print_unused_deployments(self, unused_deployments):
         self.stdout.write(f"{len(unused_deployments)} unused deployments:")
         if unused_deployments:
             for deployment in unused_deployments:
@@ -229,6 +245,27 @@ class Command(BaseCommand):
                 )
         else:
             self.stdout.write("No unused deployments found")
+
+    def list_unused_deployments(self, options):
+        self._print_unused_deployments(self._get_unused_deployments())
+
+    def delete_unused_deployments(self, options):
+        unused_deployments = self._get_unused_deployments()
+        self._print_unused_deployments(unused_deployments)
+        if not unused_deployments:
+            return
+        if not options["yes"]:
+            answer = input(
+                f"Delete these {len(unused_deployments)} deployments and their GCP resources? [y/N]: "
+            )
+            if answer.lower().strip() not in ("y", "yes"):
+                self.stdout.write("Aborted.")
+                return
+        for deployment in unused_deployments:
+            # Triggers the delete_serverless_dispatcher task, which tears down
+            # the GCP resources and then removes the row.
+            deployment.delete()
+            self.stdout.write(f"Deletion triggered for {deployment.name} ({deployment.id})")
 
     def deploy_dispatchers(self, integrations):
         for integration in integrations:
