@@ -73,6 +73,33 @@ def test_delete_task_for_orphaned_deployment_tolerates_not_found(
     assert not DispatcherDeployment.objects.filter(id=orphaned_deployment.id).exists()
 
 
+def test_delete_task_orphan_tries_service_even_if_function_deletion_errors(
+    mocker, orphaned_deployment
+):
+    """A non-NotFound failure in one deletion path must not prevent the other
+    attempt; the row is left in ERROR state for retry/investigation.
+    """
+    mocker.patch(
+        "deployments.tasks.delete_function",
+        side_effect=Exception("permission denied"),
+    )
+    mock_delete_service = mocker.patch("deployments.tasks.delete_cloudrun_service")
+    mocker.patch("deployments.tasks.delete_topic")
+    mocker.patch("deployments.tasks.delete_subscription")
+    # The final deployment.delete() re-queues teardown when status is ERROR
+    mock_delete_task = mocker.MagicMock()
+    mocker.patch("deployments.models.delete_serverless_dispatcher", mock_delete_task)
+
+    delete_serverless_dispatcher(
+        deployment_id=str(orphaned_deployment.id), topic="orphan-topic"
+    )
+
+    mock_delete_service.assert_called_once()
+    orphaned_deployment.refresh_from_db()
+    assert orphaned_deployment.status == DispatcherDeployment.Status.ERROR
+    assert "permission denied" in orphaned_deployment.status_details
+
+
 def test_delete_task_skips_topic_deletion_when_no_topic_recorded(mocker):
     """--delete-unused can target rows with a NULL/empty topic_name; the task
     must not try to build a Pub/Sub path from it (e.g. .../topics/None).

@@ -320,15 +320,29 @@ def delete_serverless_dispatcher(deployment_id, topic):
 
     try:
         if is_er_site is None:
+            # Each attempt handles its own errors so a failure in one path
+            # never prevents trying the other.
             response = None
+            errors = []
             try:
                 response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
             except NotFound:
                 print(f"Function {deployment.name} not found. Skipping deletion.")
+            except Exception as e:
+                print(f"Error deleting function {deployment.name}: {e}")
+                errors.append(f"function: {e}")
             try:
                 response = delete_cloudrun_service(service_name=deployment.name, configuration=deployment.configuration)
             except NotFound:
                 print(f"Cloud Run service {deployment.name} not found. Skipping deletion.")
+            except Exception as e:
+                print(f"Error deleting Cloud Run service {deployment.name}: {e}")
+                errors.append(f"service: {e}")
+            if errors:
+                error_msg = f"Error deleting dispatcher {deployment.name}: " + "; ".join(errors)
+                deployment.status = DispatcherDeployment.Status.ERROR
+                deployment.status_details = error_msg[:500]
+                deployment.save()
         elif is_er_site:
             response = delete_function(function_name=deployment.name, configuration=deployment.configuration)
         else:  # SMART or others will use Cloud Run
