@@ -572,3 +572,34 @@ def test_migrate_to_shared_refuses_when_setting_empty(request, capsys):
     assert "ER_SHARED_DISPATCHER_TOPIC" in (out.out + out.err)
     integration = Integration.objects.get(name="Reserve D")
     assert integration.additional["topic"] == "destination-old-topic"
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_rollback_shared_restores_topic(request, capsys):
+    integration, _ = _make_er_destination_with_deployment(request, "Reserve E")
+    call_command("dispatchers", "--migrate-to-shared", "--integration", str(integration.id), "--max", "1")
+
+    call_command("dispatchers", "--rollback-shared", "--integration", str(integration.id))
+
+    integration.refresh_from_db()
+    assert integration.additional["topic"] == "destination-old-topic"
+    assert "pre_migration_topic" not in integration.additional
+    assert "shared_pool_migrated_at" not in integration.additional
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_rollback_shared_refuses_after_teardown(request, capsys):
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve F")
+    call_command("dispatchers", "--migrate-to-shared", "--integration", str(integration.id), "--max", "1")
+    # Simulate teardown having removed the deployment
+    from deployments.models import DispatcherDeployment
+    DispatcherDeployment.objects.filter(pk=deployment.pk).delete()
+
+    call_command("dispatchers", "--rollback-shared", "--integration", str(integration.id))
+
+    out = capsys.readouterr()
+    assert "no longer exists" in (out.out + out.err)
+    integration.refresh_from_db()
+    assert integration.additional["topic"] == SHARED  # unchanged

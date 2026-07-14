@@ -573,8 +573,31 @@ class Command(BaseCommand):
                 self.stderr.write(f"Error migrating {integration.name} ({integration.id}): {e}")
                 continue
 
-    def rollback_shared(self, integration_id=None):
-        self.stderr.write("rollback_shared: not implemented yet")
+    def rollback_shared(self, integration_id):
+        if not integration_id:
+            self.stderr.write("--rollback-shared requires --integration <id>")
+            return
+        integration = Integration.objects.filter(id=integration_id).first()
+        if not integration:
+            self.stderr.write(f"Integration {integration_id} not found")
+            return
+        additional = integration.additional or {}
+        pre_migration_topic = additional.get("pre_migration_topic")
+        if not pre_migration_topic:
+            self.stderr.write(f"{integration.name} has no pre_migration_topic recorded - nothing to roll back")
+            return
+        if not Integration.objects.filter(pk=integration.pk, dispatcher_by_integration__isnull=False).exists():
+            self.stderr.write(
+                f"The old dispatcher for {integration.name} no longer exists (torn down). "
+                "Rollback now requires redeploying a dedicated dispatcher (--deploy) before flipping the topic back."
+            )
+            return
+        updated = {k: v for k, v in additional.items() if k not in ("pre_migration_topic", "shared_pool_migrated_at")}
+        updated["topic"] = pre_migration_topic
+        Integration.objects.filter(pk=integration.pk).update(additional=updated)
+        self.stdout.write(self.style.SUCCESS(
+            f"Rolled back {integration.name} to {pre_migration_topic}. The dormant dispatcher resumes consuming."
+        ))
 
     def teardown_migrated(self, options=None):
         self.stderr.write("teardown_migrated: not implemented yet")
