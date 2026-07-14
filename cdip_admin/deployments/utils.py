@@ -1,8 +1,9 @@
 import logging
 import json
+import time
 from urllib.parse import urlparse
 from google.api_core import exceptions as gcp_exceptions
-from google.cloud import secretmanager, pubsub_v1
+from google.cloud import secretmanager, monitoring_v3
 from django.conf import settings
 from core.utils import generate_short_id_milliseconds
 
@@ -340,26 +341,66 @@ def create_dispatcher_for_integration(integration):
     )
 
 
-def subscription_is_drained(subscription_name, configuration):
-    """Best-effort check that a push subscription has no deliverable backlog.
+_DRAIN_CHECK_LOOKBACK_SECONDS = 600  # 10 minutes
 
-    Peeks with a non-blocking pull: an empty response after the function has
-    been dormant for the cooling period is treated as drained. Any message
-    seen is released immediately (ack deadline 0) and the subscription is
-    treated as NOT drained.
+
+def subscription_is_drained(subscription_name, configuration):
+    """Check whether a push subscription's backlog is empty.
+
+    Portal subscriptions are push subscriptions, not pull: Pub/Sub rejects a
+    ``pull`` request against a push subscription with FAILED_PRECONDITION, so
+    a subscriber-side "peek" can never succeed here (an earlier version of
+    this helper tried exactly that and could never return True). Instead,
+    this reads the Cloud Monitoring
+    ``pubsub.googleapis.com/subscription/num_undelivered_messages`` metric
+    for the subscription over the last 10 minutes and looks at the most
+    recent data point: the subscription is drained iff that value is 0.
+
+    If no data points are returned in the lookback window, we can't verify
+    the backlog is empty, so this conservatively returns False (don't tear
+    down what we can't confirm is drained) and logs why.
+
+    Requires the caller's credentials to have the ``monitoring.timeSeries.list``
+    IAM permission on the project.
     """
     env_vars = (configuration or {}).get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
-    subscriber = pubsub_v1.SubscriberClient()
-    subscription_path = subscriber.subscription_path(project_id, subscription_name)
-    response = subscriber.pull(
-        request={"subscription": subscription_path, "max_messages": 1},
-        timeout=10,
+    project_name = f"projects/{project_id}"
+    metric_filter = (
+        'metric.type = "pubsub.googleapis.com/subscription/num_undelivered_messages" '
+        f'AND resource.labels.subscription_id = "{subscription_name}"'
     )
-    if not response.received_messages:
-        return True
-    ack_ids = [m.ack_id for m in response.received_messages]
-    subscriber.modify_ack_deadline(
-        request={"subscription": subscription_path, "ack_ids": ack_ids, "ack_deadline_seconds": 0}
-    )
-    return False
+
+    now = time.time()
+    interval = monitoring_v3.TimeInterval()
+    interval.end_time.seconds = int(now)
+    interval.end_time.nanos = int((now - interval.end_time.seconds) * 10 ** 9)
+    interval.start_time.seconds = int(now - _DRAIN_CHECK_LOOKBACK_SECONDS)
+    interval.start_time.nanos = interval.end_time.nanos
+
+    latest_end_seconds = None
+    latest_value = None
+    with monitoring_v3.MetricServiceClient() as client:
+        results = client.list_time_series(
+            request={
+                "name": project_name,
+                "filter": metric_filter,
+                "interval": interval,
+                "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+            }
+        )
+        for series in results:
+            for point in series.points:
+                end_seconds = point.interval.end_time.seconds
+                if latest_end_seconds is None or end_seconds > latest_end_seconds:
+                    latest_end_seconds = end_seconds
+                    latest_value = point.value.int64_value
+
+    if latest_value is None:
+        logger.warning(
+            f"No Monitoring data points for num_undelivered_messages on subscription "
+            f"{subscription_name} in the last {_DRAIN_CHECK_LOOKBACK_SECONDS}s; can't verify "
+            "the backlog is drained, treating as NOT drained."
+        )
+        return False
+    return latest_value == 0

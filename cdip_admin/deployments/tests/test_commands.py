@@ -698,3 +698,132 @@ def test_teardown_stamps_manually_migrated_on_first_sight(request, mocker, capsy
     assert integration.additional.get("shared_pool_migrated_at")  # stamped, not torn down
     assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
     mock_delete_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_survives_malformed_migration_stamp(request, mocker, capsys):
+    """A corrupt shared_pool_migrated_at (not ISO-parseable) must be reported
+    and skipped, not crash the whole command - it should still process later
+    integrations in the queryset."""
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve K", topic=SHARED)
+    Integration.objects.filter(pk=integration.pk).update(additional={
+        **integration.additional, "shared_pool_migrated_at": "not-a-real-timestamp",
+    })
+    mocker.patch("deployments.management.commands.dispatchers.subscription_is_drained", return_value=True)
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+    out = capsys.readouterr()
+
+    assert f"Error tearing down {integration.name}" in (out.out + out.err)
+    # Nothing was torn down; the malformed row is left alone for manual fixing
+    assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
+    mock_delete_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_migrate_to_shared_skips_when_pre_migration_topic_is_falsy(request, capsys):
+    """If neither additional.topic nor the deployment's recorded topic_name
+    are set, we can't compute a rollback lever - migrating anyway would
+    brick --rollback-shared. The integration must be skipped, not migrated
+    with a falsy pre_migration_topic."""
+    integration_type_er = request.getfixturevalue("integration_type_er")
+    organization = request.getfixturevalue("organization")
+    from deployments.models import DispatcherDeployment
+    integration = Integration.objects.create(
+        type=integration_type_er,
+        name="Reserve L",
+        owner=organization,
+        base_url="https://reservel.pamdas.org",
+        additional={"broker": "gcp_pubsub"},  # no "topic" key at all
+    )
+    DispatcherDeployment.objects.create(
+        name="dispatcher-reserve-l",
+        integration=integration,
+        topic_name=None,  # nothing to fall back on either
+        configuration={"env_vars": {"GCP_PROJECT_ID": "test-project"}},
+    )
+
+    call_command("dispatchers", "--migrate-to-shared", "--integration", str(integration.id), "--max", "1")
+    out = capsys.readouterr()
+
+    assert "cannot determine pre-migration topic" in (out.out + out.err)
+    integration.refresh_from_db()
+    assert "pre_migration_topic" not in integration.additional
+    assert "shared_pool_migrated_at" not in integration.additional
+    assert integration.additional.get("topic") != SHARED  # not migrated
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_update_source_excludes_migrated_integrations(
+    request, mocker, capsys, dispatcher_source_release_1, dispatcher_source_release_2
+):
+    """--update-source/--recreate must not select integrations already on
+    (or migrated to) the shared pool topic: redeploying their old function
+    would re-derive its topic from additional.topic - now SHARED - attaching
+    a zombie push subscription to the shared root."""
+    from deployments.models import DispatcherDeployment
+    integration_type_er = request.getfixturevalue("integration_type_er")
+    organization = request.getfixturevalue("organization")
+
+    normal = Integration.objects.create(
+        type=integration_type_er,
+        name="Normal ER Site",
+        owner=organization,
+        base_url="https://normal.pamdas.org",
+        additional={"broker": "gcp_pubsub", "topic": "destination-old-topic"},
+    )
+    DispatcherDeployment.objects.create(
+        name="dispatcher-normal",
+        integration=normal,
+        topic_name="destination-old-topic",
+        configuration={
+            "env_vars": {"GCP_PROJECT_ID": "test-project"},
+            "deployment_settings": {"source_code_path": dispatcher_source_release_1},
+        },
+    )
+
+    migrated = Integration.objects.create(
+        type=integration_type_er,
+        name="Migrated ER Site",
+        owner=organization,
+        base_url="https://migrated.pamdas.org",
+        additional={
+            "broker": "gcp_pubsub",
+            "topic": SHARED,
+            "pre_migration_topic": "destination-old-topic-2",
+            "shared_pool_migrated_at": "2024-01-01T00:00:00+00:00",
+        },
+    )
+    DispatcherDeployment.objects.create(
+        name="dispatcher-migrated",
+        integration=migrated,
+        topic_name="destination-old-topic-2",
+        configuration={
+            "env_vars": {"GCP_PROJECT_ID": "test-project"},
+            "deployment_settings": {"source_code_path": dispatcher_source_release_1},
+        },
+    )
+
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mock_deploy_serverless_dispatcher = mocker.MagicMock()
+    mocker.patch(
+        "deployments.models.deploy_serverless_dispatcher", mock_deploy_serverless_dispatcher
+    )
+
+    call_command(
+        "dispatchers", "--v2", "--type", "earth_ranger", "--max", "10",
+        "--update-source", dispatcher_source_release_2,
+    )
+    captured = capsys.readouterr()
+
+    normal.refresh_from_db()
+    assert normal.dispatcher_by_integration.configuration["deployment_settings"]["source_code_path"] == dispatcher_source_release_2
+    assert f"Update triggered for {normal.name}" in captured.out
+
+    migrated.refresh_from_db()
+    assert migrated.dispatcher_by_integration.configuration["deployment_settings"]["source_code_path"] == dispatcher_source_release_1
+    assert f"Update triggered for {migrated.name}" not in captured.out
