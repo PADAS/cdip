@@ -360,6 +360,8 @@ def subscription_is_drained(subscription_name, configuration):
     the backlog is empty, so this conservatively returns False (don't tear
     down what we can't confirm is drained) and logs why.
 
+    A subscription deleted out-of-band produces no metric data and therefore reads as not-drained forever; reclaiming such a deployment requires manual cleanup.
+
     Requires the caller's credentials to have the ``monitoring.timeSeries.list``
     IAM permission on the project.
     """

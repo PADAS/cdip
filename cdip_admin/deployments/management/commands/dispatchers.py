@@ -608,7 +608,7 @@ class Command(BaseCommand):
         if not Integration.objects.filter(pk=integration.pk, dispatcher_by_integration__isnull=False).exists():
             self.stderr.write(
                 f"The old dispatcher for {integration.name} no longer exists (torn down). "
-                "Rollback now requires redeploying a dedicated dispatcher (--deploy) before flipping the topic back."
+                "Recovery is manual: restore additional[\"topic\"] to the old dedicated topic first, then deploy a dedicated dispatcher (--deploy skips integrations with broker=gcp_pubsub, so adjust additional accordingly)."
             )
             return
         updated = {k: v for k, v in additional.items() if k not in ("pre_migration_topic", "shared_pool_migrated_at")}

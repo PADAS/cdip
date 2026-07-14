@@ -706,10 +706,27 @@ def test_teardown_survives_malformed_migration_stamp(request, mocker, capsys):
     """A corrupt shared_pool_migrated_at (not ISO-parseable) must be reported
     and skipped, not crash the whole command - it should still process later
     integrations in the queryset."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from deployments.models import DispatcherDeployment
+
+    # Integration with malformed timestamp
     integration, deployment = _make_er_destination_with_deployment(request, "Reserve K", topic=SHARED)
     Integration.objects.filter(pk=integration.pk).update(additional={
         **integration.additional, "shared_pool_migrated_at": "not-a-real-timestamp",
     })
+
+    # Healthy integration that should be processed normally
+    # Create with old dedicated topic first, then migrate to shared pool
+    healthy_integration, healthy_deployment = _make_er_destination_with_deployment(request, "Reserve K2", topic="old-dedicated-topic")
+    # Update to simulate being migrated to shared pool
+    Integration.objects.filter(pk=healthy_integration.pk).update(additional={
+        "broker": "gcp_pubsub",
+        "topic": SHARED,
+        "pre_migration_topic": "old-dedicated-topic",
+        "shared_pool_migrated_at": (timezone.now() - timedelta(days=8)).isoformat(),
+    })
+
     mocker.patch("deployments.management.commands.dispatchers.subscription_is_drained", return_value=True)
     mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
 
@@ -719,7 +736,10 @@ def test_teardown_survives_malformed_migration_stamp(request, mocker, capsys):
     assert f"Error tearing down {integration.name}" in (out.out + out.err)
     # Nothing was torn down; the malformed row is left alone for manual fixing
     assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
-    mock_delete_task.delay.assert_not_called()
+
+    # Healthy integration should still be processed
+    assert not DispatcherDeployment.objects.filter(pk=healthy_deployment.pk, integration__isnull=False).exists()
+    mock_delete_task.delay.assert_called_once()
 
 
 @pytest.mark.django_db
