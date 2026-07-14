@@ -526,6 +526,8 @@ class Command(BaseCommand):
         return True
 
     def _get_migratable_er_integrations(self, max_count, integration_id=None):
+        if max_count is not None and max_count <= 0:
+            return []
         shared = settings.ER_SHARED_DISPATCHER_TOPIC
         qs = Integration.objects.filter(dispatcher_by_integration__isnull=False)
         if integration_id:

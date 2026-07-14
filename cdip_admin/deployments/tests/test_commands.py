@@ -244,7 +244,11 @@ def test_call_dispatchers_command_deploy_with_integration_id(
     "smart_connect",
     "wps_watch"
 ])
-@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+# No @override_settings(GCP_ENVIRONMENT_ENABLED=True) here: the list fixtures
+# (instantiated mid-test via request.getfixturevalue) already set it through the
+# pytest-django settings fixture. Combining both makes the decorator's disable()
+# and the fixture's finalizer run out of order, leaking GCP_ENVIRONMENT_ENABLED=True
+# into every later test in the session.
 def test_call_dispatchers_command_update_source_by_type_with_max_v1(
     request,
     gundi_version,
@@ -364,7 +368,8 @@ def test_call_dispatchers_command_update_source_by_id_v1(
     "smart_connect",
     "wps_watch"
 ])
-@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+# See note on test_call_dispatchers_command_update_source_by_type_with_max_v1
+# about why there is no GCP_ENVIRONMENT_ENABLED override here.
 def test_call_dispatchers_command_recreate_by_type_with_max_v1(
     request,
     gundi_version,
@@ -430,7 +435,8 @@ def test_call_dispatchers_command_recreate_by_type_with_max_v1(
     "wps_watch",
     "trap_tagger"
 ])
-@override_settings(GCP_ENVIRONMENT_ENABLED=True)
+# See note on test_call_dispatchers_command_update_source_by_type_with_max_v1
+# about why there is no GCP_ENVIRONMENT_ENABLED override here.
 def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1(
     request,
     gundi_version,
@@ -502,68 +508,67 @@ def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1
 SHARED = "root-er-test-topic"
 
 
+def _make_er_destination_with_deployment(request, name, topic="destination-old-topic"):
+    # Build an ER integration with a linked deployment, without triggering
+    # real deploys (GCP_ENVIRONMENT_ENABLED is False by default in tests).
+    integration_type_er = request.getfixturevalue("integration_type_er")
+    organization = request.getfixturevalue("organization")
+    from deployments.models import DispatcherDeployment
+    integration = Integration.objects.create(
+        type=integration_type_er,
+        name=name,
+        owner=organization,
+        base_url=f"https://{name.lower().replace(' ', '')}.pamdas.org",
+        additional={"broker": "gcp_pubsub", "topic": topic},
+    )
+    deployment = DispatcherDeployment.objects.create(
+        name=f"dispatcher-{name.lower().replace(' ', '-')}",
+        integration=integration,
+        topic_name=topic,
+        configuration={"env_vars": {"GCP_PROJECT_ID": "test-project"}},
+    )
+    return integration, deployment
+
+
 @pytest.mark.django_db
 @override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
-def test_migrate_to_shared_flips_topic_and_stamps_bookkeeping(mocker, capsys, integrations_list_er):
-    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
-    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
-
-    # Use the first integration from the fixture
-    integration = integrations_list_er[0]
-    old_topic = integration.additional.get("topic")
+def test_migrate_to_shared_flips_topic_and_stamps_bookkeeping(request, capsys):
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve A")
 
     call_command("dispatchers", "--migrate-to-shared", "--max", "10")
 
     integration.refresh_from_db()
     assert integration.additional["topic"] == SHARED
-    assert integration.additional["pre_migration_topic"] == old_topic
+    assert integration.additional["pre_migration_topic"] == "destination-old-topic"
     assert integration.additional["shared_pool_migrated_at"]  # ISO timestamp
-    # Deployment should still exist
-    assert integration.dispatcher_by_integration is not None
+    # Nothing deleted: the old deployment is the rollback lever
+    deployment.refresh_from_db()
+    assert deployment.integration_id == integration.id
 
 
 @pytest.mark.django_db
 @override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
-def test_migrate_to_shared_skips_dedicated_and_already_migrated(mocker, capsys, integrations_list_er):
-    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
-    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
-
-    dedicated = integrations_list_er[0]
-    migrated = integrations_list_er[1]
-
-    # Mark one as dedicated
-    Integration.objects.filter(pk=dedicated.pk).update(
-        additional={**dedicated.additional, "dedicated_dispatcher": True}
-    )
-    dedicated.refresh_from_db()
-
-    # Mark one as already migrated to shared
-    Integration.objects.filter(pk=migrated.pk).update(
-        additional={**migrated.additional, "topic": SHARED}
-    )
-    migrated.refresh_from_db()
-
-    old_topic_dedicated = dedicated.additional.get("topic")
+def test_migrate_to_shared_skips_dedicated_and_already_migrated(request, capsys):
+    dedicated, _ = _make_er_destination_with_deployment(request, "Dedicated B")
+    dedicated.additional["dedicated_dispatcher"] = True
+    dedicated.save()
+    migrated, _ = _make_er_destination_with_deployment(request, "Done C", topic=SHARED)
 
     call_command("dispatchers", "--migrate-to-shared", "--max", "10")
 
     dedicated.refresh_from_db()
-    assert dedicated.additional["topic"] == old_topic_dedicated  # not migrated
+    assert dedicated.additional["topic"] == "destination-old-topic"
     migrated.refresh_from_db()
     assert "pre_migration_topic" not in migrated.additional  # untouched
 
 
 @pytest.mark.django_db
-def test_migrate_to_shared_refuses_when_setting_empty(mocker, capsys, integrations_list_er):
-    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
-    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
-
-    integration = integrations_list_er[0]
-    old_topic = integration.additional.get("topic")
+def test_migrate_to_shared_refuses_when_setting_empty(request, capsys):
+    _make_er_destination_with_deployment(request, "Reserve D")
 
     call_command("dispatchers", "--migrate-to-shared", "--max", "10")
 
     out = capsys.readouterr()
     assert "ER_SHARED_DISPATCHER_TOPIC" in (out.out + out.err)
-    integration.refresh_from_db()
-    assert integration.additional["topic"] == old_topic  # unchanged
+    integration = Integration.objects.get(name="Reserve D")
+    assert integration.additional["topic"] == "destination-old-topic"
