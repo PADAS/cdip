@@ -603,3 +603,98 @@ def test_rollback_shared_refuses_after_teardown(request, capsys):
     assert "no longer exists" in (out.out + out.err)
     integration.refresh_from_db()
     assert integration.additional["topic"] == SHARED  # unchanged
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_respects_cooling_period(request, mocker, capsys):
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve G")
+    call_command("dispatchers", "--migrate-to-shared", "--integration", str(integration.id), "--max", "1")
+    mock_drained = mocker.patch(
+        "deployments.management.commands.dispatchers.subscription_is_drained", return_value=True
+    )
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    # Migrated seconds ago: inside the cooling period -> nothing torn down
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+
+    assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
+    mock_delete_task.delay.assert_not_called()
+
+    # Backdate the stamp beyond the cooling period -> teardown proceeds
+    integration.refresh_from_db()
+    from datetime import timedelta
+    from django.utils import timezone
+    old = (timezone.now() - timedelta(days=8)).isoformat()
+    integration.additional["shared_pool_migrated_at"] = old
+    Integration.objects.filter(pk=integration.pk).update(additional=integration.additional)
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+
+    integration.refresh_from_db()
+    assert "shared_pool_migrated_at" not in integration.additional
+    assert mock_drained.called
+    assert not DispatcherDeployment.objects.filter(pk=deployment.pk, integration__isnull=False).exists()
+    mock_delete_task.delay.assert_called_once()  # teardown task actually fired
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_hard_skips_deployment_recording_shared_topic(request, mocker, capsys):
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve H", topic=SHARED)
+    # Corrupt state: deployment records the shared topic as its own
+    DispatcherDeployment.objects.filter(pk=deployment.pk).update(topic_name=SHARED)
+    from datetime import timedelta
+    from django.utils import timezone
+    Integration.objects.filter(pk=integration.pk).update(additional={
+        **integration.additional,
+        "shared_pool_migrated_at": (timezone.now() - timedelta(days=8)).isoformat(),
+    })
+    mocker.patch("deployments.management.commands.dispatchers.subscription_is_drained", return_value=True)
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+
+    out = capsys.readouterr()
+    assert "shared topic" in (out.out + out.err).lower()
+    assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
+    mock_delete_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_skips_undrained_subscription(request, mocker, capsys):
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve I")
+    call_command("dispatchers", "--migrate-to-shared", "--integration", str(integration.id), "--max", "1")
+    from datetime import timedelta
+    from django.utils import timezone
+    integration.refresh_from_db()
+    Integration.objects.filter(pk=integration.pk).update(additional={
+        **integration.additional,
+        "shared_pool_migrated_at": (timezone.now() - timedelta(days=8)).isoformat(),
+    })
+    mocker.patch(
+        "deployments.management.commands.dispatchers.subscription_is_drained", return_value=False
+    )
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+
+    assert DispatcherDeployment.objects.filter(pk=deployment.pk, integration__isnull=False).exists()
+    mock_delete_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_stamps_manually_migrated_on_first_sight(request, mocker, capsys):
+    # Manually moved to the shared topic previously: no stamp yet
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve J", topic=SHARED)
+    mocker.patch("deployments.management.commands.dispatchers.subscription_is_drained", return_value=True)
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+
+    integration.refresh_from_db()
+    assert integration.additional.get("shared_pool_migrated_at")  # stamped, not torn down
+    assert DispatcherDeployment.objects.filter(pk=deployment.pk).exists()
+    mock_delete_task.delay.assert_not_called()

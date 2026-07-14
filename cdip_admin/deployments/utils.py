@@ -2,7 +2,7 @@ import logging
 import json
 from urllib.parse import urlparse
 from google.api_core import exceptions as gcp_exceptions
-from google.cloud import secretmanager
+from google.cloud import secretmanager, pubsub_v1
 from django.conf import settings
 from core.utils import generate_short_id_milliseconds
 
@@ -338,3 +338,28 @@ def create_dispatcher_for_integration(integration):
             secret_id=_dispatcher_secret_id_for(integration)
         ),
     )
+
+
+def subscription_is_drained(subscription_name, configuration):
+    """Best-effort check that a push subscription has no deliverable backlog.
+
+    Peeks with a non-blocking pull: an empty response after the function has
+    been dormant for the cooling period is treated as drained. Any message
+    seen is released immediately (ack deadline 0) and the subscription is
+    treated as NOT drained.
+    """
+    env_vars = (configuration or {}).get("env_vars", {})
+    project_id = env_vars.get("GCP_PROJECT_ID")
+    subscriber = pubsub_v1.SubscriberClient()
+    subscription_path = subscriber.subscription_path(project_id, subscription_name)
+    response = subscriber.pull(
+        request={"subscription": subscription_path, "max_messages": 1},
+        timeout=10,
+    )
+    if not response.received_messages:
+        return True
+    ack_ids = [m.ack_id for m in response.received_messages]
+    subscriber.modify_ack_deadline(
+        request={"subscription": subscription_path, "ack_ids": ack_ids, "ack_deadline_seconds": 0}
+    )
+    return False
