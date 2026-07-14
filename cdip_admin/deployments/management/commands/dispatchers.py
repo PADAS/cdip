@@ -13,6 +13,9 @@ from integrations.models import Integration, OutboundIntegrationConfiguration
 from integrations.utils import get_dispatcher_topic_default_name
 
 
+SHARED_POOL_COOLING_DAYS = 7
+
+
 class Command(BaseCommand):
     help = "Manage serverless dispatcher deployments."
 
@@ -97,6 +100,30 @@ class Command(BaseCommand):
             type=str,
             help="Select a single integration by ID",
         )
+        parser.add_argument(
+            "--migrate-to-shared",
+            action="store_true",
+            default=False,
+            help="Move ER integrations onto the shared dispatcher pool topic (old dispatchers are kept for rollback)",
+        )
+        parser.add_argument(
+            "--rollback-shared",
+            action="store_true",
+            default=False,
+            help="Restore an integration's pre-migration topic (requires --integration; only while the old dispatcher still exists)",
+        )
+        parser.add_argument(
+            "--teardown-migrated",
+            action="store_true",
+            default=False,
+            help="Tear down old dispatchers of integrations migrated to the shared pool after the cooling period",
+        )
+        parser.add_argument(
+            "--cooling-days",
+            type=int,
+            default=None,
+            help="Override the shared-pool teardown cooling period (default 7 days). Use with care.",
+        )
 
     def handle(self, *args, **options):
 
@@ -169,6 +196,22 @@ class Command(BaseCommand):
                     integrations=integrations_to_update,
                     deployment_settings=new_settings
                 )
+        elif options["migrate_to_shared"]:
+            if not self._require_shared_topic():
+                return
+            self.migrate_to_shared(
+                self._get_migratable_er_integrations(
+                    max_count=options["max"], integration_id=options.get("integration")
+                )
+            )
+        elif options["rollback_shared"]:
+            if not self._require_shared_topic():
+                return
+            self.rollback_shared(integration_id=options.get("integration"))
+        elif options["teardown_migrated"]:
+            if not self._require_shared_topic():
+                return
+            self.teardown_migrated(options=options)
         self.stdout.write(self.style.SUCCESS("Done."))
 
     def list_deployments(self, options):
@@ -473,3 +516,63 @@ class Command(BaseCommand):
                 self.stdout.write(f"Integration {integration_id} v2 not found")
                 return None
         return integration
+
+    def _require_shared_topic(self):
+        if not settings.ER_SHARED_DISPATCHER_TOPIC:
+            self.stderr.write(
+                "ER_SHARED_DISPATCHER_TOPIC is not set - shared-pool verbs are disabled in this environment."
+            )
+            return False
+        return True
+
+    def _get_migratable_er_integrations(self, max_count, integration_id=None):
+        shared = settings.ER_SHARED_DISPATCHER_TOPIC
+        qs = Integration.objects.filter(dispatcher_by_integration__isnull=False)
+        if integration_id:
+            qs = qs.filter(id=integration_id)
+        candidates = []
+        for integration in qs.order_by("name"):
+            if not integration.is_er_site:
+                continue
+            additional = integration.additional or {}
+            if additional.get("dedicated_dispatcher"):
+                continue
+            if additional.get("topic") == shared:
+                continue  # already migrated (or manually moved); teardown handles it
+            candidates.append(integration)
+            if len(candidates) >= max_count:
+                break
+        return candidates
+
+    def migrate_to_shared(self, integrations):
+        from django.utils import timezone
+        shared = settings.ER_SHARED_DISPATCHER_TOPIC
+        self.stdout.write(self.style.SUCCESS(
+            f"Migrating {len(integrations)} ER integrations to shared topic {shared}..."
+        ))
+        for integration in integrations:
+            try:
+                additional = integration.additional or {}
+                deployment = integration.dispatcher_by_integration
+                pre_migration_topic = additional.get("topic") or deployment.topic_name
+                updated = {
+                    **additional,
+                    "broker": "gcp_pubsub",
+                    "topic": shared,
+                    "pre_migration_topic": pre_migration_topic,
+                    "shared_pool_migrated_at": timezone.now().isoformat(),
+                }
+                Integration.objects.filter(pk=integration.pk).update(additional=updated)
+                self.stdout.write(
+                    f"Migrated {integration.name} ({integration.id}) from {pre_migration_topic}. "
+                    f"Old dispatcher {deployment.name} kept for rollback."
+                )
+            except Exception as e:
+                self.stderr.write(f"Error migrating {integration.name} ({integration.id}): {e}")
+                continue
+
+    def rollback_shared(self, integration_id=None):
+        self.stderr.write("rollback_shared: not implemented yet")
+
+    def teardown_migrated(self, options=None):
+        self.stderr.write("teardown_migrated: not implemented yet")

@@ -3,6 +3,7 @@ from django.core.management import call_command
 from django.test import override_settings
 
 from deployments.models import DispatcherDeployment
+from integrations.models import Integration
 
 
 pytestmark = pytest.mark.django_db
@@ -496,3 +497,73 @@ def test_call_dispatchers_command_recreate_and_update_source_by_type_with_max_v1
                 force_recreate=True,
                 deployment_settings={source_key: dispatcher_source_release_2}
             )
+
+
+SHARED = "root-er-test-topic"
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_migrate_to_shared_flips_topic_and_stamps_bookkeeping(mocker, capsys, integrations_list_er):
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
+
+    # Use the first integration from the fixture
+    integration = integrations_list_er[0]
+    old_topic = integration.additional.get("topic")
+
+    call_command("dispatchers", "--migrate-to-shared", "--max", "10")
+
+    integration.refresh_from_db()
+    assert integration.additional["topic"] == SHARED
+    assert integration.additional["pre_migration_topic"] == old_topic
+    assert integration.additional["shared_pool_migrated_at"]  # ISO timestamp
+    # Deployment should still exist
+    assert integration.dispatcher_by_integration is not None
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_migrate_to_shared_skips_dedicated_and_already_migrated(mocker, capsys, integrations_list_er):
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
+
+    dedicated = integrations_list_er[0]
+    migrated = integrations_list_er[1]
+
+    # Mark one as dedicated
+    Integration.objects.filter(pk=dedicated.pk).update(
+        additional={**dedicated.additional, "dedicated_dispatcher": True}
+    )
+    dedicated.refresh_from_db()
+
+    # Mark one as already migrated to shared
+    Integration.objects.filter(pk=migrated.pk).update(
+        additional={**migrated.additional, "topic": SHARED}
+    )
+    migrated.refresh_from_db()
+
+    old_topic_dedicated = dedicated.additional.get("topic")
+
+    call_command("dispatchers", "--migrate-to-shared", "--max", "10")
+
+    dedicated.refresh_from_db()
+    assert dedicated.additional["topic"] == old_topic_dedicated  # not migrated
+    migrated.refresh_from_db()
+    assert "pre_migration_topic" not in migrated.additional  # untouched
+
+
+@pytest.mark.django_db
+def test_migrate_to_shared_refuses_when_setting_empty(mocker, capsys, integrations_list_er):
+    mocker.patch("deployments.models.transaction.on_commit", lambda fn: fn())
+    mocker.patch("deployments.models.deploy_serverless_dispatcher", mocker.MagicMock())
+
+    integration = integrations_list_er[0]
+    old_topic = integration.additional.get("topic")
+
+    call_command("dispatchers", "--migrate-to-shared", "--max", "10")
+
+    out = capsys.readouterr()
+    assert "ER_SHARED_DISPATCHER_TOPIC" in (out.out + out.err)
+    integration.refresh_from_db()
+    assert integration.additional["topic"] == old_topic  # unchanged
