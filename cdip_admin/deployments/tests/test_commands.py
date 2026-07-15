@@ -744,6 +744,36 @@ def test_teardown_survives_malformed_migration_stamp(request, mocker, capsys):
 
 @pytest.mark.django_db
 @override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
+def test_teardown_handles_naive_migration_stamp(request, mocker, capsys):
+    """A hand-edited shared_pool_migrated_at without a timezone offset (naive)
+    must be treated as UTC and compared normally against the (aware) cooling
+    cutoff, rather than being skipped forever with an aware/naive TypeError."""
+    from datetime import timedelta
+    from django.utils import timezone
+
+    # Deployment records a dedicated topic; the integration was migrated onto
+    # the shared pool. The migration stamp is naive (no tz offset).
+    integration, deployment = _make_er_destination_with_deployment(request, "Reserve L", topic="old-dedicated-topic")
+    naive_stamp = (timezone.now() - timedelta(days=8)).replace(tzinfo=None).isoformat()
+    Integration.objects.filter(pk=integration.pk).update(additional={
+        "broker": "gcp_pubsub",
+        "topic": SHARED,
+        "pre_migration_topic": "old-dedicated-topic",
+        "shared_pool_migrated_at": naive_stamp,
+    })
+    mocker.patch("deployments.management.commands.dispatchers.subscription_is_drained", return_value=True)
+    mock_delete_task = mocker.patch("deployments.models.delete_serverless_dispatcher")
+
+    call_command("dispatchers", "--teardown-migrated", "--max", "10")
+    out = capsys.readouterr()
+
+    assert "Error tearing down" not in (out.out + out.err)
+    assert not DispatcherDeployment.objects.filter(pk=deployment.pk, integration__isnull=False).exists()
+    mock_delete_task.delay.assert_called_once()
+
+
+@pytest.mark.django_db
+@override_settings(ER_SHARED_DISPATCHER_TOPIC=SHARED)
 def test_migrate_to_shared_skips_when_pre_migration_topic_is_falsy(request, capsys):
     """If neither additional.topic nor the deployment's recorded topic_name
     are set, we can't compute a rollback lever - migrating anyway would

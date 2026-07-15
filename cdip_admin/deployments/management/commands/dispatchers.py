@@ -184,13 +184,17 @@ class Command(BaseCommand):
                         integration_type_q
                     )
                     new_settings = None
-                if options.get("v2") and settings.ER_SHARED_DISPATCHER_TOPIC:
+                if options.get("v2") and type_cleaned == "earth_ranger" and settings.ER_SHARED_DISPATCHER_TOPIC:
                     # Redeploying (--update-source/--recreate) a migrated integration's
                     # old function would re-derive its topic from additional.topic -
                     # which is now the SHARED topic - attaching a zombie push
                     # subscription to the shared root and duplicating delivery of
-                    # all shared-pool traffic. Exclude anything already on, or
-                    # migrated onto, the shared pool.
+                    # all shared-pool traffic. This hazard is ER-specific (only ER
+                    # integrations are migrated onto ER_SHARED_DISPATCHER_TOPIC), so
+                    # scope the exclusion to the earth_ranger type - otherwise a
+                    # non-ER integration whose topic happens to coincide with the
+                    # shared topic value could be filtered out incorrectly. Exclude
+                    # anything already on, or migrated onto, the shared pool.
                     shared = settings.ER_SHARED_DISPATCHER_TOPIC
                     integrations_qs = integrations_qs.exclude(
                         Q(additional__topic=shared) | Q(additional__has_key="shared_pool_migrated_at")
@@ -669,8 +673,15 @@ class Command(BaseCommand):
                     )
                     processed += 1
                     continue
-                from datetime import datetime
+                from datetime import datetime, timezone as dt_timezone
                 migrated_at = datetime.fromisoformat(stamp)
+                if timezone.is_naive(migrated_at):
+                    # Hand-edited stamps (e.g. set manually before this tooling
+                    # existed) may lack a timezone offset. Treat them as UTC
+                    # rather than skipping the integration forever, since
+                    # `cutoff` (derived from timezone.now()) is always aware
+                    # and an aware/naive comparison would raise TypeError.
+                    migrated_at = timezone.make_aware(migrated_at, dt_timezone.utc)
                 if migrated_at > cutoff:
                     continue  # still cooling
                 # SAFETY: deleting a deployment deletes its recorded topic

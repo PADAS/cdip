@@ -68,3 +68,23 @@ def test_subscription_is_drained_false_when_no_data_points(mocker):
     mock_monitoring_v3.MetricServiceClient.return_value = mock_client
 
     assert subscription_is_drained("some-sub", _configuration()) is False
+
+
+def test_subscription_is_drained_false_when_project_id_missing(mocker):
+    # No GCP_PROJECT_ID configured: must bail out before ever touching
+    # monitoring_v3 (no "projects/None" request), and log a warning.
+    mock_monitoring_v3 = mocker.patch("deployments.utils.monitoring_v3")
+
+    result = subscription_is_drained("some-sub", {"env_vars": {}})
+
+    assert result is False
+    mock_monitoring_v3.MetricServiceClient.assert_not_called()
+
+
+def test_subscription_is_drained_false_when_configuration_missing_env_vars(mocker):
+    mock_monitoring_v3 = mocker.patch("deployments.utils.monitoring_v3")
+
+    result = subscription_is_drained("some-sub", {})
+
+    assert result is False
+    mock_monitoring_v3.MetricServiceClient.assert_not_called()

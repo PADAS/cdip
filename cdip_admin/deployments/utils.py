@@ -367,20 +367,36 @@ def subscription_is_drained(subscription_name, configuration):
     """
     env_vars = (configuration or {}).get("env_vars", {})
     project_id = env_vars.get("GCP_PROJECT_ID")
+    if not project_id:
+        logger.warning(
+            f"No GCP_PROJECT_ID configured for subscription {subscription_name}; "
+            "can't verify the backlog is drained, treating as NOT drained."
+        )
+        return False
     project_name = f"projects/{project_id}"
     metric_filter = (
         'metric.type = "pubsub.googleapis.com/subscription/num_undelivered_messages" '
         f'AND resource.labels.subscription_id = "{subscription_name}"'
     )
 
+    # Build a 10-minute [start_time, end_time) window. end_time is anchored to
+    # "now" (seconds + sub-second nanos); start_time is exactly
+    # _DRAIN_CHECK_LOOKBACK_SECONDS earlier, reusing end_time's nanos so the
+    # window is exactly that many seconds wide (not off by a sub-second
+    # rounding artifact from computing each boundary independently).
     now = time.time()
-    interval = monitoring_v3.TimeInterval()
-    interval.end_time.seconds = int(now)
-    interval.end_time.nanos = int((now - interval.end_time.seconds) * 10 ** 9)
-    interval.start_time.seconds = int(now - _DRAIN_CHECK_LOOKBACK_SECONDS)
-    interval.start_time.nanos = interval.end_time.nanos
+    end_seconds = int(now)
+    end_nanos = int((now - end_seconds) * 10 ** 9)
+    start_seconds = end_seconds - _DRAIN_CHECK_LOOKBACK_SECONDS
+    start_nanos = end_nanos
 
-    latest_end_seconds = None
+    interval = monitoring_v3.TimeInterval()
+    interval.end_time.seconds = end_seconds
+    interval.end_time.nanos = end_nanos
+    interval.start_time.seconds = start_seconds
+    interval.start_time.nanos = start_nanos
+
+    latest_end = None  # (seconds, nanos) of the most recent point seen so far
     latest_value = None
     with monitoring_v3.MetricServiceClient() as client:
         results = client.list_time_series(
@@ -393,9 +409,9 @@ def subscription_is_drained(subscription_name, configuration):
         )
         for series in results:
             for point in series.points:
-                end_seconds = point.interval.end_time.seconds
-                if latest_end_seconds is None or end_seconds > latest_end_seconds:
-                    latest_end_seconds = end_seconds
+                end_key = (point.interval.end_time.seconds, point.interval.end_time.nanos)
+                if latest_end is None or end_key > latest_end:
+                    latest_end = end_key
                     latest_value = point.value.int64_value
 
     if latest_value is None:
