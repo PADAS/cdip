@@ -696,7 +696,11 @@ class Command(BaseCommand):
                     ))
                     processed += 1
                     continue
-                subscription_name = f"{deployment.name[:250]}-sub".replace("--", "-")
+                # deployment.name is nullable; deploy derives a default via
+                # get_default_dispatcher_name when it's falsy without persisting
+                # it. Mirror that here so a name-less row is still teardownable.
+                deployment_name = deployment.name or get_default_dispatcher_name(integration=integration)
+                subscription_name = f"{deployment_name[:250]}-sub".replace("--", "-")
                 if not subscription_is_drained(subscription_name, deployment.configuration):
                     self.stdout.write(
                         f"{integration.name}: old subscription {subscription_name} not drained yet; skipping."
