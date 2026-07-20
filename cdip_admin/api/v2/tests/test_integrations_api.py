@@ -488,6 +488,37 @@ def test_update_integration_does_not_trigger_duplicate_check_on_self(
     assert "name" in steal_patch_response.json()
 
 
+def test_patch_unrelated_field_does_not_trigger_duplicate_check(
+        api_client, superuser, organization, integration_type_er, get_random_id
+):
+    # Regression: with legacy (name, type) duplicates already in the DB
+    # (allowed because this PR intentionally avoids a UniqueConstraint),
+    # a PATCH that only touches unrelated fields must not spuriously 409.
+    name = f"Legacy Dup {get_random_id()}"
+    Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=name,
+        base_url="https://legacy-a.pamdas.org",
+    )
+    legacy_duplicate = Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=name,
+        base_url="https://legacy-b.pamdas.org",
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": legacy_duplicate.id}),
+        data={"base_url": "https://legacy-b-new.pamdas.org"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    legacy_duplicate.refresh_from_db()
+    assert legacy_duplicate.base_url == "https://legacy-b-new.pamdas.org/"
+
+
 def test_create_er_integration_with_auto_create_configurations_as_org_admin(
         api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
         er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions

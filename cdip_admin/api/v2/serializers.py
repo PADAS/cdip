@@ -604,12 +604,15 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
-        # Enforce (name, type) uniqueness globally. On updates, only run this
-        # check when the request is attempting to set/change `name` or `type`,
-        # so legacy duplicates don't block unrelated PATCHes.
-        if self.instance is not None and "name" not in data and "type" not in data:
-            pass
-        else:
+        # Only run the duplicate (name, type) check when the request is
+        # actually setting one of those fields. On PATCHes that touch only
+        # unrelated fields (base_url, enabled, ...) we skip it, otherwise a
+        # legacy duplicate already in the DB would make every unrelated
+        # update fail with 409.
+        checking_uniqueness = (
+            self.instance is None or "name" in data or "type" in data
+        )
+        if checking_uniqueness:
             name = data.get("name", getattr(self.instance, "name", None))
             integration_type = data.get("type", getattr(self.instance, "type", None))
             if name and integration_type:
@@ -710,30 +713,46 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         configurations = validated_data.pop("configurations", [])
         webhook_configuration = validated_data.pop("webhook_configuration", {})
-        # Update the integration
-        super().update(instance=instance, validated_data=validated_data)
-        # Update or Create nested configurations if provided
-        for config_data in configurations:  # Usually less than 5-10 configs
-            config_data["integration"] = self.instance
-            if config_data.get("id"):
-                # When updating by id, the row's `action` is immutable —
-                # repointing it would (a) collide with the (integration,
-                # action) UniqueConstraint, and (b) bypass the schema
-                # validation in validate() which keyed off the existing
-                # action. The portal sometimes echoes `action` back for
-                # client convenience; ignore it on id-updates.
-                config_data.pop("action", None)
-            IntegrationConfiguration.objects.update_or_create(
-                id=config_data.get("id"),
-                defaults=config_data
-            )
-        # Update or Create webhook configuration if provided
-        if webhook_configuration and instance.type.webhook:
-            WebhookConfiguration.objects.update_or_create(
-                integration=self.instance,
-                webhook=self.instance.type.webhook,
-                defaults={"data": webhook_configuration.get("data", {})}
-            )
+        # If name/type are being changed, use the same lock+recheck pattern
+        # as create() to close the race with a concurrent create/update
+        # racing to the same (name, type). PATCHes that don't touch those
+        # fields skip the lock to stay cheap.
+        changing_uniqueness_fields = "name" in validated_data or "type" in validated_data
+        with transaction.atomic():
+            if changing_uniqueness_fields:
+                new_type = validated_data.get("type", instance.type)
+                new_name = validated_data.get("name", instance.name)
+                IntegrationType.objects.select_for_update().get(pk=new_type.pk)
+                if new_name and Integration.objects.filter(
+                    name=new_name, type=new_type
+                ).exclude(pk=instance.pk).exists():
+                    raise DuplicateIntegrationError(detail={
+                        "name": ["A connection with this name already exists for this integration type."]
+                    })
+            # Update the integration
+            super().update(instance=instance, validated_data=validated_data)
+            # Update or Create nested configurations if provided
+            for config_data in configurations:  # Usually less than 5-10 configs
+                config_data["integration"] = self.instance
+                if config_data.get("id"):
+                    # When updating by id, the row's `action` is immutable —
+                    # repointing it would (a) collide with the (integration,
+                    # action) UniqueConstraint, and (b) bypass the schema
+                    # validation in validate() which keyed off the existing
+                    # action. The portal sometimes echoes `action` back for
+                    # client convenience; ignore it on id-updates.
+                    config_data.pop("action", None)
+                IntegrationConfiguration.objects.update_or_create(
+                    id=config_data.get("id"),
+                    defaults=config_data
+                )
+            # Update or Create webhook configuration if provided
+            if webhook_configuration and instance.type.webhook:
+                WebhookConfiguration.objects.update_or_create(
+                    integration=self.instance,
+                    webhook=self.instance.type.webhook,
+                    defaults={"data": webhook_configuration.get("data", {})}
+                )
         return instance
 
 
