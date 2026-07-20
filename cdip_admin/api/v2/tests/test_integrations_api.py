@@ -491,9 +491,8 @@ def test_update_integration_does_not_trigger_duplicate_check_on_self(
 def test_patch_unrelated_field_does_not_trigger_duplicate_check(
         api_client, superuser, organization, integration_type_er, get_random_id
 ):
-    # Regression: with legacy (name, type) duplicates already in the DB
-    # (allowed because this PR intentionally avoids a UniqueConstraint),
-    # a PATCH that only touches unrelated fields must not spuriously 409.
+    # Legacy duplicates are tolerated (no DB UniqueConstraint), so a PATCH
+    # that doesn't touch name/type must not 409 on their existence.
     name = f"Legacy Dup {get_random_id()}"
     Integration.objects.create(
         owner=organization,

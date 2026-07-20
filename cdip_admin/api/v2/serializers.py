@@ -604,11 +604,8 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
-        # Only run the duplicate (name, type) check when the request is
-        # actually setting one of those fields. On PATCHes that touch only
-        # unrelated fields (base_url, enabled, ...) we skip it, otherwise a
-        # legacy duplicate already in the DB would make every unrelated
-        # update fail with 409.
+        # Skip on PATCHes that don't touch name/type — otherwise a legacy
+        # duplicate in the DB would 409 every unrelated update.
         checking_uniqueness = (
             self.instance is None or "name" in data or "type" in data
         )
@@ -626,10 +623,9 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
-                # Scope the lookup to this integration's configurations so
-                # an id from a different integration doesn't get repointed
-                # (and a missing id surfaces as a 400, not a 500 from
-                # DoesNotExist).
+                # Scope to this integration so a config id from another
+                # integration can't be repointed (and a missing id surfaces
+                # as 400, not 500).
                 try:
                     existing_config = self.instance.configurations.get(id=configuration["id"])
                 except IntegrationConfiguration.DoesNotExist:
@@ -641,14 +637,10 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 if "action" not in configuration:
                     raise drf_exceptions.ValidationError("The action id is required.")
                 action = configuration["action"]
-                # On PATCH, a new (no-id) item for an action that already
-                # has a configuration would collide with the (integration,
-                # action) UniqueConstraint at the DB layer and surface as
-                # a 500. Surface it as a friendly 400 here. The validator-
-                # level UniqueTogetherValidator that would normally catch
-                # this is disabled in IntegrationConfigurationCreateUpdate
-                # Serializer.Meta because it incorrectly required the
-                # `integration` field that the URL implies.
+                # Would collide with the (integration, action) UniqueConstraint
+                # and surface as 500. UniqueTogetherValidator is disabled on the
+                # nested serializer because it required the `integration` field
+                # that the URL already implies.
                 if self.instance and self.instance.configurations.filter(action=action).exists():
                     raise drf_exceptions.ValidationError(
                         f"A configuration for action '{action.value}' already exists on this "
@@ -675,33 +667,27 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
         with transaction.atomic():
-            # Serialize concurrent creates for this IntegrationType and re-check
-            # (name, type) inside the transaction. validate() catches most
-            # duplicates upfront (better UX), but two concurrent POSTs could
-            # both pass that check; without a DB UniqueConstraint this closes
-            # the race.
             integration_type = validated_data["type"]
-            IntegrationType.objects.select_for_update().get(pk=integration_type.pk)
             name = validated_data.get("name")
-            if name and Integration.objects.filter(name=name, type=integration_type).exists():
-                raise DuplicateIntegrationError(detail={
-                    "name": ["A connection with this name already exists for this integration type."]
-                })
-            # Create the integration
+            # Lock IntegrationType + re-check (name, type) inside the txn to
+            # close the race two concurrent POSTs would win without a DB
+            # UniqueConstraint. Uniqueness doesn't apply when name is blank.
+            if name:
+                IntegrationType.objects.select_for_update().get(pk=integration_type.pk)
+                if Integration.objects.filter(name=name, type=integration_type).exists():
+                    raise DuplicateIntegrationError(detail={
+                        "name": ["A connection with this name already exists for this integration type."]
+                    })
             integration = Integration.objects.create(**validated_data)
-            # Create configurations if provided
-            for configuration in configurations:  # Usually less than 5-10 configs
+            for configuration in configurations:
                 IntegrationConfiguration.objects.create(
                     integration=integration,
                     **configuration
                 )
-            # Create other missing configurations
             if create_configurations:
                 integration.create_missing_configurations()
-            # Create a default route as needed
             if create_default_route:
                 ensure_default_route(integration=integration)
-            # Create webhook configuration if provided
             if webhook_configuration and integration.type.webhook:
                 WebhookConfiguration.objects.create(
                     integration=integration,
@@ -713,40 +699,33 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         configurations = validated_data.pop("configurations", [])
         webhook_configuration = validated_data.pop("webhook_configuration", {})
-        # If name/type are being changed, use the same lock+recheck pattern
-        # as create() to close the race with a concurrent create/update
-        # racing to the same (name, type). PATCHes that don't touch those
-        # fields skip the lock to stay cheap.
+        # Same lock+recheck as create() when name/type are changing, to close
+        # the race between a concurrent PATCH and any other create/update.
         changing_uniqueness_fields = "name" in validated_data or "type" in validated_data
         with transaction.atomic():
             if changing_uniqueness_fields:
                 new_type = validated_data.get("type", instance.type)
                 new_name = validated_data.get("name", instance.name)
-                IntegrationType.objects.select_for_update().get(pk=new_type.pk)
-                if new_name and Integration.objects.filter(
-                    name=new_name, type=new_type
-                ).exclude(pk=instance.pk).exists():
-                    raise DuplicateIntegrationError(detail={
-                        "name": ["A connection with this name already exists for this integration type."]
-                    })
-            # Update the integration
+                if new_name:
+                    IntegrationType.objects.select_for_update().get(pk=new_type.pk)
+                    if Integration.objects.filter(
+                        name=new_name, type=new_type
+                    ).exclude(pk=instance.pk).exists():
+                        raise DuplicateIntegrationError(detail={
+                            "name": ["A connection with this name already exists for this integration type."]
+                        })
             super().update(instance=instance, validated_data=validated_data)
-            # Update or Create nested configurations if provided
-            for config_data in configurations:  # Usually less than 5-10 configs
+            for config_data in configurations:
                 config_data["integration"] = self.instance
                 if config_data.get("id"):
-                    # When updating by id, the row's `action` is immutable —
-                    # repointing it would (a) collide with the (integration,
-                    # action) UniqueConstraint, and (b) bypass the schema
-                    # validation in validate() which keyed off the existing
-                    # action. The portal sometimes echoes `action` back for
-                    # client convenience; ignore it on id-updates.
+                    # `action` is immutable on id-updates: repointing would
+                    # collide with (integration, action) and bypass schema
+                    # validation. Portal sometimes echoes it back; drop it.
                     config_data.pop("action", None)
                 IntegrationConfiguration.objects.update_or_create(
                     id=config_data.get("id"),
                     defaults=config_data
                 )
-            # Update or Create webhook configuration if provided
             if webhook_configuration and instance.type.webhook:
                 WebhookConfiguration.objects.update_or_create(
                     integration=self.instance,
