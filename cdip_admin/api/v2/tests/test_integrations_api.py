@@ -389,6 +389,135 @@ def test_cannot_create_integrations_with_invalid_url_as_org_admin(
     )
 
 
+def test_cannot_create_duplicate_integration_returns_409(
+        api_client, superuser, organization, other_organization, integration_type_er, get_random_id
+):
+    name = f"Reserve Dup {get_random_id()}"
+    Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=name,
+        base_url="https://reservex.pamdas.org",
+    )
+    count_before = Integration.objects.count()
+    api_client.force_authenticate(superuser)
+
+    same_workspace_response = api_client.post(
+        reverse("integrations-list"),
+        data={
+            "name": name,
+            "type": str(integration_type_er.id),
+            "owner": str(organization.id),
+            "base_url": "https://another.pamdas.org",
+        },
+        format="json",
+    )
+    assert same_workspace_response.status_code == status.HTTP_409_CONFLICT
+    assert "name" in same_workspace_response.json()
+
+    cross_workspace_response = api_client.post(
+        reverse("integrations-list"),
+        data={
+            "name": name,
+            "type": str(integration_type_er.id),
+            "owner": str(other_organization.id),
+            "base_url": "https://yetanother.pamdas.org",
+        },
+        format="json",
+    )
+    assert cross_workspace_response.status_code == status.HTTP_409_CONFLICT
+    assert "name" in cross_workspace_response.json()
+
+    assert Integration.objects.count() == count_before
+
+
+@pytest.mark.django_db(transaction=True)
+def test_create_integration_rolls_back_on_route_failure(
+        api_client, mocker, superuser, organization, integration_type_er, get_random_id
+):
+    mocker.patch(
+        "api.v2.serializers.ensure_default_route",
+        side_effect=RuntimeError("boom"),
+    )
+    count_before = Integration.objects.count()
+    api_client.force_authenticate(superuser)
+    with pytest.raises(RuntimeError):
+        api_client.post(
+            reverse("integrations-list"),
+            data={
+                "name": f"Rollback {get_random_id()}",
+                "type": str(integration_type_er.id),
+                "owner": str(organization.id),
+                "base_url": "https://rollback.pamdas.org",
+            },
+            format="json",
+        )
+    assert Integration.objects.count() == count_before
+
+
+def test_update_integration_does_not_trigger_duplicate_check_on_self(
+        api_client, superuser, organization, integration_type_er, get_random_id
+):
+    integration_a = Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=f"Reserve A {get_random_id()}",
+        base_url="https://reserve-a.pamdas.org",
+    )
+    integration_b = Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=f"Reserve B {get_random_id()}",
+        base_url="https://reserve-b.pamdas.org",
+    )
+    api_client.force_authenticate(superuser)
+
+    self_patch_response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": integration_a.id}),
+        data={"name": integration_a.name},
+        format="json",
+    )
+    assert self_patch_response.status_code == status.HTTP_200_OK
+
+    steal_patch_response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": integration_b.id}),
+        data={"name": integration_a.name},
+        format="json",
+    )
+    assert steal_patch_response.status_code == status.HTTP_409_CONFLICT
+    assert "name" in steal_patch_response.json()
+
+
+def test_patch_unrelated_field_does_not_trigger_duplicate_check(
+        api_client, superuser, organization, integration_type_er, get_random_id
+):
+    # Legacy duplicates are tolerated (no DB UniqueConstraint), so a PATCH
+    # that doesn't touch name/type must not 409 on their existence.
+    name = f"Legacy Dup {get_random_id()}"
+    Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=name,
+        base_url="https://legacy-a.pamdas.org",
+    )
+    legacy_duplicate = Integration.objects.create(
+        owner=organization,
+        type=integration_type_er,
+        name=name,
+        base_url="https://legacy-b.pamdas.org",
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.patch(
+        reverse("integrations-detail", kwargs={"pk": legacy_duplicate.id}),
+        data={"base_url": "https://legacy-b-new.pamdas.org"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    legacy_duplicate.refresh_from_db()
+    assert legacy_duplicate.base_url == "https://legacy-b-new.pamdas.org/"
+
+
 def test_create_er_integration_with_auto_create_configurations_as_org_admin(
         api_client, org_admin_user, organization, integration_type_er, get_random_id, er_action_auth,
         er_action_push_events, er_action_push_positions, er_action_pull_events, er_action_pull_positions

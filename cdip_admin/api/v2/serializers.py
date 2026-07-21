@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Iterable
 
 import jsonschema
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework import exceptions as drf_exceptions
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
@@ -26,6 +26,11 @@ from .utils import send_events_to_routing, send_attachments_to_routing, send_obs
     send_event_update_to_routing, send_text_messages_to_routing
 
 User = get_user_model()
+
+
+class DuplicateIntegrationError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
 
 
 class UserWorkspaceSerializer(serializers.ModelSerializer):
@@ -627,13 +632,28 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         """
         Validate the configurations
         """
+        # Skip on PATCHes that don't touch name/type — otherwise a legacy
+        # duplicate in the DB would 409 every unrelated update.
+        checking_uniqueness = (
+            self.instance is None or "name" in data or "type" in data
+        )
+        if checking_uniqueness:
+            name = data.get("name", getattr(self.instance, "name", None))
+            integration_type = data.get("type", getattr(self.instance, "type", None))
+            if name and integration_type:
+                duplicates_qs = Integration.objects.filter(name=name, type=integration_type)
+                if self.instance is not None:
+                    duplicates_qs = duplicates_qs.exclude(pk=self.instance.pk)
+                if duplicates_qs.exists():
+                    raise DuplicateIntegrationError(detail={
+                        "name": ["A connection with this name already exists for this integration type."]
+                    })
         seen_action_ids = set()
         for configuration in data.get("configurations", []):
             if self.instance and "id" in configuration:  # Integration Update
-                # Scope the lookup to this integration's configurations so
-                # an id from a different integration doesn't get repointed
-                # (and a missing id surfaces as a 400, not a 500 from
-                # DoesNotExist).
+                # Scope to this integration so a config id from another
+                # integration can't be repointed (and a missing id surfaces
+                # as 400, not 500).
                 try:
                     existing_config = self.instance.configurations.get(id=configuration["id"])
                 except IntegrationConfiguration.DoesNotExist:
@@ -645,14 +665,10 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
                 if "action" not in configuration:
                     raise drf_exceptions.ValidationError("The action id is required.")
                 action = configuration["action"]
-                # On PATCH, a new (no-id) item for an action that already
-                # has a configuration would collide with the (integration,
-                # action) UniqueConstraint at the DB layer and surface as
-                # a 500. Surface it as a friendly 400 here. The validator-
-                # level UniqueTogetherValidator that would normally catch
-                # this is disabled in IntegrationConfigurationCreateUpdate
-                # Serializer.Meta because it incorrectly required the
-                # `integration` field that the URL implies.
+                # Would collide with the (integration, action) UniqueConstraint
+                # and surface as 500. UniqueTogetherValidator is disabled on the
+                # nested serializer because it required the `integration` field
+                # that the URL already implies.
                 if self.instance and self.instance.configurations.filter(action=action).exists():
                     raise drf_exceptions.ValidationError(
                         f"A configuration for action '{action.value}' already exists on this "
@@ -678,56 +694,72 @@ class IntegrationCreateUpdateSerializer(serializers.ModelSerializer):
         webhook_configuration = validated_data.pop("webhook_configuration", {})
         create_default_route = validated_data.pop("create_default_route")
         create_configurations = validated_data.pop("create_configurations")
-        # Create the integration
-        integration = Integration.objects.create(**validated_data)
-        # Create configurations if provided
-        for configuration in configurations:  # Usually less than 5-10 configs
-            IntegrationConfiguration.objects.create(
-                integration=integration,
-                **configuration
-            )
-        # Create other missing configurations
-        if create_configurations:
-            integration.create_missing_configurations()
-        # Create a default route as needed
-        if create_default_route:
-            ensure_default_route(integration=integration)
-        # Create webhook configuration if provided
-        if webhook_configuration and integration.type.webhook:
-            WebhookConfiguration.objects.create(
-                integration=integration,
-                webhook=integration.type.webhook,
-                data=webhook_configuration.get("data", {})
-            )
+        with transaction.atomic():
+            integration_type = validated_data["type"]
+            name = validated_data.get("name")
+            # Lock IntegrationType + re-check (name, type) inside the txn to
+            # close the race two concurrent POSTs would win without a DB
+            # UniqueConstraint. Uniqueness doesn't apply when name is blank.
+            if name:
+                IntegrationType.objects.select_for_update().get(pk=integration_type.pk)
+                if Integration.objects.filter(name=name, type=integration_type).exists():
+                    raise DuplicateIntegrationError(detail={
+                        "name": ["A connection with this name already exists for this integration type."]
+                    })
+            integration = Integration.objects.create(**validated_data)
+            for configuration in configurations:
+                IntegrationConfiguration.objects.create(
+                    integration=integration,
+                    **configuration
+                )
+            if create_configurations:
+                integration.create_missing_configurations()
+            if create_default_route:
+                ensure_default_route(integration=integration)
+            if webhook_configuration and integration.type.webhook:
+                WebhookConfiguration.objects.create(
+                    integration=integration,
+                    webhook=integration.type.webhook,
+                    data=webhook_configuration.get("data", {})
+                )
         return integration
 
     def update(self, instance, validated_data):
         configurations = validated_data.pop("configurations", [])
         webhook_configuration = validated_data.pop("webhook_configuration", {})
-        # Update the integration
-        super().update(instance=instance, validated_data=validated_data)
-        # Update or Create nested configurations if provided
-        for config_data in configurations:  # Usually less than 5-10 configs
-            config_data["integration"] = self.instance
-            if config_data.get("id"):
-                # When updating by id, the row's `action` is immutable —
-                # repointing it would (a) collide with the (integration,
-                # action) UniqueConstraint, and (b) bypass the schema
-                # validation in validate() which keyed off the existing
-                # action. The portal sometimes echoes `action` back for
-                # client convenience; ignore it on id-updates.
-                config_data.pop("action", None)
-            IntegrationConfiguration.objects.update_or_create(
-                id=config_data.get("id"),
-                defaults=config_data
-            )
-        # Update or Create webhook configuration if provided
-        if webhook_configuration and instance.type.webhook:
-            WebhookConfiguration.objects.update_or_create(
-                integration=self.instance,
-                webhook=self.instance.type.webhook,
-                defaults={"data": webhook_configuration.get("data", {})}
-            )
+        # Same lock+recheck as create() when name/type are changing, to close
+        # the race between a concurrent PATCH and any other create/update.
+        changing_uniqueness_fields = "name" in validated_data or "type" in validated_data
+        with transaction.atomic():
+            if changing_uniqueness_fields:
+                new_type = validated_data.get("type", instance.type)
+                new_name = validated_data.get("name", instance.name)
+                if new_name:
+                    IntegrationType.objects.select_for_update().get(pk=new_type.pk)
+                    if Integration.objects.filter(
+                        name=new_name, type=new_type
+                    ).exclude(pk=instance.pk).exists():
+                        raise DuplicateIntegrationError(detail={
+                            "name": ["A connection with this name already exists for this integration type."]
+                        })
+            super().update(instance=instance, validated_data=validated_data)
+            for config_data in configurations:
+                config_data["integration"] = self.instance
+                if config_data.get("id"):
+                    # `action` is immutable on id-updates: repointing would
+                    # collide with (integration, action) and bypass schema
+                    # validation. Portal sometimes echoes it back; drop it.
+                    config_data.pop("action", None)
+                IntegrationConfiguration.objects.update_or_create(
+                    id=config_data.get("id"),
+                    defaults=config_data
+                )
+            if webhook_configuration and instance.type.webhook:
+                WebhookConfiguration.objects.update_or_create(
+                    integration=self.instance,
+                    webhook=self.instance.type.webhook,
+                    defaults={"data": webhook_configuration.get("data", {})}
+                )
         return instance
 
 
