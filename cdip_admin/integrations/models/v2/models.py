@@ -282,7 +282,24 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             if settings.GCP_ENVIRONMENT_ENABLED and any(
                     [self.is_er_site, self.is_smart_site, self.is_wpswatch_site, self.is_traptagger_site]
             ):
-                create_dispatcher_for_integration(self)
+                if (
+                    self.is_er_site
+                    and settings.ER_SHARED_DISPATCHER_TOPIC
+                    and not (self.additional or {}).get("dedicated_dispatcher")
+                ):
+                    # New ER destinations attach to the shared dispatcher pool
+                    # by default; a dedicated dispatcher is an explicit opt-in
+                    # via additional["dedicated_dispatcher"]. Signal-safe write:
+                    # a plain save() here would recurse through _post_save.
+                    updated_additional = {
+                        **(self.additional or {}),
+                        "broker": "gcp_pubsub",
+                        "topic": settings.ER_SHARED_DISPATCHER_TOPIC,
+                    }
+                    Integration.objects.filter(pk=self.pk).update(additional=updated_additional)
+                    self.additional = updated_additional
+                else:
+                    create_dispatcher_for_integration(self)
 
             # Create default healthcheck settings and status
             IntegrationStatus.objects.get_or_create(integration=self)
