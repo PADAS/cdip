@@ -392,6 +392,11 @@ def test_cannot_create_integrations_with_invalid_url_as_org_admin(
 def test_cannot_create_duplicate_integration_returns_409(
         api_client, superuser, organization, other_organization, integration_type_er, get_random_id
 ):
+    # Exact body is a contract with the portal, which renders this error
+    # inline under the `name` field in the create-connection form.
+    expected_duplicate_error = {
+        "name": ["A connection with this name already exists for this integration type."]
+    }
     name = f"Reserve Dup {get_random_id()}"
     Integration.objects.create(
         owner=organization,
@@ -413,7 +418,7 @@ def test_cannot_create_duplicate_integration_returns_409(
         format="json",
     )
     assert same_workspace_response.status_code == status.HTTP_409_CONFLICT
-    assert "name" in same_workspace_response.json()
+    assert same_workspace_response.json() == expected_duplicate_error
 
     cross_workspace_response = api_client.post(
         reverse("integrations-list"),
@@ -426,7 +431,7 @@ def test_cannot_create_duplicate_integration_returns_409(
         format="json",
     )
     assert cross_workspace_response.status_code == status.HTTP_409_CONFLICT
-    assert "name" in cross_workspace_response.json()
+    assert cross_workspace_response.json() == expected_duplicate_error
 
     assert Integration.objects.count() == count_before
 
@@ -485,7 +490,9 @@ def test_update_integration_does_not_trigger_duplicate_check_on_self(
         format="json",
     )
     assert steal_patch_response.status_code == status.HTTP_409_CONFLICT
-    assert "name" in steal_patch_response.json()
+    assert steal_patch_response.json() == {
+        "name": ["A connection with this name already exists for this integration type."]
+    }
 
 
 def test_patch_unrelated_field_does_not_trigger_duplicate_check(
