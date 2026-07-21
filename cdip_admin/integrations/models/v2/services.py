@@ -144,10 +144,15 @@ def filter_connections_by_status(queryset, status):
     destinations_unhealthy_q = Q(
         routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
     )
-    connection_unhealthy_q = Q(
-        provider_unhealthy_q | (destinations_unhealthy_q & ~provider_disabled_q)
+    # A destination is shared across every connection that routes to it, so an unhealthy
+    # destination must not make this connection unhealthy. Only a connection whose provider
+    # is unhealthy is reported as unhealthy; a connection with a healthy provider but an
+    # unhealthy or disabled destination is surfaced as "needs review". Keep this logic in
+    # sync with ConnectionRetrieveSerializer.get_status.
+    connection_unhealthy_q = Q(provider_unhealthy_q)
+    connection_needs_review_q = Q(
+        provider_healthy_q & (destinations_disabled_q | destinations_unhealthy_q)
     )
-    connection_needs_review_q = Q(provider_healthy_q & destinations_disabled_q)
     connection_healthy_q = Q(provider_healthy_q & ~Q(destinations_unhealthy_q | destinations_disabled_q))
     if status == ConnectionStatus.UNHEALTHY.value:
         return queryset.filter(connection_unhealthy_q)

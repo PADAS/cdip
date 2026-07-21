@@ -845,8 +845,13 @@ class ConnectionRetrieveSerializer(serializers.ModelSerializer):
         for destination in obj.destinations.all():
             destination_status, _ = IntegrationStatus.objects.get_or_create(integration=destination)
             destination_statuses.append(destination_status.status)
+        # A destination is shared across every connection that routes to it, so its health
+        # must not mark this connection as unhealthy (that hides which connection is actually
+        # failing and floods the "unhealthy" list). An unhealthy or disabled destination is
+        # surfaced as "needs review" instead. Connection-level delivery failures are already
+        # attributed to the provider, so a genuinely broken connection still shows unhealthy.
         if IntegrationStatus.Status.UNHEALTHY.value in destination_statuses:
-            return ConnectionStatus.UNHEALTHY.value
+            return ConnectionStatus.NEEDS_REVIEW.value
         if IntegrationStatus.Status.DISABLED.value in destination_statuses:
             return ConnectionStatus.NEEDS_REVIEW.value
         return ConnectionStatus.HEALTHY.value
