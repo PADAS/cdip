@@ -139,6 +139,80 @@ def handle_observation_delivered_event(event_dict: dict):
     )
 
 
+def handle_observations_batch_delivered_event(event_dict: dict):
+    event = system_events.ObservationsBatchDelivered.parse_obj(event_dict)
+    details = event.payload
+    destination_id = str(details.destination_id)
+    gundi_ids = [str(g) for g in details.gundi_ids]
+    logger.info(
+        f"Observations Batch Delivery Succeeded. batch_id: {details.batch_id}, "
+        f"destination_id: {destination_id}, count: {len(gundi_ids)}",
+        extra={"event": event_dict}
+    )
+    traces = list(GundiTrace.objects.filter(object_id__in=gundi_ids))
+    if not traces:  # This shouldn't happen
+        logger.warning(f"No known observations in batch {details.batch_id}. Event Ignored.")
+        return
+
+    traces_by_object_id = {}
+    for trace in traces:
+        traces_by_object_id.setdefault(str(trace.object_id), []).append(trace)
+
+    to_update = []
+    to_create = []
+    for gundi_id in gundi_ids:
+        object_traces = traces_by_object_id.get(gundi_id)
+        if not object_traces:
+            logger.warning(f"Unknown Observation with id {gundi_id} in batch {details.batch_id}. Skipped.")
+            continue
+        bound = next(
+            (t for t in object_traces if t.destination_id and str(t.destination_id) == destination_id),
+            None,
+        )
+        unbound = next((t for t in object_traces if not t.destination_id), None)
+        trace = bound or unbound
+        if trace:
+            trace.destination_id = destination_id
+            trace.delivered_at = details.delivered_at
+            trace.has_error = False
+            trace.error = ""
+            to_update.append(trace)
+        else:  # Delivered to an additional destination: add a row
+            base = object_traces[0]
+            to_create.append(
+                GundiTrace(
+                    object_id=base.object_id,
+                    object_type=base.object_type,
+                    source=base.source,
+                    created_by=base.created_by,
+                    data_provider=base.data_provider,
+                    destination_id=destination_id,
+                    delivered_at=details.delivered_at,
+                )
+            )
+    if to_update:
+        GundiTrace.objects.bulk_update(
+            to_update, ["destination_id", "delivered_at", "has_error", "error"]
+        )
+    if to_create:
+        GundiTrace.objects.bulk_create(to_create)
+
+    # One aggregate activity-log entry for the whole batch
+    destination = Integration.objects.filter(id=destination_id).first()
+    destination_str = destination.base_url if destination else destination_id
+    log_data = json.loads(json.dumps(event_dict["payload"], default=str))
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.DEBUG,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        integration=traces[0].data_provider,
+        value="observation_batch_delivery_succeeded",
+        title=f"{len(gundi_ids)} Observations Delivered to '{destination_str}'",
+        details=log_data,
+        is_reversible=False,
+    )
+
+
 def build_delivery_failed_event_v2_from_v1_data(event_dict: dict) -> system_events.ObservationDeliveryFailed:
     v1_payload = event_dict.get("payload")
     return system_events.ObservationDeliveryFailed(
@@ -393,6 +467,7 @@ def handle_dispatcher_log_event(event_dict):
 
 event_handlers = {
     "ObservationDelivered": handle_observation_delivered_event,
+    "ObservationsBatchDelivered": handle_observations_batch_delivered_event,
     "ObservationDeliveryFailed": handle_observation_delivery_failed_event,
     "ObservationUpdated": handle_observation_updated_event,
     "ObservationUpdateFailed": handle_observation_update_failed_event,
