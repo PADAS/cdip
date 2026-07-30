@@ -332,3 +332,96 @@ def test_create_observations_below_threshold_publishes_per_item(
     for call in mock_publisher.publish.call_args_list:
         assert call.kwargs["data"]["event_type"] == "ObservationReceived"
         assert "gundi_id" in call.kwargs["extra"]
+
+
+def _record_span_nesting(mocker):
+    # Wraps tracing.tracer.start_as_current_span to record, for every span
+    # entered, which OTHER spans (by name) were already open (their
+    # __enter__ ran but __exit__ hasn't yet) at that moment - i.e. its
+    # ancestors. Returns the list of (span_name, ancestors_tuple) entries in
+    # the order spans were entered.
+    import contextlib
+    from api.v2 import utils as api_utils
+
+    real_start = api_utils.tracing.tracer.start_as_current_span
+    active_stack = []
+    entries = []
+
+    @contextlib.contextmanager
+    def spy(name, *args, **kwargs):
+        entries.append((name, tuple(active_stack)))
+        active_stack.append(name)
+        try:
+            with real_start(name, *args, **kwargs) as span:
+                yield span
+        finally:
+            active_stack.pop()
+
+    mocker.patch.object(api_utils.tracing.tracer, "start_as_current_span", side_effect=spy)
+    return entries
+
+
+def test_per_item_publish_span_nests_under_process_observation_span(
+        api_client, mocker, mock_publisher, mock_deduplication, settings,
+        provider_trap_tagger, keyauth_headers_trap_tagger
+):
+    # I-span regression test: for trickle traffic (below the batch
+    # threshold), the publish span (gundi_api.send_observations_to_routing)
+    # must stay nested under the per-item gundi_api.process_observation
+    # span - exactly as before the batch refactor. Otherwise every
+    # single-observation POST produces two disconnected traces and the
+    # routing/dispatcher spans downstream lose the ingestion attributes
+    # (gundi_id, integration_id, external_source_id) they used to hang under.
+    settings.OBSERVATIONS_BATCH_THRESHOLD = 10  # well above 1 item -> per-item mode
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    entries = _record_span_nesting(mocker)
+
+    data = [{
+        "source": "span-device-1",
+        "type": "tracking-device",
+        "recorded_at": "2026-07-24 13:00:00-0700",
+        "location": {"lat": -51.690, "lon": -72.714},
+    }]
+    response = api_client.post(
+        reverse("observations-list"), data=data, format='json', **keyauth_headers_trap_tagger
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    publish_entries = [e for e in entries if e[0] == "gundi_api.send_observations_to_routing"]
+    assert len(publish_entries) == 1
+    _, ancestors = publish_entries[0]
+    assert "gundi_api.process_observation" in ancestors
+
+
+def test_batch_publish_span_is_not_nested_under_process_observation_span(
+        api_client, mocker, mock_publisher, mock_deduplication, settings,
+        provider_trap_tagger, keyauth_headers_trap_tagger
+):
+    # Counterpart to the test above: in batch mode the envelope is published
+    # once, after the per-item loop finishes, so it must NOT be nested under
+    # any single item's gundi_api.process_observation span.
+    settings.OBSERVATIONS_BATCH_THRESHOLD = 1  # force batch mode for 2 items
+    settings.OBSERVATIONS_BATCH_MAX_ITEMS = 10
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    entries = _record_span_nesting(mocker)
+
+    data = [
+        {
+            "source": f"batch-span-device-{i}",
+            "type": "tracking-device",
+            "recorded_at": f"2026-07-24 13:0{i}:00-0700",
+            "location": {"lat": -51.690, "lon": -72.714},
+        }
+        for i in range(2)
+    ]
+    response = api_client.post(
+        reverse("observations-list"), data=data, format='json', **keyauth_headers_trap_tagger
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    batch_entries = [e for e in entries if e[0] == "gundi_api.send_observations_batch_to_routing"]
+    assert len(batch_entries) == 1
+    _, ancestors = batch_entries[0]
+    assert "gundi_api.process_observation" not in ancestors

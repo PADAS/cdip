@@ -1829,7 +1829,19 @@ No code. Run after all repos' PRs are merged and released, in this order (each s
 
 1. Tag/release gundi-core (Task 1's version).
 2. Deploy the portal (Tasks 2 + 6 code — the publish path stays inert until step 5's env var).
-3. Deploy the ER dispatcher (Tasks 3 + 4).
+3. Deploy the ER dispatcher (Tasks 3 + 4). **Deployment-order hazard:** the
+   ER dispatcher is deployed as ONE Cloud Function per destination topic
+   (`er-dispatcher-<destination-uuid>-<env>`, see `deploy_function.sh`), not
+   as a single service — this step means redeploying ALL of them, in every
+   environment. Once step 5 flips the portal threshold, routing emits
+   `ObservationsBatchTransformedER` envelopes to every ER destination; any
+   dispatcher function still on the pre-batch revision doesn't recognize the
+   event type, logs `Event of type 'ObservationsBatchTransformedER' unknown.
+   Ignored.`, and dead-letters the whole envelope — silently, with no
+   per-item failure events to surface it in the portal. Before enabling the
+   portal threshold in step 5, enumerate the deployed dispatcher function
+   revisions per environment and confirm every ER destination's function
+   carries the batch handler.
 4. Deploy cdip-routing (Task 5).
 5. In dev only, set `OBSERVATIONS_BATCH_THRESHOLD=10` explicitly (it's the code default, but set it so the kill-switch path — raising it to `999999999` — is a config change that's already wired).
 

@@ -317,7 +317,14 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
 
 
 def send_observations_to_routing(observations, gundi_ids):
-    ready = []  # (observation_obj, gundi_id) pairs that survived duplicate checks
+    # Decide batch vs per-item from the INPUT length up front, not from the
+    # post-duplicate-check survivor count: the survivor count is only known
+    # after the loop below, and thresholding on it would make trickle
+    # traffic (a handful of items, none duplicates) behave identically to
+    # today either way, but it broke the invariant that per-item publishing
+    # happens INLINE inside the per-item span (see the else-branch below).
+    is_batch = len(observations) >= settings.OBSERVATIONS_BATCH_THRESHOLD
+    ready = []  # (observation_obj, gundi_id) survivors - only accumulated in batch mode
     for observation, gundi_id in zip(observations, gundi_ids):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
@@ -380,15 +387,20 @@ def send_observations_to_routing(observations, gundi_ids):
                 GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
 
-            ready.append((observation_obj, gundi_id))
+            if is_batch:
+                ready.append((observation_obj, gundi_id))
+            else:
+                # Trickle traffic: publish INLINE, inside this span, exactly
+                # as the pre-refactor code did. This makes
+                # gundi_api.send_observations_to_routing nest under
+                # gundi_api.process_observation again, so the ingestion
+                # attributes (gundi_id, integration_id, external_source_id)
+                # set above are still the parent context for the
+                # routing/dispatcher spans downstream.
+                _publish_single_observation(observation_obj, gundi_id)
 
-    if not ready:
-        return
-    if len(ready) >= settings.OBSERVATIONS_BATCH_THRESHOLD:
+    if is_batch and ready:
         _publish_observations_batched(ready)
-    else:
-        for observation_obj, gundi_id in ready:
-            _publish_single_observation(observation_obj, gundi_id)
 
 
 def _publish_single_observation(observation_obj, gundi_id):
