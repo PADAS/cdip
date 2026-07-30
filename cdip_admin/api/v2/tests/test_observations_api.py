@@ -271,3 +271,64 @@ def test_observation_with_invalid_lon_returns_400(
     # Check the request response
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert not mock_publisher.publish.called
+
+
+def test_create_observations_in_bulk_above_threshold_publishes_batch_envelope(
+        api_client, mocker, mock_publisher, mock_deduplication, settings,
+        provider_trap_tagger, keyauth_headers_trap_tagger
+):
+    settings.OBSERVATIONS_BATCH_THRESHOLD = 3
+    settings.OBSERVATIONS_BATCH_MAX_ITEMS = 2
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = [
+        {
+            "source": f"batch-device-{i}",
+            "type": "tracking-device",
+            "recorded_at": f"2026-07-24 13:0{i}:00-0700",
+            "location": {"lat": -51.690, "lon": -72.714},
+        }
+        for i in range(3)
+    ]
+    response = api_client.post(
+        reverse("observations-list"), data=data, format='json', **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_200_OK
+    # 3 items, max 2 per envelope -> 2 publishes (2 + 1), both batch envelopes
+    assert mock_publisher.publish.call_count == 2
+    first_call = mock_publisher.publish.call_args_list[0].kwargs
+    assert first_call["data"]["event_type"] == "ObservationsBatchReceived"
+    assert len(first_call["data"]["payload"]["observations"]) == 2
+    extra = first_call["extra"]
+    assert extra["batch"] == "true"
+    assert extra["batch_count"] == "2"
+    assert extra["gundi_version"] == "v2"
+    assert extra["observation_type"] == StreamPrefixEnum.observation.value
+    second_call = mock_publisher.publish.call_args_list[1].kwargs
+    assert len(second_call["data"]["payload"]["observations"]) == 1
+
+
+def test_create_observations_below_threshold_publishes_per_item(
+        api_client, mocker, mock_publisher, mock_deduplication, settings,
+        provider_trap_tagger, keyauth_headers_trap_tagger
+):
+    settings.OBSERVATIONS_BATCH_THRESHOLD = 10
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    data = [
+        {
+            "source": f"single-device-{i}",
+            "type": "tracking-device",
+            "recorded_at": f"2026-07-24 13:0{i}:00-0700",
+            "location": {"lat": -51.690, "lon": -72.714},
+        }
+        for i in range(2)
+    ]
+    response = api_client.post(
+        reverse("observations-list"), data=data, format='json', **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert mock_publisher.publish.call_count == 2
+    for call in mock_publisher.publish.call_args_list:
+        assert call.kwargs["data"]["event_type"] == "ObservationReceived"
+        assert "gundi_id" in call.kwargs["extra"]
