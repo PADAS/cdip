@@ -898,7 +898,11 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
 
 
-FIELD_MAPPING_ACTION_TYPES: frozenset[str] = frozenset({"ev", "evu", "obv"})
+# All stream types the platform routes (GUNDI-5548: includes txt, obvu, att —
+# not just the event/observation types the portal UI edits).
+FIELD_MAPPING_ACTION_TYPES: frozenset[str] = frozenset(
+    stream_type.value for stream_type in StreamPrefixEnum
+)
 
 
 # ---- Schema validation for RouteConfiguration.data["field_mappings"] ------
