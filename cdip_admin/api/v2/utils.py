@@ -8,7 +8,7 @@ from django.conf import settings
 from gundi_core.schemas.v2 import StreamPrefixEnum, Location, Attachment, Event, Observation, EventUpdate, \
     GundiBaseModel, TextMessage
 from gundi_core.events import EventUpdateReceived, ObservationReceived, EventReceived, AttachmentReceived, \
-    TextMessageReceived
+    TextMessageReceived, ObservationsBatchReceived, ObservationsBatch
 
 from core import tracing, cache
 from opentelemetry import trace
@@ -317,6 +317,14 @@ def send_attachments_to_routing(attachments_data, gundi_ids):
 
 
 def send_observations_to_routing(observations, gundi_ids):
+    # Decide batch vs per-item from the INPUT length up front, not from the
+    # post-duplicate-check survivor count: the survivor count is only known
+    # after the loop below, and thresholding on it would make trickle
+    # traffic (a handful of items, none duplicates) behave identically to
+    # today either way, but it broke the invariant that per-item publishing
+    # happens INLINE inside the per-item span (see the else-branch below).
+    is_batch = len(observations) >= settings.OBSERVATIONS_BATCH_THRESHOLD
+    ready = []  # (observation_obj, gundi_id) survivors - only accumulated in batch mode
     for observation, gundi_id in zip(observations, gundi_ids):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
@@ -379,33 +387,89 @@ def send_observations_to_routing(observations, gundi_ids):
                 GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
 
-            with tracing.tracer.start_as_current_span(
-                    f"gundi_api.send_observations_to_routing", kind=trace.SpanKind.PRODUCER
-            ) as current_span:
-                # Convert the event to the schema supported by routing
-                msg_for_routing = ObservationReceived(payload=observation_obj)
-                tracing.instrumentation.enrich_span_from_observation(
-                    span=current_span, observation=msg_for_routing.payload, gundi_version="v2"
-                )
-                tracing_context = json.dumps(
-                    tracing.instrumentation.build_context_headers(),
-                    default=str,
-                )
-                # Send message to routing services
-                observations_topic = settings.RAW_OBSERVATIONS_TOPIC
-                logger.debug(
-                    f"Publishing ObservationReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
-                )
-                publisher.publish(
-                    topic=observations_topic,
-                    data=msg_for_routing.dict(exclude_none=True),
-                    extra={
-                        "observation_type": StreamPrefixEnum.observation.value,
-                        "gundi_version": "v2",  # Add the version so routing knows how to handle it
-                        "gundi_id": str(gundi_id),
-                        "tracing_context": tracing_context  # Propagate OTel context in message attributes
-                    },
-                )
+            if is_batch:
+                ready.append((observation_obj, gundi_id))
+            else:
+                # Trickle traffic: publish INLINE, inside this span, exactly
+                # as the pre-refactor code did. This makes
+                # gundi_api.send_observations_to_routing nest under
+                # gundi_api.process_observation again, so the ingestion
+                # attributes (gundi_id, integration_id, external_source_id)
+                # set above are still the parent context for the
+                # routing/dispatcher spans downstream.
+                _publish_single_observation(observation_obj, gundi_id)
+
+    if is_batch and ready:
+        _publish_observations_batched(ready)
+
+
+def _publish_single_observation(observation_obj, gundi_id):
+    with tracing.tracer.start_as_current_span(
+            f"gundi_api.send_observations_to_routing", kind=trace.SpanKind.PRODUCER
+    ) as current_span:
+        # Convert the event to the schema supported by routing
+        msg_for_routing = ObservationReceived(payload=observation_obj)
+        tracing.instrumentation.enrich_span_from_observation(
+            span=current_span, observation=msg_for_routing.payload, gundi_version="v2"
+        )
+        tracing_context = json.dumps(
+            tracing.instrumentation.build_context_headers(),
+            default=str,
+        )
+        # Send message to routing services
+        observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+        logger.debug(
+            f"Publishing ObservationReceived(event_id={msg_for_routing.event_id}, gundi_id={gundi_id}) to PubSub topic {observations_topic}.."
+        )
+        publisher.publish(
+            topic=observations_topic,
+            data=msg_for_routing.dict(exclude_none=True),
+            extra={
+                "observation_type": StreamPrefixEnum.observation.value,
+                "gundi_version": "v2",  # Add the version so routing knows how to handle it
+                "gundi_id": str(gundi_id),
+                "tracing_context": tracing_context  # Propagate OTel context in message attributes
+            },
+        )
+
+
+def _publish_observations_batched(ready):
+    # All observations in one API request share the provider by construction
+    # (one API key = one integration), so the envelope invariant holds.
+    data_provider_id = str(ready[0][0].data_provider_id)
+    batch_max = settings.OBSERVATIONS_BATCH_MAX_ITEMS
+    observations_topic = settings.RAW_OBSERVATIONS_TOPIC
+    for start in range(0, len(ready), batch_max):
+        chunk = ready[start:start + batch_max]
+        with tracing.tracer.start_as_current_span(
+                f"gundi_api.send_observations_batch_to_routing", kind=trace.SpanKind.PRODUCER
+        ) as current_span:
+            batch = ObservationsBatch(
+                data_provider_id=data_provider_id,
+                observations=[obs for obs, _ in chunk],
+            )
+            msg_for_routing = ObservationsBatchReceived(payload=batch)
+            current_span.set_attribute("batch_id", str(batch.batch_id))
+            current_span.set_attribute("batch_count", len(chunk))
+            tracing_context = json.dumps(
+                tracing.instrumentation.build_context_headers(),
+                default=str,
+            )
+            logger.debug(
+                f"Publishing ObservationsBatchReceived(event_id={msg_for_routing.event_id}, "
+                f"batch_id={batch.batch_id}, count={len(chunk)}) to PubSub topic {observations_topic}.."
+            )
+            publisher.publish(
+                topic=observations_topic,
+                data=msg_for_routing.dict(exclude_none=True),
+                extra={
+                    "observation_type": StreamPrefixEnum.observation.value,
+                    "gundi_version": "v2",
+                    "batch": "true",
+                    "batch_count": str(len(chunk)),
+                    "tracing_context": tracing_context,
+                },
+            )
 
 
 def log_data_received(data: GundiBaseModel, integration_type, **kwargs):

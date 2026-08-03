@@ -465,5 +465,12 @@ MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC",
 
 # Sensors API to Routing
 RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-prod")
+# Batch envelope publishing (docs/superpowers/specs/2026-07-29-pipeline-batch-envelope-design.md).
+# List-POSTs with at least this many non-duplicate observations publish
+# ObservationsBatchReceived envelopes instead of per-item events. This is the
+# platform kill switch: set it unreachable to revert to per-item end to end.
+OBSERVATIONS_BATCH_THRESHOLD = env.int("OBSERVATIONS_BATCH_THRESHOLD", 10)
+# Max observations per envelope (PubSub messages must stay far below 10MB).
+OBSERVATIONS_BATCH_MAX_ITEMS = env.int("OBSERVATIONS_BATCH_MAX_ITEMS", 500)
 # Events on configuration changes (for integrations, routing, etc..)
 CONFIGURATION_EVENTS_TOPIC = env.str("CONFIGURATION_EVENTS_TOPIC", "configuration-events-prod")

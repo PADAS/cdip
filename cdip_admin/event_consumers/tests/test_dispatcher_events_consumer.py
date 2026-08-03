@@ -625,6 +625,85 @@ def test_is_retriable_er_error_uses_normalized_er_type_check():
     )
 
 
+def _make_batch_delivered_message(traces, destination):
+    message = MagicMock()
+    event_dict = {
+        "event_id": "705535df-1b9b-412b-9fd5-e29b09582111",
+        "timestamp": "2026-07-29 18:19:19.215459+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationsBatchDelivered",
+        "payload": {
+            "batch_id": "8a5535df-1b9b-412b-9fd5-e29b09582222",
+            "data_provider_id": str(traces[0].data_provider.id),
+            "destination_id": str(destination.id),
+            "delivered_at": "2026-07-29 18:19:19.215015+00:00",
+            "gundi_ids": [str(t.object_id) for t in traces],
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message
+
+
+def test_process_observations_batch_delivered_event(
+        lotek_observation_trace, integrations_list_er
+):
+    destination = integrations_list_er[0]
+    message = _make_batch_delivered_message(
+        traces=[lotek_observation_trace], destination=destination
+    )
+    process_event(message)
+    lotek_observation_trace.refresh_from_db()
+    assert str(lotek_observation_trace.destination.id) == str(destination.id)
+    assert str(lotek_observation_trace.delivered_at) == "2026-07-29 18:19:19.215015+00:00"
+    assert lotek_observation_trace.external_id is None  # By design: no per-item IDs from bulk posts
+    assert not lotek_observation_trace.has_error
+    # One aggregate activity-log entry for the whole batch
+    activity_log = ActivityLog.objects.filter(
+        integration_id=str(lotek_observation_trace.data_provider.id),
+        value="observation_batch_delivery_succeeded",
+    ).first()
+    assert activity_log
+    assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
+    assert activity_log.origin == ActivityLog.Origin.DISPATCHER
+    assert activity_log.title == f"1 Observations Delivered to '{destination.base_url}'"
+    assert activity_log.details["batch_id"] == "8a5535df-1b9b-412b-9fd5-e29b09582222"
+
+
+def test_process_observations_batch_delivered_event_second_destination(
+        lotek_observation_trace, integrations_list_er
+):
+    # The trace is already bound to destination[0]; delivery to destination[1]
+    # must CREATE a second trace row, not overwrite the first.
+    first, second = integrations_list_er[0], integrations_list_er[1]
+    lotek_observation_trace.destination = first
+    lotek_observation_trace.save()
+    message = _make_batch_delivered_message(
+        traces=[lotek_observation_trace], destination=second
+    )
+    process_event(message)
+    rows = GundiTrace.objects.filter(object_id=lotek_observation_trace.object_id)
+    assert rows.count() == 2
+    new_row = rows.exclude(id=lotek_observation_trace.id).first()
+    assert str(new_row.destination.id) == str(second.id)
+    assert new_row.delivered_at is not None
+
+
+def test_process_observations_batch_delivered_event_unknown_ids_are_skipped(
+        lotek_observation_trace, integrations_list_er
+):
+    destination = integrations_list_er[0]
+    message = _make_batch_delivered_message(
+        traces=[lotek_observation_trace], destination=destination
+    )
+    # Inject an unknown gundi_id alongside the real one
+    event_dict = json.loads(message.data)
+    event_dict["payload"]["gundi_ids"].append("99999999-9999-9999-9999-999999999999")
+    message.data = json.dumps(event_dict).encode("utf-8")
+    process_event(message)  # Must not raise
+    lotek_observation_trace.refresh_from_db()
+    assert lotek_observation_trace.delivered_at is not None
+
+
 # --- GUNDI-5550: resilience to DB connection loss ---
 
 from django.db import InterfaceError, OperationalError
