@@ -6,6 +6,8 @@ logging_settings.init()
 django.setup()  # To use the django ORM
 from google.cloud import pubsub_v1
 from django.conf import settings
+from django.db import InterfaceError, OperationalError
+from event_consumers.db_utils import refresh_db_connections
 from gundi_core import events as system_events
 from integrations.models import GundiTrace, Integration
 from activity_log.models import ActivityLog
@@ -479,9 +481,18 @@ event_handlers = {
 
 
 def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
+    logger.info(f"Received Dispatcher Event {message}.")
+    # Long-running non-request process: Django's per-request connection
+    # cleanup never runs here, so drop dead/expired connections ourselves
+    # before touching the ORM (GUNDI-5550).
+    refresh_db_connections()
     try:
-        logger.info(f"Received Dispatcher Event {message}.")
         event_dict = json.loads(message.data)
+    except (ValueError, UnicodeDecodeError):
+        logger.exception("Invalid JSON in Dispatcher Event message. Message discarded.")
+        message.ack()
+        return
+    try:
         logger.debug(f"Event Details", extra={"event": event_dict})
         event_type = event_dict.get("event_type")
         schema_version = event_dict.get("schema_version")
@@ -495,11 +506,20 @@ def process_event(message: pubsub_v1.subscriber.message.Message) -> None:
             message.ack()
             return
         event_handler(event_dict=event_dict)
+    except (InterfaceError, OperationalError) as e:
+        # Transient DB failure (e.g. "connection already closed"): drop the
+        # stale connection and nack so PubSub redelivers instead of losing
+        # the event and its activity log record.
+        logger.exception(f"Error Processing Dispatcher Event: {e}", extra={"event": event_dict})
+        refresh_db_connections()
+        message.nack()
     except Exception as e:
-        logger.exception(f"Error Processing Dispatcher Event: {e}", extra={"event": json.loads(message.data)})
+        # Treated as permanent for this message. Ack to avoid a poison-message
+        # redelivery loop — the subscription has no dead-letter topic yet.
+        logger.exception(f"Error Processing Dispatcher Event: {e}", extra={"event": event_dict})
+        message.ack()
     else:
         logger.info(f"Dispatcher Event Processed successfully.")
-    finally:
         message.ack()
 
 

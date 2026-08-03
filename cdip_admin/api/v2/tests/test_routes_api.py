@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 from django.urls import reverse
+from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 from integrations.models import (
     Route, RouteConfiguration, get_user_routes_qs
@@ -747,7 +748,7 @@ def test_global_search_routes_by_destination_url_as_org_admin(
 #
 # ``RouteConfiguration.data["field_mappings"]`` is a 3-level nested dict:
 #     { PROVIDER_UUID: { action_type: { DESTINATION_UUID: rule } } }
-# where action_type ∈ {ev, evu, obv} and rule has the shape of VALID_RULE
+# where action_type is a StreamPrefixEnum value and rule has the shape of VALID_RULE
 # below. These tests cover the schema validation introduced in the serializer
 # and the update-in-place behavior on PATCH.
 
@@ -811,6 +812,57 @@ def test_create_route_with_valid_field_mappings(
         [str(provider_lotek_panthera.id)]["ev"][str(destination.id)]
     )
     assert stored_rule["destination_field"] == "event_type"
+
+
+@pytest.mark.parametrize(
+    "action_type", [stream_type.value for stream_type in StreamPrefixEnum]
+)
+def test_create_route_accepts_every_stream_type_in_field_mappings(
+    api_client, superuser, organization, integrations_list_er, provider_lotek_panthera,
+    action_type,
+):
+    # GUNDI-5548: the platform routes every StreamPrefixEnum value (e.g. txt for
+    # inReach text messages), so the serializer must accept them all.
+    destination = integrations_list_er[0]
+    field_mappings = _build_field_mappings(
+        provider_lotek_panthera.id, destination.id, action_type=action_type
+    )
+
+    response = _post_route_with_field_mappings(
+        api_client, superuser, organization,
+        provider_lotek_panthera, destination, field_mappings,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+
+
+def test_patch_route_resending_stored_txt_field_mappings_passes(
+    api_client, superuser, route_2, provider_movebank_ewt
+):
+    # GUNDI-5548 repro: routes written by the InReach V1→V2 migration store txt
+    # mappings alongside obv; re-saving that same configuration must not 400.
+    destination = route_2.destinations.first()
+    provider_id = str(provider_movebank_ewt.id)
+    stored_data = {
+        "field_mappings": {
+            provider_id: {
+                "obv": {str(destination.id): dict(VALID_RULE)},
+                "txt": {str(destination.id): dict(VALID_RULE)},
+            }
+        }
+    }
+    config = route_2.configuration
+    config.data = stored_data
+    config.save()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": {"name": config.name, "data": stored_data}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
 
 
 # -- Schema validation -----------------------------------------------------
