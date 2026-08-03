@@ -623,3 +623,74 @@ def test_is_retriable_er_error_uses_normalized_er_type_check():
     assert not is_retriable_er_error(
         error=None, server_response_status=503, destination=non_er,
     )
+
+
+# --- GUNDI-5550: resilience to DB connection loss ---
+
+from django.db import InterfaceError, OperationalError
+
+
+@pytest.mark.parametrize("db_error", [
+    InterfaceError("connection already closed"),
+    OperationalError("server closed the connection unexpectedly"),
+])
+def test_transient_db_error_nacks_message_for_redelivery(
+        mocker, db_error, trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event
+):
+    # A dead DB connection must trigger redelivery, not a silent drop (GUNDI-5549)
+    mocker.patch.dict(
+        "event_consumers.dispatcher_events_consumer.event_handlers",
+        {"ObservationDelivered": mocker.MagicMock(side_effect=db_error)},
+    )
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    trap_tagger_to_er_observation_delivered_event.nack.assert_called_once()
+    trap_tagger_to_er_observation_delivered_event.ack.assert_not_called()
+
+
+def test_transient_db_error_resets_connections(
+        mocker, trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event
+):
+    mocked_close = mocker.patch(
+        "event_consumers.dispatcher_events_consumer.refresh_db_connections"
+    )
+    mocker.patch.dict(
+        "event_consumers.dispatcher_events_consumer.event_handlers",
+        {"ObservationDelivered": mocker.MagicMock(side_effect=InterfaceError("connection already closed"))},
+    )
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    # Once on entry (routine refresh) + once after the failure (drop the dead connection)
+    assert mocked_close.call_count == 2
+
+
+def test_unexpected_error_still_acks_message(
+        mocker, trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event
+):
+    # Non-DB errors keep the current log-and-ack behavior: without a
+    # dead-letter topic, nacking them would loop a poison message forever.
+    mocker.patch.dict(
+        "event_consumers.dispatcher_events_consumer.event_handlers",
+        {"ObservationDelivered": mocker.MagicMock(side_effect=ValueError("boom"))},
+    )
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    trap_tagger_to_er_observation_delivered_event.ack.assert_called_once()
+    trap_tagger_to_er_observation_delivered_event.nack.assert_not_called()
+
+
+def test_successful_processing_acks_message_exactly_once(
+        mocker, trap_tagger_event_trace, trap_tagger_to_er_observation_delivered_event
+):
+    mocked_close = mocker.patch(
+        "event_consumers.dispatcher_events_consumer.refresh_db_connections"
+    )
+    process_event(trap_tagger_to_er_observation_delivered_event)
+    trap_tagger_to_er_observation_delivered_event.ack.assert_called_once()
+    trap_tagger_to_er_observation_delivered_event.nack.assert_not_called()
+    mocked_close.assert_called_once()  # routine per-message refresh
+
+
+def test_invalid_json_message_is_discarded_without_raising(mocker):
+    message = mocker.MagicMock()
+    message.data = b"not json {"
+    process_event(message)  # must not raise
+    message.ack.assert_called_once()
+    message.nack.assert_not_called()
