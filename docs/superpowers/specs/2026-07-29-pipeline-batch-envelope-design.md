@@ -1,7 +1,7 @@
 # Pipeline Batch Envelope — Design
 
 **Date:** 2026-07-29
-**Status:** Approved design, pending implementation plan
+**Status:** Approved and implemented — see `docs/superpowers/plans/2026-07-29-pipeline-batch-envelope.md`
 **Scope:** Gundi v2 pipeline — portal API, cdip-routing, gundi-dispatcher-er, gundi-core
 
 ## Problem

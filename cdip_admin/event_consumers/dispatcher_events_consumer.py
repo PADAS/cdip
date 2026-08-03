@@ -197,7 +197,10 @@ def handle_observations_batch_delivered_event(event_dict: dict):
     if to_create:
         GundiTrace.objects.bulk_create(to_create)
 
-    # One aggregate activity-log entry for the whole batch
+    # One aggregate activity-log entry for the whole batch. Count the rows
+    # actually recorded (unknown gundi_ids were skipped above), not the
+    # envelope's input list, so the UI never overstates deliveries.
+    recorded_count = len(to_update) + len(to_create)
     destination = Integration.objects.filter(id=destination_id).first()
     destination_str = destination.base_url if destination else destination_id
     log_data = json.loads(json.dumps(event_dict["payload"], default=str))
@@ -207,7 +210,7 @@ def handle_observations_batch_delivered_event(event_dict: dict):
         origin=ActivityLog.Origin.DISPATCHER,
         integration=traces[0].data_provider,
         value="observation_batch_delivery_succeeded",
-        title=f"{len(gundi_ids)} Observations Delivered to '{destination_str}'",
+        title=f"{recorded_count} Observations Delivered to '{destination_str}'",
         details=log_data,
         is_reversible=False,
     )

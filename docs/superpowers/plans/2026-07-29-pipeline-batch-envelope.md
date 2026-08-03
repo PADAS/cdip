@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Note on paths:** this plan is a point-in-time execution record; absolute
+> paths like `/Users/chrisdo/padas/<repo>` refer to the author's local
+> checkouts of the sibling repos (gundi-core, cdip, cdip-routing,
+> gundi-dispatcher-er). Substitute your own checkout locations if re-running
+> any steps.
+
 **Goal:** Preserve source-side observation batches end-to-end through Gundi (portal → routing → ER dispatcher) so backfills post to EarthRanger's bulk sensors endpoint instead of one HTTP request per observation.
 
 **Architecture:** Three new gundi-core system events carry a batch envelope ("1..N observations sharing a provider") through the existing Pub/Sub pipeline. The portal stops shredding list-POSTs into per-item messages above a threshold; routing transforms per item and groups per `(destination, provider_key)`; the ER dispatcher bulk-posts via the already-list-capable `post_sensor_observation`. Batches only shrink or split, never merge — no buffering or timers anywhere.
