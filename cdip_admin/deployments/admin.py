@@ -1,6 +1,27 @@
+from django import forms
 from django.contrib import admin
+from django_json_widget.widgets import JSONEditorWidget
 from .models import DispatcherDeployment
 from .tasks import deploy_serverless_dispatcher
+
+
+class DispatcherDeploymentForm(forms.ModelForm):
+    configuration = forms.JSONField(
+        required=False,
+        label="JSON Configuration",
+        widget=JSONEditorWidget(width="60em", height="30em"),
+    )
+
+    class Meta:
+        model = DispatcherDeployment
+        fields = "__all__"
+
+    def clean_configuration(self):
+        # The model field is NOT NULL with default=dict; an emptied editor
+        # must save as {} rather than None. Coerce only None — falsy JSON
+        # values like [], 0, or false are valid and must be preserved.
+        value = self.cleaned_data.get("configuration")
+        return {} if value is None else value
 
 
 def restart_deployments(modeladmin, request, queryset):
@@ -56,6 +77,15 @@ class OrphanedFilter(admin.SimpleListFilter):
 
 @admin.register(DispatcherDeployment)
 class DispatcherDeploymentAdmin(admin.ModelAdmin):
+    form = DispatcherDeploymentForm
+    # Both FKs appear in list_display and their __str__ dereferences
+    # owner/type, so join them up front to avoid per-row queries.
+    list_select_related = (
+        "integration__owner",
+        "integration__type",
+        "legacy_integration__owner",
+        "legacy_integration__type",
+    )
     list_display = (
         "name",
         "status",
@@ -80,6 +110,13 @@ class DispatcherDeploymentAdmin(admin.ModelAdmin):
         "attempt_count",
         "last_attempt_at",
         "last_error",
+    )
+    # Render the integration FKs as AJAX search boxes. Plain selects load
+    # every Integration/OutboundIntegrationConfiguration, and their __str__
+    # dereferences owner/type per row, making the change page unusably slow.
+    autocomplete_fields = (
+        "integration",
+        "legacy_integration",
     )
     actions = [restart_deployments, recreate_dispatchers, delete_orphaned_dispatchers]
     search_fields = (
