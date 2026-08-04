@@ -36,3 +36,19 @@ def test_configuration_cleaning_preserves_falsy_json(raw, expected):
     form.is_valid()
     assert "configuration" not in form.errors
     assert form.cleaned_data["configuration"] == expected
+
+
+def test_configuration_renders_monaco_editor():
+    """The configuration field mounts the same Monaco editor gundi-portal uses.
+
+    The real textarea must stay in the form (Monaco syncs into it; it is
+    also the fallback if the CDN is unreachable), and the initial JSON is
+    indented server-side because Monaco renders the text it is given.
+    """
+    form = DispatcherDeploymentForm(initial={"configuration": {"env_vars": {"A": "1"}}})
+    html = str(form["configuration"])
+    assert "monaco-editor@" in html  # pinned CDN loader base
+    assert 'language: "json"' in html
+    assert "<textarea" in html
+    assert "id_configuration_monaco" in html
+    assert "&quot;env_vars&quot;: {" in html  # server-side pretty-printing

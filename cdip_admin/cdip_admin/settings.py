@@ -92,7 +92,6 @@ INSTALLED_APPS = [
     "django_extensions",
     "simple_history",
     "django_jsonform",
-    "django_json_widget",
     "storages",
     "deployments",
     "activity_log",
