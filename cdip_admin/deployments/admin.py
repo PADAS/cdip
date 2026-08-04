@@ -17,9 +17,11 @@ class DispatcherDeploymentForm(forms.ModelForm):
         fields = "__all__"
 
     def clean_configuration(self):
-        # The model field is NOT NULL with default=dict; an emptied textarea
-        # must save as {} rather than None.
-        return self.cleaned_data.get("configuration") or {}
+        # The model field is NOT NULL with default=dict; an emptied editor
+        # must save as {} rather than None. Coerce only None — falsy JSON
+        # values like [], 0, or false are valid and must be preserved.
+        value = self.cleaned_data.get("configuration")
+        return {} if value is None else value
 
 
 def restart_deployments(modeladmin, request, queryset):
