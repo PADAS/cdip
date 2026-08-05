@@ -28,12 +28,18 @@ _WIDGET_TEMPLATE = string.Template(
           window.require.config({ paths: { vs: VS_BASE } });
           // Monaco's workers can't be created cross-origin from a CDN
           // directly; the blob shim below is the documented workaround.
+          // Monaco calls getWorkerUrl once per worker, so cache the blob
+          // URL (it is released with the document on unload).
+          var workerUrl = null;
           window.MonacoEnvironment = {
             getWorkerUrl: function () {
-              return URL.createObjectURL(new Blob([
-                "self.MonacoEnvironment={baseUrl:'" + VS_BASE + "/../'};" +
-                "importScripts('" + VS_BASE + "/base/worker/workerMain.js');"
-              ], { type: "text/javascript" }));
+              if (!workerUrl) {
+                workerUrl = URL.createObjectURL(new Blob([
+                  "self.MonacoEnvironment={baseUrl:'" + VS_BASE + "/../'};" +
+                  "importScripts('" + VS_BASE + "/base/worker/workerMain.js');"
+                ], { type: "text/javascript" }));
+              }
+              return workerUrl;
             }
           };
           window.require(["vs/editor/editor.main"], function () { resolve(window.monaco); });
@@ -42,7 +48,11 @@ _WIDGET_TEMPLATE = string.Template(
         document.head.appendChild(s);
       });
     }
-    window._monacoLoaderPromise.then(cb);
+    window._monacoLoaderPromise.then(cb).catch(function (err) {
+      // The visible textarea is the fallback; just avoid an unhandled
+      // rejection in the console.
+      console.warn("Monaco failed to load; using the plain textarea.", err);
+    });
   }
   function init() {
     var textarea = document.getElementById("$widget_id");
