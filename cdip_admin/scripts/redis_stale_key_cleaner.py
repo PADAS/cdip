@@ -64,3 +64,163 @@ def find_stale_candidates(r, idle_threshold_seconds, match=None, scan_count=500,
         if on_progress:
             on_progress(len(keys), len(candidates))
     return candidates
+
+
+def validate_delete_args(delete, idle_threshold_days):
+    if delete and idle_threshold_days < MIN_DELETE_IDLE_DAYS:
+        print(
+            f"Refusing --delete with --idle-threshold {idle_threshold_days} days: "
+            f"the floor is {MIN_DELETE_IDLE_DAYS} days. Keys written recently may be "
+            "live idempotency state."
+        )
+        raise SystemExit(1)
+
+
+def fetch_sizes(r, keys):
+    sizes = []
+    for batch in chunked(keys, 500):
+        pipe = r.pipeline(transaction=False)
+        for k in batch:
+            pipe.memory_usage(k, samples=0)
+        sizes.extend(size or 0 for size in pipe.execute())
+    return sizes
+
+
+def summarize_candidates(sized, depth=1):
+    totals = {}
+    for key, _idle, size in sized:
+        prefix = key_prefix(key, depth)
+        count, total = totals.get(prefix, (0, 0))
+        totals[prefix] = (count + 1, total + size)
+    return sorted(
+        ((prefix, count, total) for prefix, (count, total) in totals.items()),
+        key=lambda row: row[2],
+        reverse=True,
+    )
+
+
+def delete_keys(r, keys, batch_size=500, throttle_seconds=0.05, on_progress=None):
+    deleted = 0
+    for batch in chunked(keys, batch_size):
+        deleted += r.unlink(*batch)
+        if on_progress:
+            on_progress(deleted)
+        if throttle_seconds:
+            time.sleep(throttle_seconds)
+    return deleted
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Find (and optionally UNLINK) keys with NO TTL idle longer than "
+        "a threshold. Dry-run unless --delete is given."
+    )
+    parser.add_argument("db", type=int, help="Redis database number to scan")
+    parser.add_argument("--idle-threshold", type=float, default=30,
+                        help="idle threshold in days (default 30)")
+    parser.add_argument("--match", default=None,
+                        help="optional SCAN MATCH glob, e.g. 'backfill*'")
+    parser.add_argument("--delete", action="store_true",
+                        help="actually delete candidates (default: dry-run)")
+    parser.add_argument("--yes", "-y", action="store_true",
+                        help="skip the confirmation prompt")
+    parser.add_argument("--batch-size", type=int, default=500,
+                        help="keys per UNLINK batch (default 500)")
+    parser.add_argument("--throttle", type=float, default=50,
+                        help="sleep between SCAN/UNLINK batches in ms (default 50)")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    validate_delete_args(args.delete, args.idle_threshold)
+    threshold_seconds = int(args.idle_threshold * DAY_SECONDS)
+    throttle_seconds = args.throttle / 1000.0
+    r = get_redis_from_env(args.db)
+
+    total = r.dbsize()
+    mode = "DELETE" if args.delete else "dry-run"
+    print(
+        f"db {args.db}: ~{total:,} keys; selecting no-TTL keys idle > "
+        f"{args.idle_threshold} days (match={args.match or '*'}) [{mode}]\n"
+    )
+
+    progress = {"scanned": 0, "start": time.time(), "last_print": 0.0}
+
+    def on_progress(n_batch, n_candidates):
+        progress["scanned"] += n_batch
+        now = time.time()
+        if now - progress["last_print"] >= 1.0:
+            elapsed = now - progress["start"]
+            rate = progress["scanned"] / elapsed if elapsed > 0 else 0
+            pct = (progress["scanned"] / total * 100) if total else 0
+            sys.stdout.write(
+                f"\rScanned {progress['scanned']:,}/{total:,} ({pct:.1f}%) "
+                f"| {rate:,.0f} keys/s | {n_candidates:,} candidates"
+            )
+            sys.stdout.flush()
+            progress["last_print"] = now
+
+    try:
+        candidates = find_stale_candidates(
+            r, threshold_seconds, match=args.match, throttle_seconds=throttle_seconds,
+            on_progress=on_progress,
+        )
+    except IdleTimeUnavailable as exc:
+        print(f"\n{exc}")
+        raise SystemExit(1)
+    sys.stdout.write("\n\n")
+
+    if not candidates:
+        print("No candidates found.")
+        return
+
+    print(f"Found {len(candidates):,} candidate keys. Sizing candidates...")
+    sizes = fetch_sizes(r, [k for k, _ in candidates])
+    sized = [(k, idle, size) for (k, idle), size in zip(candidates, sizes)]
+    total_bytes = sum(size for _, _, size in sized)
+
+    print(f"\nCandidate summary ({total_bytes / 1048576:.1f} MB total):")
+    print(f"{'prefix':<50} {'keys':>12} {'MB':>10}")
+    for prefix, count, nbytes in summarize_candidates(sized):
+        print(f"{prefix:<50} {count:>12,} {nbytes / 1048576:>10.1f}")
+
+    print("\nTop 20 largest candidates:")
+    for key, idle, size in sorted(sized, key=lambda row: row[2], reverse=True)[:20]:
+        print(f"{key.decode(errors='replace')}: {size:,} B, idle {idle // DAY_SECONDS} days")
+
+    if not args.delete:
+        print("\nDry-run complete; nothing deleted. Re-run with --delete to remove these keys.")
+        return
+
+    if not args.yes:
+        try:
+            confirm = input(f"\nUNLINK {len(candidates):,} keys from db {args.db}? [y/N] ")
+        except EOFError:
+            confirm = ""
+        if confirm.strip().lower() != "y":
+            print("Aborted.")
+            raise SystemExit(0)
+
+    print()
+    keys_to_delete = [k for k, _, _ in sized]
+    del_start = time.time()
+
+    def on_delete_progress(deleted):
+        elapsed = time.time() - del_start
+        rate = deleted / elapsed if elapsed > 0 else 0
+        pct = deleted / len(keys_to_delete) * 100
+        sys.stdout.write(
+            f"\rUnlinked {deleted:,}/{len(keys_to_delete):,} ({pct:.1f}%) | {rate:,.0f} keys/s"
+        )
+        sys.stdout.flush()
+
+    deleted = delete_keys(
+        r, keys_to_delete, batch_size=args.batch_size,
+        throttle_seconds=throttle_seconds, on_progress=on_delete_progress,
+    )
+    print(f"\n\nUnlinked {deleted:,} keys total.")
+
+
+if __name__ == "__main__":
+    main()

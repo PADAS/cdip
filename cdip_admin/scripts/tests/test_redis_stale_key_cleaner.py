@@ -85,3 +85,52 @@ class TestFetchIdleTimes:
         monkeypatch.setattr(r, "pipeline", lambda transaction=False: BoomPipe())
         with pytest.raises(IdleTimeUnavailable, match="OBJECT IDLETIME failed"):
             fetch_idle_times(r, [b"k"])
+
+
+from scripts.redis_stale_key_cleaner import (
+    MIN_DELETE_IDLE_DAYS,
+    delete_keys,
+    summarize_candidates,
+    validate_delete_args,
+)
+
+
+class TestValidateDeleteArgs:
+    def test_delete_below_floor_is_refused(self):
+        with pytest.raises(SystemExit):
+            validate_delete_args(delete=True, idle_threshold_days=1.9)
+
+    def test_delete_at_floor_is_allowed(self):
+        validate_delete_args(delete=True, idle_threshold_days=MIN_DELETE_IDLE_DAYS)
+
+    def test_dry_run_below_floor_is_allowed(self):
+        validate_delete_args(delete=False, idle_threshold_days=0.1)
+
+
+class TestSummarizeCandidates:
+    def test_groups_by_prefix_sorted_by_bytes_desc(self):
+        sized = [
+            (b"backfill.1", 40 * DAY, 100),
+            (b"backfill.2", 41 * DAY, 300),
+            (b"backfill_watermark.9", 50 * DAY, 5000),
+        ]
+        assert summarize_candidates(sized) == [
+            ("backfill_watermark", 1, 5000),
+            ("backfill", 2, 400),
+        ]
+
+
+class TestDeleteKeys:
+    def test_unlinks_all_keys_in_batches_and_reports_progress(self):
+        r = fakeredis.FakeRedis()
+        keys = []
+        for i in range(10):
+            r.set(f"stale.{i}", "x")
+            keys.append(f"stale.{i}".encode())
+        r.set("keep.me", "x")
+        progress = []
+        deleted = delete_keys(r, keys, batch_size=3, throttle_seconds=0,
+                              on_progress=progress.append)
+        assert deleted == 10
+        assert r.dbsize() == 1
+        assert progress[-1] == 10
