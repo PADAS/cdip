@@ -4,8 +4,6 @@ on:
     branches:
       - main
       - 'release-**'
-      # TEMPORARY (revert before merging PR #456): deploy this branch to dev
-      - 'feature/dispatcher-admin-monaco-editor'
 env:
   TRACING_ENABLED: ${{secrets.TRACING_ENABLED}}
   PUBSUB_ENABLED: ${{secrets.PUBSUB_ENABLED}}
@@ -39,8 +37,7 @@ jobs:
     # PADAS/serca-argocd-apps:gundi/admin-portal/values-gundi-dev.yaml and lets
     # ArgoCD's automated selfHeal pick up the change.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
-    # TEMPORARY (revert before merging PR #456): second condition deploys this branch to dev
-    if: startsWith(github.ref, 'refs/heads/main') || github.ref == 'refs/heads/feature/dispatcher-admin-monaco-editor'
+    if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
       app-name: admin-portal
