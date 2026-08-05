@@ -1,7 +1,10 @@
+from unittest.mock import Mock
+
 from scripts.redis_memory_profiler import (
     PrefixStats,
     aggregate_prefix_stats,
     format_stats_table,
+    print_overview,
 )
 
 STATS_TABLE = {
@@ -55,11 +58,6 @@ class TestFormatStatsTable:
         assert "8.0" in lines[1] and "50.0%" in lines[1]
         assert lines[2].startswith("small")
         assert "0.0%" in lines[2]
-
-
-from unittest.mock import Mock
-
-from scripts.redis_memory_profiler import print_overview
 
 
 class TestPrintOverview:
