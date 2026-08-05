@@ -129,10 +129,11 @@ class TestDeleteKeys:
             keys.append(f"stale.{i}".encode())
         r.set("keep.me", "x")
         progress = []
-        deleted, skipped = delete_keys(r, keys, batch_size=3, throttle_seconds=0,
-                              on_progress=progress.append)
+        deleted, skipped_ttl, skipped_gone = delete_keys(
+            r, keys, batch_size=3, throttle_seconds=0, on_progress=progress.append
+        )
         assert deleted == 10
-        assert skipped == 0
+        assert (skipped_ttl, skipped_gone) == (0, 0)
         assert r.dbsize() == 1
         assert progress[-1] == 10
 
@@ -149,11 +150,32 @@ class TestDeleteKeys:
         r.set("armed.key", "x", ex=3600)
         keys.append(b"armed.key")
 
-        deleted, skipped = delete_keys(r, keys, batch_size=10, throttle_seconds=0)
+        deleted, skipped_ttl, skipped_gone = delete_keys(
+            r, keys, batch_size=10, throttle_seconds=0
+        )
 
         assert deleted == 5
-        assert skipped == 1
+        assert skipped_ttl == 1
+        assert skipped_gone == 0
         assert r.exists(b"armed.key") == 1
         assert r.ttl(b"armed.key") > 0
         for i in range(5):
             assert r.exists(f"stale.{i}".encode()) == 0
+
+    def test_vanished_key_is_counted_separately_from_one_that_gained_a_ttl(self):
+        # A key deleted or expired between selection and UNLINK reports TTL -2.
+        # That is unremarkable, so it must not be reported as having acquired a
+        # TTL — the two counts mean different things to an operator.
+        r = fakeredis.FakeRedis()
+        r.set("stale.1", "x")
+        r.set("armed.key", "x", ex=3600)
+        keys = [b"stale.1", b"armed.key", b"never.existed"]
+
+        deleted, skipped_ttl, skipped_gone = delete_keys(
+            r, keys, batch_size=10, throttle_seconds=0
+        )
+
+        assert deleted == 1
+        assert skipped_ttl == 1
+        assert skipped_gone == 1
+        assert r.exists(b"armed.key") == 1

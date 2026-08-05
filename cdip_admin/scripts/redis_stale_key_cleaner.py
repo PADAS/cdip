@@ -20,6 +20,8 @@ from scripts.redis_ops_common import (
     get_redis_from_env,
     iter_key_batches,
     key_prefix,
+    non_negative_float,
+    positive_int,
 )
 
 MIN_DELETE_IDLE_DAYS = 2.0
@@ -106,28 +108,38 @@ def delete_keys(r, keys, batch_size=500, throttle_seconds=0.05, on_progress=None
     during which a key could be re-created with a TTL (e.g. a fresh
     dispatched_observation.* idempotency key). Re-checking TTL right before
     UNLINK closes that window: any key whose TTL is no longer -1 is dropped
-    rather than deleted. A key that vanished entirely (TTL == -2) is also
-    dropped — UNLINKing a gone key is harmless, but skipping it keeps the
-    skipped count meaningful.
+    rather than deleted.
 
-    Returns (deleted, skipped).
+    The two reasons for dropping a key are counted separately because they mean
+    different things to an operator: a key that gained a TTL is live again and
+    worth investigating, while a key that vanished (TTL == -2) expired or was
+    deleted by someone else and is unremarkable.
+
+    Returns (deleted, skipped_ttl, skipped_gone).
     """
     deleted = 0
-    skipped = 0
+    skipped_ttl = 0
+    skipped_gone = 0
     for batch in chunked(keys, batch_size):
         pipe = r.pipeline(transaction=False)
         for k in batch:
             pipe.ttl(k)
         ttls = pipe.execute()
-        to_delete = [k for k, ttl in zip(batch, ttls) if ttl == -1]
-        skipped += len(batch) - len(to_delete)
+        to_delete = []
+        for key, ttl in zip(batch, ttls):
+            if ttl == -1:
+                to_delete.append(key)
+            elif ttl == -2:
+                skipped_gone += 1
+            else:
+                skipped_ttl += 1
         if to_delete:
             deleted += r.unlink(*to_delete)
         if on_progress:
             on_progress(deleted)
         if throttle_seconds:
             time.sleep(throttle_seconds)
-    return deleted, skipped
+    return deleted, skipped_ttl, skipped_gone
 
 
 def parse_args():
@@ -144,9 +156,9 @@ def parse_args():
                         help="actually delete candidates (default: dry-run)")
     parser.add_argument("--yes", "-y", action="store_true",
                         help="skip the confirmation prompt")
-    parser.add_argument("--batch-size", type=int, default=500,
+    parser.add_argument("--batch-size", type=positive_int, default=500,
                         help="keys per UNLINK batch (default 500)")
-    parser.add_argument("--throttle", type=float, default=50,
+    parser.add_argument("--throttle", type=non_negative_float, default=50,
                         help="sleep between SCAN/UNLINK batches in ms (default 50)")
     return parser.parse_args()
 
@@ -235,13 +247,15 @@ def main():
         )
         sys.stdout.flush()
 
-    deleted, skipped = delete_keys(
+    deleted, skipped_ttl, skipped_gone = delete_keys(
         r, keys_to_delete, batch_size=args.batch_size,
         throttle_seconds=throttle_seconds, on_progress=on_delete_progress,
     )
     print(f"\n\nUnlinked {deleted:,} keys total.")
-    if skipped:
-        print(f"Skipped {skipped:,} keys that acquired a TTL since selection.")
+    if skipped_ttl:
+        print(f"Skipped {skipped_ttl:,} keys that acquired a TTL since selection.")
+    if skipped_gone:
+        print(f"Skipped {skipped_gone:,} keys that no longer existed.")
 
 
 if __name__ == "__main__":

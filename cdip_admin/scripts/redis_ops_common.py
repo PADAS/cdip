@@ -1,4 +1,5 @@
 """Shared helpers for the standalone Redis ops scripts. No Django dependency."""
+import argparse
 import os
 import re
 import time
@@ -6,6 +7,22 @@ import time
 import redis
 
 _SEPARATORS = re.compile(r"[.:]")
+
+
+def positive_int(value):
+    """argparse type for counts that must be >= 1 (batch sizes, SCAN counts)."""
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or greater, got {value}")
+    return number
+
+
+def non_negative_float(value):
+    """argparse type for durations that must not be negative."""
+    number = float(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError(f"must be 0 or greater, got {value}")
+    return number
 
 
 def get_redis_from_env(db):

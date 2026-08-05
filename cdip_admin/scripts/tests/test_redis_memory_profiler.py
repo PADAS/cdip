@@ -83,3 +83,28 @@ class TestPrintOverview:
         out = capsys.readouterr().out
         assert "used_memory" in out
         assert "db0" in out
+
+    def test_databases_are_ordered_numerically_not_lexicographically(self, capsys):
+        sections = {
+            "memory": {
+                "used_memory_human": "100.5M",
+                "maxmemory_human": "1.0G",
+                "maxmemory": 1073741824,
+                "maxmemory_policy": "noeviction",
+                "mem_fragmentation_ratio": 1.05,
+            },
+            "keyspace": {
+                "db10": {"keys": 10, "expires": 0, "avg_ttl": 0},
+                "db2": {"keys": 2, "expires": 0, "avg_ttl": 0},
+                "db0": {"keys": 1, "expires": 0, "avg_ttl": 0},
+            },
+        }
+        r = Mock()
+        r.info.side_effect = lambda section: sections[section]
+        print_overview(r)
+        db_lines = [
+            line.split(":")[0]
+            for line in capsys.readouterr().out.splitlines()
+            if line.startswith("db")
+        ]
+        assert db_lines == ["db0", "db2", "db10"]

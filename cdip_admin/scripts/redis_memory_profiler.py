@@ -11,7 +11,13 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 
-from scripts.redis_ops_common import get_redis_from_env, iter_key_batches, key_prefix
+from scripts.redis_ops_common import (
+    get_redis_from_env,
+    iter_key_batches,
+    key_prefix,
+    non_negative_float,
+    positive_int,
+)
 
 
 @dataclass
@@ -61,6 +67,18 @@ def format_stats_table(stats):
     return "\n".join(lines)
 
 
+def _db_sort_key(db_name):
+    """Order db0, db2, db10 numerically rather than lexicographically.
+
+    Names that don't look like 'db<N>' sort last, by name, so the output stays
+    deterministic whatever the server reports.
+    """
+    suffix = db_name[2:]
+    if db_name.startswith("db") and suffix.isdigit():
+        return (0, int(suffix), "")
+    return (1, 0, db_name)
+
+
 def print_overview(r):
     mem = r.info("memory")
     print(
@@ -70,7 +88,7 @@ def print_overview(r):
         f"fragmentation: {mem.get('mem_fragmentation_ratio')}"
     )
     keyspace = r.info("keyspace")
-    for db_name in sorted(keyspace):
+    for db_name in sorted(keyspace, key=_db_sort_key):
         info = keyspace[db_name]
         print(
             f"{db_name}: keys={info.get('keys'):,} expires={info.get('expires'):,} "
@@ -86,11 +104,11 @@ def parse_args():
     )
     parser.add_argument("db", type=int, nargs="?", default=None,
                         help="db number to profile by prefix (omit for overview only)")
-    parser.add_argument("--depth", type=int, default=1,
+    parser.add_argument("--depth", type=positive_int, default=1,
                         help="key segments (split on . and :) per prefix bucket (default 1)")
-    parser.add_argument("--scan-count", type=int, default=500,
+    parser.add_argument("--scan-count", type=positive_int, default=500,
                         help="SCAN COUNT hint per batch (default 500)")
-    parser.add_argument("--throttle", type=float, default=50,
+    parser.add_argument("--throttle", type=non_negative_float, default=50,
                         help="sleep between SCAN batches in ms (default 50)")
     return parser.parse_args()
 

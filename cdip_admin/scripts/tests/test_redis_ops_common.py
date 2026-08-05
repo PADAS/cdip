@@ -1,3 +1,5 @@
+import argparse
+
 import fakeredis
 import pytest
 
@@ -6,7 +8,28 @@ from scripts.redis_ops_common import (
     get_redis_from_env,
     iter_key_batches,
     key_prefix,
+    non_negative_float,
+    positive_int,
 )
+
+
+class TestArgTypes:
+    def test_positive_int_accepts_one_and_above(self):
+        assert positive_int("1") == 1
+        assert positive_int("500") == 500
+
+    @pytest.mark.parametrize("value", ["0", "-1"])
+    def test_positive_int_rejects_zero_and_negative(self, value):
+        with pytest.raises(argparse.ArgumentTypeError, match="1 or greater"):
+            positive_int(value)
+
+    def test_non_negative_float_accepts_zero_and_above(self):
+        assert non_negative_float("0") == 0.0
+        assert non_negative_float("50") == 50.0
+
+    def test_non_negative_float_rejects_negative(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="0 or greater"):
+            non_negative_float("-0.5")
 
 
 class TestKeyPrefix:
