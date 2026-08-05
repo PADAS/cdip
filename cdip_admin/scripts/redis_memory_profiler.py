@@ -2,8 +2,8 @@
 per-key-prefix memory/count/no-TTL breakdown. Never writes or deletes.
 
 Usage:
-    REDIS_HOST=... python redis_memory_profiler.py            # overview only
-    REDIS_HOST=... python redis_memory_profiler.py 0 --depth 1
+    cd cdip_admin && REDIS_HOST=... python -m scripts.redis_memory_profiler            # overview only
+    cd cdip_admin && REDIS_HOST=... python -m scripts.redis_memory_profiler 0 --depth 1
 """
 import argparse
 import sys

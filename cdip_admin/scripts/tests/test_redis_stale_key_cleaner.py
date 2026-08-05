@@ -129,8 +129,31 @@ class TestDeleteKeys:
             keys.append(f"stale.{i}".encode())
         r.set("keep.me", "x")
         progress = []
-        deleted = delete_keys(r, keys, batch_size=3, throttle_seconds=0,
+        deleted, skipped = delete_keys(r, keys, batch_size=3, throttle_seconds=0,
                               on_progress=progress.append)
         assert deleted == 10
+        assert skipped == 0
         assert r.dbsize() == 1
         assert progress[-1] == 10
+
+    def test_key_that_acquired_ttl_since_selection_is_skipped(self):
+        # A candidate key can be re-created with a TTL between selection and
+        # UNLINK (e.g. a long interactive confirm prompt). delete_keys must
+        # re-check TTL immediately before UNLINK and drop such keys rather
+        # than deleting them.
+        r = fakeredis.FakeRedis()
+        keys = []
+        for i in range(5):
+            r.set(f"stale.{i}", "x")
+            keys.append(f"stale.{i}".encode())
+        r.set("armed.key", "x", ex=3600)
+        keys.append(b"armed.key")
+
+        deleted, skipped = delete_keys(r, keys, batch_size=10, throttle_seconds=0)
+
+        assert deleted == 5
+        assert skipped == 1
+        assert r.exists(b"armed.key") == 1
+        assert r.ttl(b"armed.key") > 0
+        for i in range(5):
+            assert r.exists(f"stale.{i}".encode()) == 0

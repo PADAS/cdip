@@ -6,8 +6,8 @@ PubSub redelivery contract (see docs/superpowers/specs/2026-08-04-redis-prod-cle
 Dry-run by default; deletion requires --delete.
 
 Usage:
-    REDIS_HOST=... python redis_stale_key_cleaner.py 0                       # dry-run, 30d
-    REDIS_HOST=... python redis_stale_key_cleaner.py 0 --match 'backfill*' --delete
+    cd cdip_admin && REDIS_HOST=... python -m scripts.redis_stale_key_cleaner 0                       # dry-run, 30d
+    cd cdip_admin && REDIS_HOST=... python -m scripts.redis_stale_key_cleaner 0 --match 'backfill*' --delete
 """
 import argparse
 import sys
@@ -100,14 +100,34 @@ def summarize_candidates(sized, depth=1):
 
 
 def delete_keys(r, keys, batch_size=500, throttle_seconds=0.05, on_progress=None):
+    """UNLINK keys in batches, re-checking TTL immediately beforehand.
+
+    Candidate selection can be followed by a long interactive confirm prompt,
+    during which a key could be re-created with a TTL (e.g. a fresh
+    dispatched_observation.* idempotency key). Re-checking TTL right before
+    UNLINK closes that window: any key whose TTL is no longer -1 is dropped
+    rather than deleted. A key that vanished entirely (TTL == -2) is also
+    dropped — UNLINKing a gone key is harmless, but skipping it keeps the
+    skipped count meaningful.
+
+    Returns (deleted, skipped).
+    """
     deleted = 0
+    skipped = 0
     for batch in chunked(keys, batch_size):
-        deleted += r.unlink(*batch)
+        pipe = r.pipeline(transaction=False)
+        for k in batch:
+            pipe.ttl(k)
+        ttls = pipe.execute()
+        to_delete = [k for k, ttl in zip(batch, ttls) if ttl == -1]
+        skipped += len(batch) - len(to_delete)
+        if to_delete:
+            deleted += r.unlink(*to_delete)
         if on_progress:
             on_progress(deleted)
         if throttle_seconds:
             time.sleep(throttle_seconds)
-    return deleted
+    return deleted, skipped
 
 
 def parse_args():
@@ -215,11 +235,13 @@ def main():
         )
         sys.stdout.flush()
 
-    deleted = delete_keys(
+    deleted, skipped = delete_keys(
         r, keys_to_delete, batch_size=args.batch_size,
         throttle_seconds=throttle_seconds, on_progress=on_delete_progress,
     )
     print(f"\n\nUnlinked {deleted:,} keys total.")
+    if skipped:
+        print(f"Skipped {skipped:,} keys that acquired a TTL since selection.")
 
 
 if __name__ == "__main__":
