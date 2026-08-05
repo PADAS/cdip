@@ -55,3 +55,33 @@ class TestFormatStatsTable:
         assert "8.0" in lines[1] and "50.0%" in lines[1]
         assert lines[2].startswith("small")
         assert "0.0%" in lines[2]
+
+
+from unittest.mock import Mock
+
+from scripts.redis_memory_profiler import print_overview
+
+
+class TestPrintOverview:
+    def test_prints_memory_and_keyspace_sections(self, capsys):
+        r = Mock()
+        r.info.side_effect = [
+            {
+                "used_memory_human": "100.5M",
+                "maxmemory_human": "1.0G",
+                "maxmemory": 1073741824,
+                "maxmemory_policy": "allkeys-lru",
+                "mem_fragmentation_ratio": 1.05,
+            },
+            {
+                "db0": {
+                    "keys": 1000,
+                    "expires": 500,
+                    "avg_ttl": 3600000,
+                }
+            }
+        ]
+        print_overview(r)
+        out = capsys.readouterr().out
+        assert "used_memory" in out
+        assert "db0" in out
