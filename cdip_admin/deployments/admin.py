@@ -1,15 +1,25 @@
+import json
+
 from django import forms
 from django.contrib import admin
-from django_json_widget.widgets import JSONEditorWidget
 from .models import DispatcherDeployment
 from .tasks import deploy_serverless_dispatcher
+from .widgets import MonacoJSONWidget
+
+
+class PrettyJSONEncoder(json.JSONEncoder):
+    # Monaco renders the text it is given, so indent server-side.
+    def __init__(self, *args, **kwargs):
+        kwargs["indent"] = 2
+        super().__init__(*args, **kwargs)
 
 
 class DispatcherDeploymentForm(forms.ModelForm):
     configuration = forms.JSONField(
         required=False,
         label="JSON Configuration",
-        widget=JSONEditorWidget(width="60em", height="30em"),
+        encoder=PrettyJSONEncoder,
+        widget=MonacoJSONWidget(height="30em"),
     )
 
     class Meta:
