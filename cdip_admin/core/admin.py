@@ -1,7 +1,8 @@
 import logging
+import operator
 from datetime import datetime, timedelta
 
-from django.contrib.admin.filters import DateFieldListFilter
+from django.contrib.admin.filters import DateFieldListFilter, RelatedFieldListFilter
 from django.core.paginator import Paginator
 from django.db import connection
 from django.utils.functional import cached_property
@@ -9,6 +10,41 @@ from django.utils.translation import gettext_lazy as _
 
 
 logger = logging.getLogger(__name__)
+
+
+class SelectRelatedFieldListFilter(RelatedFieldListFilter):
+    """A ``RelatedFieldListFilter`` that ``select_related``s its choice queryset.
+
+    The base filter builds its sidebar dropdown by calling ``str(obj)`` on
+    every row of the related model. When that model's ``__str__`` dereferences
+    its own foreign keys -- ``Integration.__str__`` returns
+    ``f"{self.owner.name} - {self.name} - {self.type.name}"`` -- each option
+    costs one query per relation, so *every* changelist render gets slower as
+    integrations are added. Measured at 2 queries per integration.
+
+    A bare ``select_related()`` is the right tool here: it follows the target
+    model's non-nullable FKs (``Integration.owner`` and ``Integration.type``)
+    in the same query, and by definition never descends through a nullable
+    relation, so it cannot blow up into a wide join.
+
+    This mirrors ``Field.get_choices()`` rather than delegating to it, because
+    that method offers no hook for adjusting the queryset.
+    """
+
+    def field_choices(self, field, request, model_admin):
+        ordering = self.field_admin_ordering(field, request, model_admin)
+        related_model = field.remote_field.model
+        choice_func = operator.attrgetter(
+            field.remote_field.get_related_field().attname
+            if hasattr(field.remote_field, "get_related_field")
+            else "pk"
+        )
+        queryset = related_model._default_manager.complex_filter(
+            field.get_limit_choices_to()
+        ).select_related()
+        if ordering:
+            queryset = queryset.order_by(*ordering)
+        return [(choice_func(obj), str(obj)) for obj in queryset]
 
 
 class CustomDateFilter(DateFieldListFilter):
