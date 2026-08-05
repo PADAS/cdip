@@ -20,7 +20,9 @@ jobs:
       - uses: actions/checkout@v4
       - id: vars
         run: |
-          echo "tag=${{ github.head_ref || github.ref_name }}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          # Branch names may contain '/', which is invalid in a Docker tag.
+          ref_name="${{ github.head_ref || github.ref_name }}"
+          echo "tag=${ref_name//\//-}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "repository=europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/admin-portal" >> $GITHUB_OUTPUT
 
   build:
