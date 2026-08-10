@@ -257,3 +257,62 @@ def test_integration_filter_is_submittable_without_javascript(admin_client, prov
 
     assert '<form method="get" class="autocomplete-filter">' in content
     assert '<button type="submit">' in content
+
+
+def test_integration_filter_offers_the_no_integration_option(admin_client, provider):
+    """``ActivityLog.integration`` is nullable with ``on_delete=SET_NULL``, so
+    orphaned logs really do accumulate. ``RelatedFieldListFilter`` offers an
+    empty choice for exactly this case; replacing its ``choices()`` must not
+    quietly drop the ability to find those rows.
+    """
+    url = reverse("admin:activity_log_activitylog_changelist")
+    _bulk_logs(provider, 3)
+
+    content = admin_client.get(url).content.decode()
+
+    assert "integration__isnull=True" in content
+
+
+def test_integration_filter_no_integration_option_selects_orphaned_logs(
+    admin_client, provider
+):
+    """The empty choice must actually filter, not just render."""
+    url = reverse("admin:activity_log_activitylog_changelist")
+    _bulk_logs(provider, 3, title_prefix="has integration")
+    ActivityLog.objects.create(
+        log_level=ActivityLog.LogLevels.INFO,
+        log_type=ActivityLog.LogTypes.EVENT,
+        origin=ActivityLog.Origin.DISPATCHER,
+        value="orphan",
+        title="orphaned log",
+        integration=None,
+        details={},
+        revert_data={},
+    )
+
+    content = admin_client.get(url, {"integration__isnull": "True"}).content.decode()
+
+    assert "orphaned log" in content
+    assert "has integration" not in content
+
+
+def test_integration_filter_choices_offer_all_and_none(rf, admin_user):
+    """Assert on the filter's own choices rather than the rendered page: every
+    other sidebar filter also renders an "All" link, so a raw HTML search for
+    one passes even when this filter offers nothing.
+    """
+    model_admin = django_admin.site._registry[ActivityLog]
+    request = rf.get("/admin/")
+    request.user = admin_user
+    changelist = model_admin.get_changelist_instance(request)
+    spec = next(
+        s
+        for s in changelist.filter_specs
+        if getattr(s, "field", None) is not None and s.field.name == "integration"
+    )
+
+    links = list(spec.choices(changelist))[0]["links"]
+    displays = [link["display"] for link in links]
+
+    assert "All" in displays
+    assert model_admin.get_empty_value_display() in displays

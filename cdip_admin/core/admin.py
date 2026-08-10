@@ -53,12 +53,43 @@ class AutocompleteFieldListFilter(RelatedFieldListFilter):
 
     def choices(self, changelist):
         widget = AutocompleteSelect(self.field, changelist.model_admin.admin_site)
-        # AutocompleteSelect reads ``choices.field`` and ``choices.queryset``
-        # to render the selected option, so it needs a bound form field.
+        # AutocompleteSelect reads ``choices.field`` and ``choices.queryset`` to
+        # render the selected option, so it needs a bound form field. Applying
+        # ``limit_choices_to`` keeps that label consistent with what
+        # /admin/autocomplete/ will actually offer -- the endpoint applies the
+        # same filter in ``AutocompleteJsonView.get_queryset``.
         widget.choices = forms.ModelChoiceField(
-            queryset=self.field.remote_field.model._default_manager.all(),
+            queryset=self.field.remote_field.model._default_manager.complex_filter(
+                self.field.get_limit_choices_to()
+            ),
             required=False,
         ).choices
+
+        # "All" and "(None)" mirror RelatedFieldListFilter. The empty choice
+        # matters here: ``ActivityLog.integration`` is nullable with
+        # ``on_delete=SET_NULL``, so orphaned rows accumulate and this is the
+        # only way to find them. The autocomplete widget cannot express
+        # "is null", so it stays a plain link.
+        links = [
+            {
+                "selected": self.lookup_val is None and not self.lookup_val_isnull,
+                "query_string": changelist.get_query_string(
+                    remove=[self.lookup_kwarg, self.lookup_kwarg_isnull]
+                ),
+                "display": _("All"),
+            }
+        ]
+        if self.include_empty_choice:
+            links.append(
+                {
+                    "selected": bool(self.lookup_val_isnull),
+                    "query_string": changelist.get_query_string(
+                        {self.lookup_kwarg_isnull: "True"}, [self.lookup_kwarg]
+                    ),
+                    "display": self.empty_value_display,
+                }
+            )
+
         yield {
             "widget": widget.render(
                 self.lookup_kwarg,
@@ -73,10 +104,7 @@ class AutocompleteFieldListFilter(RelatedFieldListFilter):
                 for key, value in changelist.params.items()
                 if key not in (self.lookup_kwarg, self.lookup_kwarg_isnull)
             ],
-            "clear_url": changelist.get_query_string(
-                remove=[self.lookup_kwarg, self.lookup_kwarg_isnull]
-            ),
-            "is_set": bool(self.lookup_val),
+            "links": links,
         }
 
 

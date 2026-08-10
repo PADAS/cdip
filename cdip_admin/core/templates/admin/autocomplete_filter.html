@@ -11,9 +11,11 @@
        without JavaScript at all. #}
     <button type="submit">{% translate "Apply" %}</button>
   </form>
-  {% if choice.is_set %}
-    <ul class="autocomplete-filter-clear">
-      <li><a href="{{ choice.clear_url }}">{% translate "All" %}</a></li>
-    </ul>
-  {% endif %}
+  <ul>
+    {% for link in choice.links %}
+      <li{% if link.selected %} class="selected"{% endif %}>
+        <a href="{{ link.query_string }}">{{ link.display }}</a>
+      </li>
+    {% endfor %}
+  </ul>
 {% endfor %}
