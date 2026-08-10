@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from core.admin import EstimatedCountPaginator
+from core.admin import (
+    CustomDateFilter,
+    EstimatedCountPaginator,
+    SelectRelatedFieldListFilter,
+)
 
 from .models import ActivityLog
 
@@ -48,7 +52,18 @@ class ActivityLogAdmin(admin.ModelAdmin):
     # count. Doesn't replace the paginator's primary count — that's the
     # job of ``paginator`` above.
     show_full_result_count = False
-    list_select_related = True
+    # These relations must be named explicitly. A bare ``select_related()`` --
+    # which is what ``list_select_related = True`` produces -- follows only
+    # *non-nullable* FKs, and both ``integration`` and ``created_by`` are
+    # nullable, so it followed neither. Every displayed row then dereferenced
+    # them lazily, and ``Integration.__str__`` walked owner and type on top of
+    # that: ~4 queries per row.
+    list_select_related = (
+        "integration",
+        "integration__owner",
+        "integration__type",
+        "created_by",
+    )
     list_display = (
         "created_at",
         "log_level",
@@ -56,23 +71,26 @@ class ActivityLogAdmin(admin.ModelAdmin):
         "title",
         "origin",
         "log_type",
-        "details",
         "is_reversible",
-        "revert_data",
         "integration",
         "created_by",
     )
     search_fields = (
         "title",
         "value",
-        "details",
     )
-    date_hierarchy = 'created_at'
+    # No ``date_hierarchy``: it issues ``SELECT DISTINCT DATE_TRUNC(...)`` over
+    # the whole filtered queryset on every render. Postgres has no skip scan in
+    # any version, so that is a sequential scan of every partition -- measured
+    # at 3,677 buffers / 131ms per 500k rows, and linear in table size.
+    # ``CustomDateFilter`` covers the same need by building its links from the
+    # clock instead of from the table.
     list_filter = (
+        ("created_at", CustomDateFilter),
         "log_level",
         "log_type",
         "origin",
         "is_reversible",
-        "integration",
+        ("integration", SelectRelatedFieldListFilter),
     )
     actions = [revert_selected]

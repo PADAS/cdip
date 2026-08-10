@@ -2,7 +2,10 @@ import django_celery_beat
 import psycopg2
 from django.contrib import admin
 from django.db import IntegrityError
+from django.db.models import F
 from django.forms import ModelForm
+from django.urls import reverse
+from django.utils.html import format_html
 from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
 from simple_history.admin import SimpleHistoryAdmin
@@ -549,14 +552,29 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
     # count. Doesn't replace the paginator's primary count — that's the
     # job of ``paginator`` above.
     show_full_result_count = False
-    list_select_related = True
+    # ``list_select_related = True`` followed only ``data_provider`` -- a bare
+    # select_related() skips *nullable* FKs, so ``destination``, ``source`` and
+    # ``created_by`` were all dereferenced per row, and Integration/Source
+    # ``__str__`` walked owner/type/integration on top of that: ~7 queries per
+    # row, 356 for a 50-row page. ``source`` is deliberately absent -- see
+    # ``source_link`` for why loading Source rows is not made cheaper by
+    # select_related.
+    list_select_related = (
+        "data_provider",
+        "data_provider__owner",
+        "data_provider__type",
+        "destination",
+        "destination__owner",
+        "destination__type",
+        "created_by",
+    )
     list_display = (
         "pk",
         "object_id",
         "related_to",
         "object_type",
         "data_provider",
-        "source",
+        "source_link",
         "destination",
         "external_id",
         "created_at",
@@ -565,7 +583,6 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "last_update_delivered_at",
         "is_duplicate",
         "has_error",
-        "error",
         "created_by",
     )
     search_fields = (
@@ -582,8 +599,12 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "destination__owner__name",
         "destination__type__name",
     )
-    date_hierarchy = 'created_at'
+    # No ``date_hierarchy``: it issues ``SELECT DISTINCT DATE_TRUNC(...)`` over
+    # the whole filtered queryset on every render, which Postgres can only
+    # answer with a sequential scan of this -- the largest -- table. The
+    # ``created_at`` filter below covers the same need for free.
     list_filter = (
+        ("created_at", CustomDateFilter),
         ("delivered_at", CustomDateFilter),
         "has_error",
         "is_duplicate",
@@ -591,6 +612,27 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "data_provider__type",
         "destination__type",
     )
+
+    def get_queryset(self, request):
+        # Pull the source's external id in via the join rather than via
+        # ``list_select_related``. Constructing a ``Source`` instance runs
+        # ``ChangeLogMixin.__init__``, which resolves the instance's related
+        # integration *before* Django populates the FK cache -- so it costs a
+        # query per row that select_related cannot prevent. Annotating avoids
+        # building the instances at all.
+        return super().get_queryset(request).annotate(
+            _source_external_id=F("source__external_id")
+        )
+
+    @admin.display(description="Source", ordering="source__external_id")
+    def source_link(self, obj):
+        if not obj.source_id:
+            return self.get_empty_value_display()
+        return format_html(
+            '<a href="{}">{}</a>',
+            reverse("admin:integrations_source_change", args=[obj.source_id]),
+            obj._source_external_id,
+        )
 
 
 # Override the PeriodicTaskAdmin to allow searching and filtering by integration fields
