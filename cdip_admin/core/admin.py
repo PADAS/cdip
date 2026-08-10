@@ -1,8 +1,9 @@
 import logging
-import operator
 from datetime import datetime, timedelta
 
+from django import forms
 from django.contrib.admin.filters import DateFieldListFilter, RelatedFieldListFilter
+from django.contrib.admin.widgets import AutocompleteSelect
 from django.core.paginator import Paginator
 from django.db import connection
 from django.utils.functional import cached_property
@@ -12,39 +13,71 @@ from django.utils.translation import gettext_lazy as _
 logger = logging.getLogger(__name__)
 
 
-class SelectRelatedFieldListFilter(RelatedFieldListFilter):
-    """A ``RelatedFieldListFilter`` that ``select_related``s its choice queryset.
+class AutocompleteFieldListFilter(RelatedFieldListFilter):
+    """A foreign-key sidebar filter that never enumerates the related table.
 
-    The base filter builds its sidebar dropdown by calling ``str(obj)`` on
-    every row of the related model. When that model's ``__str__`` dereferences
-    its own foreign keys -- ``Integration.__str__`` returns
-    ``f"{self.owner.name} - {self.name} - {self.type.name}"`` -- each option
-    costs one query per relation, so *every* changelist render gets slower as
-    integrations are added. Measured at 2 queries per integration.
+    ``RelatedFieldListFilter`` renders one ``<option>`` per row of the related
+    model, so the changelist HTML grows without bound as rows are added --
+    roughly 168 bytes per Integration, measured. Loading those options in a
+    single ``select_related`` query fixes the query count but not the payload,
+    and rendering every Integration into a ``<select>`` is what previously
+    timed out the Route change page (see
+    ``test_route_change_page_does_not_scale_with_integration_count``).
 
-    A bare ``select_related()`` is the right tool here: it follows the target
-    model's non-nullable FKs (``Integration.owner`` and ``Integration.type``)
-    in the same query, and by definition never descends through a nullable
-    relation, so it cannot blow up into a wide join.
+    ``AutocompleteSelect`` renders only the *currently selected* option --
+    ``AutocompleteMixin.optgroups`` filters the queryset to the selected keys,
+    so an unfiltered changelist emits zero options and issues zero queries --
+    and fetches the rest over AJAX, 20 at a time, as the user types.
 
-    This mirrors ``Field.get_choices()`` rather than delegating to it, because
-    that method offers no hook for adjusting the queryset.
+    This reuses Django's own ``/admin/autocomplete/`` endpoint and bundled
+    select2 assets, so it needs no extra dependency. The endpoint validates the
+    *source* field and requires the related model's admin to define
+    ``search_fields``; it does not require the field to appear in any
+    ``ModelAdmin.autocomplete_fields``, which is what makes it usable from a
+    filter that has no form field at all.
+
+    The admin using this filter must contribute the widget's media, which
+    Django does not collect from filters -- see ``ActivityLogAdmin.media``.
     """
 
+    template = "admin/autocomplete_filter.html"
+
     def field_choices(self, field, request, model_admin):
-        ordering = self.field_admin_ordering(field, request, model_admin)
-        related_model = field.remote_field.model
-        choice_func = operator.attrgetter(
-            field.remote_field.get_related_field().attname
-            if hasattr(field.remote_field, "get_related_field")
-            else "pk"
-        )
-        queryset = related_model._default_manager.complex_filter(
-            field.get_limit_choices_to()
-        ).select_related()
-        if ordering:
-            queryset = queryset.order_by(*ordering)
-        return [(choice_func(obj), str(obj)) for obj in queryset]
+        # Never enumerate the related table; that is the entire point.
+        return []
+
+    def has_output(self):
+        # The base class hides a filter offering fewer than two choices, and
+        # this one deliberately offers none up front.
+        return True
+
+    def choices(self, changelist):
+        widget = AutocompleteSelect(self.field, changelist.model_admin.admin_site)
+        # AutocompleteSelect reads ``choices.field`` and ``choices.queryset``
+        # to render the selected option, so it needs a bound form field.
+        widget.choices = forms.ModelChoiceField(
+            queryset=self.field.remote_field.model._default_manager.all(),
+            required=False,
+        ).choices
+        yield {
+            "widget": widget.render(
+                self.lookup_kwarg,
+                self.lookup_val,
+                attrs={"onchange": "this.form.submit();"},
+            ),
+            # Every other active parameter has to ride along as a hidden input
+            # or submitting this filter would silently drop the search term,
+            # the date filter and the ordering.
+            "carried_params": [
+                (key, value)
+                for key, value in changelist.params.items()
+                if key not in (self.lookup_kwarg, self.lookup_kwarg_isnull)
+            ],
+            "clear_url": changelist.get_query_string(
+                remove=[self.lookup_kwarg, self.lookup_kwarg_isnull]
+            ),
+            "is_set": bool(self.lookup_val),
+        }
 
 
 class CustomDateFilter(DateFieldListFilter):

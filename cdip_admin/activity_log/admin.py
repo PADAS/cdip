@@ -1,9 +1,10 @@
 from django.contrib import admin
+from django.contrib.admin.widgets import AutocompleteSelect
 
 from core.admin import (
+    AutocompleteFieldListFilter,
     CustomDateFilter,
     EstimatedCountPaginator,
-    SelectRelatedFieldListFilter,
 )
 
 from .models import ActivityLog
@@ -91,6 +92,16 @@ class ActivityLogAdmin(admin.ModelAdmin):
         "log_type",
         "origin",
         "is_reversible",
-        ("integration", SelectRelatedFieldListFilter),
+        ("integration", AutocompleteFieldListFilter),
     )
     actions = [revert_selected]
+
+    @property
+    def media(self):
+        # Django collects media from the admin and its forms, but not from
+        # list filters, so the select2 assets AutocompleteFieldListFilter
+        # depends on have to be contributed here or the widget renders as an
+        # inert <select>.
+        return super().media + AutocompleteSelect(
+            self.opts.get_field("integration"), self.admin_site
+        ).media
