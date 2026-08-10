@@ -58,10 +58,16 @@ class AutocompleteFieldListFilter(RelatedFieldListFilter):
         # ``limit_choices_to`` keeps that label consistent with what
         # /admin/autocomplete/ will actually offer -- the endpoint applies the
         # same filter in ``AutocompleteJsonView.get_queryset``.
+        #
+        # ``select_related()`` matters even though only one row is ever
+        # fetched: rendering the label calls ``Integration.__str__``, which
+        # dereferences owner and type, so a filtered changelist paid 3 queries
+        # instead of 1 -- the same N+1 this filter exists to remove, reappearing
+        # on exactly the pages where the filter is in use.
         widget.choices = forms.ModelChoiceField(
             queryset=self.field.remote_field.model._default_manager.complex_filter(
                 self.field.get_limit_choices_to()
-            ),
+            ).select_related(),
             required=False,
         ).choices
 

@@ -316,3 +316,53 @@ def test_integration_filter_choices_offer_all_and_none(rf, admin_user):
 
     assert "All" in displays
     assert model_admin.get_empty_value_display() in displays
+
+
+def test_integration_filter_actually_filters_by_integration(
+    admin_client, provider, organization, integration_type_er
+):
+    """The filter's whole purpose, pinned.
+
+    ``field_choices()`` returns nothing on purpose, so nothing else here would
+    notice if Django's parameter handling changed and the filter silently
+    stopped narrowing the queryset -- the page would still render, just with
+    every row.
+    """
+    other = Integration.objects.create(
+        type=integration_type_er,
+        owner=organization,
+        name="Other Provider",
+        base_url="https://other.example.org",
+    )
+    _bulk_logs(provider, 3, title_prefix="wanted")
+    _bulk_logs(other, 3, title_prefix="unwanted")
+
+    url = reverse("admin:activity_log_activitylog_changelist")
+    content = admin_client.get(
+        url, {"integration__id__exact": str(provider.pk)}
+    ).content.decode()
+
+    assert "wanted 0" in content
+    assert "unwanted" not in content
+
+
+def test_selected_integration_label_does_not_cost_extra_queries(
+    admin_client, provider
+):
+    """Rendering the selected option calls ``Integration.__str__``, which
+    dereferences owner and type -- the very N+1 this filter exists to avoid,
+    reappearing on exactly the pages where someone is using the filter.
+    """
+    url = reverse("admin:activity_log_activitylog_changelist")
+    _bulk_logs(provider, 5)
+
+    unfiltered = _changelist_query_count(admin_client, url)
+    filtered = _changelist_query_count(
+        admin_client, f"{url}?integration__id__exact={provider.pk}"
+    )
+
+    assert filtered <= unfiltered + 1, (
+        f"Filtering costs {filtered - unfiltered} extra queries "
+        f"({unfiltered} -> {filtered}); the selected option's label should be "
+        "fetched with select_related."
+    )
