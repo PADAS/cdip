@@ -74,13 +74,6 @@ def test_route_change_page_owner_and_configuration_use_autocomplete(
     assert isinstance(unwrap(form.fields["configuration"].widget), AutocompleteSelect)
 
 
-def _changelist_query_count(admin_client, url):
-    with CaptureQueriesContext(connection) as ctx:
-        response = admin_client.get(url)
-    assert response.status_code == 200, response.status_code
-    return len(ctx.captured_queries)
-
-
 @pytest.fixture
 def trace_fixtures(organization, integration_type_er):
     from integrations.models import Source
@@ -126,10 +119,10 @@ def test_gundi_trace_changelist_query_count_does_not_scale_with_row_count(
     url = reverse("admin:integrations_gunditrace_changelist")
 
     _bulk_traces(provider, destination, source, 5)
-    baseline = _changelist_query_count(admin_client, url)
+    baseline = _render_query_count(admin_client, url)
 
     _bulk_traces(provider, destination, source, 95)
-    after = _changelist_query_count(admin_client, url)
+    after = _render_query_count(admin_client, url)
 
     assert after - baseline <= 2, (
         "GundiTrace changelist query count scales with the number of rows: "
