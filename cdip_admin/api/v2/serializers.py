@@ -505,10 +505,10 @@ class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer)
         super().update(instance=instance, validated_data=validated_data)
         # Update or Create nested actions if provided
         for action_data in actions:  # Usually less than 5 actions
-            action_data["integration_type"] = self.instance
             IntegrationAction.objects.update_or_create(
-                value=action_data.get("value"),
-                defaults=action_data
+                integration_type=instance,
+                value=action_data.pop("value"),
+                defaults=action_data,
             )
         # Create or update webhook if provided
         if webhook_data := validated_data.get("webhook"):
