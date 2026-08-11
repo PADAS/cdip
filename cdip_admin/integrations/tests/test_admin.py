@@ -160,3 +160,33 @@ def test_gundi_trace_changelist_does_not_render_error_text_per_row(admin_client)
     model_admin = django_admin.site._registry[GundiTrace]
     assert "error" not in model_admin.list_display
     assert "has_error" in model_admin.list_display
+
+
+def test_gundi_trace_type_filters_have_distinguishable_titles(
+    admin_client, trace_fixtures, organization
+):
+    """``data_provider__type`` and ``destination__type`` both point at
+    IntegrationType, so both inherit its verbose name and the sidebar renders
+    two identical "By Integration Type" panels with no way to tell which one
+    filters the provider and which the destination.
+
+    Needs two IntegrationTypes: a related-field filter offering fewer than two
+    choices is hidden, so with one type the duplication does not appear.
+    """
+    from integrations.models import IntegrationType
+
+    IntegrationType.objects.create(name="Second Type", value="second_type")
+    provider, destination, source = trace_fixtures
+    _bulk_traces(provider, destination, source, 2)
+
+    url = reverse("admin:integrations_gunditrace_changelist")
+    content = admin_client.get(url).content.decode()
+
+    assert content.count("By Integration Type") == 0, (
+        "The sidebar renders duplicate 'By Integration Type' filters; the "
+        "provider and destination type filters need distinct titles."
+    )
+    # Assert the replacements are present too: a bare "no duplicates" check
+    # would also pass if both filters disappeared altogether.
+    assert "By Provider type" in content
+    assert "By Destination type" in content
