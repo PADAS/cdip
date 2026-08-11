@@ -163,7 +163,7 @@ def test_gundi_trace_changelist_does_not_render_error_text_per_row(admin_client)
 
 
 def test_gundi_trace_type_filters_have_distinguishable_titles(
-    admin_client, trace_fixtures, organization
+    admin_client, trace_fixtures
 ):
     """``data_provider__type`` and ``destination__type`` both point at
     IntegrationType, so both inherit its verbose name and the sidebar renders
