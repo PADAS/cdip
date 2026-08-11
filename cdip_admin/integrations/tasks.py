@@ -434,6 +434,7 @@ def backfill_action_configurations_for_type(integration_type_id):
     # integrations safely. Errors propagate so Celery's autoretry_for fires.
     IntegrationType = apps.get_model("integrations", "IntegrationType")
     Integration = apps.get_model("integrations", "Integration")
+    IntegrationAction = apps.get_model("integrations", "IntegrationAction")
     integration_type = IntegrationType.objects.filter(id=integration_type_id).first()
     if integration_type is None:
         # Most likely the type was deleted between the action's save committing
@@ -447,7 +448,12 @@ def backfill_action_configurations_for_type(integration_type_id):
         return
     # Fetch the action list once — every integration in this loop shares the
     # same type, so re-querying actions per integration is wasted work.
-    actions = list(integration_type.actions.all())
+    # Reference actions are stateless queries with no per-integration
+    # configuration (see create_missing_configurations), so exclude them here
+    # too rather than relying solely on the filter downstream.
+    actions = list(
+        integration_type.actions.exclude(type=IntegrationAction.ActionTypes.REFERENCE)
+    )
     logger.info(
         "Backfilling configurations for IntegrationType %s (value=%s, actions=%d)",
         integration_type_id, integration_type.value, len(actions),

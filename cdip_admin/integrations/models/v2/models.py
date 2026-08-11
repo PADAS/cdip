@@ -388,6 +388,10 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         # task, repair management command).
         if actions is None:
             actions = self.type.actions.all()
+        # Reference actions are stateless queries (config model IS the query);
+        # they have no per-integration configuration, so don't create junk rows
+        # that would surface in the portal's configuration list.
+        actions = [a for a in actions if a.type != IntegrationAction.ActionTypes.REFERENCE]
         for action in actions:
             # get_or_create is race-safe in combination with the unique
             # constraint on (integration, action). Two concurrent backfills
