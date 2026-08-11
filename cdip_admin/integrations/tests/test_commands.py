@@ -1,4 +1,6 @@
 import json
+from io import StringIO
+
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -57,6 +59,37 @@ def test_repair_integration_configurations_with_integration_type(
         "--integration-type", "earth_ranger",
     )
 
+    assert integration.configurations.filter(action=er_action_show_permissions).exists()
+
+
+def test_repair_integration_configurations_excludes_reference_actions(
+    er_destination_without_show_permissions_config, er_action_show_permissions,
+    integration_type_er,
+):
+    # Reference actions have no per-integration configuration (see
+    # Integration.create_missing_configurations), so the repair command
+    # shouldn't report or count them as "missing" — that would forever show
+    # up in dry-run/live output even though no row would ever be created.
+    integration = er_destination_without_show_permissions_config
+    reference_action = IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.REFERENCE,
+        name="Reference Lookup",
+        value="reference_lookup",
+    )
+
+    out = StringIO()
+    call_command(
+        "repair_integration_configurations",
+        "--integration", str(integration.id),
+        stdout=out,
+    )
+
+    output = out.getvalue()
+    assert "reference_lookup" not in output
+    assert not IntegrationConfiguration.objects.filter(
+        integration=integration, action=reference_action,
+    ).exists()
     assert integration.configurations.filter(action=er_action_show_permissions).exists()
 
 
