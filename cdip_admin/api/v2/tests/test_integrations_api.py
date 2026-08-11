@@ -876,6 +876,79 @@ def test_register_integration_type_as_superuser(api_client, superuser):
         assert action_in_db.is_periodic_action == action["is_periodic_action"]
 
 
+def test_register_integration_type_with_reference_action_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology Y",
+        "value": "tech_y",
+        "description": f"Default type for integrations with Technology Y",
+        "service_url": "https://techy-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Technology Y list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+    response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    integration_type = IntegrationType.objects.get(value=request_data["value"])
+    action_in_db = IntegrationAction.objects.get(integration_type=integration_type, value="list_tag_names")
+    assert action_in_db.type == "reference"
+
+
+def test_get_integration_type_with_reference_action_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology Z",
+        "value": "tech_z",
+        "description": f"Default type for integrations with Technology Z",
+        "service_url": "https://techz-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Technology Z list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+    create_response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+    assert create_response.status_code == status.HTTP_201_CREATED
+
+    response = api_client.get(
+        reverse("integration-types-detail", kwargs={"value": request_data["value"]}),
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    actions_by_value = {action["value"]: action for action in response_data["actions"]}
+    assert actions_by_value["list_tag_names"]["type"] == "reference"
+
+
 def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client, superuser):
     mock_register_integration_type_in_kong = mocker.MagicMock()
     mocker.patch("api.v2.serializers.register_integration_type_in_kong", mock_register_integration_type_in_kong)

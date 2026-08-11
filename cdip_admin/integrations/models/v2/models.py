@@ -59,6 +59,7 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         PULL_DATA = "pull", "Pull Data"
         PUSH_DATA = "push", "Push Data"
         GENERIC = "generic", "Generic Action"
+        REFERENCE = "reference", "Reference Data"
 
     type = models.CharField(
         max_length=20,
