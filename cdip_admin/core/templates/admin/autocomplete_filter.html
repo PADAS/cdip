@@ -1,0 +1,21 @@
+{% load i18n %}
+<h3>{% blocktranslate with filter_title=title %}By {{ filter_title }}{% endblocktranslate %}</h3>
+{% for choice in choices %}
+  <form method="get" class="autocomplete-filter">
+    {% for key, value in choice.carried_params %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    {{ choice.widget }}
+    {# The widget also submits on change, but that path depends on select2
+       re-dispatching the event, so keep an explicit control that works
+       without JavaScript at all. #}
+    <button type="submit">{% translate "Apply" %}</button>
+  </form>
+  <ul>
+    {% for link in choice.links %}
+      <li{% if link.selected %} class="selected"{% endif %}>
+        <a href="{{ link.query_string }}">{{ link.display }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endfor %}
