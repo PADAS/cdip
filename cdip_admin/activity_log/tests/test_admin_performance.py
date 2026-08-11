@@ -366,3 +366,31 @@ def test_selected_integration_label_does_not_cost_extra_queries(
         f"({unfiltered} -> {filtered}); the selected option's label should be "
         "fetched with select_related."
     )
+
+
+def test_integration_filter_leaks_no_template_source(admin_client, provider):
+    """Django's ``{# ... #}`` comments are single-line only -- a multi-line one
+    is not a comment at all and renders as literal text in the sidebar, which
+    is exactly what shipped to dev. Asserting the Apply button exists did not
+    catch it; this asserts nothing stray comes with it.
+    """
+    url = reverse("admin:activity_log_activitylog_changelist")
+    _bulk_logs(provider, 3)
+
+    content = admin_client.get(url).content.decode()
+
+    assert "{#" not in content
+    assert "#}" not in content
+    assert "select2 re-dispatching" not in content
+
+
+def test_integration_filter_matches_admin_filter_markup(admin_client, provider):
+    """The sidebar filters are collapsible ``<details>`` elements in Django
+    4.2's admin. A bare ``<h3>`` renders as a non-collapsible odd one out.
+    """
+    url = reverse("admin:activity_log_activitylog_changelist")
+    _bulk_logs(provider, 3)
+
+    content = admin_client.get(url).content.decode()
+
+    assert '<details data-filter-title="integration"' in content

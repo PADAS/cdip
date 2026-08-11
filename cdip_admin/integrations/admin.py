@@ -10,7 +10,7 @@ from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
 from simple_history.admin import SimpleHistoryAdmin
 from django.contrib import messages
-from core.admin import CustomDateFilter, EstimatedCountPaginator
+from core.admin import CustomDateFilter, EstimatedCountPaginator, titled_filter
 import deployments.models
 from .models import (
     OutboundIntegrationType,
@@ -609,8 +609,10 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "has_error",
         "is_duplicate",
         "object_type",
-        "data_provider__type",
-        "destination__type",
+        # Both point at IntegrationType, so without explicit titles the
+        # sidebar shows two identical "By Integration Type" panels.
+        ("data_provider__type", titled_filter("Provider type")),
+        ("destination__type", titled_filter("Destination type")),
     )
 
     def get_queryset(self, request):

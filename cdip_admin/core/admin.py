@@ -13,6 +13,23 @@ from django.utils.translation import gettext_lazy as _
 logger = logging.getLogger(__name__)
 
 
+def titled_filter(title, base=RelatedFieldListFilter):
+    """Return a copy of ``base`` whose sidebar heading is ``title``.
+
+    A related-field filter takes its heading from the *target* model, so two
+    filters pointing at the same model render identical headings: filtering
+    Gundi Traces by provider type and by destination type produced two panels
+    both labelled "By Integration Type", with nothing to distinguish them.
+    """
+
+    class TitledFieldListFilter(base):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.title = title
+
+    return TitledFieldListFilter
+
+
 class AutocompleteFieldListFilter(RelatedFieldListFilter):
     """A foreign-key sidebar filter that never enumerates the related table.
 
