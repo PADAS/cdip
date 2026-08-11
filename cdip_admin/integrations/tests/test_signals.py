@@ -104,6 +104,36 @@ def test_new_action_does_not_duplicate_existing_configs(
     assert push_positions_configs_before == push_positions_configs_after
 
 
+def test_new_reference_action_does_not_backfill_configs(
+    run_backfill_inline, er_destination_without_show_permissions_config, integration_type_er,
+):
+    # Reference actions are stateless queries (the config model IS the query
+    # params); they have no per-integration configuration. Creating one
+    # shouldn't leave junk IntegrationConfiguration rows that would surface
+    # in the portal's configuration list.
+    integration = er_destination_without_show_permissions_config
+
+    reference_action = IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.REFERENCE,
+        name="New Reference Action",
+        value="new_reference_action",
+    )
+    generic_action = IntegrationAction.objects.create(
+        integration_type=integration_type_er,
+        type=IntegrationAction.ActionTypes.GENERIC,
+        name="New Generic Action Sibling",
+        value="new_generic_action_sibling",
+    )
+
+    assert not IntegrationConfiguration.objects.filter(
+        integration=integration, action=reference_action,
+    ).exists()
+    assert IntegrationConfiguration.objects.filter(
+        integration=integration, action=generic_action,
+    ).exists()
+
+
 def test_post_save_dispatches_async_does_not_block(
     mocker, er_destination_without_show_permissions_config, integration_type_er,
 ):

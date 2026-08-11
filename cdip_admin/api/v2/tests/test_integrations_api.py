@@ -876,6 +876,79 @@ def test_register_integration_type_as_superuser(api_client, superuser):
         assert action_in_db.is_periodic_action == action["is_periodic_action"]
 
 
+def test_register_integration_type_with_reference_action_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology Y",
+        "value": "tech_y",
+        "description": f"Default type for integrations with Technology Y",
+        "service_url": "https://techy-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Technology Y list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+    response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    integration_type = IntegrationType.objects.get(value=request_data["value"])
+    action_in_db = IntegrationAction.objects.get(integration_type=integration_type, value="list_tag_names")
+    assert action_in_db.type == "reference"
+
+
+def test_get_integration_type_with_reference_action_as_superuser(api_client, superuser):
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "name": "Technology Z",
+        "value": "tech_z",
+        "description": f"Default type for integrations with Technology Z",
+        "service_url": "https://techz-actions-runner-fakeurl123-uc.a.run.app",
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Technology Z list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+    create_response = api_client.post(
+        reverse("integration-types-list"),
+        data=request_data,
+        format="json"
+    )
+    assert create_response.status_code == status.HTTP_201_CREATED
+
+    response = api_client.get(
+        reverse("integration-types-detail", kwargs={"value": request_data["value"]}),
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.json()
+    actions_by_value = {action["value"]: action for action in response_data["actions"]}
+    assert actions_by_value["list_tag_names"]["type"] == "reference"
+
+
 def test_register_integration_type_with_webhooks_as_superuser(mocker, api_client, superuser):
     mock_register_integration_type_in_kong = mocker.MagicMock()
     mocker.patch("api.v2.serializers.register_integration_type_in_kong", mock_register_integration_type_in_kong)
@@ -960,6 +1033,101 @@ def test_update_service_url_in_integration_type_as_superuser(api_client, superus
     assert response.status_code == status.HTTP_200_OK
     integration_type_lotek.refresh_from_db()
     assert integration_type_lotek.service_url == lotek_integration_url
+
+
+def test_update_integration_type_with_actions_as_superuser(api_client, superuser, integration_type_lotek):
+    # Regression test: PATCH with an "actions" payload used to raise a NameError (500)
+    # because the validate() loop referenced `action` before it was assigned.
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Lotek list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+
+    response = api_client.patch(
+        reverse("integration-types-detail", kwargs={"value": integration_type_lotek.value}),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    action_data = request_data["actions"][0]
+    action_in_db = IntegrationAction.objects.get(
+        integration_type=integration_type_lotek, value=action_data["value"]
+    )
+    assert action_in_db.type == action_data["type"]
+    assert action_in_db.name == action_data["name"]
+    assert action_in_db.description == action_data["description"]
+    assert action_in_db.schema == action_data["schema"]
+    assert action_in_db.is_periodic_action == action_data["is_periodic_action"]
+
+
+def test_update_integration_type_actions_does_not_repoint_action_from_another_type(
+        api_client, superuser, integration_type_lotek, integration_type_movebank
+):
+    # Regression test: IntegrationAction.objects.update_or_create() used to be scoped
+    # only by `value` (with `integration_type` passed via `defaults`), so patching type A
+    # with an action value that already exists on type B would silently re-point B's
+    # action to A instead of creating a new action under A.
+    api_client.force_authenticate(superuser)
+    shared_value = "shared_action_value"
+    movebank_action = IntegrationAction.objects.create(
+        integration_type=integration_type_movebank,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Movebank Shared Action",
+        value=shared_value,
+        description="Movebank's own action",
+        schema={"type": "object", "properties": {}},
+        is_periodic_action=False,
+    )
+    request_data = {
+        "actions": [
+            {
+                "type": "reference",
+                "name": "Lotek Shared Action",
+                "value": shared_value,
+                "description": "Lotek's own action, sharing a value with Movebank's",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+
+    response = api_client.patch(
+        reverse("integration-types-detail", kwargs={"value": integration_type_lotek.value}),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    # Movebank's action must be untouched (still belongs to Movebank).
+    movebank_action.refresh_from_db()
+    assert movebank_action.integration_type == integration_type_movebank
+    assert movebank_action.name == "Movebank Shared Action"
+    # Lotek must have gotten its own, separate action row with the same value.
+    lotek_action = IntegrationAction.objects.get(
+        integration_type=integration_type_lotek, value=shared_value
+    )
+    assert lotek_action.id != movebank_action.id
+    assert lotek_action.name == "Lotek Shared Action"
+    # There are now two distinct action rows sharing this value, one per type.
+    assert IntegrationAction.objects.filter(value=shared_value).count() == 2
 
 
 def _test_filter_integration_types(api_client, user, filters, expected_integration_types):

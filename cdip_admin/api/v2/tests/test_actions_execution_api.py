@@ -139,6 +139,77 @@ def test_execute_action_with_config_overrides(
     )
 
 
+def test_execute_reference_action_as_superuser(
+        api_client, mocker, requests_mock, superuser, organization,
+        cellstop_integration, cellstop_action_list_tag_names, cellstop_list_tag_names_response
+):
+    # RFC ask 2: reference-type actions are not gated by an is_executable flag
+    # or an action-type check in the proxy; the same role rules that apply to
+    # other action types apply here.
+    mocker.patch("integrations.models.v2.models.google.auth.transport.requests.Request", mocker.MagicMock())
+    mocker.patch("integrations.models.v2.models.google.oauth2.id_token.fetch_id_token", mocker.MagicMock(return_value="fake_id_token"))
+    integration_service_url = cellstop_integration.type.service_url
+    actions_execute_url = urljoin(integration_service_url, "/v1/actions/execute")
+    gcp_request_mock = requests_mock.post(
+        actions_execute_url, json=cellstop_list_tag_names_response, status_code=status.HTTP_200_OK
+    )
+    api_url = reverse(
+        "actions-execute",
+        kwargs={"integration_pk": cellstop_integration.id, "value": cellstop_action_list_tag_names.value},
+    )
+    config_overrides = {"tag_type": "vessel"}
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(api_url, data={"config_overrides": config_overrides}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == cellstop_list_tag_names_response
+    sent_payload = gcp_request_mock.last_request.json()
+    assert sent_payload["integration_id"] == str(cellstop_integration.id)
+    assert sent_payload["action_id"] == "list_tag_names"
+    assert sent_payload["config_overrides"] == config_overrides
+
+
+def test_execute_reference_action_as_org_admin(
+        api_client, mocker, requests_mock, org_admin_user, organization,
+        cellstop_integration, cellstop_action_list_tag_names, cellstop_list_tag_names_response
+):
+    mocker.patch("integrations.models.v2.models.google.auth.transport.requests.Request", mocker.MagicMock())
+    mocker.patch("integrations.models.v2.models.google.oauth2.id_token.fetch_id_token", mocker.MagicMock(return_value="fake_id_token"))
+    integration_service_url = cellstop_integration.type.service_url
+    actions_execute_url = urljoin(integration_service_url, "/v1/actions/execute")
+    gcp_request_mock = requests_mock.post(
+        actions_execute_url, json=cellstop_list_tag_names_response, status_code=status.HTTP_200_OK
+    )
+    api_url = reverse(
+        "actions-execute",
+        kwargs={"integration_pk": cellstop_integration.id, "value": cellstop_action_list_tag_names.value},
+    )
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.post(api_url, data={}, format="json")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == cellstop_list_tag_names_response
+    sent_payload = gcp_request_mock.last_request.json()
+    assert sent_payload["integration_id"] == str(cellstop_integration.id)
+    assert sent_payload["action_id"] == "list_tag_names"
+
+
+def test_cannot_execute_reference_action_as_org_viewer(
+        api_client, mocker, requests_mock, org_viewer_user, organization,
+        cellstop_integration, cellstop_action_list_tag_names
+):
+    _test_cannot_execute_action(
+        mocker=mocker,
+        api_client=api_client,
+        requests_mock=requests_mock,
+        user=org_viewer_user,
+        integration=cellstop_integration,
+        action=cellstop_action_list_tag_names,
+    )
+
+
 def test_execute_action_forwards_explicit_triggered_by(
         api_client, mocker, requests_mock, superuser, organization,
         cellstop_integration, cellstop_action_auth, cellstop_action_auth_response

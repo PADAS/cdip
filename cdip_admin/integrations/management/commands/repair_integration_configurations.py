@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from integrations.models import Integration, IntegrationType
+from integrations.models import Integration, IntegrationAction, IntegrationType
 
 
 class Command(BaseCommand):
@@ -79,7 +79,16 @@ class Command(BaseCommand):
         integrations_touched = 0
         for integration in qs.iterator():
             if integration.type_id not in actions_by_type:
-                actions_by_type[integration.type_id] = list(integration.type.actions.all())
+                # Reference actions are stateless queries with no per-integration
+                # configuration (see Integration.create_missing_configurations),
+                # so exclude them here too — otherwise they'd forever show as
+                # "missing" in this command's output and inflate the created
+                # count, even though no row would ever be created for them.
+                actions_by_type[integration.type_id] = list(
+                    integration.type.actions.exclude(
+                        type=IntegrationAction.ActionTypes.REFERENCE
+                    )
+                )
             actions = actions_by_type[integration.type_id]
 
             existing_action_ids = set(

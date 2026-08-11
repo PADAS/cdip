@@ -432,12 +432,14 @@ class IntegrationTypeIdempotentCreateSerializer(serializers.ModelSerializer):
         Validate the actions or webhook data
         """
         for action_data in data.get("actions", []):
-            # ToDo: validate action data?
-            if self.instance and "value" in action:  # Update
-                action = IntegrationAction.objects.get(integration_type=self, value=action_data["value"])
-                serializer = IntegrationActionCreateUpdateSerializer(instance=action, data=action_data)
+            if self.instance and "value" in action_data:  # Update path
+                action = IntegrationAction.objects.filter(
+                    integration_type=self.instance, value=action_data["value"]
+                ).first()
+                serializer = IntegrationActionCreateUpdateSerializer(
+                    instance=action, data=action_data
+                ) if action else IntegrationActionCreateUpdateSerializer(data=action_data)
             else:  # Create
-                # Validate the action data
                 serializer = IntegrationActionCreateUpdateSerializer(data=action_data)
             serializer.is_valid(raise_exception=True)
         if webhook_data := data.get("webhook"):  # Update
@@ -503,10 +505,10 @@ class IntegrationTypeUpdateSerializer(IntegrationTypeIdempotentCreateSerializer)
         super().update(instance=instance, validated_data=validated_data)
         # Update or Create nested actions if provided
         for action_data in actions:  # Usually less than 5 actions
-            action_data["integration_type"] = self.instance
             IntegrationAction.objects.update_or_create(
-                value=action_data.get("value"),
-                defaults=action_data
+                integration_type=instance,
+                value=action_data.pop("value"),
+                defaults=action_data,
             )
         # Create or update webhook if provided
         if webhook_data := validated_data.get("webhook"):
