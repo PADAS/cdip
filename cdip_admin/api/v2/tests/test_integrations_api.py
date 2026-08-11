@@ -1035,6 +1035,45 @@ def test_update_service_url_in_integration_type_as_superuser(api_client, superus
     assert integration_type_lotek.service_url == lotek_integration_url
 
 
+def test_update_integration_type_with_actions_as_superuser(api_client, superuser, integration_type_lotek):
+    # Regression test: PATCH with an "actions" payload used to raise a NameError (500)
+    # because the validate() loop referenced `action` before it was assigned.
+    api_client.force_authenticate(superuser)
+    request_data = {
+        "actions": [
+            {
+                "type": "reference",
+                "name": "List Tag Names",
+                "value": "list_tag_names",
+                "description": "Lotek list tag names action",
+                "schema": {
+                    "type": "object",
+                    "properties": {}
+                },
+                "ui_schema": {},
+                "is_periodic_action": False
+            }
+        ]
+    }
+
+    response = api_client.patch(
+        reverse("integration-types-detail", kwargs={"value": integration_type_lotek.value}),
+        data=request_data,
+        format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    action_data = request_data["actions"][0]
+    action_in_db = IntegrationAction.objects.get(
+        integration_type=integration_type_lotek, value=action_data["value"]
+    )
+    assert action_in_db.type == action_data["type"]
+    assert action_in_db.name == action_data["name"]
+    assert action_in_db.description == action_data["description"]
+    assert action_in_db.schema == action_data["schema"]
+    assert action_in_db.is_periodic_action == action_data["is_periodic_action"]
+
+
 def _test_filter_integration_types(api_client, user, filters, expected_integration_types):
     api_client.force_authenticate(user)
     response = api_client.get(
