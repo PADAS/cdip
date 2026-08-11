@@ -1438,6 +1438,28 @@ def cellstop_action_auth_response():
 
 
 @pytest.fixture
+def cellstop_action_list_tag_names(integration_type_cellstop):
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.REFERENCE,
+        name="List Tag Names",
+        value="list_tag_names",
+        description="List the tag names available for this integration",
+        schema={
+            "type": "object",
+            "properties": {},
+        },
+    )
+
+
+@pytest.fixture
+def cellstop_list_tag_names_response():
+    return {
+        "tag_names": ["tag-1", "tag-2"]
+    }
+
+
+@pytest.fixture
 def cellstop_integration(
         organization,
         other_organization,
