@@ -516,7 +516,10 @@ def test_list_connections_ordered_by_destination_type_asc_as_superuser(
         integrations_list_er, route_1, route_2, smart_destination_1,
 ):
     # Give trap_tagger a SMART destination so more than one distinct
-    # destination type is present across connections.
+    # destination type is present across connections. `integrations_list_er`
+    # members are providers on their own default routes (via
+    # `ensure_default_route`) with zero destinations, so they also contribute
+    # NULL destination_type rows the ordering must place last.
     provider_trap_tagger.default_route.destinations.add(smart_destination_1)
 
     api_client.force_authenticate(superuser)
@@ -533,6 +536,7 @@ def test_list_connections_ordered_by_destination_type_asc_as_superuser(
     min_types = [_min_destination_type_name(c) for c in connections]
     non_null = [t for t in min_types if t is not None]
     nulls = [t for t in min_types if t is None]
+    assert nulls, "expected at least one connection with no destinations to witness NULL ordering"
     assert non_null == sorted(non_null)
     assert min_types == non_null + nulls  # Postgres puts NULLs last on ASC
 
@@ -558,8 +562,39 @@ def test_list_connections_ordered_by_destination_type_desc_as_superuser(
     min_types = [_min_destination_type_name(c) for c in connections]
     non_null = [t for t in min_types if t is not None]
     nulls = [t for t in min_types if t is None]
+    assert nulls, "expected at least one connection with no destinations to witness NULL ordering"
     assert non_null == sorted(non_null, reverse=True)
     assert min_types == nulls + non_null  # Postgres puts NULLs first on DESC
+
+
+def test_list_connections_ordered_by_destination_type_scoped_as_org_admin(
+        api_client, org_admin_user, organization,
+        provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list_er, route_1, route_2,
+):
+    # org_admin_user only owns `organization`, which owns integrations_list_er[:5]
+    # and provider_lotek_panthera. The other providers must not appear even
+    # though the Min() annotation joins across routes and destinations owned
+    # by other organizations.
+    allowed_provider_ids = {
+        str(p.id) for p in list(integrations_list_er[:5]) + [provider_lotek_panthera]
+    }
+    disallowed_provider_ids = {
+        str(p.id) for p in list(integrations_list_er[5:]) + [provider_movebank_ewt]
+    }
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert set(provider_ids) == allowed_provider_ids
+    assert not (set(provider_ids) & disallowed_provider_ids)
+    assert len(provider_ids) == len(set(provider_ids))  # one row per connection
 
 
 def test_list_connections_ordered_by_destination_type_no_duplicates(
