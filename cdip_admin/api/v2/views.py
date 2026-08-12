@@ -285,7 +285,11 @@ class ConnectionsView(
         providers = Integration.providers.all()
         # Annotate only when sorting by destination type, to avoid paying
         # the join + GROUP BY on every list request
-        if "destination_type" in self.request.query_params.get("ordering", ""):
+        requested_ordering = {
+            field.strip().lstrip("-")
+            for field in self.request.query_params.get("ordering", "").split(",")
+        }
+        if "destination_type" in requested_ordering:
             providers = providers.annotate(
                 destination_type=Min("routing_rules_by_provider__destinations__type__name")
             )
