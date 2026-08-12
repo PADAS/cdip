@@ -500,3 +500,84 @@ def test_filter_connections_by_status_needs_review_as_superuser(
         },
         expected_integrations=[connection_with_disabled_destination]  # provider OK but destination disabled
     )
+
+
+def _min_destination_type_name(connection):
+    type_names = [
+        d["type"]["name"] for d in connection["destinations"]
+        if d.get("type") and d["type"].get("name")
+    ]
+    return min(type_names) if type_names else None
+
+
+def test_list_connections_ordered_by_destination_type_asc_as_superuser(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    # Give trap_tagger a SMART destination so more than one distinct
+    # destination type is present across connections.
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))  # one row per connection
+
+    min_types = [_min_destination_type_name(c) for c in connections]
+    non_null = [t for t in min_types if t is not None]
+    nulls = [t for t in min_types if t is None]
+    assert non_null == sorted(non_null)
+    assert min_types == non_null + nulls  # Postgres puts NULLs last on ASC
+
+
+def test_list_connections_ordered_by_destination_type_desc_as_superuser(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "-destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))
+
+    min_types = [_min_destination_type_name(c) for c in connections]
+    non_null = [t for t in min_types if t is not None]
+    nulls = [t for t in min_types if t is None]
+    assert non_null == sorted(non_null, reverse=True)
+    assert min_types == nulls + non_null  # Postgres puts NULLs first on DESC
+
+
+def test_list_connections_ordered_by_destination_type_no_duplicates(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list_er, route_1, route_2,
+):
+    # route_1 attaches 10 ER destinations to provider_lotek_panthera; without
+    # the Min() annotation a naive join would return 10 rows for that provider.
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))
+    lotek_rows = [c for c in connections if c["provider"]["id"] == str(provider_lotek_panthera.id)]
+    assert len(lotek_rows) == 1

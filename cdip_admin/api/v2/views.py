@@ -1,6 +1,6 @@
 import django_filters
 from django.db import transaction
-from django.db.models import Subquery
+from django.db.models import Min, Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
@@ -266,7 +266,7 @@ class ConnectionsView(
         custom_filters.CustomizableSearchFilter
     ]
     filterset_class = ConnectionFilter
-    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
+    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name', 'destination_type']
     ordering = ['id']
     search_fields = [  # Default search fields (used in the global search box)
         "name", "base_url", 'type__name',  # Providers
@@ -283,6 +283,12 @@ class ConnectionsView(
         Return the integrations used as providers in at least one route
         """
         providers = Integration.providers.all()
+        # Annotate only when sorting by destination type, to avoid paying
+        # the join + GROUP BY on every list request
+        if "destination_type" in self.request.query_params.get("ordering", ""):
+            providers = providers.annotate(
+                destination_type=Min("routing_rules_by_provider__destinations__type__name")
+            )
         if self.request.user.is_superuser:
             return providers  # Superusers can see all the providers
         # Filter providers to return only the ones that the user is allowed to see
