@@ -7,6 +7,7 @@ import jsonschema
 import psycopg2
 import requests
 import google.oauth2.id_token
+from google.auth.exceptions import GoogleAuthError
 from urllib.parse import urljoin, urlparse
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -72,9 +73,11 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
                 f"Integration Type '{self}' does not have a service endpoint configured"
             )
         actions_execute_url = urljoin(service_url, "v1/actions/execute")
-        auth_req = google.auth.transport.requests.Request()
-        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
         try:
+            # `fetch_id_token` hits GCP metadata; wrap it in the same try so
+            # a transient auth-service outage is a 502, not a 500.
+            auth_req = google.auth.transport.requests.Request()
+            id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
             response = requests.post(
                 url=actions_execute_url,
                 headers={"Authorization": f"Bearer {id_token}"},
@@ -94,7 +97,10 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
             )
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError, GoogleAuthError) as e:
+            # ValueError covers a non-JSON response body on older `requests`
+            # versions (recent versions wrap it as RequestException). GoogleAuthError
+            # covers metadata-server failures from `fetch_id_token`.
             raise ValueError(f"Action runner unreachable for '{self}': {type(e).__name__}") from e
 
 

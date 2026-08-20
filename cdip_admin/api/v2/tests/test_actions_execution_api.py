@@ -435,6 +435,57 @@ def test_ephemeral_execute_runner_timeout_returns_502(
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
 
 
+def test_ephemeral_execute_non_json_response_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A 200 with a non-JSON body (e.g. HTML from a broken proxy) must degrade
+    # to 502 rather than escape as an uncaught JSONDecodeError → 500.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, text="<html>oops</html>", status_code=200)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_auth_failure_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A GCP metadata / auth-service outage during id_token fetch must degrade
+    # to 502, not bubble up as an unhandled GoogleAuthError → 500.
+    from google.auth.exceptions import RefreshError
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(side_effect=RefreshError("metadata unreachable")),
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
 def test_ephemeral_execute_missing_owner_is_400(
         api_client, mocker, requests_mock, superuser, organization,
         integration_type_cellstop, cellstop_action_list_tag_names,
