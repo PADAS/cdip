@@ -423,3 +423,23 @@ def test_ephemeral_execute_missing_owner_is_400(
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_ephemeral_execute_malformed_owner_uuid_is_403(
+        api_client, mocker, requests_mock, org_admin_user, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A malformed `owner` UUID must be rejected by the permission check as
+    # 403 (not resolvable to an org the caller belongs to), not crash the
+    # ORM filter downstream as 500.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_admin_user)
+    body = _ephemeral_body(organization)
+    body["owner"] = "not-a-uuid"
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN

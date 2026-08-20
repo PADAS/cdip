@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import permissions
 
 from activity_log.models import ActivityLog
@@ -46,8 +48,14 @@ def get_user_org(request, view) -> str:
             org_id = None
     elif view.basename == "integration-types" and view.action == "execute_reference_action":
         # There's no saved integration row yet — authz keys on `owner`, the
-        # workspace the caller intends to create the integration in.
-        org_id = request.data.get("owner")
+        # workspace the caller intends to create the integration in. Validate
+        # the UUID here so a malformed value results in a clean 403 rather
+        # than a 500 from the ORM filter downstream.
+        raw_owner = request.data.get("owner")
+        try:
+            org_id = str(uuid.UUID(raw_owner)) if raw_owner else None
+        except (ValueError, TypeError):
+            org_id = None
     elif view.basename == "connections":
         integration_id = request.data.get("pk")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
