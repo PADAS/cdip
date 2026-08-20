@@ -1,6 +1,6 @@
 import django_filters
 from django.db import transaction
-from django.db.models import Min, Subquery
+from django.db.models import Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
@@ -261,7 +261,7 @@ class ConnectionsView(
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
-        drf_filters.OrderingFilter,
+        custom_filters.ConnectionOrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
         custom_filters.CustomizableSearchFilter
     ]
@@ -283,16 +283,6 @@ class ConnectionsView(
         Return the integrations used as providers in at least one route
         """
         providers = Integration.providers.all()
-        # Annotate only when sorting by destination type, to avoid paying
-        # the join + GROUP BY on every list request
-        requested_ordering = {
-            field.strip().lstrip("-")
-            for field in self.request.query_params.get("ordering", "").split(",")
-        }
-        if "destination_type" in requested_ordering:
-            providers = providers.annotate(
-                destination_type=Min("routing_rules_by_provider__destinations__type__name")
-            )
         if self.request.user.is_superuser:
             return providers  # Superusers can see all the providers
         # Filter providers to return only the ones that the user is allowed to see

@@ -616,3 +616,43 @@ def test_list_connections_ordered_by_destination_type_no_duplicates(
     assert len(provider_ids) == len(set(provider_ids))
     lotek_rows = [c for c in connections if c["provider"]["id"] == str(provider_lotek_panthera.id)]
     assert len(lotek_rows) == 1
+
+
+def test_list_connections_ordered_by_destination_type_paginates_deterministically(
+        monkeypatch, api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    # Force a page size smaller than the fixture footprint so cursor pagination
+    # actually round-trips. Reproduces the regression where NULL destination
+    # types encoded as the literal "None" filtered out no-destination rows
+    # from page 2, and where tied `Min()` values could shuffle across pages.
+    from rest_framework.pagination import CursorPagination
+    from api.v2 import views
+
+    class _SmallPageCursorPagination(CursorPagination):
+        page_size = 3
+
+    monkeypatch.setattr(
+        views.ConnectionsView, "pagination_class",
+        _SmallPageCursorPagination, raising=False,
+    )
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    expected_ids = {
+        str(p.id) for p in list(integrations_list_er)
+        + [provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger]
+    }
+
+    api_client.force_authenticate(superuser)
+    collected_ids = []
+    next_url = reverse("connections-list") + "?ordering=destination_type"
+    while next_url:
+        response = api_client.get(next_url)
+        assert response.status_code == status.HTTP_200_OK
+        page = response.json()
+        collected_ids.extend(c["provider"]["id"] for c in page["results"])
+        next_url = page.get("next")
+
+    assert len(collected_ids) == len(set(collected_ids)), "no row appears twice across pages"
+    assert set(collected_ids) == expected_ids, "no row is dropped across pages"
