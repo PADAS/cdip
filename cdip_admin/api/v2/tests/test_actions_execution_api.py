@@ -408,6 +408,33 @@ def test_ephemeral_execute_type_without_service_url_returns_502(
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
 
 
+def test_ephemeral_execute_runner_timeout_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A hung/unreachable runner must surface as a clean 502 (so the portal
+    # falls back to plain text), not a 500 from an unhandled RequestException.
+    import requests as requests_lib
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, exc=requests_lib.exceptions.ConnectTimeout)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
 def test_ephemeral_execute_missing_owner_is_400(
         api_client, mocker, requests_mock, superuser, organization,
         integration_type_cellstop, cellstop_action_list_tag_names,

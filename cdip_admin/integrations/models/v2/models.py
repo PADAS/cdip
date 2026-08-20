@@ -51,6 +51,10 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
+    # (connect, read) — connect fast so a dead runner surfaces quickly; the
+    # read budget covers cold starts on the runner's Cloud Run instance.
+    _EPHEMERAL_RUNNER_TIMEOUT = (5, 20)
+
     def execute_reference_action_ephemeral(
         self, action_value, base_url, configurations, config_overrides=None,
     ):
@@ -58,6 +62,9 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
 
         Never persists or logs the payload — it carries user-typed credentials.
         The runner enforces the reference-only constraint independently.
+
+        Raises ValueError on any network/HTTP failure — the view converts that
+        into a 502 so the portal falls back to plain text rather than hanging.
         """
         service_url = self.service_url
         if not service_url:
@@ -67,24 +74,28 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
         actions_execute_url = urljoin(service_url, "v1/actions/execute")
         auth_req = google.auth.transport.requests.Request()
         id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
-        response = requests.post(
-            url=actions_execute_url,
-            headers={"Authorization": f"Bearer {id_token}"},
-            json={
-                "integration_id": None,
-                "action_id": action_value,
-                "run_in_background": False,
-                "triggered_by": "manual",
-                "config_overrides": config_overrides or {},
-                "integration_state": {
-                    "type_value": self.value,
-                    "base_url": base_url or "",
-                    "configurations": configurations,
+        try:
+            response = requests.post(
+                url=actions_execute_url,
+                headers={"Authorization": f"Bearer {id_token}"},
+                json={
+                    "integration_id": None,
+                    "action_id": action_value,
+                    "run_in_background": False,
+                    "triggered_by": "manual",
+                    "config_overrides": config_overrides or {},
+                    "integration_state": {
+                        "type_value": self.value,
+                        "base_url": base_url or "",
+                        "configurations": configurations,
+                    },
                 },
-            },
-        )
-        response.raise_for_status()
-        return response.json()
+                timeout=self._EPHEMERAL_RUNNER_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            raise ValueError(f"Action runner unreachable for '{self}': {type(e).__name__}") from e
 
 
 class IntegrationAction(UUIDAbstractModel, TimestampedModel):
