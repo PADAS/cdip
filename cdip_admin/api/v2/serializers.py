@@ -1784,6 +1784,19 @@ class ActionTriggerSerializer(serializers.Serializer):
     )
 
 
+class _DraftActionConfigSerializer(serializers.Serializer):
+    action_value = serializers.SlugField()
+    data = serializers.JSONField()
+
+
+class TypeActionExecuteSerializer(serializers.Serializer):
+    # `owner` scopes authz — the caller must be a member of that organization.
+    owner = serializers.UUIDField()
+    base_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    configurations = _DraftActionConfigSerializer(many=True, default=list)
+    config_overrides = serializers.JSONField(required=False, default=dict)
+
+
 class UserAgreementSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     eula = serializers.HiddenField(default=EULA.objects.get_active_eula)

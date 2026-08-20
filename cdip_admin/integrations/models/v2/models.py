@@ -51,6 +51,41 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
+    def execute_reference_action_ephemeral(
+        self, action_value, base_url, configurations, config_overrides=None,
+    ):
+        """Forward a reference action to this type's runner with a draft payload.
+
+        Never persists or logs the payload — it carries user-typed credentials.
+        The runner enforces the reference-only constraint independently.
+        """
+        service_url = self.service_url
+        if not service_url:
+            raise ValueError(
+                f"Integration Type '{self}' does not have a service endpoint configured"
+            )
+        actions_execute_url = urljoin(service_url, "v1/actions/execute")
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+        response = requests.post(
+            url=actions_execute_url,
+            headers={"Authorization": f"Bearer {id_token}"},
+            json={
+                "integration_id": None,
+                "action_id": action_value,
+                "run_in_background": False,
+                "triggered_by": "manual",
+                "config_overrides": config_overrides or {},
+                "integration_state": {
+                    "type_value": self.value,
+                    "base_url": base_url or "",
+                    "configurations": configurations,
+                },
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
 
 class IntegrationAction(UUIDAbstractModel, TimestampedModel):
 

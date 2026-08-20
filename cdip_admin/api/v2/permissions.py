@@ -44,6 +44,10 @@ def get_user_org(request, view) -> str:
             org_id = str(Integration.objects.get(id=integration_id).owner.id)
         else:
             org_id = None
+    elif view.basename == "integration-types" and view.action == "execute_reference_action":
+        # There's no saved integration row yet — authz keys on `owner`, the
+        # workspace the caller intends to create the integration in.
+        org_id = request.data.get("owner")
     elif view.basename == "connections":
         integration_id = request.data.get("pk")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
@@ -77,6 +81,7 @@ class IsOrgAdmin(permissions.BasePermission):
         "organizations": ["list", "retrieve", "update", "partial_update"],
         "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
         "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "integration-types": ["execute_reference_action"],
         "actions": ["execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy", "delete_configuration"],
