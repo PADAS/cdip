@@ -29,13 +29,26 @@ class ConnectionOrderingFilter(filters.OrderingFilter):
     removes the backend-dependent NULLS FIRST / NULLS LAST behavior.
 
     Appends `id` as a stable tiebreaker so pages are deterministic even
-    for rows that share a destination type name.
+    for rows that share a destination type name. The tiebreaker is
+    injected in `get_ordering()` so it applies to both the filter's own
+    `order_by()` and to `CursorPagination.paginate_queryset()`, which
+    re-orders the queryset using the value it obtains from this method.
     """
 
     # A codepoint above any character IntegrationType names use, so
     # connections with no destinations sort after every real type name
     # on ASC (and before every real type name on DESC).
     _NO_DESTINATION_SENTINEL = "￿"
+
+    def get_ordering(self, request, queryset, view):
+        ordering = super().get_ordering(request, queryset, view) or []
+        ordering = list(ordering)
+        if any(field.removeprefix("-") == "destination_type" for field in ordering):
+            # Only append the tiebreaker if the caller did not already
+            # request `id` in either direction.
+            if not any(field.removeprefix("-") == "id" for field in ordering):
+                ordering.append("id")
+        return ordering
 
     def filter_queryset(self, request, queryset, view):
         ordering = self.get_ordering(request, queryset, view) or ()
@@ -46,5 +59,5 @@ class ConnectionOrderingFilter(filters.OrderingFilter):
                     Value(self._NO_DESTINATION_SENTINEL),
                 )
             )
-            return queryset.order_by(*ordering, "id")
+            return queryset.order_by(*ordering)
         return super().filter_queryset(request, queryset, view)
