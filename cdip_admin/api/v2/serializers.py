@@ -1786,7 +1786,10 @@ class ActionTriggerSerializer(serializers.Serializer):
 
 class _DraftActionConfigSerializer(serializers.Serializer):
     action_value = serializers.SlugField()
-    data = serializers.JSONField()
+    # DictField (not JSONField) so a string/list/number for `data` fails here
+    # as a 400 with the field name, rather than leaking through to the runner
+    # and coming back as a 502 "Action runner unreachable" from raise_for_status.
+    data = serializers.DictField()
 
 
 class TypeActionExecuteSerializer(serializers.Serializer):
@@ -1794,7 +1797,7 @@ class TypeActionExecuteSerializer(serializers.Serializer):
     owner = serializers.UUIDField()
     base_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     configurations = _DraftActionConfigSerializer(many=True, default=list)
-    config_overrides = serializers.JSONField(required=False, default=dict)
+    config_overrides = serializers.DictField(required=False, default=dict)
 
 
 class UserAgreementSerializer(serializers.ModelSerializer):

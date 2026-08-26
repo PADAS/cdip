@@ -35,6 +35,29 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+def _post_to_runner(service_url, payload, timeout=None):
+    """Send an ActionRequest payload to a type's runner and return its JSON.
+
+    Central place for the runner-call machinery (URL join, id-token fetch,
+    Bearer POST, raise_for_status, JSON decode) so a change to any of them
+    lands in one spot. Callers decide what to do with the exceptions —
+    saved-integration runs let them propagate; ephemeral runs wrap in a
+    ValueError so the view can translate to 502 and the portal falls back
+    to plain text.
+    """
+    actions_execute_url = urljoin(service_url, "v1/actions/execute")
+    auth_req = google.auth.transport.requests.Request()
+    id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+    response = requests.post(
+        url=actions_execute_url,
+        headers={"Authorization": f"Bearer {id_token}"},
+        json=payload,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     value = models.SlugField(
@@ -72,16 +95,10 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
             raise ValueError(
                 f"Integration Type '{self}' does not have a service endpoint configured"
             )
-        actions_execute_url = urljoin(service_url, "v1/actions/execute")
         try:
-            # `fetch_id_token` hits GCP metadata; wrap it in the same try so
-            # a transient auth-service outage is a 502, not a 500.
-            auth_req = google.auth.transport.requests.Request()
-            id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
-            response = requests.post(
-                url=actions_execute_url,
-                headers={"Authorization": f"Bearer {id_token}"},
-                json={
+            return _post_to_runner(
+                service_url,
+                payload={
                     "integration_id": None,
                     "action_id": action_value,
                     "run_in_background": False,
@@ -95,8 +112,6 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
                 },
                 timeout=self._EPHEMERAL_RUNNER_TIMEOUT,
             )
-            response.raise_for_status()
-            return response.json()
         except (requests.RequestException, ValueError, GoogleAuthError) as e:
             # ValueError covers a non-JSON response body on older `requests`
             # versions (recent versions wrap it as RequestException). GoogleAuthError
@@ -163,23 +178,18 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
+    # (connect, read) — matches the ephemeral timeout so a stuck runner
+    # doesn't hang the request thread until the outer worker timeout fires.
+    _RUNNER_TIMEOUT = (5, 20)
+
     def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):
         service_url = integration.type.service_url
         if not service_url:
             raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
 
-        # Build the URL for the action runner endpoint
-        actions_execute_path = "v1/actions/execute"
-        actions_execute_url = urljoin(service_url, actions_execute_path)
-
-        # Make an authorized request to the action runner endpoint using google.oauth2.id_token
-        auth_req = google.auth.transport.requests.Request()
-        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
-        auth_headers = {"Authorization": f"Bearer {id_token}"}
-        response = requests.post(
-            url=actions_execute_url,
-            headers=auth_headers,
-            json={
+        return _post_to_runner(
+            service_url,
+            payload={
                 "integration_id": str(integration.id),
                 "action_id": self.value,
                 "run_in_background": run_in_background,
@@ -188,10 +198,9 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
                 # See GUNDI-5400.
                 "triggered_by": triggered_by,
                 "config_overrides": config_overrides,
-            }
+            },
+            timeout=self._RUNNER_TIMEOUT,
         )
-        response.raise_for_status()
-        return response.json()
 
     def _pre_save(self, *args, **kwargs):
         pass

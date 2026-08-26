@@ -503,17 +503,26 @@ def test_ephemeral_execute_missing_owner_is_400(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-def test_ephemeral_execute_malformed_owner_uuid_is_403(
+@pytest.mark.parametrize("owner_value", [
+    "not-a-uuid",                             # bad UUID string
+    123,                                      # integer — .replace() on it raises AttributeError
+    True,                                     # bool
+    ["a", "b"],                               # list
+    {"nested": "dict"},                       # dict
+])
+def test_ephemeral_execute_malformed_owner_is_403(
         api_client, mocker, requests_mock, org_admin_user, organization,
-        integration_type_cellstop, cellstop_action_list_tag_names,
+        integration_type_cellstop, cellstop_action_list_tag_names, owner_value,
 ):
-    # A malformed `owner` UUID must be rejected by the permission check as
-    # 403 (not resolvable to an org the caller belongs to), not crash the
-    # ORM filter downstream as 500.
+    # A malformed `owner` (bad UUID, non-string, non-scalar) must be rejected
+    # by the permission check as 403 (not resolvable to an org the caller
+    # belongs to), not crash as 500. `uuid.UUID(non-string)` raises
+    # AttributeError, not just ValueError/TypeError — every truthy non-string
+    # value must survive the guard.
     _mock_runner(mocker, requests_mock, integration_type_cellstop)
     api_client.force_authenticate(org_admin_user)
     body = _ephemeral_body(organization)
-    body["owner"] = "not-a-uuid"
+    body["owner"] = owner_value
 
     response = api_client.post(
         _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
@@ -521,3 +530,48 @@ def test_ephemeral_execute_malformed_owner_uuid_is_403(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_ephemeral_execute_non_dict_body_is_403(
+        api_client, mocker, requests_mock, org_admin_user,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A JSON array body would make `request.data.get('owner')` raise
+    # AttributeError from the permission layer. Guard against that too.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=["not", "a", "dict"], format="json",
+    )
+
+    assert response.status_code in (
+        status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN,
+    )
+
+
+@pytest.mark.parametrize("field,bad_value", [
+    ("config_overrides", "not-a-dict"),
+    ("config_overrides", ["a", "b"]),
+    ("config_overrides", 42),
+])
+def test_ephemeral_execute_non_dict_config_overrides_is_400(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, field, bad_value,
+):
+    # A non-dict config_overrides used to leak through the serializer as
+    # JSONField and blow up as 502 from the runner-side pydantic dict
+    # rejection. DictField makes it a clean 400 with the field name.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+    body = _ephemeral_body(organization)
+    body[field] = bad_value
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert field in response.json()
