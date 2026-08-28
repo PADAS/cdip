@@ -35,6 +35,20 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class RunnerCallError(ValueError):
+    """Wrapper for any failure of a runner call the ephemeral view can catch.
+
+    Subclasses ValueError so `except ValueError` in existing callers still
+    catches it. `upstream_status` carries the runner's HTTP status when the
+    failure was an HTTP response (so the caller can distinguish a source-side
+    401/403 from a runner unreachable / timeout); None for network-level
+    failures where the runner never returned a status.
+    """
+    def __init__(self, message, upstream_status=None):
+        super().__init__(message)
+        self.upstream_status = upstream_status
+
+
 def _post_to_runner(service_url, payload, timeout=None):
     """Send an ActionRequest payload to a type's runner and return its JSON.
 
@@ -112,11 +126,25 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
                 },
                 timeout=self._EPHEMERAL_RUNNER_TIMEOUT,
             )
+        except requests.HTTPError as e:
+            # The runner returned a non-2xx response. Carry its status code
+            # along so the view can hand the portal a structured signal — a
+            # 401/403 from the runner means the source system rejected the
+            # user-typed credentials, which is very different from the runner
+            # itself being down.
+            upstream = e.response.status_code if e.response is not None else None
+            raise RunnerCallError(
+                f"Action runner unreachable for '{self}': HTTPError",
+                upstream_status=upstream,
+            ) from e
         except (requests.RequestException, ValueError, GoogleAuthError) as e:
             # ValueError covers a non-JSON response body on older `requests`
             # versions (recent versions wrap it as RequestException). GoogleAuthError
-            # covers metadata-server failures from `fetch_id_token`.
-            raise ValueError(f"Action runner unreachable for '{self}': {type(e).__name__}") from e
+            # covers metadata-server failures from `fetch_id_token`. No upstream
+            # status to report — the runner never handed us one.
+            raise RunnerCallError(
+                f"Action runner unreachable for '{self}': {type(e).__name__}",
+            ) from e
 
 
 class IntegrationAction(UUIDAbstractModel, TimestampedModel):

@@ -1453,6 +1453,24 @@ def cellstop_action_list_tag_names(integration_type_cellstop):
 
 
 @pytest.fixture
+def cellstop_action_pull_observations(integration_type_cellstop):
+    # Used to prove that ephemeral execution rejects non-reference / non-auth
+    # actions — a pull action would move data through Gundi on behalf of an
+    # integration that doesn't yet exist.
+    return IntegrationAction.objects.create(
+        integration_type=integration_type_cellstop,
+        type=IntegrationAction.ActionTypes.PULL_DATA,
+        name="Pull Observations",
+        value="pull_observations",
+        description="Pull observations from Cellstop",
+        schema={
+            "type": "object",
+            "properties": {},
+        },
+    )
+
+
+@pytest.fixture
 def cellstop_list_tag_names_response():
     return {
         "tag_names": ["tag-1", "tag-2"]

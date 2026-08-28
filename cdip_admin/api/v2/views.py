@@ -274,9 +274,18 @@ class IntegrationTypeView(viewsets.ModelViewSet):
                 {"detail": f"Action '{action_value}' not found for integration type '{integration_type.value}'."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        if integration_action.type != IntegrationAction.ActionTypes.REFERENCE:
+        # Reference actions (stateless lookups) and auth actions (verify
+        # credentials, no writes) are safe to run ephemerally. Everything
+        # else (pull/push/generic) would move data on behalf of an integration
+        # that doesn't exist and stays rejected. The runner enforces the
+        # same rule independently.
+        _EPHEMERAL_SAFE = (
+            IntegrationAction.ActionTypes.REFERENCE,
+            IntegrationAction.ActionTypes.AUTHENTICATION,
+        )
+        if integration_action.type not in _EPHEMERAL_SAFE:
             return Response(
-                {"detail": "Only reference actions can be executed on integration types."},
+                {"detail": "Only reference and auth actions can be executed on integration types."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         serializer = self.get_serializer(data=request.data)
@@ -292,7 +301,14 @@ class IntegrationTypeView(viewsets.ModelViewSet):
                 config_overrides=serializer.validated_data.get("config_overrides") or {},
             )
         except ValueError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            # RunnerCallError carries the runner's HTTP status when the failure
+            # was an HTTP response (source-side auth rejection vs. runner down).
+            # Surface it in the body so the portal can classify without regex-
+            # matching the detail string. Any other ValueError predates that
+            # attribute and is treated as a runner-side failure with unknown
+            # upstream status.
+            body = {"detail": str(e), "upstream_status": getattr(e, "upstream_status", None)}
+            return Response(body, status=status.HTTP_502_BAD_GATEWAY)
         return Response(response_data, status=status.HTTP_200_OK)
 
 

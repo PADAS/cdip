@@ -341,11 +341,31 @@ def test_ephemeral_execute_rejects_org_viewer(
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-def test_ephemeral_execute_rejects_non_reference_action(
+def test_ephemeral_execute_rejects_pull_action(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_pull_observations,
+):
+    # Reference + auth actions are ephemerally safe; pull/push/generic move
+    # data on behalf of an integration that doesn't exist and stay rejected.
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_pull_observations.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not gcp_mock.called
+
+
+def test_ephemeral_execute_allows_auth_action(
         api_client, mocker, requests_mock, superuser, organization,
         integration_type_cellstop, cellstop_action_auth,
 ):
-    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    # Auth actions verify credentials without side effects — the portal's
+    # "Test Connection" button in the creation wizard uses them.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
     api_client.force_authenticate(superuser)
 
     response = api_client.post(
@@ -353,8 +373,7 @@ def test_ephemeral_execute_rejects_non_reference_action(
         data=_ephemeral_body(organization), format="json",
     )
 
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert not gcp_mock.called
+    assert response.status_code == status.HTTP_200_OK
 
 
 def test_ephemeral_execute_unknown_action_returns_404(
@@ -459,6 +478,64 @@ def test_ephemeral_execute_non_json_response_returns_502(
     )
 
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_runner_4xx_carries_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # When the runner responds non-2xx (source system rejected the
+    # user-typed credentials), cdip still returns 502 but the body must carry
+    # the runner's real status code so the portal can classify the failure
+    # as "invalid credentials" vs "runner down" without regex-matching detail.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, json={"detail": "bad token"}, status_code=401)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] == 401
+
+
+def test_ephemeral_execute_runner_timeout_omits_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # Timeouts/connection errors don't have an HTTP status — upstream_status
+    # must be None (not omitted) so the portal can distinguish "runner down"
+    # from "source rejected credentials".
+    import requests as requests_lib
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, exc=requests_lib.exceptions.ConnectTimeout)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] is None
 
 
 def test_ephemeral_execute_auth_failure_returns_502(
