@@ -36,29 +36,15 @@ User = get_user_model()
 
 
 class RunnerCallError(ValueError):
-    """Wrapper for any failure of a runner call the ephemeral view can catch.
-
-    Subclasses ValueError so `except ValueError` in existing callers still
-    catches it. `upstream_status` carries the runner's HTTP status when the
-    failure was an HTTP response (so the caller can distinguish a source-side
-    401/403 from a runner unreachable / timeout); None for network-level
-    failures where the runner never returned a status.
-    """
+    """Runner-call failure; upstream_status carries the runner's HTTP status
+    when the failure was an HTTP response (None for network-level failures)."""
     def __init__(self, message, upstream_status=None):
         super().__init__(message)
         self.upstream_status = upstream_status
 
 
 def _post_to_runner(service_url, payload, timeout=None):
-    """Send an ActionRequest payload to a type's runner and return its JSON.
-
-    Central place for the runner-call machinery (URL join, id-token fetch,
-    Bearer POST, raise_for_status, JSON decode) so a change to any of them
-    lands in one spot. Callers decide what to do with the exceptions —
-    saved-integration runs let them propagate; ephemeral runs wrap in a
-    ValueError so the view can translate to 502 and the portal falls back
-    to plain text.
-    """
+    """POST an ActionRequest payload to a type's runner and return its JSON."""
     actions_execute_url = urljoin(service_url, "v1/actions/execute")
     auth_req = google.auth.transport.requests.Request()
     id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
@@ -89,21 +75,15 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.name}"
 
-    # (connect, read) — connect fast so a dead runner surfaces quickly; the
-    # read budget covers cold starts on the runner's Cloud Run instance.
+    # (connect, read) — user is watching a spinner, tighter than the saved path.
     _EPHEMERAL_RUNNER_TIMEOUT = (5, 20)
 
     def execute_reference_action_ephemeral(
         self, action_value, base_url, configurations, config_overrides=None,
     ):
-        """Forward a reference action to this type's runner with a draft payload.
-
-        Never persists or logs the payload — it carries user-typed credentials.
-        The runner enforces the reference-only constraint independently.
-
-        Raises ValueError on any network/HTTP failure — the view converts that
-        into a 502 so the portal falls back to plain text rather than hanging.
-        """
+        """Forward a reference/auth action to the runner with a draft payload.
+        Never persists or logs it — carries user-typed credentials. Raises
+        RunnerCallError (a ValueError) on network/HTTP failure."""
         service_url = self.service_url
         if not service_url:
             raise ValueError(
@@ -127,21 +107,15 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
                 timeout=self._EPHEMERAL_RUNNER_TIMEOUT,
             )
         except requests.HTTPError as e:
-            # The runner returned a non-2xx response. Carry its status code
-            # along so the view can hand the portal a structured signal — a
-            # 401/403 from the runner means the source system rejected the
-            # user-typed credentials, which is very different from the runner
-            # itself being down.
+            # Preserve the runner's status so the portal can tell source-side
+            # auth rejection (401/403) apart from a runner that's down.
             upstream = e.response.status_code if e.response is not None else None
             raise RunnerCallError(
                 f"Action runner unreachable for '{self}': HTTPError",
                 upstream_status=upstream,
             ) from e
         except (requests.RequestException, ValueError, GoogleAuthError) as e:
-            # ValueError covers a non-JSON response body on older `requests`
-            # versions (recent versions wrap it as RequestException). GoogleAuthError
-            # covers metadata-server failures from `fetch_id_token`. No upstream
-            # status to report — the runner never handed us one.
+            # ValueError = non-JSON body on old requests; GoogleAuthError = fetch_id_token failure.
             raise RunnerCallError(
                 f"Action runner unreachable for '{self}': {type(e).__name__}",
             ) from e
@@ -206,22 +180,9 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
-    # (connect, read) — 5s connect so a dead runner surfaces quickly (very
-    # occasionally forgiving of a Cloud Run ingress reconfigure that takes
-    # >5s to SYN-ACK; the trade-off vs. long request-thread stalls on a
-    # totally dead runner is worth it). No read timeout because
-    # operator-initiated `execute()` legitimately runs paginated pulls, long
-    # auth handshakes, or cold-started runners — a tight read budget here
-    # would regress those into spurious 5xx errors.
-    #
-    # Note the outer ceiling: gunicorn's worker timeout (default 30s, or
-    # whatever is configured in the deploy script) still kills any request
-    # that takes longer end-to-end, `read=None` or not. If you need to
-    # tolerate runner responses beyond that, bump gunicorn's --timeout too.
-    #
-    # The ephemeral path has its own tighter budget on IntegrationType —
-    # the user is actively watching a spinner, so cutting it off at 20s
-    # matches what they'd read as "the button is broken" anyway.
+    # (connect, read). No read timeout — operator-initiated actions can run
+    # long (paginated pulls, cold runners). gunicorn's worker timeout is the
+    # real outer ceiling; bump it if runner responses need to exceed that.
     _RUNNER_TIMEOUT = (5, None)
 
     def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):

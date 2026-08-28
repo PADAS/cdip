@@ -226,12 +226,8 @@ class IntegrationsView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-# Which IntegrationAction types can be executed ephemerally (no saved
-# integration id) through the type-level route. Reference actions are stateless
-# lookups; auth actions verify credentials without side effects by contract.
-# Everything else (pull/push/generic) moves data through Gundi and stays
-# rejected. Hoisted to module level so the "which types are safe" contract is
-# discoverable by grep, not buried inside a view method.
+# Action types allowed on the type-level ephemeral route.
+# Reference = stateless lookups; auth = credential verification.
 _EPHEMERAL_SAFE_ACTION_TYPES = (
     IntegrationAction.ActionTypes.REFERENCE,
     IntegrationAction.ActionTypes.AUTHENTICATION,
@@ -271,13 +267,8 @@ class IntegrationTypeView(viewsets.ModelViewSet):
         url_name="execute-reference-action",
     )
     def execute_reference_action(self, request, action_value=None, value=None):
-        """Execute a reference or auth action against a draft integration.
-
-        Nothing is persisted or logged — the payload carries user-typed
-        credentials. Restricted to reference and auth actions (see
-        _EPHEMERAL_SAFE_ACTION_TYPES); the runner enforces the same rule
-        independently.
-        """
+        """Execute a reference/auth action against a draft integration. Never
+        persists or logs — the payload carries user-typed credentials."""
         integration_type = self.get_object()
         integration_action = IntegrationAction.objects.filter(
             integration_type=integration_type, value=action_value,
@@ -305,18 +296,8 @@ class IntegrationTypeView(viewsets.ModelViewSet):
                 config_overrides=serializer.validated_data.get("config_overrides") or {},
             )
         except ValueError as e:
-            # RunnerCallError carries the runner's HTTP status when the failure
-            # was an HTTP response (source-side auth rejection vs. runner down).
-            # Surface it in the body so the portal can classify without regex-
-            # matching the detail string. Any other ValueError predates that
-            # attribute and is treated as a runner-side failure with unknown
-            # upstream status.
-            #
-            # DO NOT include `str(e.__cause__)` here — the __cause__ chain
-            # holds the raw requests.HTTPError, whose repr can carry the
-            # runner's response body (which may include credentials the
-            # source system echoed back in its error). The static detail
-            # template is deliberately opaque.
+            # NEVER add str(e.__cause__) — __cause__ holds the raw
+            # requests.HTTPError whose repr can echo the source's response body.
             body = {"detail": str(e), "upstream_status": getattr(e, "upstream_status", None)}
             return Response(body, status=status.HTTP_502_BAD_GATEWAY)
         return Response(response_data, status=status.HTTP_200_OK)
