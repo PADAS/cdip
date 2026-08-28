@@ -315,7 +315,7 @@ def test_ephemeral_execute_rejects_non_member_org_admin(
         api_client, mocker, requests_mock, org_admin_user_2, organization,
         integration_type_cellstop, cellstop_action_list_tag_names,
 ):
-    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
     api_client.force_authenticate(org_admin_user_2)
 
     response = api_client.post(
@@ -324,13 +324,17 @@ def test_ephemeral_execute_rejects_non_member_org_admin(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    # The permission check must reject before the runner is contacted — a
+    # refactor that reordered these would still let this test pass without the
+    # explicit not-called assertion.
+    assert not gcp_mock.called
 
 
 def test_ephemeral_execute_rejects_org_viewer(
         api_client, mocker, requests_mock, org_viewer_user, organization,
         integration_type_cellstop, cellstop_action_list_tag_names,
 ):
-    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
     api_client.force_authenticate(org_viewer_user)
 
     response = api_client.post(
@@ -339,6 +343,7 @@ def test_ephemeral_execute_rejects_org_viewer(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not gcp_mock.called
 
 
 def test_ephemeral_execute_rejects_pull_action(
@@ -507,6 +512,39 @@ def test_ephemeral_execute_runner_4xx_carries_upstream_status(
 
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
     assert response.data["upstream_status"] == 401
+    # Belt-and-suspenders: the sentinel password from _ephemeral_body must
+    # never surface in the error response. If a future change swaps the
+    # serializer to one that echoes values, this catches it.
+    assert b"ephemeral-token-abc" not in response.content
+
+
+def test_ephemeral_execute_runner_5xx_carries_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A runner returning 500 is a runner-side bug, not a credentials problem.
+    # upstream_status must forward that so the portal can render "couldn't
+    # reach the service" rather than mislabel the user's credentials as invalid.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, json={"detail": "runner exploded"}, status_code=500)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] == 500
+    assert b"ephemeral-token-abc" not in response.content
 
 
 def test_ephemeral_execute_runner_timeout_omits_upstream_status(
@@ -536,6 +574,7 @@ def test_ephemeral_execute_runner_timeout_omits_upstream_status(
 
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
     assert response.data["upstream_status"] is None
+    assert b"ephemeral-token-abc" not in response.content
 
 
 def test_ephemeral_execute_auth_failure_returns_502(

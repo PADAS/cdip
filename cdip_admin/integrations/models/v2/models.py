@@ -206,9 +206,14 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
-    # (connect, read) — matches the ephemeral timeout so a stuck runner
-    # doesn't hang the request thread until the outer worker timeout fires.
-    _RUNNER_TIMEOUT = (5, 20)
+    # (connect, read) — connect fast so a dead runner surfaces quickly. The
+    # read budget must be generous: a saved-integration execute() call runs
+    # operator-initiated actions that legitimately do batch work (paginated
+    # pulls, long-running auth handshakes) or hit a cold-started runner. A
+    # tight read timeout here would regress those into spurious 5xx errors.
+    # The ephemeral path has its own tighter budget on IntegrationType — the
+    # user is actively watching a spinner, so cutting it off at 20s is fine.
+    _RUNNER_TIMEOUT = (5, None)
 
     def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):
         service_url = integration.type.service_url

@@ -226,6 +226,18 @@ class IntegrationsView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+# Which IntegrationAction types can be executed ephemerally (no saved
+# integration id) through the type-level route. Reference actions are stateless
+# lookups; auth actions verify credentials without side effects by contract.
+# Everything else (pull/push/generic) moves data through Gundi and stays
+# rejected. Hoisted to module level so the "which types are safe" contract is
+# discoverable by grep, not buried inside a view method.
+_EPHEMERAL_SAFE_ACTION_TYPES = (
+    IntegrationAction.ActionTypes.REFERENCE,
+    IntegrationAction.ActionTypes.AUTHENTICATION,
+)
+
+
 class IntegrationTypeView(viewsets.ModelViewSet):
     """
     An endpoint for listing integration types.
@@ -259,11 +271,12 @@ class IntegrationTypeView(viewsets.ModelViewSet):
         url_name="execute-reference-action",
     )
     def execute_reference_action(self, request, action_value=None, value=None):
-        """Execute a reference action against a draft integration.
+        """Execute a reference or auth action against a draft integration.
 
         Nothing is persisted or logged — the payload carries user-typed
-        credentials. Restricted to reference actions; the runner enforces the
-        same rule independently.
+        credentials. Restricted to reference and auth actions (see
+        _EPHEMERAL_SAFE_ACTION_TYPES); the runner enforces the same rule
+        independently.
         """
         integration_type = self.get_object()
         integration_action = IntegrationAction.objects.filter(
@@ -274,16 +287,7 @@ class IntegrationTypeView(viewsets.ModelViewSet):
                 {"detail": f"Action '{action_value}' not found for integration type '{integration_type.value}'."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        # Reference actions (stateless lookups) and auth actions (verify
-        # credentials, no writes) are safe to run ephemerally. Everything
-        # else (pull/push/generic) would move data on behalf of an integration
-        # that doesn't exist and stays rejected. The runner enforces the
-        # same rule independently.
-        _EPHEMERAL_SAFE = (
-            IntegrationAction.ActionTypes.REFERENCE,
-            IntegrationAction.ActionTypes.AUTHENTICATION,
-        )
-        if integration_action.type not in _EPHEMERAL_SAFE:
+        if integration_action.type not in _EPHEMERAL_SAFE_ACTION_TYPES:
             return Response(
                 {"detail": "Only reference and auth actions can be executed on integration types."},
                 status=status.HTTP_403_FORBIDDEN,
