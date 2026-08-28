@@ -206,13 +206,22 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
-    # (connect, read) — connect fast so a dead runner surfaces quickly. The
-    # read budget must be generous: a saved-integration execute() call runs
-    # operator-initiated actions that legitimately do batch work (paginated
-    # pulls, long-running auth handshakes) or hit a cold-started runner. A
-    # tight read timeout here would regress those into spurious 5xx errors.
-    # The ephemeral path has its own tighter budget on IntegrationType — the
-    # user is actively watching a spinner, so cutting it off at 20s is fine.
+    # (connect, read) — 5s connect so a dead runner surfaces quickly (very
+    # occasionally forgiving of a Cloud Run ingress reconfigure that takes
+    # >5s to SYN-ACK; the trade-off vs. long request-thread stalls on a
+    # totally dead runner is worth it). No read timeout because
+    # operator-initiated `execute()` legitimately runs paginated pulls, long
+    # auth handshakes, or cold-started runners — a tight read budget here
+    # would regress those into spurious 5xx errors.
+    #
+    # Note the outer ceiling: gunicorn's worker timeout (default 30s, or
+    # whatever is configured in the deploy script) still kills any request
+    # that takes longer end-to-end, `read=None` or not. If you need to
+    # tolerate runner responses beyond that, bump gunicorn's --timeout too.
+    #
+    # The ephemeral path has its own tighter budget on IntegrationType —
+    # the user is actively watching a spinner, so cutting it off at 20s
+    # matches what they'd read as "the button is broken" anyway.
     _RUNNER_TIMEOUT = (5, None)
 
     def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):

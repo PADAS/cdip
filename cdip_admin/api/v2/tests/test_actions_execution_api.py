@@ -396,15 +396,21 @@ def test_ephemeral_execute_unknown_action_returns_404(
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.parametrize("user_fixture", ["superuser", "org_admin_user"])
 def test_ephemeral_execute_creates_no_activity_log(
-        api_client, mocker, requests_mock, superuser, organization,
+        user_fixture, request,
+        api_client, mocker, requests_mock, organization,
         integration_type_cellstop, cellstop_action_list_tag_names, cellstop_list_tag_names_response,
 ):
+    # Parametrized over roles because superuser and org_admin_user hit
+    # different permission code paths (IsSuperuser short-circuits before
+    # IsOrgAdmin). A signal handler added on either branch that writes a log
+    # would slip past a single-role test — this catches both.
     from activity_log.models import ActivityLog
     _mock_runner(
         mocker, requests_mock, integration_type_cellstop, cellstop_list_tag_names_response,
     )
-    api_client.force_authenticate(superuser)
+    api_client.force_authenticate(request.getfixturevalue(user_fixture))
     starting_count = ActivityLog.objects.count()
 
     response = api_client.post(
@@ -662,9 +668,11 @@ def test_ephemeral_execute_non_dict_body_is_403(
         data=["not", "a", "dict"], format="json",
     )
 
-    assert response.status_code in (
-        status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN,
-    )
+    # Must be 403 specifically: `_request_data_get` reduces `owner` to None,
+    # `get_user_org` returns None, `IsOrgAdmin.has_permission` returns False.
+    # A 400 here would mean the permission layer let the request through,
+    # which is precisely the leak the guard was added to prevent.
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.parametrize("field,bad_value", [

@@ -311,6 +311,12 @@ class IntegrationTypeView(viewsets.ModelViewSet):
             # matching the detail string. Any other ValueError predates that
             # attribute and is treated as a runner-side failure with unknown
             # upstream status.
+            #
+            # DO NOT include `str(e.__cause__)` here — the __cause__ chain
+            # holds the raw requests.HTTPError, whose repr can carry the
+            # runner's response body (which may include credentials the
+            # source system echoed back in its error). The static detail
+            # template is deliberately opaque.
             body = {"detail": str(e), "upstream_status": getattr(e, "upstream_status", None)}
             return Response(body, status=status.HTTP_502_BAD_GATEWAY)
         return Response(response_data, status=status.HTTP_200_OK)
