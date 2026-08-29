@@ -17,14 +17,31 @@ class ConnectionStatus(str, Enum):
     NEEDS_REVIEW = "needs_review"
 
 
-def ensure_default_route(integration):
+def ensure_default_route(integration, route_name=None):
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models
         Route = apps.get_model('integrations', 'Route')
-        name = integration.name + " - Default Route"
-        routing_rule, _ = Route.objects.get_or_create(
-            owner_id=integration.owner.id,
+        # The route's name is what the portal shows the user, so it must be the
+        # name they typed -- no " - Default Route" suffix appended to it.
+        # Route.name isn't blank=True while Integration.name is, so fall back to
+        # something readable rather than storing "", which would fail validation
+        # on any later PATCH of the route.
+        base_name = (route_name or integration.name or f"{integration.type.name} Route")
+        # Leave room for the " (99)" disambiguation suffix below; both names are
+        # CharField(max_length=200).
+        base_name = base_name[:190]
+        # Route has no unique constraint on (owner, name), so a get_or_create
+        # here would adopt an unrelated route the owner already has -- attaching
+        # this integration as a provider on it and inheriting its destinations.
+        # Always create, disambiguating the name on collision instead.
+        name = base_name
+        collision_count = 2
+        while Route.objects.filter(owner_id=integration.owner_id, name=name).exists():
+            name = f"{base_name} ({collision_count})"
+            collision_count += 1
+        routing_rule = Route.objects.create(
+            owner_id=integration.owner_id,
             name=name,
         )
         integration.default_route = routing_rule
