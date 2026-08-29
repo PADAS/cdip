@@ -170,6 +170,10 @@ def _test_create_integration(
     # Check that a default routing rule is created
     if create_default_route:
         assert integration.default_route
+        # The route carries the name the caller sent, verbatim. The portal's
+        # "Route Name" field is this `name`, and the new Routes UI renders the
+        # route record's own name (GUNDI-5644).
+        assert integration.default_route.name == name
         activity_log = ActivityLog.objects.filter(integration_id=integration.id, value="integration_updated").first()
         _test_activity_logs_on_instance_updated(
             activity_log=activity_log,

@@ -78,6 +78,26 @@ def test_default_route_name_falls_back_to_type_when_integration_name_blank(
     assert integration.default_route.name == f"{integration_type_lotek.name} Route"
 
 
+def test_default_route_name_falls_back_when_name_is_whitespace_only(
+        organization, integration_type_lotek
+):
+    # Route.name is validated with allow_blank=False, so "   " is rejected on a
+    # later PATCH exactly like "" is. It has to take the same fallback.
+    integration = _make_integration(organization, integration_type_lotek, "   ")
+
+    ensure_default_route(integration=integration)
+
+    assert integration.default_route.name == f"{integration_type_lotek.name} Route"
+
+
+def test_default_route_name_is_stripped(organization, integration_type_lotek):
+    integration = _make_integration(organization, integration_type_lotek, "  Kruger GPS  ")
+
+    ensure_default_route(integration=integration)
+
+    assert integration.default_route.name == "Kruger GPS"
+
+
 def test_default_route_name_is_truncated_to_fit_the_field(organization, integration_type_lotek):
     long_name = "K" * 200  # Integration.name and Route.name are both max_length=200
     integration = _make_integration(organization, integration_type_lotek, long_name)
@@ -86,6 +106,26 @@ def test_default_route_name_is_truncated_to_fit_the_field(organization, integrat
 
     # Truncated with room to spare for a disambiguation suffix.
     assert integration.default_route.name == "K" * 190
+
+
+def test_long_name_still_fits_the_column_once_disambiguated(organization, integration_type_lotek):
+    # This is what the truncation above is actually for: without it, the
+    # collision suffix pushes the name past Route.name's 200 characters and
+    # Postgres raises DataError.
+    long_name = "K" * 200
+    first = _make_integration(organization, integration_type_lotek, long_name)
+    ensure_default_route(integration=first)
+
+    second = Integration.objects.create(
+        type=integration_type_lotek,
+        name=long_name,
+        owner=organization,
+        base_url="https://api2.test.lotek.com",
+    )
+    ensure_default_route(integration=second)
+
+    assert second.default_route.name == "K" * 190 + " (2)"
+    assert len(second.default_route.name) <= 200
 
 
 def test_ensure_default_route_uses_explicit_route_name(organization, integration_type_lotek):
