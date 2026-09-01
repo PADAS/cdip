@@ -228,3 +228,474 @@ def test_execute_action_forwards_explicit_triggered_by(
         triggered_by="auto",
         expected_triggered_by="auto",
     )
+
+
+def _ephemeral_url(integration_type, action_value):
+    from django.urls import reverse
+    return reverse(
+        "integration-types-execute-reference-action",
+        kwargs={"value": integration_type.value, "action_value": action_value},
+    )
+
+
+def _mock_runner(mocker, requests_mock, integration_type, response_body=None, status_code=status.HTTP_200_OK):
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type.service_url, "/v1/actions/execute")
+    return requests_mock.post(
+        actions_execute_url, json=response_body or {}, status_code=status_code,
+    )
+
+
+def _ephemeral_body(organization, base_url="https://sandbox.example.com", token="ephemeral-token-abc"):
+    return {
+        "owner": str(organization.id),
+        "base_url": base_url,
+        "configurations": [
+            {"action_value": "auth", "data": {"username": "user@example.com", "password": token}},
+        ],
+        "config_overrides": {"tag_type": "vessel"},
+    }
+
+
+def test_ephemeral_execute_as_superuser_forwards_draft_state(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, cellstop_list_tag_names_response,
+):
+    gcp_mock = _mock_runner(
+        mocker, requests_mock, integration_type_cellstop, cellstop_list_tag_names_response,
+    )
+    api_client.force_authenticate(superuser)
+    body = _ephemeral_body(organization)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == cellstop_list_tag_names_response
+    sent = gcp_mock.last_request.json()
+    assert sent["integration_id"] is None
+    assert sent["action_id"] == "list_tag_names"
+    assert sent["run_in_background"] is False
+    assert sent["config_overrides"] == {"tag_type": "vessel"}
+    integration_state = sent["integration_state"]
+    assert integration_state["type_value"] == "cellstop"
+    assert integration_state["base_url"] == "https://sandbox.example.com"
+    assert integration_state["configurations"] == [
+        {"action_value": "auth", "data": {"username": "user@example.com", "password": "ephemeral-token-abc"}},
+    ]
+
+
+def test_ephemeral_execute_as_org_admin_of_owner(
+        api_client, mocker, requests_mock, org_admin_user, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, cellstop_list_tag_names_response,
+):
+    _mock_runner(
+        mocker, requests_mock, integration_type_cellstop, cellstop_list_tag_names_response,
+    )
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_ephemeral_execute_rejects_non_member_org_admin(
+        api_client, mocker, requests_mock, org_admin_user_2, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_admin_user_2)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    # The permission check must reject before the runner is contacted — a
+    # refactor that reordered these would still let this test pass without the
+    # explicit not-called assertion.
+    assert not gcp_mock.called
+
+
+def test_ephemeral_execute_rejects_org_viewer(
+        api_client, mocker, requests_mock, org_viewer_user, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_viewer_user)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not gcp_mock.called
+
+
+def test_ephemeral_execute_rejects_pull_action(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_pull_observations,
+):
+    # Reference + auth actions are ephemerally safe; pull/push/generic move
+    # data on behalf of an integration that doesn't exist and stay rejected.
+    gcp_mock = _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_pull_observations.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not gcp_mock.called
+
+
+def test_ephemeral_execute_allows_auth_action(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_auth,
+):
+    # Auth actions verify credentials without side effects — the portal's
+    # "Test Connection" button in the creation wizard uses them.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_auth.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_ephemeral_execute_unknown_action_returns_404(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop,
+):
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, "nonexistent_action"),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.parametrize("user_fixture", ["superuser", "org_admin_user"])
+def test_ephemeral_execute_creates_no_activity_log(
+        user_fixture, request,
+        api_client, mocker, requests_mock, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, cellstop_list_tag_names_response,
+):
+    # Parametrized over roles because superuser and org_admin_user hit
+    # different permission code paths (IsSuperuser short-circuits before
+    # IsOrgAdmin). A signal handler added on either branch that writes a log
+    # would slip past a single-role test — this catches both.
+    from activity_log.models import ActivityLog
+    _mock_runner(
+        mocker, requests_mock, integration_type_cellstop, cellstop_list_tag_names_response,
+    )
+    api_client.force_authenticate(request.getfixturevalue(user_fixture))
+    starting_count = ActivityLog.objects.count()
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert ActivityLog.objects.count() == starting_count
+
+
+def test_ephemeral_execute_type_without_service_url_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    integration_type_cellstop.service_url = ""
+    integration_type_cellstop.save()
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_runner_timeout_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A hung/unreachable runner must surface as a clean 502 (so the portal
+    # falls back to plain text), not a 500 from an unhandled RequestException.
+    import requests as requests_lib
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, exc=requests_lib.exceptions.ConnectTimeout)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_non_json_response_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A 200 with a non-JSON body (e.g. HTML from a broken proxy) must degrade
+    # to 502 rather than escape as an uncaught JSONDecodeError → 500.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, text="<html>oops</html>", status_code=200)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_runner_4xx_carries_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # When the runner responds non-2xx (source system rejected the
+    # user-typed credentials), cdip still returns 502 but the body must carry
+    # the runner's real status code so the portal can classify the failure
+    # as "invalid credentials" vs "runner down" without regex-matching detail.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, json={"detail": "bad token"}, status_code=401)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] == 401
+    # Belt-and-suspenders: the sentinel password from _ephemeral_body must
+    # never surface in the error response. If a future change swaps the
+    # serializer to one that echoes values, this catches it.
+    assert b"ephemeral-token-abc" not in response.content
+
+
+def test_ephemeral_execute_runner_5xx_carries_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A runner returning 500 is a runner-side bug, not a credentials problem.
+    # upstream_status must forward that so the portal can render "couldn't
+    # reach the service" rather than mislabel the user's credentials as invalid.
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, json={"detail": "runner exploded"}, status_code=500)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] == 500
+    assert b"ephemeral-token-abc" not in response.content
+
+
+def test_ephemeral_execute_runner_timeout_omits_upstream_status(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # Timeouts/connection errors don't have an HTTP status — upstream_status
+    # must be None (not omitted) so the portal can distinguish "runner down"
+    # from "source rejected credentials".
+    import requests as requests_lib
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(return_value="fake_id_token"),
+    )
+    actions_execute_url = urljoin(integration_type_cellstop.service_url, "/v1/actions/execute")
+    requests_mock.post(actions_execute_url, exc=requests_lib.exceptions.ConnectTimeout)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.data["upstream_status"] is None
+    assert b"ephemeral-token-abc" not in response.content
+
+
+def test_ephemeral_execute_auth_failure_returns_502(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A GCP metadata / auth-service outage during id_token fetch must degrade
+    # to 502, not bubble up as an unhandled GoogleAuthError → 500.
+    from google.auth.exceptions import RefreshError
+    mocker.patch(
+        "integrations.models.v2.models.google.auth.transport.requests.Request",
+        mocker.MagicMock(),
+    )
+    mocker.patch(
+        "integrations.models.v2.models.google.oauth2.id_token.fetch_id_token",
+        mocker.MagicMock(side_effect=RefreshError("metadata unreachable")),
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=_ephemeral_body(organization), format="json",
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_ephemeral_execute_missing_owner_is_400(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+    body = _ephemeral_body(organization)
+    body.pop("owner")
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.parametrize("owner_value", [
+    "not-a-uuid",                             # bad UUID string
+    123,                                      # integer — .replace() on it raises AttributeError
+    True,                                     # bool
+    ["a", "b"],                               # list
+    {"nested": "dict"},                       # dict
+])
+def test_ephemeral_execute_malformed_owner_is_403(
+        api_client, mocker, requests_mock, org_admin_user, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, owner_value,
+):
+    # A malformed `owner` (bad UUID, non-string, non-scalar) must be rejected
+    # by the permission check as 403 (not resolvable to an org the caller
+    # belongs to), not crash as 500. `uuid.UUID(non-string)` raises
+    # AttributeError, not just ValueError/TypeError — every truthy non-string
+    # value must survive the guard.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_admin_user)
+    body = _ephemeral_body(organization)
+    body["owner"] = owner_value
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_ephemeral_execute_non_dict_body_is_403(
+        api_client, mocker, requests_mock, org_admin_user,
+        integration_type_cellstop, cellstop_action_list_tag_names,
+):
+    # A JSON array body would make `request.data.get('owner')` raise
+    # AttributeError from the permission layer. Guard against that too.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=["not", "a", "dict"], format="json",
+    )
+
+    # Must be 403 specifically: `_request_data_get` reduces `owner` to None,
+    # `get_user_org` returns None, `IsOrgAdmin.has_permission` returns False.
+    # A 400 here would mean the permission layer let the request through,
+    # which is precisely the leak the guard was added to prevent.
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.parametrize("field,bad_value", [
+    ("config_overrides", "not-a-dict"),
+    ("config_overrides", ["a", "b"]),
+    ("config_overrides", 42),
+])
+def test_ephemeral_execute_non_dict_config_overrides_is_400(
+        api_client, mocker, requests_mock, superuser, organization,
+        integration_type_cellstop, cellstop_action_list_tag_names, field, bad_value,
+):
+    # A non-dict config_overrides used to leak through the serializer as
+    # JSONField and blow up as 502 from the runner-side pydantic dict
+    # rejection. DictField makes it a clean 400 with the field name.
+    _mock_runner(mocker, requests_mock, integration_type_cellstop)
+    api_client.force_authenticate(superuser)
+    body = _ephemeral_body(organization)
+    body[field] = bad_value
+
+    response = api_client.post(
+        _ephemeral_url(integration_type_cellstop, cellstop_action_list_tag_names.value),
+        data=body, format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert field in response.json()

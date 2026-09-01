@@ -226,6 +226,14 @@ class IntegrationsView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+# Action types allowed on the type-level ephemeral route.
+# Reference = stateless lookups; auth = credential verification.
+_EPHEMERAL_SAFE_ACTION_TYPES = (
+    IntegrationAction.ActionTypes.REFERENCE,
+    IntegrationAction.ActionTypes.AUTHENTICATION,
+)
+
+
 class IntegrationTypeView(viewsets.ModelViewSet):
     """
     An endpoint for listing integration types.
@@ -248,7 +256,51 @@ class IntegrationTypeView(viewsets.ModelViewSet):
             return v2_serializers.IntegrationTypeIdempotentCreateSerializer
         elif self.action in ["update", "partial_update"]:
             return v2_serializers.IntegrationTypeUpdateSerializer
+        elif self.action == "execute_reference_action":
+            return v2_serializers.TypeActionExecuteSerializer
         return v2_serializers.IntegrationTypeFullSerializer
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"actions/(?P<action_value>[-\w]+)/execute",
+        url_name="execute-reference-action",
+    )
+    def execute_reference_action(self, request, action_value=None, value=None):
+        """Execute a reference/auth action against a draft integration. Never
+        persists or logs — the payload carries user-typed credentials."""
+        integration_type = self.get_object()
+        integration_action = IntegrationAction.objects.filter(
+            integration_type=integration_type, value=action_value,
+        ).first()
+        if integration_action is None:
+            return Response(
+                {"detail": f"Action '{action_value}' not found for integration type '{integration_type.value}'."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if integration_action.type not in _EPHEMERAL_SAFE_ACTION_TYPES:
+            return Response(
+                {"detail": "Only reference and auth actions can be executed on integration types."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            response_data = integration_type.execute_reference_action_ephemeral(
+                action_value=action_value,
+                base_url=serializer.validated_data.get("base_url"),
+                configurations=[
+                    {"action_value": c["action_value"], "data": c["data"]}
+                    for c in serializer.validated_data.get("configurations", [])
+                ],
+                config_overrides=serializer.validated_data.get("config_overrides") or {},
+            )
+        except ValueError as e:
+            # NEVER add str(e.__cause__) — __cause__ holds the raw
+            # requests.HTTPError whose repr can echo the source's response body.
+            body = {"detail": str(e), "upstream_status": getattr(e, "upstream_status", None)}
+            return Response(body, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class ConnectionsView(

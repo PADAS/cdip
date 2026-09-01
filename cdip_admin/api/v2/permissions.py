@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import permissions
 
 from activity_log.models import ActivityLog
@@ -26,6 +28,19 @@ class IsSuperuser(permissions.BasePermission):
         return self.has_permission(request, view)
 
 
+def _request_data_get(request, key):
+    """`request.data.get` when the body is a mapping; None otherwise.
+
+    A JSON top-level array (or number, or string) makes `request.data` a
+    list/number/string — `.get` on it raises AttributeError, which
+    otherwise bubbles up as a 500 from the permission layer.
+    """
+    data = getattr(request, "data", None)
+    if isinstance(data, dict):
+        return data.get(key)
+    return None
+
+
 def get_user_org(request, view) -> str:
     context = request.parser_context["kwargs"]
     if view.basename == "organizations":
@@ -43,6 +58,19 @@ def get_user_org(request, view) -> str:
         if integration_id := context.get("integration_pk"):
             org_id = str(Integration.objects.get(id=integration_id).owner.id)
         else:
+            org_id = None
+    elif view.basename == "integration-types" and view.action == "execute_reference_action":
+        # There's no saved integration row yet — authz keys on `owner`, the
+        # workspace the caller intends to create the integration in. Validate
+        # the UUID here so a malformed value results in a clean 403 rather
+        # than a 500 from the ORM filter downstream. `uuid.UUID(non-string)`
+        # raises AttributeError (via .replace() on the input), not ValueError,
+        # so a body of `{"owner": 123}` or `{"owner": true}` would otherwise
+        # escape as a 500; coerce to str and catch the wider set.
+        raw_owner = _request_data_get(request, "owner")
+        try:
+            org_id = str(uuid.UUID(str(raw_owner))) if raw_owner else None
+        except (ValueError, TypeError, AttributeError):
             org_id = None
     elif view.basename == "connections":
         integration_id = request.data.get("pk")
@@ -77,6 +105,7 @@ class IsOrgAdmin(permissions.BasePermission):
         "organizations": ["list", "retrieve", "update", "partial_update"],
         "members": ["list", "invite", "retrieve", "update", "partial_update", "remove"],
         "integrations": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "integration-types": ["execute_reference_action"],
         "actions": ["execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy", "delete_configuration"],

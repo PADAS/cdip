@@ -7,6 +7,7 @@ import jsonschema
 import psycopg2
 import requests
 import google.oauth2.id_token
+from google.auth.exceptions import GoogleAuthError
 from urllib.parse import urljoin, urlparse
 from core.models import UUIDAbstractModel, TimestampedModel
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -34,6 +35,29 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class RunnerCallError(ValueError):
+    """Runner-call failure; upstream_status carries the runner's HTTP status
+    when the failure was an HTTP response (None for network-level failures)."""
+    def __init__(self, message, upstream_status=None):
+        super().__init__(message)
+        self.upstream_status = upstream_status
+
+
+def _post_to_runner(service_url, payload, timeout=None):
+    """POST an ActionRequest payload to a type's runner and return its JSON."""
+    actions_execute_url = urljoin(service_url, "v1/actions/execute")
+    auth_req = google.auth.transport.requests.Request()
+    id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+    response = requests.post(
+        url=actions_execute_url,
+        headers={"Authorization": f"Bearer {id_token}"},
+        json=payload,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 class IntegrationType(UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200)
     value = models.SlugField(
@@ -50,6 +74,51 @@ class IntegrationType(UUIDAbstractModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.name}"
+
+    # (connect, read) — user is watching a spinner, tighter than the saved path.
+    _EPHEMERAL_RUNNER_TIMEOUT = (5, 20)
+
+    def execute_reference_action_ephemeral(
+        self, action_value, base_url, configurations, config_overrides=None,
+    ):
+        """Forward a reference/auth action to the runner with a draft payload.
+        Never persists or logs it — carries user-typed credentials. Raises
+        RunnerCallError (a ValueError) on network/HTTP failure."""
+        service_url = self.service_url
+        if not service_url:
+            raise ValueError(
+                f"Integration Type '{self}' does not have a service endpoint configured"
+            )
+        try:
+            return _post_to_runner(
+                service_url,
+                payload={
+                    "integration_id": None,
+                    "action_id": action_value,
+                    "run_in_background": False,
+                    "triggered_by": "manual",
+                    "config_overrides": config_overrides or {},
+                    "integration_state": {
+                        "type_value": self.value,
+                        "base_url": base_url or "",
+                        "configurations": configurations,
+                    },
+                },
+                timeout=self._EPHEMERAL_RUNNER_TIMEOUT,
+            )
+        except requests.HTTPError as e:
+            # Preserve the runner's status so the portal can tell source-side
+            # auth rejection (401/403) apart from a runner that's down.
+            upstream = e.response.status_code if e.response is not None else None
+            raise RunnerCallError(
+                f"Action runner unreachable for '{self}': HTTPError",
+                upstream_status=upstream,
+            ) from e
+        except (requests.RequestException, ValueError, GoogleAuthError) as e:
+            # ValueError = non-JSON body on old requests; GoogleAuthError = fetch_id_token failure.
+            raise RunnerCallError(
+                f"Action runner unreachable for '{self}': {type(e).__name__}",
+            ) from e
 
 
 class IntegrationAction(UUIDAbstractModel, TimestampedModel):
@@ -111,23 +180,19 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
         # Helper method to validate a configuration against the Action's schema
         jsonschema.validate(instance=configuration, schema=self.schema)
 
+    # (connect, read). No read timeout — operator-initiated actions can run
+    # long (paginated pulls, cold runners). gunicorn's worker timeout is the
+    # real outer ceiling; bump it if runner responses need to exceed that.
+    _RUNNER_TIMEOUT = (5, None)
+
     def execute(self, integration, config_overrides=None, run_in_background=False, triggered_by="manual"):
         service_url = integration.type.service_url
         if not service_url:
             raise ValueError(f"Integration Type '{integration.type}' does not have a service endpoint configured")
 
-        # Build the URL for the action runner endpoint
-        actions_execute_path = "v1/actions/execute"
-        actions_execute_url = urljoin(service_url, actions_execute_path)
-
-        # Make an authorized request to the action runner endpoint using google.oauth2.id_token
-        auth_req = google.auth.transport.requests.Request()
-        id_token = google.oauth2.id_token.fetch_id_token(auth_req, service_url)
-        auth_headers = {"Authorization": f"Bearer {id_token}"}
-        response = requests.post(
-            url=actions_execute_url,
-            headers=auth_headers,
-            json={
+        return _post_to_runner(
+            service_url,
+            payload={
                 "integration_id": str(integration.id),
                 "action_id": self.value,
                 "run_in_background": run_in_background,
@@ -136,10 +201,9 @@ class IntegrationAction(UUIDAbstractModel, TimestampedModel):
                 # See GUNDI-5400.
                 "triggered_by": triggered_by,
                 "config_overrides": config_overrides,
-            }
+            },
+            timeout=self._RUNNER_TIMEOUT,
         )
-        response.raise_for_status()
-        return response.json()
 
     def _pre_save(self, *args, **kwargs):
         pass
