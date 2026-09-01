@@ -261,12 +261,12 @@ class ConnectionsView(
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     filter_backends = [
-        drf_filters.OrderingFilter,
+        custom_filters.ConnectionOrderingFilter,
         django_filters.rest_framework.DjangoFilterBackend,
         custom_filters.CustomizableSearchFilter
     ]
     filterset_class = ConnectionFilter
-    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name']
+    ordering_fields = ['id', 'name', 'base_url', 'type__name', 'owner__name', 'destination_type']
     ordering = ['id']
     search_fields = [  # Default search fields (used in the global search box)
         "name", "base_url", 'type__name',  # Providers
