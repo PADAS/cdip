@@ -17,14 +17,33 @@ class ConnectionStatus(str, Enum):
     NEEDS_REVIEW = "needs_review"
 
 
-def ensure_default_route(integration):
+def ensure_default_route(integration, route_name=None):
+    """Give `integration` a default Route, creating one if it has none.
+
+    The name cascades route_name -> integration.name -> "<type> Route"; blank is
+    not a distinct signal, so an empty Route Name field in the portal falls back
+    to the connection's name. The two names are independent after creation --
+    renaming one never renames the other.
+    """
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models
         Route = apps.get_model('integrations', 'Route')
-        name = integration.name + " - Default Route"
-        routing_rule, _ = Route.objects.get_or_create(
-            owner_id=integration.owner.id,
+        # Strip before testing, not after: `or` short-circuits, so a
+        # whitespace-only route_name would win the chain and skip integration.name.
+        given_name = (route_name or "").strip() or (integration.name or "").strip()
+        # Route.name is validated with allow_blank=False so it can't be left
+        # blank; 190 leaves room for the " (N)" suffix below (max_length=200).
+        base_name = (given_name or f"{integration.type.name} Route")[:190]
+        # (owner, name) has no unique constraint, so get_or_create would adopt an
+        # unrelated route of the owner's and inherit its destinations.
+        name = base_name
+        collision_count = 2
+        while Route.objects.filter(owner_id=integration.owner_id, name=name).exists():
+            name = f"{base_name} ({collision_count})"
+            collision_count += 1
+        routing_rule = Route.objects.create(
+            owner_id=integration.owner_id,
             name=name,
         )
         integration.default_route = routing_rule
