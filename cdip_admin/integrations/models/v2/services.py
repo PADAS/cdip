@@ -20,35 +20,23 @@ class ConnectionStatus(str, Enum):
 def ensure_default_route(integration, route_name=None):
     """Give `integration` a default Route, creating one if it has none.
 
-    The route's name comes from `route_name` when given, otherwise from
-    `integration.name`. Blank is not a distinct signal: None, "" and "   " all
-    mean "derive it", so the name cascades route_name -> integration.name ->
-    "<type> Route". That keeps an empty Route Name field in the portal falling
-    back to the connection's name rather than to the integration type.
+    The name cascades route_name -> integration.name -> "<type> Route"; blank is
+    not a distinct signal, so an empty Route Name field in the portal falls back
+    to the connection's name. The two names are independent after creation --
+    renaming one never renames the other.
     """
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models
         Route = apps.get_model('integrations', 'Route')
-        # The route's name is what the portal shows the user, so at creation it
-        # has to be the name they typed -- no " - Default Route" suffix appended
-        # to it. The two names are independent from here on: renaming the
-        # connection does not rename the route, and vice versa.
-        # Integration.name is blank=True while Route.name is not, so an empty
-        # (or whitespace-only) name falls back to something readable: Route.name
-        # is validated with allow_blank=False, and a route named "" or "   "
-        # would be rejected on every later PATCH of it.
-        # Strip each candidate before testing it, not after: `or` short-circuits,
-        # so a whitespace-only route_name would otherwise win the chain and then
-        # strip to "", skipping integration.name entirely.
+        # Strip before testing, not after: `or` short-circuits, so a
+        # whitespace-only route_name would win the chain and skip integration.name.
         given_name = (route_name or "").strip() or (integration.name or "").strip()
-        # Truncate to leave 10 characters for the disambiguation suffix added
-        # below; Integration.name and Route.name are both max_length=200.
+        # Route.name is validated with allow_blank=False so it can't be left
+        # blank; 190 leaves room for the " (N)" suffix below (max_length=200).
         base_name = (given_name or f"{integration.type.name} Route")[:190]
-        # Route has no unique constraint on (owner, name), so a get_or_create
-        # here would adopt an unrelated route the owner already has -- attaching
-        # this integration as a provider on it and inheriting its destinations.
-        # Always create, disambiguating the name on collision instead.
+        # (owner, name) has no unique constraint, so get_or_create would adopt an
+        # unrelated route of the owner's and inherit its destinations.
         name = base_name
         collision_count = 2
         while Route.objects.filter(owner_id=integration.owner_id, name=name).exists():

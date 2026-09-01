@@ -6,10 +6,9 @@ from integrations.models import Integration, Route, RouteProvider, ensure_defaul
 pytestmark = pytest.mark.django_db
 
 
-# These use a provider type (Lotek) rather than an ER site on purpose:
-# Integration._post_save deploys a dispatcher for ER/SMART/WPSWatch/TrapTagger
-# sites whenever GCP_ENVIRONMENT_ENABLED is on, which reaches for GCP Secret
-# Manager. A provider is also what ensure_default_route actually attaches.
+# A provider type (Lotek), not an ER site: Integration._post_save deploys a
+# dispatcher for ER/SMART/WPSWatch/TrapTagger sites when GCP_ENVIRONMENT_ENABLED
+# is on, which reaches for GCP Secret Manager.
 def _make_integration(organization, integration_type, name):
     return Integration.objects.create(
         type=integration_type,
@@ -34,11 +33,9 @@ def test_default_route_name_disambiguated_on_collision(organization, integration
 
     ensure_default_route(integration=integration)
 
-    # A brand new route, not the owner's pre-existing one.
     assert integration.default_route.id != existing_route.id
     assert integration.default_route.name == "Kruger GPS (2)"
-    # The pre-existing route must not have picked up the integration as a
-    # provider -- that would leak data to whatever destinations it already has.
+    # Picking it up as a provider would leak data to that route's destinations.
     assert not existing_route.data_providers.filter(id=integration.id).exists()
     assert integration.default_route.data_providers.filter(id=integration.id).exists()
 
@@ -56,8 +53,7 @@ def test_default_route_name_disambiguates_past_second_collision(organization, in
 def test_default_route_name_ignores_same_name_route_of_another_owner(
         organization, other_organization, integration_type_lotek
 ):
-    # Disambiguation is scoped to the owner, so another org's route of the same
-    # name must not push this one to "(2)".
+    # Disambiguation is scoped to the owner.
     Route.objects.create(owner=other_organization, name="Kruger GPS")
     integration = _make_integration(organization, integration_type_lotek, "Kruger GPS")
 
@@ -69,8 +65,6 @@ def test_default_route_name_ignores_same_name_route_of_another_owner(
 def test_default_route_name_falls_back_to_type_when_integration_name_blank(
         organization, integration_type_lotek
 ):
-    # Integration.name is blank=True but Route.name is not, so a blank name must
-    # not produce a route named "".
     integration = _make_integration(organization, integration_type_lotek, "")
 
     ensure_default_route(integration=integration)
@@ -81,8 +75,6 @@ def test_default_route_name_falls_back_to_type_when_integration_name_blank(
 def test_default_route_name_falls_back_when_name_is_whitespace_only(
         organization, integration_type_lotek
 ):
-    # Route.name is validated with allow_blank=False, so "   " is rejected on a
-    # later PATCH exactly like "" is. It has to take the same fallback.
     integration = _make_integration(organization, integration_type_lotek, "   ")
 
     ensure_default_route(integration=integration)
@@ -104,14 +96,12 @@ def test_default_route_name_is_truncated_to_fit_the_field(organization, integrat
 
     ensure_default_route(integration=integration)
 
-    # Truncated with room to spare for a disambiguation suffix.
     assert integration.default_route.name == "K" * 190
 
 
 def test_long_name_still_fits_the_column_once_disambiguated(organization, integration_type_lotek):
-    # This is what the truncation above is actually for: without it, the
-    # collision suffix pushes the name past Route.name's 200 characters and
-    # Postgres raises DataError.
+    # What the truncation is for: otherwise the collision suffix pushes the name
+    # past Route.name's 200 characters and Postgres raises DataError.
     long_name = "K" * 200
     first = _make_integration(organization, integration_type_lotek, long_name)
     ensure_default_route(integration=first)
@@ -133,8 +123,6 @@ def test_ensure_default_route_uses_explicit_route_name(organization, integration
 
     ensure_default_route(integration=integration, route_name="Kruger GPS")
 
-    # An explicit route name wins over the connection's name, so the portal can
-    # later name the Route independently of the Connection.
     assert integration.default_route.name == "Kruger GPS"
     assert integration.name == "Kruger Connection"
 
@@ -142,8 +130,7 @@ def test_ensure_default_route_uses_explicit_route_name(organization, integration
 def test_whitespace_only_route_name_falls_back_to_the_integration_name(
         organization, integration_type_lotek
 ):
-    # A blank route_name is not authoritative -- it means "derive it", so the
-    # cascade has to reach integration.name and not jump to the type fallback.
+    # Blank means "derive it", so the cascade must reach integration.name.
     integration = _make_integration(organization, integration_type_lotek, "Kruger GPS")
 
     ensure_default_route(integration=integration, route_name="   ")

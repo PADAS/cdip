@@ -170,17 +170,12 @@ def _test_create_integration(
     # Check that a default routing rule is created
     if create_default_route:
         assert integration.default_route
-        # The route carries the name the caller sent, verbatim. The portal's
-        # "Route Name" field is this `name`, and the new Routes UI renders the
-        # route record's own name (GUNDI-5644).
-        # ensure_default_route also strips, truncates to 190 and falls back for
-        # blank names; every caller here passes a plain short name, so the
-        # comparison below is exact. Fail loudly rather than confusingly if a
-        # future caller passes a name those rules would rewrite.
+        # The route carries the name the caller sent, verbatim -- no
+        # " - Default Route" suffix (GUNDI-5644). The exact comparison only
+        # holds for names the naming rules leave alone.
         assert name == name.strip()[:190], (
-            "this helper compares the route name exactly, so it needs a plain "
-            "name; stripping/truncation/fallback are covered by "
-            "integrations/tests/test_default_route_naming.py"
+            "this helper needs a plain name; stripping/truncation/fallback are "
+            "covered by integrations/tests/test_default_route_naming.py"
         )
         assert integration.default_route.name == name
         activity_log = ActivityLog.objects.filter(integration_id=integration.id, value="integration_updated").first()
