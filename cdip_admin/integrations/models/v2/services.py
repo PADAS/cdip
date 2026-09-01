@@ -30,13 +30,18 @@ def ensure_default_route(integration, route_name=None):
     if not integration.default_route:
         # Avoid circular imports related to models
         Route = apps.get_model('integrations', 'Route')
-        # The route's name is what the portal shows the user, so it has to be
-        # the name they typed -- no " - Default Route" suffix appended to it.
+        # The route's name is what the portal shows the user, so at creation it
+        # has to be the name they typed -- no " - Default Route" suffix appended
+        # to it. The two names are independent from here on: renaming the
+        # connection does not rename the route, and vice versa.
         # Integration.name is blank=True while Route.name is not, so an empty
         # (or whitespace-only) name falls back to something readable: Route.name
         # is validated with allow_blank=False, and a route named "" or "   "
         # would be rejected on every later PATCH of it.
-        given_name = (route_name or integration.name or "").strip()
+        # Strip each candidate before testing it, not after: `or` short-circuits,
+        # so a whitespace-only route_name would otherwise win the chain and then
+        # strip to "", skipping integration.name entirely.
+        given_name = (route_name or "").strip() or (integration.name or "").strip()
         # Truncate to leave 10 characters for the disambiguation suffix added
         # below; Integration.name and Route.name are both max_length=200.
         base_name = (given_name or f"{integration.type.name} Route")[:190]

@@ -139,6 +139,36 @@ def test_ensure_default_route_uses_explicit_route_name(organization, integration
     assert integration.name == "Kruger Connection"
 
 
+def test_whitespace_only_route_name_falls_back_to_the_integration_name(
+        organization, integration_type_lotek
+):
+    # A blank route_name is not authoritative -- it means "derive it", so the
+    # cascade has to reach integration.name and not jump to the type fallback.
+    integration = _make_integration(organization, integration_type_lotek, "Kruger GPS")
+
+    ensure_default_route(integration=integration, route_name="   ")
+
+    assert integration.default_route.name == "Kruger GPS"
+
+
+def test_route_name_is_stripped_when_given_explicitly(organization, integration_type_lotek):
+    integration = _make_integration(organization, integration_type_lotek, "Kruger Connection")
+
+    ensure_default_route(integration=integration, route_name="  Kruger GPS  ")
+
+    assert integration.default_route.name == "Kruger GPS"
+
+
+def test_blank_route_name_and_blank_integration_name_fall_back_to_type(
+        organization, integration_type_lotek
+):
+    integration = _make_integration(organization, integration_type_lotek, "   ")
+
+    ensure_default_route(integration=integration, route_name="   ")
+
+    assert integration.default_route.name == f"{integration_type_lotek.name} Route"
+
+
 def test_ensure_default_route_is_idempotent(organization, integration_type_lotek):
     integration = _make_integration(organization, integration_type_lotek, "Kruger GPS")
 
