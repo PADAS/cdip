@@ -18,6 +18,14 @@ class ConnectionStatus(str, Enum):
 
 
 def ensure_default_route(integration, route_name=None):
+    """Give `integration` a default Route, creating one if it has none.
+
+    The route's name comes from `route_name` when given, otherwise from
+    `integration.name`. Blank is not a distinct signal: None, "" and "   " all
+    mean "derive it", so the name cascades route_name -> integration.name ->
+    "<type> Route". That keeps an empty Route Name field in the portal falling
+    back to the connection's name rather than to the integration type.
+    """
     # Ensure that a default routing rule group is set for integrations
     if not integration.default_route:
         # Avoid circular imports related to models

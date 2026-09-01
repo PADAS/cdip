@@ -173,6 +173,15 @@ def _test_create_integration(
         # The route carries the name the caller sent, verbatim. The portal's
         # "Route Name" field is this `name`, and the new Routes UI renders the
         # route record's own name (GUNDI-5644).
+        # ensure_default_route also strips, truncates to 190 and falls back for
+        # blank names; every caller here passes a plain short name, so the
+        # comparison below is exact. Fail loudly rather than confusingly if a
+        # future caller passes a name those rules would rewrite.
+        assert name == name.strip()[:190], (
+            "this helper compares the route name exactly, so it needs a plain "
+            "name; stripping/truncation/fallback are covered by "
+            "integrations/tests/test_default_route_naming.py"
+        )
         assert integration.default_route.name == name
         activity_log = ActivityLog.objects.filter(integration_id=integration.id, value="integration_updated").first()
         _test_activity_logs_on_instance_updated(
