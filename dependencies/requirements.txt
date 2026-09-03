@@ -188,6 +188,7 @@ google-api-core==2.25.1
     #   google-cloud-core
     #   google-cloud-eventarc
     #   google-cloud-functions
+    #   google-cloud-monitoring
     #   google-cloud-pubsub
     #   google-cloud-run
     #   google-cloud-secret-manager
@@ -197,6 +198,7 @@ google-auth==2.40.3
     # via
     #   google-api-core
     #   google-cloud-core
+    #   google-cloud-monitoring
     #   google-cloud-pubsub
     #   google-cloud-storage
     #   google-cloud-trace
@@ -205,6 +207,8 @@ google-cloud-core==2.4.3
 google-cloud-eventarc==1.10.0
     # via -r requirements.in
 google-cloud-functions==1.13.1
+    # via -r requirements.in
+google-cloud-monitoring==2.31.0
     # via -r requirements.in
 google-cloud-pubsub==2.25.0
     # via cdip-connector
@@ -240,6 +244,7 @@ grpc-google-iam-v1==0.14.2
 grpcio==1.75.0
     # via
     #   google-api-core
+    #   google-cloud-monitoring
     #   google-cloud-pubsub
     #   googleapis-common-protos
     #   grpc-google-iam-v1
@@ -375,6 +380,7 @@ proto-plus==1.26.1
     #   google-api-core
     #   google-cloud-eventarc
     #   google-cloud-functions
+    #   google-cloud-monitoring
     #   google-cloud-pubsub
     #   google-cloud-run
     #   google-cloud-secret-manager
@@ -384,6 +390,7 @@ protobuf==4.25.8
     #   google-api-core
     #   google-cloud-eventarc
     #   google-cloud-functions
+    #   google-cloud-monitoring
     #   google-cloud-pubsub
     #   google-cloud-run
     #   google-cloud-secret-manager

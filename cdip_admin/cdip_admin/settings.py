@@ -462,6 +462,11 @@ DISPATCHER_DEFAULTS_SECRET_SMART = env.str("DISPATCHER_DEFAULTS_SECRET_SMART", "
 DISPATCHER_DEFAULTS_SECRET_WPSWATCH = env.str("DISPATCHER_DEFAULTS_SECRET_WPSWATCH", "wps-dispatcher-defaults-prod")
 DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER = env.str("DISPATCHER_DEFAULTS_SECRET_TRAPTAGGER", "tt-dispatcher-defaults-prod")
 MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC", "movebank-dispatcher-topic-prod")
+# Shared ER dispatcher pool. When set, new EarthRanger destinations are
+# attached to this topic instead of getting a dedicated dispatcher, and the
+# `dispatchers` command's shared-pool migration verbs operate against it.
+# Empty string = feature disabled.
+ER_SHARED_DISPATCHER_TOPIC = env.str("ER_SHARED_DISPATCHER_TOPIC", default="")
 
 # Sensors API to Routing
 RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-prod")
