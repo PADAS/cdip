@@ -76,8 +76,18 @@ def get_user_org(request, view) -> str:
         integration_id = request.data.get("pk")
         org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
     elif view.basename == "sources":
-        integration_id = request.data.get("provider")
-        org_id = str(Integration.objects.get(id=integration_id).owner.id) if integration_id else None
+        # Reachable now that sources can be created: the provider id arrives in the request
+        # body, so a missing, malformed or unknown value must resolve to "no organization"
+        # — and therefore a clean 403 — instead of raising out of the permission layer as a
+        # 500. `uuid.UUID(non-string)` raises AttributeError rather than ValueError, so a
+        # body of `{"provider": 123}` needs the wider except as well.
+        raw_provider = _request_data_get(request, "provider")
+        try:
+            provider_id = str(uuid.UUID(str(raw_provider))) if raw_provider else None
+        except (ValueError, TypeError, AttributeError):
+            provider_id = None
+        provider = Integration.objects.filter(id=provider_id).first() if provider_id else None
+        org_id = str(provider.owner_id) if provider else None
     elif view.basename == "routes":
         if view.action in ["retrieve", "update", "partial_update", "destroy", "delete_configuration"]:
             route_id = context.get("pk")

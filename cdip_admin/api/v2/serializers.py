@@ -6,6 +6,7 @@ from typing import Any, Iterable
 import jsonschema
 from rest_framework import serializers, status
 from rest_framework import exceptions as drf_exceptions
+from rest_framework.validators import UniqueTogetherValidator
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
@@ -898,6 +899,43 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_routing_rules(self, obj):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
+
+
+class SourceCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    # `provider` is not a free naming choice: get_user_org (api/v2/permissions.py) resolves
+    # the caller's organization by reading this exact key off the request body. Renaming it
+    # returns 403 to org admins with no other symptom.
+    provider = serializers.PrimaryKeyRelatedField(
+        source="integration", queryset=Integration.objects.all()
+    )
+
+    class Meta:
+        model = Source
+        fields = ("id", "provider", "external_id", "name")
+        validators = [
+            # Declared explicitly rather than left to the model's unique_together, so the
+            # collision names `provider` — the key the client sent — rather than the model's
+            # `integration`, and so it can never reach the database as an IntegrityError.
+            UniqueTogetherValidator(
+                queryset=Source.objects.all(),
+                fields=("provider", "external_id"),
+                message="A source with this external ID already exists for this provider.",
+            )
+        ]
+
+    def validate_provider(self, value):
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return value
+        if not get_user_integrations_qs(user).filter(id=value.id).exists():
+            raise drf_exceptions.ValidationError(
+                detail="You don't have enough privileges in the selected provider"
+            )
+        return value
+
+    def to_representation(self, instance):
+        return SourceRetrieveSerializer(instance=instance, context=self.context).data
 
 
 # All stream types the platform routes (GUNDI-5548: includes txt, obvu, att —

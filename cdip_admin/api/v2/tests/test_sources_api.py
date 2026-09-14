@@ -2,6 +2,8 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from integrations.models import Source
+
 
 pytestmark = pytest.mark.django_db
 
@@ -423,3 +425,139 @@ def test_global_search_sources_as_org_viewer(
         },
         expected_sources=movebank_sources
     )
+
+
+# ---- Manual source creation (GUNDI-5178) ----------------------------------
+
+
+def _post_source(api_client, user, provider_id, external_id="new-collar-001", name=None):
+    payload = {"provider": provider_id, "external_id": external_id}
+    if name is not None:
+        payload["name"] = name
+    api_client.force_authenticate(user)
+    return api_client.post(reverse("sources-list"), data=payload, format="json")
+
+
+def _test_create_source(api_client, user, provider, external_id="new-collar-001", name="Kifaru"):
+    response = _post_source(
+        api_client, user, str(provider.id), external_id=external_id, name=name
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    response_data = response.json()
+    source = Source.objects.get(id=response_data["id"])
+    assert source.external_id == external_id
+    assert source.integration_id == provider.id
+    if name is not None:
+        assert source.name == name
+    # The write response is rendered with the retrieve serializer, so the UI can use it
+    # without a follow-up GET.
+    for field in (
+        "id", "external_id", "status", "provider", "destinations",
+        "routing_rules", "update_frequency", "last_update", "created_at",
+    ):
+        assert field in response_data
+    return source
+
+
+def test_create_source_as_superuser(
+        api_client, superuser, organization, provider_lotek_panthera
+):
+    _test_create_source(api_client, superuser, provider_lotek_panthera)
+
+
+def test_create_source_as_org_admin(
+        api_client, org_admin_user, organization, provider_lotek_panthera
+):
+    _test_create_source(api_client, org_admin_user, provider_lotek_panthera)
+
+
+def test_create_source_without_name(
+        api_client, org_admin_user, organization, provider_lotek_panthera
+):
+    source = _test_create_source(
+        api_client, org_admin_user, provider_lotek_panthera, name=None
+    )
+    assert source.name == ""
+
+
+def test_create_source_that_has_never_reported(
+        api_client, org_admin_user, organization, provider_lotek_panthera
+):
+    # The point of the endpoint: a device can be listed in a routing filter before it has
+    # ever sent data. Such a source has no SourceState, which the API reports as "unknown".
+    response = _post_source(
+        api_client, org_admin_user, str(provider_lotek_panthera.id), external_id="not-yet-seen"
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    assert response.json()["last_update"] == "unknown"
+
+
+def test_cannot_create_source_as_org_viewer(
+        api_client, org_viewer_user, organization, provider_lotek_panthera
+):
+    response = _post_source(api_client, org_viewer_user, str(provider_lotek_panthera.id))
+    assert response.status_code == status.HTTP_403_FORBIDDEN, response.content
+    assert not Source.objects.filter(external_id="new-collar-001").exists()
+
+
+def test_cannot_create_source_for_another_org_provider_as_org_admin(
+        api_client, org_admin_user, organization, other_organization, provider_movebank_ewt
+):
+    response = _post_source(api_client, org_admin_user, str(provider_movebank_ewt.id))
+    assert response.status_code == status.HTTP_403_FORBIDDEN, response.content
+    assert not Source.objects.filter(external_id="new-collar-001").exists()
+
+
+def test_create_duplicate_source_is_rejected(
+        api_client, org_admin_user, organization, provider_lotek_panthera, lotek_sources
+):
+    existing = lotek_sources[0]
+    response = _post_source(
+        api_client, org_admin_user, str(provider_lotek_panthera.id),
+        external_id=existing.external_id,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "already exists" in response.content.decode()
+
+
+def test_create_source_reusing_external_id_from_another_provider(
+        api_client, superuser, organization, other_organization,
+        provider_lotek_panthera, provider_movebank_ewt, movebank_sources
+):
+    # external_id is unique per provider, not globally — the same collar id may legitimately
+    # exist under two providers. This is why routing's filter payload is keyed by provider.
+    borrowed = movebank_sources[0].external_id
+    _test_create_source(
+        api_client, superuser, provider_lotek_panthera, external_id=borrowed
+    )
+
+
+@pytest.mark.parametrize(
+    "provider_id",
+    [
+        pytest.param("not-a-uuid", id="malformed-provider"),
+        pytest.param("6b8f3c1e-0000-4000-8000-000000000000", id="unknown-provider"),
+        pytest.param(None, id="missing-provider"),
+    ],
+)
+def test_create_source_with_bad_provider_does_not_error_in_permission_layer(
+        api_client, org_admin_user, organization, provider_lotek_panthera, provider_id
+):
+    # The org resolver reads `provider` straight off the request body. Before GUNDI-5178 it
+    # passed the raw value to Integration.objects.get(), which raised out of the permission
+    # layer as a 500 for anything missing, malformed or unknown. Unreachable while the
+    # viewset was read-only; reachable now.
+    response = _post_source(api_client, org_admin_user, provider_id)
+    assert response.status_code == status.HTTP_403_FORBIDDEN, response.content
+
+
+def test_create_source_with_unknown_provider_as_superuser_is_a_validation_error(
+        api_client, superuser, organization, provider_lotek_panthera
+):
+    # Superusers short-circuit the org resolver, so they reach the serializer and get the
+    # field-level error rather than the 403 a scoped user sees.
+    response = _post_source(
+        api_client, superuser, "6b8f3c1e-0000-4000-8000-000000000000"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "provider" in response.json()
