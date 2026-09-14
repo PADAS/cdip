@@ -6,7 +6,6 @@ from typing import Any, Iterable
 import jsonschema
 from rest_framework import serializers, status
 from rest_framework import exceptions as drf_exceptions
-from rest_framework.validators import UniqueTogetherValidator
 from core.enums import RoleChoices
 from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
@@ -30,6 +29,11 @@ User = get_user_model()
 
 
 class DuplicateIntegrationError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
+
+
+class DuplicateSourceError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "conflict"
 
@@ -913,16 +917,10 @@ class SourceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = ("id", "provider", "external_id", "name")
-        validators = [
-            # Declared explicitly rather than left to the model's unique_together, so the
-            # collision names `provider` — the key the client sent — rather than the model's
-            # `integration`, and so it can never reach the database as an IntegrityError.
-            UniqueTogetherValidator(
-                queryset=Source.objects.all(),
-                fields=("provider", "external_id"),
-                message="A source with this external ID already exists for this provider.",
-            )
-        ]
+        # A duplicate is a conflict with existing state, not a malformed request, so it is
+        # answered 409 in validate() below. DRF would otherwise derive a
+        # UniqueTogetherValidator from the model's unique_together and answer 400 first.
+        validators = []
 
     def validate_provider(self, value):
         user = self.context.get("request").user
@@ -933,6 +931,15 @@ class SourceCreateSerializer(serializers.ModelSerializer):
                 detail="You don't have enough privileges in the selected provider"
             )
         return value
+
+    def validate(self, attrs):
+        if Source.objects.filter(
+            integration=attrs["integration"], external_id=attrs["external_id"]
+        ).exists():
+            raise DuplicateSourceError(detail={
+                "external_id": ["A source with this external ID already exists for this provider."]
+            })
+        return attrs
 
     def to_representation(self, instance):
         return SourceRetrieveSerializer(instance=instance, context=self.context).data
