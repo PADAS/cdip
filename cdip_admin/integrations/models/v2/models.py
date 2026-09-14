@@ -802,10 +802,18 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         GEO_BOUNDARY = "geoboundary", "GEO Boundary"
         TIME = "time", "Timeframe"
 
+    class FilterModes(models.TextChoices):
+        WHITELIST = "whitelist", "Whitelist"
+        BLACKLIST = "blacklist", "Blacklist"
+
     type = models.CharField(
         max_length=20,
         choices=SourceFilterTypes.choices,
         default=SourceFilterTypes.SOURCE_LIST
+    )
+    mode = models.CharField(
+        max_length=20,
+        choices=FilterModes.choices,
     )
     order_number = models.PositiveIntegerField(default=0, db_index=True)
     name = models.CharField(max_length=200, blank=True)
@@ -823,13 +831,37 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         related_name="source_filters",
         verbose_name="Routing Rule"
     )
+    destination = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="source_filters_by_destination",
+        verbose_name="Destination"
+    )
+    # Populated for type="list". The other filter types describe their selection in
+    # `selector` instead, which is why this is blank-able rather than required.
+    sources = models.ManyToManyField(
+        "integrations.Source",
+        blank=True,
+        related_name="source_filters_by_source",
+        verbose_name="Sources"
+    )
+    enabled = models.BooleanField(default=True)
     integration_field = "routing_rule__first_provider"
 
     class Meta:
         ordering = ("routing_rule", "order_number",)
+        constraints = [
+            # One list filter per arrow, carrying exactly one mode, so whitelist and
+            # blacklist cannot coexist on the same route/destination pair. `type` is part
+            # of the key so a future geoboundary filter can share the arrow with this one.
+            models.UniqueConstraint(
+                fields=("routing_rule", "destination", "type"),
+                name="unique_source_filter_per_route_destination_type",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.name} {self.type}"
+        return f"{self.name} {self.mode} {self.type}"
 
 
 class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
