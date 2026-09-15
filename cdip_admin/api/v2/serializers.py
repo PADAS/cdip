@@ -11,10 +11,12 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from core.utils import timezone_from_offset, parse_crontab_schedule_from_dict
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
+    Source, SourceState, SourceConfiguration, SourceFilter, ensure_default_route, RouteConfiguration, \
+    get_user_integrations_qs, \
     GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -34,6 +36,11 @@ class DuplicateIntegrationError(drf_exceptions.APIException):
 
 
 class DuplicateSourceError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
+
+
+class DuplicateSourceFilterError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "conflict"
 
@@ -943,6 +950,108 @@ class SourceCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return SourceRetrieveSerializer(instance=instance, context=self.context).data
+
+
+class SourceSummarySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    last_update = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Source
+        fields = ("id", "external_id", "name", "last_update")
+
+    def get_last_update(self, obj):
+        try:
+            source_state = obj.state
+        except SourceState.DoesNotExist:
+            return "unknown"
+        else:
+            return source_state.data.get("last_data_received", "unknown")
+
+
+class SourceFilterSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    destination = IntegrationSummarySerializer(read_only=True)
+    sources = SourceSummarySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SourceFilter
+        fields = ("id", "destination", "type", "mode", "enabled", "name", "description", "sources")
+
+
+class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    destination = serializers.PrimaryKeyRelatedField(queryset=Integration.objects.all())
+    source_ids = serializers.PrimaryKeyRelatedField(
+        source="sources", many=True, queryset=Source.objects.all(), write_only=True
+    )
+
+    class Meta:
+        model = SourceFilter
+        fields = (
+            "id", "destination", "type", "mode", "enabled", "name", "description", "source_ids"
+        )
+        # `selector` is deliberately not exposed. For type="list" the M2M is the single way
+        # to say which devices a rule covers; offering both would allow two rules in one row
+        # that disagree with each other.
+
+    @property
+    def _route(self):
+        return self.context["route"]
+
+    def validate_destination(self, value):
+        if not self._route.destinations.filter(id=value.id).exists():
+            raise drf_exceptions.ValidationError(
+                "This destination is not one of the route's destinations."
+            )
+        return value
+
+    def validate_source_ids(self, value):
+        if not value:
+            raise drf_exceptions.ValidationError("At least one source is required.")
+        if len(value) > settings.SOURCE_FILTER_MAX_SOURCES:
+            raise drf_exceptions.ValidationError(
+                f"A filter may reference at most {settings.SOURCE_FILTER_MAX_SOURCES} sources."
+            )
+        provider_ids = set(self._route.data_providers.values_list("id", flat=True))
+        strangers = sorted(
+            {s.external_id for s in value if s.integration_id not in provider_ids}
+        )
+        if strangers:
+            raise drf_exceptions.ValidationError(
+                f"These sources belong to a provider that is not on this route: {strangers}"
+            )
+        return value
+
+    def validate(self, attrs):
+        destination = attrs.get("destination") or getattr(self.instance, "destination", None)
+        # `type` carries a model default, so DRF leaves it out of validated_data when the
+        # client omits it — the database applies it at save time. Resolving it here keeps
+        # the duplicate check looking for the row that will actually be written.
+        filter_type = (
+            attrs.get("type")
+            or getattr(self.instance, "type", None)
+            or SourceFilter.SourceFilterTypes.SOURCE_LIST
+        )
+        duplicates = SourceFilter.objects.filter(
+            routing_rule=self._route, destination=destination, type=filter_type
+        )
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise DuplicateSourceFilterError(detail={
+                "destination": [
+                    "This destination already has a filter of this type on this route."
+                ]
+            })
+        return attrs
+
+    def create(self, validated_data):
+        validated_data["routing_rule"] = self._route
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        return SourceFilterSerializer(instance=instance, context=self.context).data
 
 
 # All stream types the platform routes (GUNDI-5548: includes txt, obvu, att —

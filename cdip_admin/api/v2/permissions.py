@@ -88,6 +88,17 @@ def get_user_org(request, view) -> str:
             provider_id = None
         provider = Integration.objects.filter(id=provider_id).first() if provider_id else None
         org_id = str(provider.owner_id) if provider else None
+    elif view.basename == "filters":
+        # Nested under routes, so authz keys on the parent route. Guarded the same way as
+        # the sources branch: an unknown or malformed route id resolves to "no organization"
+        # and a 403, rather than raising out of the permission layer.
+        raw_route_id = context.get("route_pk")
+        try:
+            route_id = str(uuid.UUID(str(raw_route_id))) if raw_route_id else None
+        except (ValueError, TypeError, AttributeError):
+            route_id = None
+        route = Route.objects.filter(id=route_id).first() if route_id else None
+        org_id = str(route.owner_id) if route else None
     elif view.basename == "routes":
         if view.action in ["retrieve", "update", "partial_update", "destroy", "delete_configuration"]:
             route_id = context.get("pk")
@@ -119,6 +130,7 @@ class IsOrgAdmin(permissions.BasePermission):
         "actions": ["execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy", "delete_configuration"],
+        "filters": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "logs": ["list", "retrieve", "revert"]
     }
 

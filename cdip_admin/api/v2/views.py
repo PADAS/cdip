@@ -7,6 +7,9 @@ from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace, IntegrationAction
 from integrations.models import IntegrationType, Integration
+# Aliased: `SourceFilter` in this module is the DRF FilterSet imported above, not the
+# model of the same name.
+from integrations.models import SourceFilter as SourceFilterModel
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
 from accounts.models import AccountProfileOrganization, EULA
@@ -384,6 +387,42 @@ class SourcesView(
         if self.action == "create":
             return v2_serializers.SourceCreateSerializer
         return v2_serializers.SourceRetrieveSerializer
+
+
+class RouteFiltersView(viewsets.ModelViewSet):
+    """
+    An endpoint for managing the routing filters of a route
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    # Explicit ordering: the default cursor paginator falls back to `-created`, which this
+    # model does not have.
+    filter_backends = [drf_filters.OrderingFilter]
+    ordering_fields = ["created_at", "order_number", "destination__name"]
+    ordering = ["created_at"]
+
+    def get_route(self):
+        # Resolved against the user's own routes, so a route in another organization is a
+        # 404 here rather than an empty filter list.
+        if not hasattr(self, "_route"):
+            self._route = generics.get_object_or_404(
+                get_user_routes_qs(user=self.request.user), pk=self.kwargs["route_pk"]
+            )
+        return self._route
+
+    def get_queryset(self):
+        return SourceFilterModel.objects.filter(
+            routing_rule=self.get_route()
+        ).select_related("destination").prefetch_related("sources__state")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["route"] = self.get_route()
+        return context
+
+    def get_serializer_class(self):
+        if self.action in ["create", "update", "partial_update"]:
+            return v2_serializers.SourceFilterCreateUpdateSerializer
+        return v2_serializers.SourceFilterSerializer
 
 
 class RoutesView(viewsets.ModelViewSet):
