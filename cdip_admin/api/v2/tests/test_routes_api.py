@@ -1251,3 +1251,19 @@ def test_filters_block_omits_types_it_cannot_carry(
     assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
         s.external_id for s in lotek_sources
     }
+
+
+def test_filters_block_omits_a_destination_no_longer_on_the_route(
+        api_client, superuser, organization, route_1
+):
+    # Route update prunes these, but a removal that bypasses the API leaves the filter
+    # pointing at an Integration that still exists, so the cascade never fires. Routing must
+    # not be handed a rule for an arrow the route no longer has.
+    source_filter = route_1.source_filters.get()
+    route_1.destinations.remove(source_filter.destination)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert str(source_filter.destination_id) not in response.json()["filters"]

@@ -1,6 +1,7 @@
 import django_filters
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import transaction
-from django.db.models import Count, Prefetch, Subquery
+from django.db.models import Count, Prefetch, Q, Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
@@ -414,13 +415,37 @@ class RouteFiltersView(viewsets.ModelViewSet):
         # Sources are not serialized inline — a filter may hold up to
         # SOURCE_FILTER_MAX_SOURCES of them — so only the count travels with the rule and
         # the list itself is paged from the `sources` action below.
-        return SourceFilterModel.objects.filter(
+        queryset = SourceFilterModel.objects.filter(
             routing_rule=self.get_route()
-        ).select_related("destination").annotate(sources_count=Count("sources"))
+        ).select_related("destination")
+        if self.action not in ("list", "retrieve"):
+            # Annotations only on the read paths. ChangeLogMixin.save() diffs every
+            # attribute it finds on the instance, so an annotated row reaching a write
+            # records the aggregates as if they were edited fields, and the activity log
+            # cannot serialize them.
+            return queryset
+        # `providers` and `excludes_default_source` both describe the rule's own sources, so
+        # they are aggregated here rather than derived per row: a page of rules used to cost
+        # two extra queries for every rule on it.
+        return queryset.annotate(
+            sources_count=Count("sources", distinct=True),
+            provider_ids=ArrayAgg("sources__integration_id", distinct=True),
+            default_source_provider_ids=ArrayAgg(
+                "sources__integration_id",
+                distinct=True,
+                filter=Q(sources__external_id=v2_serializers.DEFAULT_SOURCE_EXTERNAL_ID),
+            ),
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["route"] = self.get_route()
+        route = self.get_route()
+        context["route"] = route
+        # Resolved once for the page. A rule may only name sources of the route's own
+        # providers, so this covers every row on it.
+        context["provider_names"] = {
+            str(provider.id): provider.name for provider in route.data_providers.all()
+        }
         return context
 
     def get_serializer_class(self):

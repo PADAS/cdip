@@ -1002,26 +1002,56 @@ class SourceFilterSerializer(serializers.ModelSerializer):
         annotated = getattr(obj, "sources_count", None)
         return annotated if annotated is not None else obj.sources.count()
 
+    @staticmethod
+    def _annotated_ids(obj, attribute, fallback):
+        # Annotated on the queryset by RouteFiltersView; recomputed when the serializer is
+        # used on an instance straight from a write, where the annotation is absent.
+        values = getattr(obj, attribute) if hasattr(obj, attribute) else fallback()
+        return {str(value) for value in (values or []) if value}
+
+    def _covered_provider_ids(self, obj):
+        return self._annotated_ids(
+            obj, "provider_ids",
+            lambda: obj.sources.values_list("integration_id", flat=True).distinct(),
+        )
+
+    def _provider_ids_naming_their_default_source(self, obj):
+        return self._annotated_ids(
+            obj, "default_source_provider_ids",
+            lambda: obj.sources.filter(
+                external_id=DEFAULT_SOURCE_EXTERNAL_ID
+            ).values_list("integration_id", flat=True).distinct(),
+        )
+
     def get_providers(self, obj):
         # The set of providers a rule actually covers. A rule only affects the providers
         # whose sources it names, and the paginated source list no longer lets the client
         # work this out for itself.
-        providers = Integration.objects.filter(
-            sources_by_integration__in=obj.sources.all()
-        ).distinct()
-        return [{"id": str(p.id), "name": p.name} for p in providers]
+        provider_ids = self._covered_provider_ids(obj)
+        names = dict(self.context.get("provider_names") or {})
+        unnamed = provider_ids - names.keys()
+        if unnamed:
+            names.update({
+                str(p.id): p.name for p in Integration.objects.filter(id__in=unnamed)
+            })
+        return sorted(
+            ({"id": pid, "name": names.get(pid, "")} for pid in provider_ids),
+            key=lambda provider: (provider["name"], provider["id"]),
+        )
 
     def get_excludes_default_source(self, obj):
         if obj.mode != SourceFilter.FilterModes.WHITELIST:
             return False
-        # Scoped to the providers the rule names, matching get_providers above. A provider
-        # the rule does not cover is not missing its default source, it is untouched by the
-        # rule, and warning about it would send the operator looking for a drop that the
-        # rule cannot cause.
-        return Source.objects.filter(
-            integration_id__in=obj.sources.values("integration_id"),
-            external_id=DEFAULT_SOURCE_EXTERNAL_ID,
-        ).exclude(id__in=obj.sources.values("id")).exists()
+        # Answered from the rule's own sources, not from whether a `default-source` row
+        # exists yet. Ingestion creates that row the first time a provider reports without
+        # one, so keying off its existence would stay silent for a whitelist written before
+        # any sourceless data arrives, which is exactly when the operator can still fix it.
+        # The rule is scoped to the providers it names: one it does not cover is untouched,
+        # not omitted.
+        return bool(
+            self._covered_provider_ids(obj)
+            - self._provider_ids_naming_their_default_source(obj)
+        )
 
 
 class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
@@ -1529,11 +1559,18 @@ class RouteDetailSerializer(RouteRetrieveFullSerializer):
         # keys are also the scope of the rule: a provider absent from the map is untouched
         # by it.
         filters = {}
+        destination_ids = {destination.id for destination in obj.destinations.all()}
         for source_filter in obj.source_filters.all():
             # Keyed by destination, so only one filter per arrow fits. Other types describe
             # their selection in `selector`, which this block does not carry, and emitting
             # one here would displace the list rule for the same destination.
             if source_filter.type != SourceFilter.SourceFilterTypes.SOURCE_LIST:
+                continue
+            # Route update prunes filters whose destination it drops, but a removal that
+            # bypasses the API (the admin, a shell, a data migration) leaves the row
+            # pointing at an Integration that still exists, so nothing deletes it. Routing
+            # is never told to filter an arrow the route no longer has.
+            if source_filter.destination_id not in destination_ids:
                 continue
             by_provider = {}
             for source in source_filter.sources.all():

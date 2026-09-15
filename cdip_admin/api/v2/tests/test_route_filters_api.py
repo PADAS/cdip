@@ -1,6 +1,8 @@
 from unittest import mock
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
@@ -559,3 +561,75 @@ def test_default_source_of_a_provider_the_rule_does_not_cover_is_not_flagged(
 
     assert response.status_code == status.HTTP_200_OK, response.content
     assert response.json()["results"][0]["excludes_default_source"] is False
+
+
+def test_whitelist_is_flagged_before_ingestion_has_created_the_default_source(
+        api_client, superuser, organization, route_1, provider_lotek_panthera
+):
+    # No `default-source` row exists yet: the provider has never reported without one. The
+    # whitelist will still drop that traffic the moment it arrives, and this is the point at
+    # which the operator can still add it, so the advisory must not wait for the row.
+    assert not Source.objects.filter(
+        integration=provider_lotek_panthera, external_id="default-source"
+    ).exists()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["results"][0]["excludes_default_source"] is True
+
+
+# ---- Query budget ---------------------------------------------------------
+
+
+def test_listing_filters_costs_the_same_whatever_the_number_of_rules(
+        api_client, superuser, organization, route_1, lotek_sources, integrations_list_er
+):
+    # `providers` and `excludes_default_source` describe each rule's own sources, so they
+    # are aggregated on the queryset and cost nothing per row. The three queries a rule
+    # still adds come from ChangeLogMixin resolving `routing_rule__first_provider` on every
+    # instance it loads, which is not the serializer's to avoid.
+    api_client.force_authenticate(superuser)
+
+    with CaptureQueriesContext(connection) as one_rule:
+        response = api_client.get(_list_url(route_1))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert len(response.json()["results"]) == 1
+
+    for order, destination in enumerate(integrations_list_er[1:4], start=2):
+        extra = SourceFilter.objects.create(
+            type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+            mode=SourceFilter.FilterModes.WHITELIST,
+            routing_rule=route_1,
+            destination=destination,
+            order_number=order,
+        )
+        extra.sources.set(lotek_sources)
+
+    with CaptureQueriesContext(connection) as four_rules:
+        response = api_client.get(_list_url(route_1))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert len(response.json()["results"]) == 4
+
+    per_extra_rule = (
+        len(four_rules.captured_queries) - len(one_rule.captured_queries)
+    ) / 3
+    assert per_extra_rule <= 3, [q["sql"] for q in four_rules.captured_queries]
+
+
+def test_a_filter_rendered_straight_from_a_write_still_reports_its_providers(
+        api_client, org_admin_user, organization, route_1, integrations_list_er, lotek_sources,
+        provider_lotek_panthera
+):
+    # The create response serializes the instance it just saved, which carries none of the
+    # list annotations.
+    response = _post(
+        api_client, org_admin_user, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:2]),
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    body = response.json()
+    assert [p["id"] for p in body["providers"]] == [str(provider_lotek_panthera.id)]
+    assert body["excludes_default_source"] is True
+    assert body["sources_count"] == 2
