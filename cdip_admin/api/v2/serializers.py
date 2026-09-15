@@ -1445,8 +1445,43 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
-            # "filters"  # ToDo: Support "filters" or "rules"
+            # No "filters" here on purpose — see RouteDetailSerializer.
         )
+
+
+class RouteDetailSerializer(RouteRetrieveFullSerializer):
+    """Route retrieve, carrying the filter block cdip-routing evaluates.
+
+    Separate from the list representation because a route may hold several filters of up to
+    SOURCE_FILTER_MAX_SOURCES devices each, and a page of routes would multiply that for a
+    view that never needs the device lists.
+    """
+
+    filters = serializers.SerializerMethodField()
+
+    class Meta(RouteRetrieveFullSerializer.Meta):
+        fields = RouteRetrieveFullSerializer.Meta.fields + ("filters",)
+
+    def get_filters(self, obj):
+        # Grouped by provider on the wire although the model is not. `external_id` is unique
+        # only within a provider, so a flat list would let a second provider's
+        # identically-named device satisfy a whitelist written for the first. The provider
+        # keys are also the scope of the rule: a provider absent from the map is untouched
+        # by it.
+        filters = {}
+        for source_filter in obj.source_filters.all():
+            by_provider = {}
+            for source in source_filter.sources.all():
+                by_provider.setdefault(str(source.integration_id), []).append(
+                    source.external_id
+                )
+            filters[str(source_filter.destination_id)] = {
+                "type": source_filter.type,
+                "mode": source_filter.mode,
+                "enabled": source_filter.enabled,
+                "by_provider": by_provider,
+            }
+        return filters
 
 
 class KeyRelatedField(serializers.RelatedField):

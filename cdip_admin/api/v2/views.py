@@ -1,6 +1,6 @@
 import django_filters
 from django.db import transaction
-from django.db.models import Count, Subquery
+from django.db.models import Count, Prefetch, Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
@@ -9,7 +9,7 @@ from integrations.models import Route, get_user_integrations_qs, get_integration
 from integrations.models import IntegrationType, Integration
 # Aliased: `SourceFilter` in this module is the DRF FilterSet imported above, not the
 # model of the same name.
-from integrations.models import SourceFilter as SourceFilterModel
+from integrations.models import Source, SourceFilter as SourceFilterModel
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
 from accounts.models import AccountProfileOrganization, EULA
@@ -472,11 +472,23 @@ class RoutesView(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
             return v2_serializers.RouteCreateUpdateSerializer
+        if self.action == "retrieve":
+            return v2_serializers.RouteDetailSerializer
         return v2_serializers.RouteRetrieveFullSerializer
 
     def get_queryset(self):
         # Returns a list with the routes that the user is allowed to see
-        return get_user_routes_qs(user=self.request.user)
+        queryset = get_user_routes_qs(user=self.request.user)
+        if self.action == "retrieve":
+            # Only the detail view serializes filters, and only these three columns are
+            # read while grouping them.
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "source_filters__sources",
+                    queryset=Source.objects.only("id", "integration_id", "external_id"),
+                )
+            )
+        return queryset
 
     @action(detail=True, methods=["delete"], url_path="configuration")
     def delete_configuration(self, request, pk: str | None = None) -> Response:
