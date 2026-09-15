@@ -1,7 +1,10 @@
+from unittest import mock
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from api.v2.serializers import SourceFilterCreateUpdateSerializer
 from integrations.models import Source, SourceFilter
 
 pytestmark = pytest.mark.django_db
@@ -195,6 +198,79 @@ def test_second_filter_for_the_same_destination_conflicts(
     assert "already has a filter" in response.content.decode()
 
 
+def test_reject_a_filter_type_the_wire_block_cannot_carry(
+        api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
+):
+    # The unique constraint allows a second type on the same arrow, but the block routing
+    # reads is keyed by destination alone, so the newcomer would displace the list rule and
+    # silently drop its whitelist. Until that contract carries the type, refuse the write.
+    response = _post(
+        api_client, superuser, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:1], type="geoboundary"),
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "type" in response.json()
+
+
+def test_stranger_sources_are_reported_by_id_not_by_external_id(
+        api_client, superuser, organization, other_organization, route_1,
+        integrations_list_er, movebank_sources
+):
+    # source_ids resolves against every Source in the system, so the rejection must not
+    # echo the device identifier of a source in another organization.
+    stranger = movebank_sources[0]
+    response = _post(
+        api_client, superuser, route_1, _payload(integrations_list_er[1], [stranger])
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    body = response.content.decode()
+    assert str(stranger.id) in body
+    assert stranger.external_id not in body
+
+
+def test_duplicate_filter_losing_a_race_is_still_a_conflict(
+        api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
+):
+    # Simulate the concurrent POST that slips past the check in validate(): the insert then
+    # hits the unique constraint, which must surface as the same 409 rather than a 500.
+    with mock.patch.object(
+        SourceFilterCreateUpdateSerializer, "validate", side_effect=lambda attrs: attrs
+    ):
+        response = _post(
+            api_client, superuser, route_1,
+            _payload(integrations_list_er[0], lotek_sources[:1]),
+        )
+    assert response.status_code == status.HTTP_409_CONFLICT, response.content
+    assert "already has a filter" in response.content.decode()
+    assert route_1.source_filters.count() == 1
+
+
+def test_moving_a_filter_onto_a_taken_destination_losing_a_race_is_a_conflict(
+        api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
+):
+    taken = route_1.source_filters.get()
+    moving = SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        mode=SourceFilter.FilterModes.WHITELIST,
+        routing_rule=route_1,
+        destination=integrations_list_er[1],
+    )
+    moving.sources.set(lotek_sources[:1])
+
+    api_client.force_authenticate(superuser)
+    with mock.patch.object(
+        SourceFilterCreateUpdateSerializer, "validate", side_effect=lambda attrs: attrs
+    ):
+        response = api_client.patch(
+            _detail_url(route_1, moving),
+            data={"destination": str(taken.destination_id)},
+            format="json",
+        )
+    assert response.status_code == status.HTTP_409_CONFLICT, response.content
+    moving.refresh_from_db()
+    assert moving.destination_id == integrations_list_er[1].id
+
+
 def test_mode_is_required(
         api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
 ):
@@ -295,6 +371,68 @@ def test_removing_a_destination_from_the_route_removes_its_filters(
     destination = source_filter.destination
     destination.delete()
     assert not SourceFilter.objects.filter(id=source_filter.id).exists()
+
+
+def test_narrowing_the_route_destinations_prunes_the_orphaned_filters(
+        api_client, superuser, organization, route_1, integrations_list_er
+):
+    # Dropping a destination only rewrites the route's own M2M row; the filter's FK points
+    # at the Integration, which still exists. Left behind it keeps shipping in the block
+    # routing reads and comes back into force if the arrow is ever re-added.
+    source_filter = route_1.source_filters.get()
+    kept = [i for i in route_1.destinations.all() if i.id != source_filter.destination_id]
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"destinations": [str(i.id) for i in kept]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert not SourceFilter.objects.filter(id=source_filter.id).exists()
+
+
+def test_narrowing_the_route_providers_drops_their_sources_from_the_filters(
+        api_client, superuser, organization, route_1, provider_lotek_panthera,
+        provider_ats, make_random_sources
+):
+    ats_sources = make_random_sources(provider=provider_ats, qty=2)
+    route_1.data_providers.add(provider_ats)
+    source_filter = route_1.source_filters.get()
+    source_filter.sources.add(*ats_sources)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"data_providers": [str(provider_lotek_panthera.id)]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    remaining = set(source_filter.sources.values_list("id", flat=True))
+    assert remaining.isdisjoint({s.id for s in ats_sources})
+    assert remaining
+
+
+def test_widening_the_route_leaves_the_filters_alone(
+        api_client, superuser, organization, route_1, provider_ats, integrations_list_er
+):
+    source_filter = route_1.source_filters.get()
+    before = set(source_filter.sources.values_list("id", flat=True))
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"data_providers": [
+            str(i.id) for i in list(route_1.data_providers.all()) + [provider_ats]
+        ]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert SourceFilter.objects.filter(id=source_filter.id).exists()
+    assert set(source_filter.sources.values_list("id", flat=True)) == before
 
 
 def test_deleting_a_source_removes_it_from_the_filter(
@@ -399,4 +537,25 @@ def test_blacklist_is_never_flagged_for_default_source(
 
     api_client.force_authenticate(superuser)
     response = api_client.get(_list_url(route_1))
+    assert response.json()["results"][0]["excludes_default_source"] is False
+
+
+def test_default_source_of_a_provider_the_rule_does_not_cover_is_not_flagged(
+        api_client, superuser, organization, route_1, provider_lotek_panthera,
+        provider_ats, make_random_sources
+):
+    # The rule only covers the providers whose sources it names. A default source belonging
+    # to another provider on the route is not dropped by this rule, so flagging it would
+    # send the operator hunting for a drop the rule cannot cause.
+    route_1.data_providers.add(provider_ats)
+    Source.objects.create(integration=provider_ats, external_id="default-source")
+    covered_default = Source.objects.create(
+        integration=provider_lotek_panthera, external_id="default-source"
+    )
+    route_1.source_filters.get().sources.add(covered_default)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
     assert response.json()["results"][0]["excludes_default_source"] is False

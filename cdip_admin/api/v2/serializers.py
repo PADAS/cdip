@@ -1014,8 +1014,12 @@ class SourceFilterSerializer(serializers.ModelSerializer):
     def get_excludes_default_source(self, obj):
         if obj.mode != SourceFilter.FilterModes.WHITELIST:
             return False
+        # Scoped to the providers the rule names, matching get_providers above. A provider
+        # the rule does not cover is not missing its default source, it is untouched by the
+        # rule, and warning about it would send the operator looking for a drop that the
+        # rule cannot cause.
         return Source.objects.filter(
-            integration__in=obj.routing_rule.data_providers.all(),
+            integration_id__in=obj.sources.values("integration_id"),
             external_id=DEFAULT_SOURCE_EXTERNAL_ID,
         ).exclude(id__in=obj.sources.values("id")).exists()
 
@@ -1023,6 +1027,16 @@ class SourceFilterSerializer(serializers.ModelSerializer):
 class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     destination = serializers.PrimaryKeyRelatedField(queryset=Integration.objects.all())
+    # The block cdip-routing reads (RouteRetrieveFullWithFiltersSerializer.get_filters) is
+    # keyed by destination alone, so it carries one filter per arrow. The model's unique
+    # constraint is wider, reserving room for a second type on the same arrow, so until
+    # that wire contract grows a type dimension only list filters may be created: a second
+    # type would pass the constraint and then silently displace the list rule from the
+    # payload, dropping the whitelist without any error.
+    type = serializers.ChoiceField(
+        choices=[SourceFilter.SourceFilterTypes.SOURCE_LIST],
+        default=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+    )
     source_ids = serializers.PrimaryKeyRelatedField(
         source="sources", many=True, queryset=Source.objects.all(), write_only=True
     )
@@ -1055,8 +1069,11 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
                 f"A filter may reference at most {settings.SOURCE_FILTER_MAX_SOURCES} sources."
             )
         provider_ids = set(self._route.data_providers.values_list("id", flat=True))
+        # Reported by id, not by external_id: source_ids resolves against every Source in
+        # the system, so echoing the device identifier would hand a caller the name of a
+        # device in another organization.
         strangers = sorted(
-            {s.external_id for s in value if s.integration_id not in provider_ids}
+            {str(s.id) for s in value if s.integration_id not in provider_ids}
         )
         if strangers:
             raise drf_exceptions.ValidationError(
@@ -1080,16 +1097,38 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             duplicates = duplicates.exclude(pk=self.instance.pk)
         if duplicates.exists():
-            raise DuplicateSourceFilterError(detail={
-                "destination": [
-                    "This destination already has a filter of this type on this route."
-                ]
-            })
+            raise self._duplicate_error()
         return attrs
+
+    @staticmethod
+    def _duplicate_error():
+        return DuplicateSourceFilterError(detail={
+            "destination": [
+                "This destination already has a filter of this type on this route."
+            ]
+        })
 
     def create(self, validated_data):
         validated_data["routing_rule"] = self._route
-        return super().create(validated_data)
+        return self._save_translating_conflicts(super().create, validated_data)
+
+    def update(self, instance, validated_data):
+        # A PUT may move the filter onto another destination, so it races the constraint
+        # the same way a create does.
+        return self._save_translating_conflicts(super().update, instance, validated_data)
+
+    def _save_translating_conflicts(self, write, *args):
+        # The check in validate() is not atomic with the write, so a concurrent request
+        # reaches unique_source_filter_per_route_destination_type. DRF derives no validator
+        # from that constraint (routing_rule is not a serializer field), which leaves the
+        # database as the only guard: answer its violation with the 409 validate() promises
+        # instead of letting IntegrityError surface as a 500. The savepoint keeps the outer
+        # ATOMIC_REQUESTS transaction usable after the failed write.
+        try:
+            with transaction.atomic():
+                return write(*args)
+        except IntegrityError:
+            raise self._duplicate_error()
 
     def to_representation(self, instance):
         return SourceFilterSerializer(instance=instance, context=self.context).data
@@ -1426,7 +1465,28 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return super().create(self._materialize_validated_data(validated_data))
 
     def update(self, instance: Route, validated_data: dict) -> Route:
-        return super().update(instance, self._materialize_validated_data(validated_data))
+        with transaction.atomic():
+            route = super().update(instance, self._materialize_validated_data(validated_data))
+            self._prune_filters(route)
+        return route
+
+    @staticmethod
+    def _prune_filters(route: Route) -> None:
+        """Drop the parts of a route's filters that the route no longer covers.
+
+        Narrowing `destinations` or `data_providers` only rewrites the route's own M2M rows.
+        A SourceFilter points at the Integration, which still exists, so the rule survives:
+        it keeps shipping in the block routing reads, it can no longer be saved back through
+        the API, and re-adding the destination silently puts the old rule back in force on
+        an arrow the operator believes is new.
+        """
+        route.source_filters.exclude(destination__in=route.destinations.all()).delete()
+        for source_filter in route.source_filters.prefetch_related("sources"):
+            orphaned = source_filter.sources.exclude(
+                integration__in=route.data_providers.all()
+            )
+            if orphaned.exists():
+                source_filter.sources.remove(*orphaned)
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
@@ -1470,6 +1530,11 @@ class RouteDetailSerializer(RouteRetrieveFullSerializer):
         # by it.
         filters = {}
         for source_filter in obj.source_filters.all():
+            # Keyed by destination, so only one filter per arrow fits. Other types describe
+            # their selection in `selector`, which this block does not carry, and emitting
+            # one here would displace the list rule for the same destination.
+            if source_filter.type != SourceFilter.SourceFilterTypes.SOURCE_LIST:
+                continue
             by_provider = {}
             for source in source_filter.sources.all():
                 by_provider.setdefault(str(source.integration_id), []).append(

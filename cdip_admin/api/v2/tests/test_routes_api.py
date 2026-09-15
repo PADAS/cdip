@@ -1221,3 +1221,33 @@ def test_filters_block_is_scoped_to_the_route(
     filters = response.json()["filters"]
     other_destination = str(route_2.source_filters.get().destination_id)
     assert other_destination not in filters
+
+
+def test_filters_block_omits_types_it_cannot_carry(
+        api_client, superuser, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    # The block is keyed by destination, so two filters on one arrow would collapse into a
+    # single entry and the list rule, the one routing enforces, could lose. A non-list
+    # filter describes its selection in `selector`, which this block does not carry, so it
+    # is left out instead of overwriting its neighbour.
+    list_filter = route_1.source_filters.get()
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.GEO_BOUNDARY,
+        mode=SourceFilter.FilterModes.WHITELIST,
+        routing_rule=route_1,
+        destination=list_filter.destination,
+        selector={"polygon": []},
+        # Ordered after the list rule, which is the case that used to overwrite it:
+        # Meta.ordering decides which of the two reaches the destination key last.
+        order_number=list_filter.order_number + 1,
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    rule = response.json()["filters"][str(list_filter.destination_id)]
+    assert rule["type"] == "list"
+    assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
+        s.external_id for s in lotek_sources
+    }
