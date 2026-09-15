@@ -29,6 +29,11 @@ from .utils import send_events_to_routing, send_attachments_to_routing, send_obs
 
 User = get_user_model()
 
+# The external_id ingestion assigns when a client submits without a source. It is a
+# real Source row, so a whitelist that omits it silently drops every sourceless
+# submission from that provider.
+DEFAULT_SOURCE_EXTERNAL_ID = "default-source"
+
 
 class DuplicateIntegrationError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
@@ -969,14 +974,50 @@ class SourceSummarySerializer(serializers.ModelSerializer):
             return source_state.data.get("last_data_received", "unknown")
 
 
+class DestinationSummarySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = Integration
+        fields = ("id", "name")
+
+
 class SourceFilterSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
-    destination = IntegrationSummarySerializer(read_only=True)
-    sources = SourceSummarySerializer(many=True, read_only=True)
+    destination = DestinationSummarySerializer(read_only=True)
+    # Annotated on the queryset; falls back to a COUNT when the serializer is used on an
+    # instance straight from a write, where the annotation is absent.
+    sources_count = serializers.SerializerMethodField()
+    providers = serializers.SerializerMethodField()
+    excludes_default_source = serializers.SerializerMethodField()
 
     class Meta:
         model = SourceFilter
-        fields = ("id", "destination", "type", "mode", "enabled", "name", "description", "sources")
+        fields = (
+            "id", "destination", "type", "mode", "enabled", "name", "description",
+            "sources_count", "providers", "excludes_default_source", "updated_at",
+        )
+
+    def get_sources_count(self, obj):
+        annotated = getattr(obj, "sources_count", None)
+        return annotated if annotated is not None else obj.sources.count()
+
+    def get_providers(self, obj):
+        # The set of providers a rule actually covers. A rule only affects the providers
+        # whose sources it names, and the paginated source list no longer lets the client
+        # work this out for itself.
+        providers = Integration.objects.filter(
+            sources_by_integration__in=obj.sources.all()
+        ).distinct()
+        return [{"id": str(p.id), "name": p.name} for p in providers]
+
+    def get_excludes_default_source(self, obj):
+        if obj.mode != SourceFilter.FilterModes.WHITELIST:
+            return False
+        return Source.objects.filter(
+            integration__in=obj.routing_rule.data_providers.all(),
+            external_id=DEFAULT_SOURCE_EXTERNAL_ID,
+        ).exclude(id__in=obj.sources.values("id")).exists()
 
 
 class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
@@ -1467,7 +1508,7 @@ class GundiTraceSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     source = serializers.CharField(
         write_only=True,
-        default="default-source"
+        default=DEFAULT_SOURCE_EXTERNAL_ID
     )
 
     def validate(self, data):
@@ -1589,7 +1630,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         if not self.instance:
             source, created = Source.objects.get_or_create(
                 integration=data["integration"],
-                external_id=data.get("source", "default-source")
+                external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID)
             )
             data["source"] = source
         return data
@@ -1679,7 +1720,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data.get("source", "default-source"),
+            external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID),
             defaults={
                 "name": data.get("source_name", "")
             }
@@ -1860,7 +1901,7 @@ class TextMessageSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data.get("source", "default-source"),
+            external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID),
             defaults={
                 "name": data.get("source_name", "")
             }

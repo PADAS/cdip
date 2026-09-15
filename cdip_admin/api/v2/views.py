@@ -1,6 +1,6 @@
 import django_filters
 from django.db import transaction
-from django.db.models import Subquery
+from django.db.models import Count, Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
@@ -22,6 +22,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from . import serializers as v2_serializers
+from .pagination import FilterSourcesPagination
 from . import permissions
 from . import filters as custom_filters
 
@@ -410,9 +411,12 @@ class RouteFiltersView(viewsets.ModelViewSet):
         return self._route
 
     def get_queryset(self):
+        # Sources are not serialized inline — a filter may hold up to
+        # SOURCE_FILTER_MAX_SOURCES of them — so only the count travels with the rule and
+        # the list itself is paged from the `sources` action below.
         return SourceFilterModel.objects.filter(
             routing_rule=self.get_route()
-        ).select_related("destination").prefetch_related("sources__state")
+        ).select_related("destination").annotate(sources_count=Count("sources"))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -423,6 +427,21 @@ class RouteFiltersView(viewsets.ModelViewSet):
         if self.action in ["create", "update", "partial_update"]:
             return v2_serializers.SourceFilterCreateUpdateSerializer
         return v2_serializers.SourceFilterSerializer
+
+    @action(detail=True, methods=["get"], url_path="sources")
+    def sources(self, request, route_pk=None, pk=None):
+        """The devices this filter covers, paged 50 at a time."""
+        queryset = self.get_object().sources.select_related("state").order_by(
+            "external_id", "id"
+        )
+        # Instantiated here rather than set as the view's pagination_class, so the filter
+        # list keeps the project-wide page size and only this sub-list defaults to 50.
+        paginator = FilterSourcesPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = v2_serializers.SourceSummarySerializer(
+            page, many=True, context=self.get_serializer_context()
+        )
+        return paginator.get_paginated_response(serializer.data)
 
 
 class RoutesView(viewsets.ModelViewSet):

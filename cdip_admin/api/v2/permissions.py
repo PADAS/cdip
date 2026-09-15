@@ -130,7 +130,7 @@ class IsOrgAdmin(permissions.BasePermission):
         "actions": ["execute"],
         "sources": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
         "routes": ["list", "create", "retrieve", "update", "partial_update", "destroy", "delete_configuration"],
-        "filters": ["list", "create", "retrieve", "update", "partial_update", "destroy"],
+        "filters": ["list", "create", "retrieve", "update", "partial_update", "destroy", "sources"],
         "logs": ["list", "retrieve", "revert"]
     }
 

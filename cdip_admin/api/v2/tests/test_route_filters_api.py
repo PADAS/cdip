@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from integrations.models import SourceFilter
+from integrations.models import Source, SourceFilter
 
 pytestmark = pytest.mark.django_db
 
@@ -37,7 +37,10 @@ def _post(api_client, user, route, payload):
 
 
 @pytest.mark.parametrize("user_fixture", ["superuser", "org_admin_user", "org_viewer_user"])
-def test_list_filters(request, api_client, organization, route_1, lotek_sources, user_fixture):
+def test_list_filters(
+        request, api_client, organization, route_1, lotek_sources,
+        provider_lotek_panthera, user_fixture
+):
     user = request.getfixturevalue(user_fixture)
     api_client.force_authenticate(user)
     response = api_client.get(_list_url(route_1))
@@ -49,10 +52,15 @@ def test_list_filters(request, api_client, organization, route_1, lotek_sources,
     assert rule["mode"] == "whitelist"
     assert rule["type"] == "list"
     assert rule["enabled"] is True
-    # Destination and sources arrive expanded, so the UI needs no follow-up call.
-    assert rule["destination"]["id"]
-    assert {s["external_id"] for s in rule["sources"]} == {s.external_id for s in lotek_sources}
-    assert "last_update" in rule["sources"][0]
+    assert rule["updated_at"]
+    # The destination is summarised, not expanded — the UI already knows the route's
+    # destinations from the flow map and only needs to match the rule to an arrow.
+    assert set(rule["destination"]) == {"id", "name"}
+    # Sources are paged from their own endpoint, so only the count and the providers the
+    # rule covers travel with the rule itself.
+    assert "sources" not in rule
+    assert rule["sources_count"] == len(lotek_sources)
+    assert [p["id"] for p in rule["providers"]] == [str(provider_lotek_panthera.id)]
 
 
 def test_cannot_list_filters_of_another_org_route(
@@ -299,3 +307,96 @@ def test_deleting_a_source_removes_it_from_the_filter(
     source_filter.refresh_from_db()
     assert removed.id not in set(source_filter.sources.values_list("id", flat=True))
     assert SourceFilter.objects.filter(id=source_filter.id).exists()
+
+
+# ---- Paged sources --------------------------------------------------------
+
+
+def _sources_url(route, source_filter):
+    return reverse(
+        "filters-sources",
+        kwargs={"route_pk": str(route.id), "pk": str(source_filter.id)},
+    )
+
+
+def test_filter_sources_are_paged(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(_sources_url(route_1, source_filter))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    body = response.json()
+    assert body["count"] == len(lotek_sources)
+    assert {s["external_id"] for s in body["results"]} == {s.external_id for s in lotek_sources}
+    assert "last_update" in body["results"][0]
+
+
+def test_filter_sources_page_size_can_be_overridden(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(_sources_url(route_1, source_filter), {"limit": 2})
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    body = response.json()
+    assert len(body["results"]) == 2
+    assert body["count"] == len(lotek_sources)
+
+
+def test_cannot_read_filter_sources_of_another_org_route(
+        api_client, org_admin_user, organization, other_organization, route_2
+):
+    source_filter = route_2.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(_sources_url(route_2, source_filter))
+    assert response.status_code in (
+        status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND
+    ), response.content
+
+
+# ---- default-source advisory ----------------------------------------------
+
+
+def test_whitelist_omitting_default_source_is_flagged(
+        api_client, superuser, organization, route_1, provider_lotek_panthera
+):
+    # Ingestion creates this row for any client that submits without a source. A whitelist
+    # that leaves it out stops all of that provider's sourceless traffic.
+    Source.objects.create(
+        integration=provider_lotek_panthera, external_id="default-source"
+    )
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["results"][0]["excludes_default_source"] is True
+
+
+def test_whitelist_including_default_source_is_not_flagged(
+        api_client, superuser, organization, route_1, provider_lotek_panthera
+):
+    default_source = Source.objects.create(
+        integration=provider_lotek_panthera, external_id="default-source"
+    )
+    source_filter = route_1.source_filters.get()
+    source_filter.sources.add(default_source)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+    assert response.json()["results"][0]["excludes_default_source"] is False
+
+
+def test_blacklist_is_never_flagged_for_default_source(
+        api_client, superuser, organization, route_1, provider_lotek_panthera
+):
+    Source.objects.create(integration=provider_lotek_panthera, external_id="default-source")
+    source_filter = route_1.source_filters.get()
+    source_filter.mode = SourceFilter.FilterModes.BLACKLIST
+    source_filter.save()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+    assert response.json()["results"][0]["excludes_default_source"] is False
