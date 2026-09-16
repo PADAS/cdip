@@ -874,3 +874,38 @@ def test_explicit_er_reuse_rejects_incomplete_or_unsupported_auth(
 
     assert Integration.objects.count() == 1
     assert Route.objects.count() == 0
+
+
+def test_malformed_er_integration_id_is_rejected_cleanly(
+    bridge_integration, integration_types_for_conversion
+):
+    with pytest.raises(CommandError, match="not found"):
+        run_conversion(bridge_integration, "--er-integration", "not-a-uuid")
+
+
+def test_auth_config_without_authentication_type_is_treated_as_token(
+    bridge_integration, existing_er_factory
+):
+    # The ER auth schema defaults authentication_type to "token", so a config
+    # holding only a token is a legitimate token-auth integration.
+    existing = existing_er_factory({"token": ER_TOKEN})
+
+    run_conversion(bridge_integration)
+
+    assert Integration.objects.filter(type__value="earth_ranger").count() == 1
+    route = Route.objects.get(data_providers=integration_of_type("inreach"))
+    assert list(route.destinations.all()) == [existing]
+
+
+def test_token_only_config_is_compared_by_er_user_when_tokens_differ(
+    bridge_integration, existing_er_factory
+):
+    existing_er_factory({"token": "a-different-token"})
+
+    with patch(f"{COMMAND_MODULE}.requests.get") as get:
+        get.return_value = er_user_response("shared_account")
+        run_conversion(bridge_integration)
+
+    # Both sides are token auth, so both tokens get looked up.
+    assert get.call_count == 2
+    assert Integration.objects.filter(type__value="earth_ranger").count() == 1

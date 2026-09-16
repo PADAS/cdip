@@ -59,6 +59,20 @@ MARKER_KEY = "converted_from_bridge_integration"
 ER_USER_PATH = "api/v1.0/user/me"
 ER_REQUEST_TIMEOUT = 10
 
+# Values of the ER auth action's "authentication_type" field.
+AUTH_TYPE_TOKEN = "token"
+AUTH_TYPE_USERNAME_PASSWORD = "username_password"
+
+
+def auth_type(credentials):
+    """Return an ER auth config's authentication type.
+
+    The ER 'auth' action schema declares authentication_type with a default of
+    "token", so a config holding only a token legitimately omits the key. An
+    explicit but unrecognised value is returned as-is, for the caller to reject.
+    """
+    return credentials.get("authentication_type") or AUTH_TYPE_TOKEN
+
 # Keys the conversion reads out of BridgeIntegration.additional.
 REQUIRED_KEYS = (
     "er_site",
@@ -316,7 +330,7 @@ class Command(BaseCommand):
         self._set_action_config(
             integration,
             "auth",
-            {"authentication_type": "token", "token": additional["er_token"]},
+            {"authentication_type": AUTH_TYPE_TOKEN, "token": additional["er_token"]},
         )
         return integration
 
@@ -366,9 +380,14 @@ class Command(BaseCommand):
         return existing
 
     def _load_named_er_integration(self, integration_id):
-        integration = Integration.objects.filter(
-            id=integration_id, type__value=TYPE_EARTH_RANGER
-        ).first()
+        try:
+            integration = Integration.objects.filter(
+                id=integration_id, type__value=TYPE_EARTH_RANGER
+            ).first()
+        except (ValidationError, ValueError):
+            # A mistyped --er-integration should read as a bad argument, not a
+            # UUID parsing traceback out of the queryset.
+            integration = None
         if integration is None:
             raise CommandError(
                 f"EarthRanger integration '{integration_id}' not found."
@@ -397,9 +416,9 @@ class Command(BaseCommand):
             )
         credentials = auth.data if isinstance(auth.data, dict) else {}
         required_fields = {
-            "token": ("token",),
-            "username_password": ("username", "password"),
-        }.get(credentials.get("authentication_type"))
+            AUTH_TYPE_TOKEN: ("token",),
+            AUTH_TYPE_USERNAME_PASSWORD: ("username", "password"),
+        }.get(auth_type(credentials))
         if not required_fields or any(
             not isinstance(credentials.get(field), str)
             or not credentials[field].strip()
@@ -424,7 +443,7 @@ class Command(BaseCommand):
         """Confirm the candidate authenticates as the same ER user as the bridge."""
         auth = existing.configurations.get(action__value="auth").data
         bridge_token = additional["er_token"]
-        uses_token = auth.get("authentication_type") == "token"
+        uses_token = auth_type(auth) == AUTH_TYPE_TOKEN
 
         if uses_token and auth.get("token") == bridge_token:
             # Same credential, so the permissions are identical by definition.
