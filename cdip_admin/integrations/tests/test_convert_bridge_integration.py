@@ -1,4 +1,6 @@
 import json
+import shutil
+import subprocess
 from io import StringIO
 
 from unittest.mock import Mock, patch
@@ -665,7 +667,11 @@ def test_username_password_integration_is_matched_against_the_er_user(
     bridge_integration, existing_er_factory
 ):
     existing = existing_er_factory(
-        {"authentication_type": "username_password", "username": "shared_account"}
+        {
+            "authentication_type": "username_password",
+            "username": "shared_account",
+            "password": "test-password",
+        }
     )
 
     with patch(f"{COMMAND_MODULE}.requests.get") as get:
@@ -785,3 +791,86 @@ def test_an_er_integration_for_a_different_site_is_not_a_candidate(
     run_conversion(bridge_integration)
 
     assert Integration.objects.filter(type__value="earth_ranger").count() == 2
+
+
+def test_missing_optional_append_recipients_defaults_to_false(
+    bridge_integration, integration_types_for_conversion
+):
+    bridge_integration.additional.pop("append_recipients_to_message")
+    bridge_integration.save()
+
+    run_conversion(bridge_integration)
+
+    config = integration_of_type("inreach").configurations.get(
+        action__value="push_messages"
+    )
+    assert config.data == {"append_recipients_to_message": False}
+
+
+@pytest.mark.parametrize("password", [None, "", "   "])
+@pytest.mark.parametrize("explicit_selection", [False, True])
+def test_er_reuse_rejects_missing_password(
+    bridge_integration, existing_er_factory, password, explicit_selection
+):
+    auth = {"authentication_type": "username_password", "username": "shared_account"}
+    if password is not None:
+        auth["password"] = password
+    existing = existing_er_factory(auth)
+    args = ("--er-integration", str(existing.id)) if explicit_selection else ()
+
+    with patch(f"{COMMAND_MODULE}.requests.get") as get:
+        get.return_value = er_user_response("shared_account")
+        with pytest.raises(CommandError, match="credentials"):
+            run_conversion(bridge_integration, *args)
+
+    assert Integration.objects.count() == 1
+    assert Route.objects.count() == 0
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq CLI is required")
+@pytest.mark.parametrize("alert_type, expected", [
+    ("CHECK-IN I'M OK", "ew_check_in_im_ok"),
+    ("NEW ALERT", "NEW ALERT"),
+])
+def test_everywhere_hub_transform_preserves_string_event_type(
+    bridge_integration, integration_types_for_conversion, alert_type, expected
+):
+    run_conversion(bridge_integration)
+    config = integration_of_type("generic_webhooks").webhook_configuration.data
+    payload = {
+        "alertType": alert_type,
+        "deviceName": "tracker-1",
+        "description": "Alert description",
+        "createTimeMs": 1700000000000,
+        "location": {
+            "gpsTimeMs": 1700000000000,
+            "latitudeDegrees": 1,
+            "longitudeDegrees": 2,
+        },
+    }
+    result = subprocess.run(
+        ["jq", config["jq_filter"]], input=json.dumps(payload),
+        text=True, capture_output=True, check=True,
+    )
+    event = json.loads(result.stdout)
+    assert event["event_type"] == expected
+    assert event["source"] == "tracker-1"
+    assert event["recorded_at"] == "2023-11-14T22:13:20Z"
+
+
+@pytest.mark.parametrize("auth", [
+    {"authentication_type": "token"},
+    {"authentication_type": "token", "token": ""},
+    {"authentication_type": "username_password", "password": "test-password"},
+    {"authentication_type": "unknown", "token": ER_TOKEN},
+])
+def test_explicit_er_reuse_rejects_incomplete_or_unsupported_auth(
+    bridge_integration, existing_er_factory, auth
+):
+    existing = existing_er_factory(auth)
+
+    with pytest.raises(CommandError, match="credentials"):
+        run_conversion(bridge_integration, "--er-integration", str(existing.id))
+
+    assert Integration.objects.count() == 1
+    assert Route.objects.count() == 0

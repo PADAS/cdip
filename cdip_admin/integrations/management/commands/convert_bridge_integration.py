@@ -67,7 +67,6 @@ REQUIRED_KEYS = (
     "inreach_url",
     "inreach_username",
     "inreach_password",
-    "append_recipients_to_message",
 )
 
 # Webhook payload transform for the Everywhere Hub alert feed. The jq filter
@@ -84,7 +83,7 @@ EVERYWHERE_HUB_JQ_FILTER = """{ "CHECK-IN I'M OK": "ew_check_in_im_ok",
   "MISSED CHECK-IN ESCALATION": "ew_missed_check_in_escalation",
   "SELF CHECK-IN STARTED": "ew_self_check_in_started",
   "SELF CHECK-IN STOPPED": "ew_self_check_in_stopped"} as $am
-| .alertType = (if $am[.alertType] then $am[.alertType] else . end)
+| .alertType = (if $am[.alertType] then $am[.alertType] else .alertType end)
 | .createTimeMs = (.createTimeMs | floor)
 | .location.gpsTimeMs = (.location.gpsTimeMs | floor)
 | { source: .deviceName,
@@ -295,9 +294,9 @@ class Command(BaseCommand):
             integration,
             "push_messages",
             {
-                "append_recipients_to_message": additional[
-                    "append_recipients_to_message"
-                ]
+                "append_recipients_to_message": additional.get(
+                    "append_recipients_to_message", False
+                )
             },
         )
         self._create_webhook_config(
@@ -395,6 +394,20 @@ class Command(BaseCommand):
             raise CommandError(
                 f"EarthRanger integration {existing.id} has no auth "
                 "configuration; refusing to route to it."
+            )
+        credentials = auth.data if isinstance(auth.data, dict) else {}
+        required_fields = {
+            "token": ("token",),
+            "username_password": ("username", "password"),
+        }.get(credentials.get("authentication_type"))
+        if not required_fields or any(
+            not isinstance(credentials.get(field), str)
+            or not credentials[field].strip()
+            for field in required_fields
+        ):
+            raise CommandError(
+                f"EarthRanger integration {existing.id} has incomplete or "
+                "unsupported auth credentials; refusing to route to it."
             )
         configured = set(
             existing.configurations.values_list("action__value", flat=True)
