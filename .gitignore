@@ -290,3 +290,6 @@ override.tf.json
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
 # example: *tfplan*
+
+# Local task notes — may hold payloads pasted from production
+TASK.md
