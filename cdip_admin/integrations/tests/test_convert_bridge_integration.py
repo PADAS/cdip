@@ -909,3 +909,133 @@ def test_token_only_config_is_compared_by_er_user_when_tokens_differ(
     # Both sides are token auth, so both tokens get looked up.
     assert get.call_count == 2
     assert Integration.objects.filter(type__value="earth_ranger").count() == 1
+
+
+# --- Handoff URLs ----------------------------------------------------------
+
+
+API_KEY_MODULE = "integrations.models.v2.models"
+
+
+@pytest.fixture(autouse=True)
+def fake_api_keys():
+    """Mint a predictable key per integration without touching Kong.
+
+    Autouse: every conversion now builds handoff URLs, so without this the
+    whole module would make real calls to the Kong admin API.
+    """
+    def key_for(integration):
+        return f"key-{integration.type.value}"
+
+    with patch(f"{API_KEY_MODULE}.get_api_key", side_effect=key_for) as get_key:
+        yield get_key
+
+
+def test_report_includes_the_three_handoff_urls(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    report = run_conversion_json(bridge_integration)
+
+    assert sorted(report["urls"]) == ["er_messages", "inreach_alerts", "inreach_gps"]
+
+
+def test_inreach_gps_url_carries_the_inreach_key(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    report = run_conversion_json(bridge_integration)
+
+    entry = report["urls"]["inreach_gps"]
+    assert entry["integration"] == str(integration_of_type("inreach").id)
+    assert entry["url"] == (
+        "https://hooks.gundiservice.org/webhooks"
+        "?integration_type=inreach&apikey=key-inreach"
+    )
+
+
+def test_alerts_url_carries_the_everywhere_hub_key(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    report = run_conversion_json(bridge_integration)
+
+    entry = report["urls"]["inreach_alerts"]
+    assert entry["integration"] == str(integration_of_type("generic_webhooks").id)
+    assert entry["url"] == (
+        "https://hooks.gundiservice.org/webhooks"
+        "?integration_type=generic_webhooks&apikey=key-generic_webhooks"
+    )
+
+
+def test_messages_url_reports_its_key_separately(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    report = run_conversion_json(bridge_integration)
+
+    entry = report["urls"]["er_messages"]
+    assert entry["integration"] == str(integration_of_type("api_push").id)
+    assert entry["url"] == "https://sensors.api.gundiservice.org/v2/messages/"
+    assert entry["apikey"] == "key-api_push"
+
+
+def test_urls_follow_the_configured_base_urls(
+    bridge_integration, integration_types_for_conversion, fake_api_keys, settings
+):
+    settings.GUNDI_WEBHOOKS_BASE_URL = "https://hooks.stage.gundiservice.org"
+    settings.GUNDI_SENSORS_BASE_URL = "https://sensors.stage.gundiservice.org"
+
+    report = run_conversion_json(bridge_integration)
+
+    assert report["urls"]["inreach_gps"]["url"].startswith(
+        "https://hooks.stage.gundiservice.org/webhooks?"
+    )
+    assert (
+        report["urls"]["er_messages"]["url"]
+        == "https://sensors.stage.gundiservice.org/v2/messages/"
+    )
+
+
+def test_dry_run_does_not_mint_api_keys(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    report = run_conversion_json(bridge_integration, "--dry-run")
+
+    # Kong is outside the transaction, so a rolled-back run must not touch it.
+    assert fake_api_keys.call_count == 0
+    assert "{apikey}" in report["urls"]["inreach_gps"]["url"]
+    assert report["urls"]["er_messages"]["apikey"] == "{apikey}"
+
+
+def test_api_keys_are_verbatim_while_other_credentials_stay_redacted(
+    bridge_integration, integration_types_for_conversion, fake_api_keys
+):
+    output = run_conversion(bridge_integration)
+
+    assert "key-inreach" in output
+    assert ER_TOKEN not in output
+    assert INREACH_PASSWORD not in output
+
+
+def test_a_kong_failure_is_reported_without_losing_the_conversion(
+    bridge_integration, integration_types_for_conversion
+):
+    with patch(f"{API_KEY_MODULE}.get_api_key", side_effect=OSError("kong is down")):
+        report = run_conversion_json(bridge_integration)
+
+    # The integrations are already committed; a key failure must not undo them.
+    assert Integration.objects.count() == 4
+    assert "error" in report["urls"]["inreach_gps"]
+    assert "url" not in report["urls"]["inreach_gps"]
+
+
+def test_a_kong_failure_for_one_url_leaves_the_others_intact(
+    bridge_integration, integration_types_for_conversion
+):
+    def flaky(integration):
+        if integration.type.value == "api_push":
+            raise OSError("kong is down")
+        return f"key-{integration.type.value}"
+
+    with patch(f"{API_KEY_MODULE}.get_api_key", side_effect=flaky):
+        report = run_conversion_json(bridge_integration)
+
+    assert "error" in report["urls"]["er_messages"]
+    assert report["urls"]["inreach_gps"]["url"].endswith("apikey=key-inreach")
