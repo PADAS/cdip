@@ -2084,6 +2084,9 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     is_duplicate = serializers.BooleanField(read_only=True)
     has_error = serializers.BooleanField(read_only=True)
+    is_filtered = serializers.BooleanField(read_only=True)
+    filtered_at = serializers.DateTimeField(read_only=True)
+    filtered_by = serializers.CharField(read_only=True)
 
 
 class ActivityLogBaseSerializer(serializers.Serializer):

@@ -670,7 +670,8 @@ class GundiTraceFilter(django_filters_rest.FilterSet):
             'related_to': ['exact', ],
             'data_provider': ['exact', ],
             'destination': ['exact', ],
-            'external_id': ['exact', ]
+            'external_id': ['exact', ],
+            'is_filtered': ['exact', ]
         }
 
 
