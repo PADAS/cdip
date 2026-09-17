@@ -3,6 +3,7 @@
 import json
 
 import requests
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -58,6 +59,10 @@ MARKER_KEY = "converted_from_bridge_integration"
 # tell whether two different tokens belong to the same ER user.
 ER_USER_PATH = "api/v1.0/user/me"
 ER_REQUEST_TIMEOUT = 10
+
+# Placeholder used where a real API key would go on a dry run. Minting a key
+# creates a Kong consumer, which a rolled-back transaction cannot undo.
+API_KEY_PLACEHOLDER = "{apikey}"
 
 # Values of the ER auth action's "authentication_type" field.
 AUTH_TYPE_TOKEN = "token"
@@ -229,6 +234,7 @@ class Command(BaseCommand):
         self.created_routes = []
         self.created_route_configurations = []
         self.reused_integrations = []
+        self.url_targets = {}
 
         bridge = self._load_bridge(options["bridge_integration_id"])
         additional = bridge.additional or {}
@@ -251,11 +257,21 @@ class Command(BaseCommand):
                 # transaction.on_commit never fires on a rolled-back block.
                 transaction.set_rollback(True)
 
+        # Minting an API key creates a Kong consumer, which lives outside the
+        # database and survives a rollback — so keys are only fetched once the
+        # transaction has committed, and never on a dry run.
+        report["urls"] = self._build_urls(dry_run)
+
         self.stderr.write(
             f"{'Would convert' if dry_run else 'Converted'} BridgeIntegration "
             f"'{bridge.name}': {len(self.created_integrations)} integrations, "
             f"{len(self.created_routes)} routes."
         )
+        if not dry_run:
+            self.stderr.write(
+                "The report contains live API keys: treat it as a credential, "
+                "not as something to paste into a ticket."
+            )
         self.stdout.write(json.dumps(report, indent=2))
 
     def _convert(self, bridge, additional, types, options, reusable_er):
@@ -280,6 +296,14 @@ class Command(BaseCommand):
         self._create_route(
             bridge, provider=webhook_provider, destination=earth_ranger
         )
+
+        # The three entry points a data provider needs after conversion. The ER
+        # destination is absent by design: nothing is ever posted to it directly.
+        self.url_targets = {
+            "inreach_gps": inreach,
+            "inreach_alerts": webhook_provider,
+            "er_messages": api_push,
+        }
 
         return self._build_report(bridge, show_secrets=options["show_secrets"])
 
@@ -543,6 +567,54 @@ class Command(BaseCommand):
         )
         self.created_route_configurations.append(configuration)
         return configuration
+
+    # --- Handoff URLs -----------------------------------------------------
+
+    def _build_urls(self, dry_run):
+        """Build the entry-point URLs a data provider needs after conversion.
+
+        API keys appear verbatim: these URLs exist to be handed to whoever
+        configures the device side, and redacting them by default would only
+        push operators into passing --show-secrets on every run, exposing the
+        ER token and inReach password along with them.
+        """
+        webhooks_base = settings.GUNDI_WEBHOOKS_BASE_URL.rstrip("/")
+        sensors_base = settings.GUNDI_SENSORS_BASE_URL.rstrip("/")
+
+        urls = {}
+        for role, integration in self.url_targets.items():
+            entry = {
+                "integration": str(integration.id),
+                "name": integration.name,
+            }
+            if dry_run:
+                api_key = API_KEY_PLACEHOLDER
+            else:
+                try:
+                    api_key = integration.api_key
+                except Exception as exc:
+                    # Broad by intent: a Kong failure arrives as a requests
+                    # error, a ConsumerCreationError or an OSError, and by this
+                    # point the conversion is committed. Losing the whole report
+                    # over an unreachable key service would be the wrong trade.
+                    entry["error"] = (
+                        f"Could not obtain an API key: "
+                        f"{exc.__class__.__name__}: {exc}"
+                    )
+                    urls[role] = entry
+                    continue
+
+            if role == "er_messages":
+                # This one authenticates with a header, not a query parameter.
+                entry["url"] = f"{sensors_base}/v2/messages/"
+                entry["apikey"] = api_key
+            else:
+                entry["url"] = (
+                    f"{webhooks_base}/webhooks"
+                    f"?integration_type={integration.type.value}&apikey={api_key}"
+                )
+            urls[role] = entry
+        return urls
 
     # --- Report -----------------------------------------------------------
 
