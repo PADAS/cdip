@@ -12,7 +12,8 @@ from accounts.models import AccountProfileOrganization, AccountProfile, UserAgre
 from core.utils import timezone_from_offset, parse_crontab_schedule_from_dict
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
-    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
+    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus, \
+    AmbiguousDefaultRouteError
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.contrib.auth import get_user_model
@@ -36,6 +37,19 @@ class DuplicateIntegrationError(drf_exceptions.APIException):
 class DuplicateSourceError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "conflict"
+
+
+class AmbiguousDefaultRouteConflict(drf_exceptions.APIException):
+    """409 for a route change that would leave a provider without a clear default
+    route (spec §5.1). Body: {"detail": ..., "candidates": [{"id", "name"}]}."""
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "ambiguous_default_route"
+
+    def __init__(self, error: AmbiguousDefaultRouteError):
+        super().__init__(detail={
+            "detail": str(error),
+            "candidates": [{"id": str(route.pk), "name": route.name} for route in error.candidates],
+        })
 
 
 class UserWorkspaceSerializer(serializers.ModelSerializer):

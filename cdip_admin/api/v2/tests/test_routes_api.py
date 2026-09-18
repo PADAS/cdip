@@ -1198,3 +1198,74 @@ def test_create_reverse_flow_route_sets_default_for_destination_site(
 
     er_site.refresh_from_db()
     assert er_site.default_route == route
+
+
+# --- refusals surface as 409 --------------------------------------------------
+
+@pytest.fixture
+def ambiguous_provider(organization, integration_type_lotek, integrations_list_er):
+    """default=R1, also on R2 and R3, all delivering. Deleting R1 or removing
+    the provider from it has two candidates → refused."""
+    from integrations.models import RouteProvider, RouteDestination
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization, name="Ambiguous", base_url="https://api.test.lotek.com",
+    )
+    routes = []
+    for name in ("R1", "R2", "R3"):
+        route = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=route)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=route)])
+        routes.append(route)
+    Integration.objects.filter(pk=provider.pk).update(default_route=routes[0])
+    provider.refresh_from_db()
+    return provider, routes
+
+
+def test_delete_route_with_ambiguous_default_returns_409_with_candidates(api_client, superuser, ambiguous_provider):
+    provider, (r1, r2, r3) = ambiguous_provider
+    api_client.force_authenticate(superuser)
+
+    response = api_client.delete(reverse("routes-detail", kwargs={"pk": r1.id}))
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    body = response.json()
+    assert "Cannot choose a default route" in body["detail"]
+    assert {c["id"] for c in body["candidates"]} == {str(r2.id), str(r3.id)}
+    assert all(set(c) == {"id", "name"} for c in body["candidates"])
+    assert Route.objects.filter(pk=r1.pk).exists()
+    provider.refresh_from_db()
+    assert provider.default_route == r1
+
+
+def test_patch_route_removing_provider_with_ambiguous_default_returns_409(api_client, superuser, ambiguous_provider):
+    provider, (r1, r2, r3) = ambiguous_provider
+    api_client.force_authenticate(superuser)
+
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": r1.id}),
+        data={"name": "renamed", "data_providers": []},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    r1.refresh_from_db()
+    assert r1.name == "R1"                       # the whole update rolled back
+    assert r1.data_providers.filter(pk=provider.pk).exists()
+
+
+def test_delete_route_with_one_other_route_reassigns_and_succeeds(api_client, superuser, organization, integration_type_lotek, integrations_list_er):
+    from integrations.models import RouteProvider, RouteDestination
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization, name="Two routes", base_url="https://api.test.lotek.com",
+    )
+    r1, r2 = (Route.objects.create(owner=organization, name=n) for n in ("R1", "R2"))
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r) for r in (r1, r2)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r) for r in (r1, r2)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=r1)
+    api_client.force_authenticate(superuser)
+
+    response = api_client.delete(reverse("routes-detail", kwargs={"pk": r1.id}))
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    provider.refresh_from_db()
+    assert provider.default_route == r2
