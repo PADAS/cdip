@@ -228,3 +228,143 @@ def test_resolve_to_null_does_not_log(make_provider, make_route):
     provider.refresh_from_db()
     assert provider.default_route is None
     assert auto_assign_logs(provider).count() == 0
+
+
+# --- entry point 1: a provider joins a route ---------------------------------
+
+def test_route_provider_create_sets_null_default(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("New")
+
+    RouteProvider.objects.create(integration=provider, route=route)
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+    assert auto_assign_logs(provider).get().details["via"] == "route_provider_added"
+
+
+def test_data_providers_add_sets_null_default(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("New")
+
+    route.data_providers.add(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+    assert auto_assign_logs(provider).count() == 1
+
+
+def test_data_providers_set_sets_null_default(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("New")
+
+    route.data_providers.set([provider])
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+
+
+def test_reverse_add_sets_null_default(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("New")
+
+    provider.routing_rules_by_provider.add(route)
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+
+
+def test_join_switches_empty_default_to_route_that_already_delivers(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    placeholder = make_route("Placeholder", providers=[provider])
+    set_default(provider, placeholder)
+    real = make_route("Real", destinations=[er])
+
+    real.data_providers.add(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route == real
+    log = auto_assign_logs(provider).get()
+    assert log.details["via"] == "route_provider_added"
+    assert log.details["previous_default_route_id"] == str(placeholder.pk)
+
+
+def test_join_keeps_default_that_delivers(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    default = make_route("Default", providers=[provider], destinations=[er])
+    set_default(provider, default)
+    other = make_route("Other", destinations=[er])
+
+    other.data_providers.add(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route == default
+    assert auto_assign_logs(provider).count() == 0
+
+
+# --- entry point 1b: a route gains destinations (DRF adds providers first) ----
+
+def test_adding_destinations_after_providers_switches_empty_default(make_provider, make_destination, make_route):
+    """Mirrors POST /v2/routes/: ModelSerializer writes data_providers, then destinations."""
+    provider, er = make_provider(), make_destination()
+    placeholder = make_route("Placeholder", providers=[provider])
+    set_default(provider, placeholder)
+    new_route = make_route("New")
+
+    new_route.data_providers.add(provider)      # new_route is still empty → default stays
+    provider.refresh_from_db()
+    assert provider.default_route == placeholder
+
+    new_route.destinations.add(er)              # now it delivers → switch
+
+    provider.refresh_from_db()
+    assert provider.default_route == new_route
+    assert auto_assign_logs(provider).get().details["via"] == "route_destination_added"
+
+
+def test_route_destination_create_switches_empty_default(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    placeholder = make_route("Placeholder", providers=[provider])
+    set_default(provider, placeholder)
+    new_route = make_route("New", providers=[provider])
+
+    RouteDestination.objects.create(integration=er, route=new_route)
+
+    provider.refresh_from_db()
+    assert provider.default_route == new_route
+
+
+def test_adding_destination_to_default_route_itself_changes_nothing(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    default = make_route("Default", providers=[provider])
+    set_default(provider, default)
+
+    default.destinations.add(er)
+
+    provider.refresh_from_db()
+    assert provider.default_route == default
+    assert auto_assign_logs(provider).count() == 0
+
+
+# --- raw / convergence ---------------------------------------------------------
+
+def test_raw_save_is_skipped(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("Fixture-loaded")
+
+    RouteProvider(integration=provider, route=route).save_base(raw=True)
+
+    provider.refresh_from_db()
+    assert provider.default_route is None
+
+
+def test_ensure_default_route_converges_without_auto_assign_log(make_provider):
+    from integrations.models import ensure_default_route
+    provider = make_provider()
+
+    ensure_default_route(integration=provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route is not None
+    assert provider.default_route.data_providers.filter(pk=provider.pk).exists()
+    assert auto_assign_logs(provider).count() == 0
