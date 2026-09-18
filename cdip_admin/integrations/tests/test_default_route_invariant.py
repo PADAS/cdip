@@ -368,3 +368,49 @@ def test_ensure_default_route_converges_without_auto_assign_log(make_provider):
     assert provider.default_route is not None
     assert provider.default_route.data_providers.filter(pk=provider.pk).exists()
     assert auto_assign_logs(provider).count() == 0
+
+
+# --- entry point 4: default_route set directly --------------------------------
+
+def test_setting_default_route_directly_adds_provider_membership(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("Chosen")
+
+    provider.default_route = route
+    provider.save()
+
+    assert RouteProvider.objects.filter(integration=provider, route=route).exists()
+    provider.refresh_from_db()
+    assert provider.default_route == route
+    assert auto_assign_logs(provider).count() == 0   # a human chose it; nothing was auto-assigned
+
+
+def test_setting_default_route_via_update_fields_adds_membership(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("Chosen")
+
+    provider.default_route = route
+    provider.save(update_fields=["default_route"])
+
+    assert RouteProvider.objects.filter(integration=provider, route=route).exists()
+
+
+def test_saving_unrelated_fields_does_not_touch_membership(make_provider, make_route):
+    provider = make_provider()
+    orphan = make_route("Orphan")
+    set_default(provider, orphan)                     # broken state, set without signals
+
+    provider.name = "renamed"
+    provider.save(update_fields=["name"])
+
+    assert not RouteProvider.objects.filter(integration=provider, route=orphan).exists()
+
+
+def test_raw_integration_save_is_skipped(make_provider, make_route):
+    provider = make_provider()
+    route = make_route("Chosen")
+    provider.default_route = route
+
+    provider.save_base(raw=True)
+
+    assert not RouteProvider.objects.filter(integration=provider, route=route).exists()

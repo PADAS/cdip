@@ -124,3 +124,20 @@ def on_route_destinations_m2m_changed(sender, instance, action, reverse, pk_set,
     routes = Route.objects.filter(pk__in=pk_set) if reverse else [instance]
     for route in routes:
         _reconsider_providers_of(route)
+
+
+@receiver(post_save, sender=Integration)
+def on_integration_saved_ensure_membership(sender, instance, raw=False, update_fields=None, **kwargs):
+    """Entry point 4: ``default_route`` set directly (admin, ORM, ensure_default_route).
+
+    An integration must be a provider on its default route (§4 clause 2), so
+    add the RouteProvider row if it is missing — what ensure_default_route()
+    already does for the API path. post_save (not pre_save) because the
+    through-row needs the integration's PK.
+    """
+    if raw or instance.default_route_id is None:
+        return
+    if update_fields is not None and "default_route" not in update_fields:
+        return
+    if not RouteProvider.objects.filter(integration_id=instance.pk, route_id=instance.default_route_id).exists():
+        RouteProvider.objects.create(integration=instance, route_id=instance.default_route_id)
