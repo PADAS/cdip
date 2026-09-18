@@ -2,10 +2,11 @@ import pytest
 from django.contrib import admin as django_admin
 from django.contrib.admin.widgets import AutocompleteSelect, RelatedFieldWidgetWrapper
 from django.db import connection
+from django.forms.models import inlineformset_factory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from integrations.models import Integration
+from integrations.models import Integration, Route, RouteProvider, RouteDestination
 
 pytestmark = pytest.mark.django_db
 
@@ -190,3 +191,103 @@ def test_gundi_trace_type_filters_have_distinguishable_titles(
     # would also pass if both filters disappeared altogether.
     assert "By Provider type" in content
     assert "By Destination type" in content
+
+
+# --- default route refusals ----------------------------------------------------
+
+@pytest.fixture
+def ambiguous_provider(organization, integration_type_lotek, integrations_list_er):
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization, name="Ambiguous", base_url="https://api.test.lotek.com",
+    )
+    routes = []
+    for name in ("R1", "R2", "R3"):
+        route = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=route)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=route)])
+        routes.append(route)
+    Integration.objects.filter(pk=provider.pk).update(default_route=routes[0])
+    provider.refresh_from_db()
+    return provider, routes
+
+
+def test_admin_delete_of_ambiguous_default_route_is_refused_with_message(admin_client, ambiguous_provider):
+    provider, (r1, r2, r3) = ambiguous_provider
+    url = reverse("admin:integrations_route_delete", args=[r1.pk])
+
+    response = admin_client.post(url, {"post": "yes"}, follow=True)
+
+    assert response.status_code == 200
+    messages = [str(m) for m in response.context["messages"]]
+    assert any("Cannot choose a default route" in m and r2.name in m and r3.name in m for m in messages), messages
+    assert not any("deleted successfully" in m for m in messages), messages
+    assert Route.objects.filter(pk=r1.pk).exists()
+    provider.refresh_from_db()
+    assert provider.default_route == r1
+
+
+def test_admin_bulk_delete_of_ambiguous_default_route_deletes_nothing(admin_client, ambiguous_provider):
+    """Bulk-deleting R1 alone leaves R2 and R3 as candidates → refused.
+    (Selecting R1 *and* R2 would leave only R3 and legitimately succeed.)"""
+    provider, (r1, r2, r3) = ambiguous_provider
+    url = reverse("admin:integrations_route_changelist")
+
+    response = admin_client.post(
+        url,
+        {"action": "delete_selected", "_selected_action": [str(r1.pk)], "post": "yes"},
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert Route.objects.filter(pk=r1.pk).exists()
+    messages = [str(m) for m in response.context["messages"]]
+    assert any("Cannot choose a default route" in m for m in messages), messages
+
+
+def test_provider_inline_formset_refuses_ambiguous_removal(ambiguous_provider):
+    from integrations.admin import RouteProviderInlineFormSet
+    provider, (r1, r2, r3) = ambiguous_provider
+    link = RouteProvider.objects.get(integration=provider, route=r1)
+    FormSet = inlineformset_factory(
+        Route, RouteProvider, formset=RouteProviderInlineFormSet, fields=("integration",), extra=0, can_delete=True,
+    )
+    prefix = FormSet.get_default_prefix()
+    data = {
+        f"{prefix}-TOTAL_FORMS": "1", f"{prefix}-INITIAL_FORMS": "1",
+        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+        f"{prefix}-0-id": str(link.pk), f"{prefix}-0-integration": str(provider.pk), f"{prefix}-0-DELETE": "on",
+    }
+
+    formset = FormSet(data, instance=r1)
+
+    assert not formset.is_valid()
+    assert any("Cannot choose a default route" in e for e in formset.non_form_errors())
+    assert RouteProvider.objects.filter(pk=link.pk).exists()
+
+
+def test_provider_inline_formset_allows_unambiguous_removal(organization, integration_type_lotek, integrations_list_er):
+    from integrations.admin import RouteProviderInlineFormSet
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization, name="Two routes", base_url="https://api.test.lotek.com",
+    )
+    r1, r2 = (Route.objects.create(owner=organization, name=n) for n in ("R1", "R2"))
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r) for r in (r1, r2)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r) for r in (r1, r2)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=r1)
+    link = RouteProvider.objects.get(integration=provider, route=r1)
+    FormSet = inlineformset_factory(
+        Route, RouteProvider, formset=RouteProviderInlineFormSet, fields=("integration",), extra=0, can_delete=True,
+    )
+    prefix = FormSet.get_default_prefix()
+    data = {
+        f"{prefix}-TOTAL_FORMS": "1", f"{prefix}-INITIAL_FORMS": "1",
+        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+        f"{prefix}-0-id": str(link.pk), f"{prefix}-0-integration": str(provider.pk), f"{prefix}-0-DELETE": "on",
+    }
+
+    formset = FormSet(data, instance=r1)
+
+    assert formset.is_valid(), formset.errors
+    formset.save()
+    provider.refresh_from_db()
+    assert provider.default_route == r2
