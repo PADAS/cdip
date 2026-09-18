@@ -5,7 +5,7 @@ from django.urls import reverse
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 from integrations.models import (
-    Route, RouteConfiguration, get_user_routes_qs
+    Route, RouteConfiguration, Source, SourceFilter, get_user_routes_qs
 )
 
 
@@ -1124,3 +1124,146 @@ def test_cannot_delete_unrelated_route_configuration_as_org_admin(
     assert response.status_code == status.HTTP_404_NOT_FOUND
     route_2.refresh_from_db()
     assert route_2.configuration is not None
+
+
+# ---- The filters block cdip-routing reads (GUNDI-5178) --------------------
+
+
+def test_route_detail_carries_the_filters_block(
+        api_client, superuser, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    source_filter = route_1.source_filters.get()
+    filters = response.json()["filters"]
+
+    rule = filters[str(source_filter.destination_id)]
+    assert rule["mode"] == "whitelist"
+    assert rule["type"] == "list"
+    assert rule["enabled"] is True
+    assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
+        s.external_id for s in lotek_sources
+    }
+
+
+def test_route_list_does_not_carry_the_filters_block(
+        api_client, superuser, organization, route_1, lotek_sources
+):
+    # A page of routes would multiply every filter's device list for a view that never
+    # needs it; only the detail view pays that cost.
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-list"))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert all("filters" not in route for route in response.json()["results"])
+
+
+def test_route_without_filters_reports_an_empty_block(
+        api_client, superuser, organization, route_1
+):
+    route_1.source_filters.all().delete()
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["filters"] == {}
+
+
+def test_filters_block_groups_identical_external_ids_by_provider(
+        api_client, superuser, organization, route_1, integrations_list_er,
+        lotek_sources, provider_lotek_panthera
+):
+    # The reason for the grouping: external_id is unique per provider, not globally. Two
+    # providers may each own a device called the same thing, and a flat list would let the
+    # wrong one satisfy the rule.
+    second_provider = integrations_list_er[2]
+    route_1.data_providers.add(second_provider)
+    borrowed = Source.objects.create(
+        integration=second_provider, external_id=lotek_sources[0].external_id
+    )
+    source_filter = route_1.source_filters.get()
+    source_filter.sources.add(borrowed)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    by_provider = response.json()["filters"][str(source_filter.destination_id)]["by_provider"]
+    assert by_provider[str(second_provider.id)] == [borrowed.external_id]
+    assert borrowed.external_id in by_provider[str(provider_lotek_panthera.id)]
+    # Same string under two providers, kept apart.
+    assert str(second_provider.id) != str(provider_lotek_panthera.id)
+
+
+def test_disabled_filter_still_travels_with_its_flag(
+        api_client, superuser, organization, route_1
+):
+    # Routing honours `enabled` rather than the rule being absent, so the operator can
+    # switch a rule off without losing the device list.
+    source_filter = route_1.source_filters.get()
+    source_filter.enabled = False
+    source_filter.save()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    rule = response.json()["filters"][str(source_filter.destination_id)]
+    assert rule["enabled"] is False
+
+
+def test_filters_block_is_scoped_to_the_route(
+        api_client, superuser, organization, other_organization, route_1, route_2
+):
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    filters = response.json()["filters"]
+    other_destination = str(route_2.source_filters.get().destination_id)
+    assert other_destination not in filters
+
+
+def test_filters_block_omits_types_it_cannot_carry(
+        api_client, superuser, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    # The block is keyed by destination, so two filters on one arrow would collapse into a
+    # single entry and the list rule, the one routing enforces, could lose. A non-list
+    # filter describes its selection in `selector`, which this block does not carry, so it
+    # is left out instead of overwriting its neighbour.
+    list_filter = route_1.source_filters.get()
+    SourceFilter.objects.create(
+        type=SourceFilter.SourceFilterTypes.GEO_BOUNDARY,
+        mode=SourceFilter.FilterModes.WHITELIST,
+        routing_rule=route_1,
+        destination=list_filter.destination,
+        selector={"polygon": []},
+        # Ordered after the list rule, which is the case that used to overwrite it:
+        # Meta.ordering decides which of the two reaches the destination key last.
+        order_number=list_filter.order_number + 1,
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    rule = response.json()["filters"][str(list_filter.destination_id)]
+    assert rule["type"] == "list"
+    assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
+        s.external_id for s in lotek_sources
+    }
+
+
+def test_filters_block_omits_a_destination_no_longer_on_the_route(
+        api_client, superuser, organization, route_1
+):
+    # Route update prunes these, but a removal that bypasses the API leaves the filter
+    # pointing at an Integration that still exists, so the cascade never fires. Routing must
+    # not be handed a rule for an arrow the route no longer has.
+    source_filter = route_1.source_filters.get()
+    route_1.destinations.remove(source_filter.destination)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert str(source_filter.destination_id) not in response.json()["filters"]

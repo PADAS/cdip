@@ -1,12 +1,16 @@
 import django_filters
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import transaction
-from django.db.models import Subquery
+from django.db.models import Count, Prefetch, Q, Subquery
 from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
     get_user_routes_qs, GundiTrace, IntegrationAction
 from integrations.models import IntegrationType, Integration
+# Aliased: `SourceFilter` in this module is the DRF FilterSet imported above, not the
+# model of the same name.
+from integrations.models import Source, SourceFilter as SourceFilterModel
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
 from accounts.models import AccountProfileOrganization, EULA
@@ -19,6 +23,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from . import serializers as v2_serializers
+from .pagination import FilterSourcesPagination
 from . import permissions
 from . import filters as custom_filters
 
@@ -386,6 +391,84 @@ class SourcesView(
         return v2_serializers.SourceRetrieveSerializer
 
 
+class RouteFiltersView(viewsets.ModelViewSet):
+    """
+    An endpoint for managing the routing filters of a route
+    """
+    permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
+    # Explicit ordering: the default cursor paginator falls back to `-created`, which this
+    # model does not have.
+    filter_backends = [drf_filters.OrderingFilter]
+    ordering_fields = ["created_at", "order_number", "destination__name"]
+    ordering = ["created_at"]
+
+    def get_route(self):
+        # Resolved against the user's own routes, so a route in another organization is a
+        # 404 here rather than an empty filter list.
+        if not hasattr(self, "_route"):
+            self._route = generics.get_object_or_404(
+                get_user_routes_qs(user=self.request.user), pk=self.kwargs["route_pk"]
+            )
+        return self._route
+
+    def get_queryset(self):
+        # Sources are not serialized inline — a filter may hold up to
+        # SOURCE_FILTER_MAX_SOURCES of them — so only the count travels with the rule and
+        # the list itself is paged from the `sources` action below.
+        queryset = SourceFilterModel.objects.filter(
+            routing_rule=self.get_route()
+        ).select_related("destination")
+        if self.action not in ("list", "retrieve"):
+            # Annotations only on the read paths. ChangeLogMixin.save() diffs every
+            # attribute it finds on the instance, so an annotated row reaching a write
+            # records the aggregates as if they were edited fields, and the activity log
+            # cannot serialize them.
+            return queryset
+        # `providers` and `excludes_default_source` both describe the rule's own sources, so
+        # they are aggregated here rather than derived per row: a page of rules used to cost
+        # two extra queries for every rule on it.
+        return queryset.annotate(
+            sources_count=Count("sources", distinct=True),
+            provider_ids=ArrayAgg("sources__integration_id", distinct=True),
+            default_source_provider_ids=ArrayAgg(
+                "sources__integration_id",
+                distinct=True,
+                filter=Q(sources__external_id=v2_serializers.DEFAULT_SOURCE_EXTERNAL_ID),
+            ),
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        route = self.get_route()
+        context["route"] = route
+        # Resolved once for the page. A rule may only name sources of the route's own
+        # providers, so this covers every row on it.
+        context["provider_names"] = {
+            str(provider.id): provider.name for provider in route.data_providers.all()
+        }
+        return context
+
+    def get_serializer_class(self):
+        if self.action in ["create", "update", "partial_update"]:
+            return v2_serializers.SourceFilterCreateUpdateSerializer
+        return v2_serializers.SourceFilterSerializer
+
+    @action(detail=True, methods=["get"], url_path="sources")
+    def sources(self, request, route_pk=None, pk=None):
+        """The devices this filter covers, paged 50 at a time."""
+        queryset = self.get_object().sources.select_related("state").order_by(
+            "external_id", "id"
+        )
+        # Instantiated here rather than set as the view's pagination_class, so the filter
+        # list keeps the project-wide page size and only this sub-list defaults to 50.
+        paginator = FilterSourcesPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = v2_serializers.SourceSummarySerializer(
+            page, many=True, context=self.get_serializer_context()
+        )
+        return paginator.get_paginated_response(serializer.data)
+
+
 class RoutesView(viewsets.ModelViewSet):
     """
     An endpoint for managing routes
@@ -414,11 +497,23 @@ class RoutesView(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
             return v2_serializers.RouteCreateUpdateSerializer
+        if self.action == "retrieve":
+            return v2_serializers.RouteDetailSerializer
         return v2_serializers.RouteRetrieveFullSerializer
 
     def get_queryset(self):
         # Returns a list with the routes that the user is allowed to see
-        return get_user_routes_qs(user=self.request.user)
+        queryset = get_user_routes_qs(user=self.request.user)
+        if self.action == "retrieve":
+            # Only the detail view serializes filters, and only these three columns are
+            # read while grouping them.
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "source_filters__sources",
+                    queryset=Source.objects.only("id", "integration_id", "external_id"),
+                )
+            )
+        return queryset
 
     @action(detail=True, methods=["delete"], url_path="configuration")
     def delete_configuration(self, request, pk: str | None = None) -> Response:
