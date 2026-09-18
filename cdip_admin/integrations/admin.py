@@ -1,9 +1,12 @@
 import django_celery_beat
 import psycopg2
 from django.contrib import admin
-from django.db import IntegrityError
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.forms import ModelForm
+from django.forms.models import BaseInlineFormSet
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html
 from django_celery_beat.admin import PeriodicTaskAdmin
@@ -34,6 +37,8 @@ from .models import (
     GundiTrace,
     IntegrationWebhook,
     WebhookConfiguration,
+    AmbiguousDefaultRouteError,
+    decide_default_route,
 )
 
 from .forms import (
@@ -437,8 +442,30 @@ class WebhookConfigurationAdmin(admin.ModelAdmin):
     )
 
 
+class RouteProviderInlineFormSet(BaseInlineFormSet):
+    """Refuse (as a form error, before anything is saved) removing a provider
+    from a route when that would leave its default route ambiguous (spec §5.1).
+    Raising from the pre_delete receiver instead would poison the admin's
+    surrounding transaction."""
+
+    def clean(self):
+        super().clean()
+        route = self.instance
+        if route.pk is None:
+            return
+        for form in self.deleted_forms:
+            link = form.instance
+            if link.pk is None:
+                continue
+            try:
+                decide_default_route(link.integration, leaving_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(str(error))
+
+
 class RouteProviderInline(admin.TabularInline):
     model = Route.data_providers.through
+    formset = RouteProviderInlineFormSet
     # Without this, every inline row renders a <select> of *every* Integration,
     # and Integration.__str__ touches owner.name/type.name (not select_related),
     # making the Route change page an N+1 storm that times out in production.
@@ -469,6 +496,49 @@ class RouteAdmin(admin.ModelAdmin):
         RouteProviderInline,
         RouteDestinationInline,
     )
+
+    # -- default route refusals (spec §5.1) ---------------------------------
+    # Deleting a route that is a provider's default is refused by the FK's
+    # on_delete when the provider is on several other routes. Turn that into an
+    # admin message instead of a 500. The savepoint keeps the admin's outer
+    # transaction usable after the aborted delete.
+    #
+    # reassign_default_route (the FK's on_delete callable) raises at
+    # Collector.collect() time, not at Collector.delete() time -- and both the
+    # single-object delete view and the "Delete selected" action call
+    # get_deleted_objects() (which collects) to render the confirmation page
+    # *before* delete_model/delete_queryset ever run. So the refusal has to be
+    # caught here too, the same way Django itself turns a ProtectedError from
+    # collect() into a "protected" list instead of a 500: treat it as nothing
+    # being deletable and let the admin's own "cannot delete" path render.
+    # delete_model/delete_queryset stay as a second line of defense for any
+    # future on_delete that raises during delete() instead of collect().
+
+    def get_deleted_objects(self, objs, request):
+        try:
+            return super().get_deleted_objects(objs, request)
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+            return [], {}, set(), [str(error)]
+
+    def delete_model(self, request, obj):
+        try:
+            with transaction.atomic():
+                super().delete_model(request, obj)
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                super().delete_queryset(request, queryset)
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+
+    def response_delete(self, request, obj_display, obj_id):
+        if Route.objects.filter(pk=obj_id).exists():  # refused above: no success message, back to the route
+            return HttpResponseRedirect(reverse("admin:integrations_route_change", args=[obj_id]))
+        return super().response_delete(request, obj_display, obj_id)
 
 
 @admin.register(RouteConfiguration)
