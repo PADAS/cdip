@@ -348,10 +348,11 @@ class ConnectionsView(
 class SourcesView(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     viewsets.GenericViewSet
 ):
     """
-    An endpoint for retrieving sources
+    An endpoint for retrieving and creating sources
     """
     permission_classes = [permissions.IsSuperuser | permissions.IsOrgAdmin | permissions.IsOrgViewer]
     #lookup_field = 'external_id'
@@ -380,6 +381,8 @@ class SourcesView(
         return get_user_sources_qs(user=self.request.user)
 
     def get_serializer_class(self):
+        if self.action == "create":
+            return v2_serializers.SourceCreateSerializer
         return v2_serializers.SourceRetrieveSerializer
 
 

@@ -33,6 +33,11 @@ class DuplicateIntegrationError(drf_exceptions.APIException):
     default_code = "conflict"
 
 
+class DuplicateSourceError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
+
+
 class UserWorkspaceSerializer(serializers.ModelSerializer):
     """One workspace a user belongs to.
 
@@ -866,7 +871,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = (
-            "id", "external_id", "status", "provider", "destinations", "routing_rules",
+            "id", "external_id", "name", "status", "provider", "destinations", "routing_rules",
             "update_frequency", "last_update", "created_at"
         )
 
@@ -898,6 +903,65 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
 
     def get_routing_rules(self, obj):
         return RoutingRuleSummarySerializer(instance=obj.integration.routing_rules, many=True).data
+
+
+class SourceCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    # `provider` is not a free naming choice: get_user_org (api/v2/permissions.py) resolves
+    # the caller's organization by reading this exact key off the request body. Renaming it
+    # returns 403 to org admins with no other symptom.
+    provider = serializers.PrimaryKeyRelatedField(
+        source="integration", queryset=Integration.objects.all()
+    )
+
+    class Meta:
+        model = Source
+        fields = ("id", "provider", "external_id", "name")
+        # A duplicate is a conflict with existing state, not a malformed request, so it is
+        # answered 409 in validate()/create() below. DRF would otherwise derive a
+        # UniqueTogetherValidator from the model's unique_together and answer 400 first.
+        # Dropping the validators moves the uniqueness guarantee to the DB constraint.
+        validators = []
+
+    def validate_provider(self, value):
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return value
+        if not get_user_integrations_qs(user).filter(id=value.id).exists():
+            raise drf_exceptions.ValidationError(
+                detail="You don't have enough privileges in the selected provider"
+            )
+        return value
+
+    @staticmethod
+    def _duplicate_error():
+        return DuplicateSourceError(detail={
+            "external_id": ["A source with this external ID already exists for this provider."]
+        })
+
+    def validate(self, attrs):
+        integration = attrs.get("integration")
+        external_id = attrs.get("external_id")
+        if integration and external_id and Source.objects.filter(
+            integration=integration, external_id=external_id
+        ).exists():
+            raise self._duplicate_error()
+        return attrs
+
+    def create(self, validated_data):
+        # The check in validate() loses to a concurrent POST: two clients (or a client and
+        # ingestion) both pass it, and the second insert hits the (integration, external_id)
+        # unique constraint. That constraint is the only real guard left once validators are
+        # off, so its violation answers the same 409 the check does, not a 500. The savepoint
+        # keeps the outer ATOMIC_REQUESTS transaction usable after the failed insert.
+        try:
+            with transaction.atomic():
+                return super().create(validated_data)
+        except IntegrityError:
+            raise self._duplicate_error()
+
+    def to_representation(self, instance):
+        return SourceRetrieveSerializer(instance=instance, context=self.context).data
 
 
 # All stream types the platform routes (GUNDI-5548: includes txt, obvu, att —
