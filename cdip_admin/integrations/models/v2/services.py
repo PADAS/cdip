@@ -199,6 +199,16 @@ def calculate_integration_status(integration_id):
         integration_status.save()
         return integration_status.status
 
+    # A broken default route is the *cause* of downstream errors, so it is
+    # checked before the dispatcher / error-threshold branches and names itself
+    # (spec §5.2). Destination-only integrations return None here and are exempt.
+    default_route_state = get_default_route_state(integration)
+    if default_route_state is not None and default_route_state != DefaultRouteState.VALID:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = DEFAULT_ROUTE_STATUS_DETAILS[default_route_state]
+        integration_status.save()
+        return integration_status.status
+
     # When the dispatcher is in ERROR (e.g. GCP quota exhausted), short-circuit
     # to UNHEALTHY immediately rather than waiting for the activity-log error
     # threshold to accumulate. Use a queryset filter rather than the OneToOne
