@@ -13,9 +13,9 @@ from integrations.models import (
     Integration,
     IntegrationConfiguration,
     IntegrationType,
-    Route,
     RouteConfiguration,
     WebhookConfiguration,
+    ensure_default_route,
 )
 
 
@@ -285,17 +285,14 @@ class Command(BaseCommand):
         )
 
         self._create_route(
-            bridge,
             provider=inreach,
             destination=earth_ranger,
             configuration=self._provider_key_configuration(
                 inreach, earth_ranger, additional["er_source_provider"]
             ),
         )
-        self._create_route(bridge, provider=api_push, destination=inreach)
-        self._create_route(
-            bridge, provider=webhook_provider, destination=earth_ranger
-        )
+        self._create_route(provider=api_push, destination=inreach)
+        self._create_route(provider=webhook_provider, destination=earth_ranger)
 
         # The three entry points a data provider needs after conversion. The ER
         # destination is absent by design: nothing is ever posted to it directly.
@@ -535,14 +532,23 @@ class Command(BaseCommand):
 
     # --- Routes -----------------------------------------------------------
 
-    def _create_route(self, bridge, provider, destination, configuration=None):
-        route = Route.objects.create(
-            name=f"{provider.name} to {destination.name}"[:200],
-            owner=bridge.owner,
-            configuration=configuration,
+    def _create_route(self, provider, destination, configuration=None):
+        # Go through the same service the v2 API uses on create, so this route
+        # becomes the provider's default_route. That matters: the routing
+        # service resolves destinations and field mappings through
+        # default_route only, so a provider without one routes nothing and
+        # its field mappings are never applied. It also registers the provider
+        # via RouteProvider.save(), which enables its periodic pull tasks the
+        # way an API-created connection would -- data_providers.add() skips
+        # that hook.
+        ensure_default_route(
+            provider, route_name=f"{provider.name} to {destination.name}"
         )
-        route.data_providers.add(provider)
+        route = provider.default_route
         route.destinations.add(destination)
+        if configuration is not None:
+            route.configuration = configuration
+            route.save()
         self.created_routes.append(route)
         return route
 
@@ -641,6 +647,9 @@ class Command(BaseCommand):
                         "type": i.type.value,
                         "base_url": i.base_url,
                         "owner": str(i.owner_id),
+                        "default_route": (
+                            str(i.default_route_id) if i.default_route_id else None
+                        ),
                     }
                     for i in integrations
                 ],
@@ -687,6 +696,9 @@ class Command(BaseCommand):
                         "type": i.type.value,
                         "base_url": i.base_url,
                         "owner": str(i.owner_id),
+                        "default_route": (
+                            str(i.default_route_id) if i.default_route_id else None
+                        ),
                     }
                     for i in self.reused_integrations
                 ],
