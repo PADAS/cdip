@@ -134,6 +134,52 @@ def resolve_default_route(integration, *, leaving_route=None, joining_route=None
     return decision.route
 
 
+def reassign_default_route(collector, field, sub_objs, using):
+    """``on_delete`` for ``Integration.default_route`` (replaces ``SET_NULL``).
+
+    Runs at *collection* time, before anything is deleted. ``sub_objs`` are the
+    integrations whose default is one of the routes being deleted. For each,
+    decide the new default among the routes that will survive and schedule the
+    update through ``collector.add_field_update`` — the same mechanism
+    ``SET_NULL``/``SET()`` use.
+
+    Why a custom on_delete rather than a pre_delete receiver alone:
+
+    * An ambiguity is refused *here*, during ``Collector.collect()``, i.e. before
+      ``Collector.delete()`` opens its ``atomic(savepoint=False)`` block. A raise
+      from a ``pre_delete`` receiver happens inside that block and marks the
+      caller's transaction for rollback (``TransactionManagementError`` on the
+      next query), so callers could not recover and report the refusal.
+    * Every route in the same delete is excluded from the candidates at once
+      (``collector.data[Route]``), independent of signal ordering.
+
+    (In Django 4.2 ``SET_NULL`` itself is lazy — ``lazy_sub_objs = True`` — so a
+    reassignment made in ``pre_delete`` would in fact survive it; the collector
+    race the original design assumed does not occur. The callable is kept for
+    the two reasons above.)
+
+    Integrations that are themselves being deleted in the same cascade (an
+    Organization delete takes its routes and its integrations together) just get
+    NULL, exactly as before. The collector may reach this field before it has
+    collected the organization's integrations, so ownership is checked too.
+
+    Raises ``AmbiguousDefaultRouteError`` (aborting the whole delete) when a
+    surviving default cannot be chosen.
+    """
+    Route = apps.get_model("integrations", "Route")
+    Integration = apps.get_model("integrations", "Integration")
+    Organization = apps.get_model("organizations", "Organization")
+    doomed_routes = {route.pk for route in collector.data.get(Route, ())}
+    doomed_integrations = {integration.pk for integration in collector.data.get(Integration, ())}
+    doomed_owners = {organization.pk for organization in collector.data.get(Organization, ())}
+    for integration in sub_objs:
+        if integration.pk in doomed_integrations or integration.owner_id in doomed_owners:
+            collector.add_field_update(field, None, [integration])
+            continue
+        decision = decide_default_route(integration, exclude_route_ids=doomed_routes)
+        collector.add_field_update(field, decision.route, [integration])
+
+
 def _log_auto_assignment(integration, route, previous_id, via):
     ActivityLog = apps.get_model("activity_log", "ActivityLog")
     try:
