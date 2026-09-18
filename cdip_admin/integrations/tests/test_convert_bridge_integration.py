@@ -1039,3 +1039,59 @@ def test_a_kong_failure_for_one_url_leaves_the_others_intact(
 
     assert "error" in report["urls"]["er_messages"]
     assert report["urls"]["inreach_gps"]["url"].endswith("apikey=key-inreach")
+
+
+# --- Default routes -------------------------------------------------------
+#
+# The routing service resolves a provider's destinations through
+# Integration.default_route only (cdip-routing event_handlers.py), and reads
+# the field mappings from that route's configuration. A provider without one
+# cannot route anything, and its field mappings are never applied.
+
+
+def test_each_provider_gets_the_route_it_feeds_as_its_default_route(
+    bridge_integration, integration_types_for_conversion
+):
+    run_conversion(bridge_integration)
+
+    inreach = integration_of_type("inreach")
+    api_push = integration_of_type("api_push")
+    alerts = integration_of_type("generic_webhooks")
+    earth_ranger = integration_of_type("earth_ranger")
+
+    assert list(inreach.default_route.destinations.all()) == [earth_ranger]
+    assert list(api_push.default_route.destinations.all()) == [inreach]
+    assert list(alerts.default_route.destinations.all()) == [earth_ranger]
+
+
+def test_destination_only_earth_ranger_has_no_default_route(
+    bridge_integration, integration_types_for_conversion
+):
+    # Mirrors the v2 API convention: destination-only integrations are created
+    # with create_default_route=False.
+    run_conversion(bridge_integration)
+
+    assert integration_of_type("earth_ranger").default_route is None
+
+
+def test_provider_key_mapping_lives_on_the_route_the_router_reads(
+    bridge_integration, integration_types_for_conversion
+):
+    run_conversion(bridge_integration)
+
+    inreach = integration_of_type("inreach")
+    earth_ranger = integration_of_type("earth_ranger")
+
+    field_mappings = inreach.default_route.configuration.data["field_mappings"]
+    assert str(earth_ranger.id) in field_mappings[str(inreach.id)]["obv"]
+
+
+def test_default_routes_do_not_add_extra_routes(
+    bridge_integration, integration_types_for_conversion
+):
+    run_conversion(bridge_integration)
+
+    # Three routes, each one *is* its provider's default -- not three routes
+    # plus three empty defaults.
+    assert Route.objects.count() == 3
+    assert Route.objects.filter(destinations__isnull=True).count() == 0
