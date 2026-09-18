@@ -35,7 +35,7 @@ arriving?" — so that:
 | Disclosure level | Identity + routing summary **including destination base URLs** + delivery telemetry. |
 | Key cardinality | One key ⇄ one integration. Multiple integrations per key are not supported and will not be. Response is a single object, not a list. |
 | Volume telemetry | Live count on demand, backed by a new composite index on `GundiTrace`, cached 60s, gracefully degraded on timeout. |
-| Header-spoofing hazard | Tracked as a **separate, higher-priority task**; not a dependency of this work (see *Exposure*). |
+| Header-spoofing hazard | Tracked as a **separate, higher-priority task** ([GUNDI-5736](https://allenai.atlassian.net/browse/GUNDI-5736)); not a dependency of this work (see *Exposure*). |
 | Portal UI snippet | Filed separately against the front-end repo (`gundi-portal`); not in this spec. |
 
 ## Current state (verified in code)
@@ -243,7 +243,7 @@ Redis instance has filled before, so the TTL stays short.
   a running Kong. If exploitable, the serious half is the existing **write**
   path (`serializers.py:1299` picks the target integration from
   `request.integration_id`), not this read endpoint. Action: verify as its own
-  task; if confirmed, strip `X-Consumer-*` and `X-Credential-*` from inbound
+  task — [GUNDI-5736](https://allenai.atlassian.net/browse/GUNDI-5736); if confirmed, strip `X-Consumer-*` and `X-Credential-*` from inbound
   requests at the edge on every route. This spec does not depend on the outcome.
 - **Logging.** Log `integration_id`, never the key. The existing exception
   handler already attaches `integration_id` (`api/v2/exception_handler.py:59`).
@@ -269,7 +269,7 @@ Redis instance has filled before, so the TTL stays short.
 - Key rotation / revocation.
 - v1 sensors-API (`cdip-api`) parity, including multi-integration consumers.
 - Portal UI snippet (front-end repo).
-- Header-stripping hardening at the Kong edge (separate, higher priority).
+- Header-stripping hardening at the Kong edge (separate, higher priority) — GUNDI-5736.
 
 ## Testing
 
