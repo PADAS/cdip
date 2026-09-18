@@ -1,7 +1,7 @@
 # Default route invariant: enforce, detect, see
 
 **Date:** 2026-09-18
-**Status:** Approved design, awaiting implementation plan
+**Status:** Approved design. Implementation plan: `docs/superpowers/plans/2026-09-18-default-route-invariant.md`
 **Ticket:** [GUNDI-5731](https://allenai.atlassian.net/browse/GUNDI-5731) — *Default routing rule stays empty after creating a route from a new connection* (blocks GUNDI-5730)
 **Related PRs:** #469, #470, #472 (the management-command instance of this bug, all merged)
 
