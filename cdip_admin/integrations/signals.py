@@ -107,8 +107,13 @@ def on_route_providers_m2m_changed(sender, instance, action, reverse, pk_set, **
         for integration, route in _provider_route_pairs(instance, reverse, pk_set):
             resolve_default_route(integration, joining_route=route, via="route_provider_added")
     elif action == "pre_remove":
-        for integration, route in _provider_route_pairs(instance, reverse, pk_set):
-            resolve_default_route(integration, leaving_route=route, via="route_provider_removed")
+        if reverse:  # instance is the Integration: it leaves every route in pk_set at once,
+            # so each is a sibling of the others, not a lone leaving_route -- exclude them all
+            # together instead of looping (which would let each look like a survivor in turn).
+            resolve_default_route(instance, exclude_route_ids=set(pk_set), via="route_provider_removed")
+        else:        # instance is the Route: only it is being left, one integration at a time.
+            for integration, route in _provider_route_pairs(instance, reverse, pk_set):
+                resolve_default_route(integration, leaving_route=route, via="route_provider_removed")
     elif action == "pre_clear":
         if reverse:  # instance is the Integration: it leaves every route
             route_ids = list(instance.routing_rules_by_provider.values_list("pk", flat=True))

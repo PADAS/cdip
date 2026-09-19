@@ -242,6 +242,28 @@ def test_admin_bulk_delete_of_ambiguous_default_route_deletes_nothing(admin_clie
     assert Route.objects.filter(pk=r1.pk).exists()
     messages = [str(m) for m in response.context["messages"]]
     assert any("Cannot choose a default route" in m for m in messages), messages
+    assert not any("Successfully deleted" in m for m in messages), messages
+
+
+def test_admin_delete_refused_from_pre_delete_path_deletes_nothing(admin_client, organization, integration_type_lotek, integrations_list_er):
+    """default NULL, provider on R1, R2, R3 (all delivering): deleting R1 passes collection
+    (default is not R1) and is refused from pre_delete(RouteProvider) → delete_model's savepoint."""
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Null default", base_url="https://api.test.lotek.com")
+    routes = []
+    for name in ("R1", "R2", "R3"):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r)])
+        routes.append(r)
+    url = reverse("admin:integrations_route_delete", args=[routes[0].pk])
+
+    response = admin_client.post(url, {"post": "yes"}, follow=True)
+
+    assert response.status_code == 200
+    assert Route.objects.filter(pk=routes[0].pk).exists()
+    messages = [str(m) for m in response.context["messages"]]
+    assert any("Cannot choose a default route" in m for m in messages), messages
+    assert not any("deleted successfully" in m for m in messages), messages
 
 
 def test_provider_inline_formset_refuses_ambiguous_removal(ambiguous_provider):
@@ -291,3 +313,46 @@ def test_provider_inline_formset_allows_unambiguous_removal(organization, integr
     formset.save()
     provider.refresh_from_db()
     assert provider.default_route == r2
+
+
+def test_integration_admin_form_refuses_ambiguous_default_route(organization, integration_type_lotek, integrations_list_er):
+    from integrations.admin import IntegrationAdminForm
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Two delivering", base_url="https://api.test.lotek.com")
+    empty = Route.objects.create(owner=organization, name="Empty")
+    for name in ("R1", "R2"):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r)])
+
+    form = IntegrationAdminForm(instance=provider, data={
+        "type": str(provider.type_id), "owner": str(provider.owner_id), "name": provider.name,
+        "base_url": provider.base_url, "enabled": "on", "default_route": str(empty.pk), "additional": "{}",
+    })
+
+    assert not form.is_valid()
+    assert any("Cannot choose a default route" in e for e in form.errors["default_route"])
+
+
+def test_provider_inline_formset_refuses_ambiguous_addition(organization, integration_type_lotek, integrations_list_er):
+    from integrations.admin import RouteProviderInlineFormSet
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Two delivering", base_url="https://api.test.lotek.com")
+    placeholder = Route.objects.create(owner=organization, name="Placeholder")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=placeholder)])
+    for name in ("R1", "R2"):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=placeholder)
+    new_empty = Route.objects.create(owner=organization, name="New empty")
+    FormSet = inlineformset_factory(Route, RouteProvider, formset=RouteProviderInlineFormSet, fields=("integration",), extra=1, can_delete=True)
+    prefix = FormSet.get_default_prefix()
+    data = {
+        f"{prefix}-TOTAL_FORMS": "1", f"{prefix}-INITIAL_FORMS": "0",
+        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+        f"{prefix}-0-integration": str(provider.pk),
+    }
+
+    formset = FormSet(data, instance=new_empty)
+
+    assert not formset.is_valid()
+    assert any("Cannot choose a default route" in e for e in formset.non_form_errors())

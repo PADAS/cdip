@@ -671,3 +671,17 @@ def test_default_route_fk_uses_the_custom_on_delete():
     from integrations.models.v2.default_route import reassign_default_route
     field = Integration._meta.get_field("default_route")
     assert field.remote_field.on_delete is reassign_default_route
+
+
+def test_reverse_remove_of_several_routes_excludes_all_of_them(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    r3 = make_route("R3", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    provider.routing_rules_by_provider.remove(r1, r2)
+
+    provider.refresh_from_db()
+    assert provider.default_route == r3
+    assert auto_assign_logs(provider).count() == 1

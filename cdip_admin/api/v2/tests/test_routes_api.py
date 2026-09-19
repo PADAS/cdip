@@ -1253,6 +1253,30 @@ def test_patch_route_removing_provider_with_ambiguous_default_returns_409(api_cl
     assert r1.data_providers.filter(pk=provider.pk).exists()
 
 
+def test_create_route_refused_as_ambiguous_leaves_no_orphan_route(api_client, superuser, organization, integration_type_lotek, integrations_list_er):
+    """Empty placeholder default + two delivering routes: joining a new empty route is ambiguous → 409, and the new Route must not survive."""
+    from integrations.models import RouteProvider, RouteDestination
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Placeholder default", base_url="https://api.test.lotek.com")
+    placeholder = Route.objects.create(owner=organization, name="Placeholder")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=placeholder)])
+    for name in ("R1", "R2"):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=placeholder)
+    routes_before = Route.objects.count()
+    api_client.force_authenticate(superuser)
+
+    response = api_client.post(
+        reverse("routes-list"),
+        data={"name": "New empty", "owner": str(organization.id), "data_providers": [str(provider.id)], "destinations": [], "additional": {}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert Route.objects.count() == routes_before
+
+
 def test_delete_route_with_one_other_route_reassigns_and_succeeds(api_client, superuser, organization, integration_type_lotek, integrations_list_er):
     from integrations.models import RouteProvider, RouteDestination
     provider = Integration.objects.create(
