@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from collections import defaultdict
-from django.db.models import F
+from django.db.models import F, Prefetch
 from django.forms import ModelForm
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponseRedirect
@@ -657,6 +657,10 @@ class RouteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "owner",
+        "providers_display",
+        "destinations_display",
+        "default_for_display",
     )
     list_filter = (
         "owner",
@@ -675,6 +679,47 @@ class RouteAdmin(admin.ModelAdmin):
         RouteProviderInline,
         RouteDestinationInline,
     )
+    list_select_related = ("owner",)
+    readonly_fields = ("default_route_for_panel",)
+
+    def get_queryset(self, request):
+        # The three new columns walk M2M/reverse FK relations; prefetch so the
+        # changelist stays at a flat query count.
+        # Prefetch querysets use Integration.objects.all() rather than
+        # .only("id", "name") -- Integration.__init__ does not query, so
+        # instantiating full rows is cheap, and .only() here would conflict
+        # with default_route_for_panel's select_related("type") on the same
+        # cached queryset (deferred fields can't be select_related).
+        return super().get_queryset(request).prefetch_related(
+            Prefetch("data_providers", queryset=Integration.objects.all()),
+            Prefetch("destinations", queryset=Integration.objects.all()),
+            Prefetch("integrations_by_rule", queryset=Integration.objects.all()),
+        )
+
+    @admin.display(description="Providers")
+    def providers_display(self, obj):
+        return ", ".join(i.name for i in obj.data_providers.all()) or "—"
+
+    @admin.display(description="Destinations")
+    def destinations_display(self, obj):
+        return ", ".join(i.name for i in obj.destinations.all()) or "—"
+
+    @admin.display(description="Default for")
+    def default_for_display(self, obj):
+        return ", ".join(i.name for i in obj.integrations_by_rule.all()) or "—"
+
+    @admin.display(description="Default route for")
+    def default_route_for_panel(self, obj):
+        """Integrations whose default this route is — the fact that matters before deleting it."""
+        if obj.pk is None:
+            return "—"
+        rows = [
+            (reverse("admin:integrations_integration_change", args=[i.pk]), i.name)
+            for i in obj.integrations_by_rule.select_related("type").order_by("name")
+        ]
+        if not rows:
+            return "No integration uses this route as its default."
+        return format_html("<ul>{}</ul>", format_html_join("", '<li><a href="{}">{}</a></li>', rows))
 
     # -- default route refusals (spec §5.1) ---------------------------------
     # Deleting a route can be refused when a provider on it would be left with

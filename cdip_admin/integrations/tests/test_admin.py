@@ -640,3 +640,46 @@ def test_integration_change_page_default_route_uses_autocomplete(admin_client, v
     if isinstance(widget, RelatedFieldWidgetWrapper):
         widget = widget.widget
     assert isinstance(widget, AutocompleteSelect)
+
+
+# --- default route visibility: RouteAdmin ---------------------------------------
+
+def test_route_changelist_shows_owner_providers_destinations_and_default_for(admin_client, visibility_zoo):
+    url = reverse("admin:integrations_route_changelist") + "?q=Valid+route"
+
+    content = admin_client.get(url).content.decode()
+
+    assert visibility_zoo["valid"].owner.name in content
+    assert "Valid provider" in content
+    assert visibility_zoo["er"].name in content
+    assert "Default for" in content
+
+
+def test_route_changelist_query_count_does_not_scale_with_rows(admin_client, visibility_zoo, organization, integration_type_lotek):
+    """The three new columns must not add per-row queries.
+
+    Each Route row already costs one query on this codebase: Route.__init__
+    runs ChangeLogMixin, which resolves ``first_provider`` eagerly. That is
+    pre-existing and allowed for here (+1 per added route); the prefetched
+    columns themselves must add nothing per row.
+    """
+    added = 40
+    url = reverse("admin:integrations_route_changelist")
+    baseline = _render_query_count(admin_client, url)
+
+    routes = Route.objects.bulk_create([Route(owner=organization, name=f"Bulk route {i}") for i in range(added)])
+    RouteProvider.objects.bulk_create([RouteProvider(integration=visibility_zoo["valid"], route=r) for r in routes])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=visibility_zoo["er"], route=r) for r in routes])
+
+    after = _render_query_count(admin_client, url)
+    assert after - baseline <= added + 2, f"{baseline} -> {after} queries after adding {added} routes"
+
+
+def test_route_change_page_shows_default_route_for_panel(admin_client, visibility_zoo):
+    url = reverse("admin:integrations_route_change", args=[visibility_zoo["valid_route"].pk])
+
+    content = admin_client.get(url).content.decode()
+
+    assert "Default route for" in content
+    assert "Valid provider" in content
+    assert reverse("admin:integrations_integration_change", args=[visibility_zoo["valid"].pk]) in content
