@@ -356,3 +356,133 @@ def test_provider_inline_formset_refuses_ambiguous_addition(organization, integr
 
     assert not formset.is_valid()
     assert any("Cannot choose a default route" in e for e in formset.non_form_errors())
+
+
+# --- default route visibility: IntegrationAdmin ---------------------------------
+
+@pytest.fixture
+def mock_api_key_column(mocker, mock_get_api_key):
+    """IntegrationAdmin.list_display renders ``api_key``, which calls Kong per row."""
+    mocker.patch("integrations.models.v2.models.Integration.api_key", mock_get_api_key)
+
+
+@pytest.fixture
+def visibility_zoo(organization, integration_type_lotek, integrations_list_er):
+    def provider(name):
+        return Integration.objects.create(
+            type=integration_type_lotek, owner=organization, name=name, base_url="https://api.test.lotek.com",
+        )
+
+    def route(name, providers=(), destinations=()):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=p, route=r) for p in providers])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=d, route=r) for d in destinations])
+        return r
+
+    er = integrations_list_er[0]
+    valid = provider("Valid provider")
+    valid_route = route("Valid route", providers=[valid], destinations=[er])
+    Integration.objects.filter(pk=valid.pk).update(default_route=valid_route)
+
+    missing = provider("Missing provider")
+    route("Missing route", providers=[missing], destinations=[er])
+
+    not_member = provider("Not-member provider")
+    route("NM route", providers=[not_member], destinations=[er])
+    Integration.objects.filter(pk=not_member.pk).update(default_route=route("Orphan route"))
+
+    empty = provider("Empty-default provider")
+    Integration.objects.filter(pk=empty.pk).update(default_route=route("Placeholder", providers=[empty]))
+    route("Real route", providers=[empty], destinations=[er])
+
+    return {"valid": valid, "valid_route": valid_route, "missing": missing, "not_member": not_member, "empty": empty, "er": er}
+
+
+@pytest.mark.parametrize("state, key", [
+    ("missing", "missing"), ("not_member", "not_member"), ("empty_default", "empty"),
+])
+def test_integration_changelist_default_route_filter_isolates_each_violation(admin_client, mock_api_key_column, visibility_zoo, state, key):
+    url = reverse("admin:integrations_integration_changelist") + f"?default_route_state={state}"
+
+    response = admin_client.get(url)
+
+    assert response.status_code == 200
+    assert {obj.pk for obj in response.context["cl"].queryset} == {visibility_zoo[key].pk}
+
+
+def test_integration_changelist_default_route_filter_valid_excludes_violators(admin_client, mock_api_key_column, visibility_zoo):
+    url = reverse("admin:integrations_integration_changelist") + "?default_route_state=valid"
+
+    response = admin_client.get(url)
+
+    pks = {obj.pk for obj in response.context["cl"].queryset}
+    assert visibility_zoo["valid"].pk in pks
+    assert not ({visibility_zoo["missing"].pk, visibility_zoo["not_member"].pk, visibility_zoo["empty"].pk} & pks)
+
+
+def test_integration_changelist_shows_default_route_as_link(admin_client, mock_api_key_column, visibility_zoo):
+    url = reverse("admin:integrations_integration_changelist") + f"?q={visibility_zoo['valid'].name}"
+
+    content = admin_client.get(url).content.decode()
+
+    assert reverse("admin:integrations_route_change", args=[visibility_zoo["valid_route"].pk]) in content
+    assert "Valid route" in content
+
+
+def test_integration_changelist_query_count_does_not_scale_with_rows(admin_client, mock_api_key_column, visibility_zoo, organization, integration_type_lotek):
+    url = reverse("admin:integrations_integration_changelist")
+    baseline = _render_query_count(admin_client, url)
+
+    route = Route.objects.create(owner=organization, name="Shared default")
+    Integration.objects.bulk_create([
+        Integration(type=integration_type_lotek, owner=organization, name=f"Bulk {i}",
+                    base_url="https://api.test.lotek.com", default_route=route)
+        for i in range(60)
+    ])
+
+    after = _render_query_count(admin_client, url)
+    assert after - baseline <= 2, f"{baseline} -> {after} queries after adding 60 integrations"
+
+
+def test_integration_change_page_shows_route_panels(admin_client, visibility_zoo):
+    url = reverse("admin:integrations_integration_change", args=[visibility_zoo["empty"].pk])
+
+    content = admin_client.get(url).content.decode()
+
+    assert "Routes as provider" in content
+    assert "★" in content                                   # the default is marked
+    assert "Placeholder" in content and "Real route" in content
+    assert visibility_zoo["er"].name in content             # destinations listed under the real route
+
+
+def test_integration_change_page_destination_panel_lists_providers(admin_client, visibility_zoo):
+    url = reverse("admin:integrations_integration_change", args=[visibility_zoo["er"].pk])
+
+    content = admin_client.get(url).content.decode()
+
+    assert "Routes as destination" in content
+    assert "Valid provider" in content
+
+
+def test_integration_change_page_query_count_does_not_scale_with_route_count(admin_client, visibility_zoo, organization):
+    provider = visibility_zoo["empty"]
+    url = reverse("admin:integrations_integration_change", args=[provider.pk])
+    baseline = _render_query_count(admin_client, url)
+
+    routes = Route.objects.bulk_create([Route(owner=organization, name=f"Bulk route {i}") for i in range(20)])
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r) for r in routes])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=visibility_zoo["er"], route=r) for r in routes])
+
+    after = _render_query_count(admin_client, url)
+    assert after - baseline <= 2, f"{baseline} -> {after} queries after adding 20 routes"
+
+
+def test_integration_change_page_default_route_uses_autocomplete(admin_client, visibility_zoo):
+    url = reverse("admin:integrations_integration_change", args=[visibility_zoo["valid"].pk])
+    response = admin_client.get(url)
+    form = response.context["adminform"].form
+
+    widget = form.fields["default_route"].widget
+    if isinstance(widget, RelatedFieldWidgetWrapper):
+        widget = widget.widget
+    assert isinstance(widget, AutocompleteSelect)
