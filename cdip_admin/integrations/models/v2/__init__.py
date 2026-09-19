@@ -23,6 +23,7 @@ from .default_route import (
     DefaultRouteDecision,
     DEFAULT_ROUTE_AUTO_ASSIGNED,
     decide_default_route,
+    reassign_default_route,
     resolve_default_route,
     route_has_destinations,
 )

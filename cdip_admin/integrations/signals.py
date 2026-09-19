@@ -97,10 +97,30 @@ def on_route_provider_saved(sender, instance, created, raw=False, **kwargs):
 
 @receiver(m2m_changed, sender=RouteProvider)
 def on_route_providers_m2m_changed(sender, instance, action, reverse, pk_set, **kwargs):
-    """Entry point 1 (route.data_providers.add/.set, integration.routing_rules_by_provider.add)."""
+    """Entry points 1 and 2 for route.data_providers.add/.set/.remove/.clear and the reverse accessor.
+
+    ``pre_remove``/``pre_clear`` (not post_*) so the relationship still exists
+    and "other routes" is computable; a raised AmbiguousDefaultRouteError aborts
+    the operation inside the caller's transaction.
+    """
     if action == "post_add":
         for integration, route in _provider_route_pairs(instance, reverse, pk_set):
             resolve_default_route(integration, joining_route=route, via="route_provider_added")
+    elif action == "pre_remove":
+        if reverse:  # instance is the Integration: it leaves every route in pk_set at once,
+            # so each is a sibling of the others, not a lone leaving_route -- exclude them all
+            # together instead of looping (which would let each look like a survivor in turn).
+            resolve_default_route(instance, exclude_route_ids=set(pk_set), via="route_provider_removed")
+        else:        # instance is the Route: only it is being left, one integration at a time.
+            for integration, route in _provider_route_pairs(instance, reverse, pk_set):
+                resolve_default_route(integration, leaving_route=route, via="route_provider_removed")
+    elif action == "pre_clear":
+        if reverse:  # instance is the Integration: it leaves every route
+            route_ids = list(instance.routing_rules_by_provider.values_list("pk", flat=True))
+            resolve_default_route(instance, exclude_route_ids=route_ids, via="route_provider_removed")
+        else:        # instance is the Route: every provider leaves it
+            for integration in Integration.objects.filter(routing_rules_by_provider=instance):
+                resolve_default_route(integration, leaving_route=instance, via="route_provider_removed")
 
 
 def _reconsider_providers_of(route):
@@ -141,3 +161,57 @@ def on_integration_saved_ensure_membership(sender, instance, raw=False, update_f
         return
     if not RouteProvider.objects.filter(integration_id=instance.pk, route_id=instance.default_route_id).exists():
         RouteProvider.objects.create(integration=instance, route_id=instance.default_route_id)
+
+
+def _origin_model(origin):
+    """Model class behind ``pre_delete``'s ``origin`` (the instance or queryset
+    whose .delete() started the cascade), or None."""
+    if origin is None:
+        return None
+    if isinstance(origin, QuerySet):
+        return origin.model
+    return type(origin)
+
+
+def _routes_leaving_in_this_delete(instance, origin):
+    """Every route ``instance.integration`` is leaving in the delete that ``origin`` started.
+
+    The Collector sends pre_delete for every RouteProvider row it collected
+    BEFORE deleting any of them, so a sibling row for the same integration
+    would otherwise look like a surviving route and get picked as the new
+    default. Re-evaluating ``origin`` here is safe: nothing is deleted yet.
+    """
+    leaving = {instance.route_id}
+    if isinstance(origin, QuerySet):
+        if issubclass(origin.model, Route):
+            leaving |= set(origin.values_list("pk", flat=True))
+        elif issubclass(origin.model, RouteProvider):
+            leaving |= set(
+                origin.filter(integration_id=instance.integration_id).values_list("route_id", flat=True)
+            )
+    elif isinstance(origin, Route):
+        leaving.add(origin.pk)
+    return leaving
+
+
+@receiver(pre_delete, sender=RouteProvider)
+def on_route_provider_pre_delete(sender, instance, **kwargs):
+    """Entry point 2 for RouteProvider rows deleted directly or cascaded from a Route delete.
+
+    Only runs when the delete started at a Route or a RouteProvider. When it
+    started at the Integration (or anything that cascades to it, e.g. an
+    Organization) the provider itself is going away and reassigning its default
+    would be pointless — and could refuse a legitimate delete.
+    """
+    origin_model = _origin_model(kwargs.get("origin"))
+    if origin_model is Route or (origin_model is not None and issubclass(origin_model, Route)):
+        via = "route_deleted"
+    elif origin_model is None or issubclass(origin_model, RouteProvider):
+        via = "route_provider_removed"
+    else:
+        return
+    try:
+        integration = Integration.objects.get(pk=instance.integration_id)
+    except Integration.DoesNotExist:
+        return
+    resolve_default_route(integration, exclude_route_ids=_routes_leaving_in_this_delete(instance, kwargs.get("origin")), via=via)

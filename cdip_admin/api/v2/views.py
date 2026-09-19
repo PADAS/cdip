@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from activity_log.models import ActivityLog
 from integrations.models import Route, get_user_integrations_qs, get_integrations_owners_qs, get_user_sources_qs, \
-    get_user_routes_qs, GundiTrace, IntegrationAction
+    get_user_routes_qs, GundiTrace, IntegrationAction, AmbiguousDefaultRouteError
 from integrations.models import IntegrationType, Integration
 from integrations.filters import IntegrationFilter, ConnectionFilter, IntegrationTypeFilter, SourceFilter, RouteFilter, \
     GundiTraceFilter, ActivityLogFilter
@@ -445,6 +445,23 @@ class RoutesView(viewsets.ModelViewSet):
             is_still_referenced = Route.objects.filter(configuration=locked_config).exists()
             if not is_still_referenced:
                 locked_config.delete()
+
+    def perform_create(self, serializer):
+        # Same reason as perform_update: receivers may refuse the m2m write after the
+        # Route row exists; without atomic() the refused create leaves an orphan Route.
+        with transaction.atomic():
+            serializer.save()
+
+    def perform_update(self, serializer):
+        # Receivers may refuse an m2m change (AmbiguousDefaultRouteError). ATOMIC_REQUESTS
+        # is off, so without this the scalar fields would already be committed.
+        with transaction.atomic():
+            serializer.save()
+
+    def handle_exception(self, exc):
+        if isinstance(exc, AmbiguousDefaultRouteError):
+            exc = v2_serializers.AmbiguousDefaultRouteConflict(exc)
+        return super().handle_exception(exc)
 
 
 class SingleOrBulkCreateModelMixin(mixins.CreateModelMixin):
