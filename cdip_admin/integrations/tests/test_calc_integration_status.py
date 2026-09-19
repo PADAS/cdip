@@ -1,7 +1,7 @@
 import pytest
-from integrations.models import IntegrationStatus, Integration
+from integrations.models import IntegrationStatus, Integration, Route, RouteProvider, RouteDestination
 from activity_log.models import ActivityLog
-from ..models.v2 import calculate_integration_status
+from ..models.v2 import calculate_integration_status, DEFAULT_ROUTE_STATUS_DETAILS, DefaultRouteState
 
 
 pytestmark = pytest.mark.django_db
@@ -234,3 +234,84 @@ def test_retriable_update_failures_count_toward_sustained_errors(provider_lotek_
 
     provider_lotek_panthera.status.refresh_from_db()
     assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == (
+        "Sustained delivery errors - destination may be down or overloaded"
+    )
+
+
+# --- default route invariant (spec §5.2) ----------------------------------------
+
+def _null_default_without_signals(integration):
+    Integration.objects.filter(pk=integration.pk).update(default_route=None)
+
+
+def test_provider_without_default_route_is_unhealthy_naming_the_cause(provider_lotek_panthera):
+    _null_default_without_signals(provider_lotek_panthera)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == DEFAULT_ROUTE_STATUS_DETAILS[DefaultRouteState.MISSING]
+
+
+def test_provider_whose_default_is_not_one_of_its_routes_is_unhealthy(provider_lotek_panthera, organization):
+    orphan = Route.objects.create(owner=organization, name="Orphan")
+    Integration.objects.filter(pk=provider_lotek_panthera.pk).update(default_route=orphan)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == DEFAULT_ROUTE_STATUS_DETAILS[DefaultRouteState.NOT_MEMBER]
+
+
+def test_provider_with_empty_default_beside_delivering_route_is_unhealthy(
+    provider_lotek_panthera, destination_movebank, organization
+):
+    real = Route.objects.create(owner=organization, name="Real")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider_lotek_panthera, route=real)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=destination_movebank, route=real)])
+    # the fixture's default is an empty placeholder; leave it as the default
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == DEFAULT_ROUTE_STATUS_DETAILS[DefaultRouteState.EMPTY_DEFAULT]
+
+
+def test_destination_only_integration_is_not_flagged(destination_movebank):
+    assert destination_movebank.default_route is None
+
+    calculate_integration_status(integration_id=destination_movebank.id)
+
+    destination_movebank.status.refresh_from_db()
+    assert destination_movebank.status.status == IntegrationStatus.Status.HEALTHY
+
+
+def test_default_route_branch_precedes_error_threshold(
+    provider_lotek_panthera,
+    pull_observations_action_started_activity_log,
+    pull_observations_action_failed_activity_log,
+    pull_observations_action_failed_activity_log_2,
+    pull_observations_action_failed_activity_log_3,
+):
+    """A missing default is the cause of downstream errors; the detail must name the cause."""
+    _null_default_without_signals(provider_lotek_panthera)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.UNHEALTHY
+    assert provider_lotek_panthera.status.status_details == DEFAULT_ROUTE_STATUS_DETAILS[DefaultRouteState.MISSING]
+
+
+def test_disabled_wins_over_default_route(provider_lotek_panthera):
+    _null_default_without_signals(provider_lotek_panthera)
+    Integration.objects.filter(pk=provider_lotek_panthera.pk).update(enabled=False)
+
+    calculate_integration_status(integration_id=provider_lotek_panthera.id)
+
+    provider_lotek_panthera.status.refresh_from_db()
+    assert provider_lotek_panthera.status.status == IntegrationStatus.Status.DISABLED
