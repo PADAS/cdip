@@ -293,8 +293,29 @@ class IntegrationActionAdmin(admin.ModelAdmin):
 
 
 
+class IntegrationAdminForm(ModelForm):
+    """Refuse (as a form error, before anything is saved) setting a
+    ``default_route`` that ``decide_default_route`` would refuse as ambiguous
+    (spec §5.1). Raising from a post_save receiver instead would surface as a
+    500 from the admin's change form."""
+
+    class Meta:
+        model = Integration
+        fields = "__all__"
+
+    def clean_default_route(self):
+        route = self.cleaned_data.get("default_route")
+        if route is not None and self.instance.pk is not None:
+            try:
+                decide_default_route(self.instance, joining_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(str(error))
+        return route
+
+
 @admin.register(Integration)
 class IntegrationAdmin(admin.ModelAdmin):
+    form = IntegrationAdminForm
     list_display = (
         "id",
         "type",
@@ -443,10 +464,11 @@ class WebhookConfigurationAdmin(admin.ModelAdmin):
 
 
 class RouteProviderInlineFormSet(BaseInlineFormSet):
-    """Refuse (as a form error, before anything is saved) removing a provider
-    from a route when that would leave its default route ambiguous (spec §5.1).
-    Raising from the pre_delete receiver instead would poison the admin's
-    surrounding transaction."""
+    """Refuse (as a form error, before anything is saved) a provider change on
+    a route -- removal or addition -- when that would leave a default route
+    ambiguous (spec §5.1). Raising from the pre_delete/post_save receiver
+    instead would poison the admin's surrounding transaction (removal) or
+    surface as a 500 from the change form (addition)."""
 
     def clean(self):
         super().clean()
@@ -459,6 +481,19 @@ class RouteProviderInlineFormSet(BaseInlineFormSet):
                 continue
             try:
                 decide_default_route(link.integration, leaving_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(str(error))
+        for form in self.forms:
+            if form in self.deleted_forms:
+                continue
+            link = form.instance
+            if link.pk is not None:
+                continue  # an existing link, not a new one -- nothing is joining
+            integration = form.cleaned_data.get("integration") if form.cleaned_data else None
+            if integration is None:
+                continue
+            try:
+                decide_default_route(integration, joining_route=route)
             except AmbiguousDefaultRouteError as error:
                 raise ValidationError(str(error))
 
@@ -498,21 +533,33 @@ class RouteAdmin(admin.ModelAdmin):
     )
 
     # -- default route refusals (spec §5.1) ---------------------------------
-    # Deleting a route that is a provider's default is refused by the FK's
-    # on_delete when the provider is on several other routes. Turn that into an
-    # admin message instead of a 500. The savepoint keeps the admin's outer
-    # transaction usable after the aborted delete.
+    # Deleting a route can be refused when a provider on it would be left with
+    # an ambiguous default (AmbiguousDefaultRouteError). Turn that into an
+    # admin message instead of a 500. There are two distinct refusal paths,
+    # and BOTH are reachable -- this is not dead code:
     #
-    # reassign_default_route (the FK's on_delete callable) raises at
-    # Collector.collect() time, not at Collector.delete() time -- and both the
-    # single-object delete view and the "Delete selected" action call
-    # get_deleted_objects() (which collects) to render the confirmation page
-    # *before* delete_model/delete_queryset ever run. So the refusal has to be
-    # caught here too, the same way Django itself turns a ProtectedError from
-    # collect() into a "protected" list instead of a 500: treat it as nothing
-    # being deletable and let the admin's own "cannot delete" path render.
-    # delete_model/delete_queryset stay as a second line of defense for any
-    # future on_delete that raises during delete() instead of collect().
+    # 1. get_deleted_objects() -- reassign_default_route (the FK's on_delete
+    #    callable) can raise while Collector.collect() walks the FK from a
+    #    provider whose *default_route* is one of the routes being deleted.
+    #    Both the single-object delete view and the "Delete selected" action
+    #    call get_deleted_objects() (which collects) to render the
+    #    confirmation page *before* delete_model/delete_queryset ever run, so
+    #    catching it here -- the same way Django itself turns a
+    #    ProtectedError from collect() into a "protected" list instead of a
+    #    500 -- stops the delete before anything is touched: nothing is
+    #    deletable and the admin's own "cannot delete" path renders.
+    #
+    # 2. delete_model()/delete_queryset() -- a provider whose default_route is
+    #    NOT one of the routes being deleted, but who is a provider on ≥2
+    #    OTHER delivering routes among them, passes collection cleanly (its FK
+    #    isn't touched) and only raises later, from pre_delete(RouteProvider)
+    #    fired inside Collector.delete() while candidates are re-decided. The
+    #    savepoint here keeps the admin's outer transaction usable after that
+    #    aborted delete. IMPORTANT: by the time this refusal is caught, Django
+    #    has already called log_deletion() and written a "deleted" LogEntry
+    #    for the route -- that history entry is accepted as stale (the route
+    #    in fact still exists); it does not affect ActivityLog, which is only
+    #    written by a successful resolve_default_route() call.
 
     def get_deleted_objects(self, objs, request):
         try:

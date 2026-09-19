@@ -449,6 +449,12 @@ class RoutesView(viewsets.ModelViewSet):
             if not is_still_referenced:
                 locked_config.delete()
 
+    def perform_create(self, serializer):
+        # Same reason as perform_update: receivers may refuse the m2m write after the
+        # Route row exists; without atomic() the refused create leaves an orphan Route.
+        with transaction.atomic():
+            serializer.save()
+
     def perform_update(self, serializer):
         # Receivers may refuse an m2m change (AmbiguousDefaultRouteError). ATOMIC_REQUESTS
         # is off, so without this the scalar fields would already be committed.
