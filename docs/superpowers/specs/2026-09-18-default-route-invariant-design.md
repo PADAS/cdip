@@ -358,6 +358,51 @@ output** before `--fix`.
   the invariant still holds (default is a member); they can re-point the default
   in admin.
 
+## 8a. Amendments from implementation (2026-09-18, PRs #475, #477, #478)
+
+Recorded so this document stops disagreeing with the code.
+
+1. **Placeholder means "no destinations" only.** §4.1 described a placeholder as
+   "no destinations, no configuration"; §4 clause 3 defines the violation without
+   the configuration test. The resolver (`decide_default_route`) and the detector
+   (`annotate_default_route_state`) must agree exactly, or `--fix` could never
+   repair something the status pipeline flags, so both use "no destinations".
+2. **The collector race in §5.1 entry point 3 does not occur in Django 4.2.**
+   `SET_NULL.lazy_sub_objs = True`: the field update is a lazy queryset
+   re-evaluated after `pre_delete`, so a reassignment made in a `pre_delete`
+   receiver survives it (the test written to prove the race passed before the
+   custom `on_delete` existed). The custom `on_delete` is kept for two reasons
+   that do hold: an ambiguity is refused at *collection* time, before the
+   collector's `atomic(savepoint=False)` block (a raise inside that block leaves
+   the caller's transaction aborted); and every route in the same delete is
+   excluded from the candidates at once.
+3. **Entry point 1b — a route gains destinations.** DRF's `ModelSerializer`
+   writes `data_providers` before `destinations`, so at the moment the
+   provider-join receiver fires for `POST /v2/routes/` the new route is itself
+   empty and the §4.1 row 2 switch cannot happen. `post_save(RouteDestination)`
+   and `m2m_changed(post_add)` on `Route.destinations` re-run the same decision
+   for each provider on the route.
+4. **Candidates prefer routes that deliver.** In every branch of the decision,
+   when any candidate has destinations only delivering candidates are
+   considered; an empty route is chosen only when no candidate delivers. Without
+   this, a provider with a NULL default joining an empty route beside a
+   delivering one would have been "healed" into the §4 clause 3 violation.
+5. **Admin refusals are caught in `get_deleted_objects`** (Django runs the
+   deletion collector there, before `delete_model`), reusing Django's own
+   "protected objects" page; `delete_model`/`delete_queryset` remain for the
+   refusals raised from `pre_delete` during the delete itself. Provider additions
+   and the Integration form's `default_route` field are validated in the form
+   (`clean`) so an ambiguous choice is a form error, not a 500.
+6. **Additional accepted limit (§8):** a route *losing* its last destination
+   (`destinations.remove()`, the destination inline, deleting a destination
+   integration) can create a clause 3 violation that only the beat-cycle
+   detector catches; §4.1 has no row for it.
+7. **Pre-existing, out of scope, filed as follow-ups:** every `Route`
+   instantiation costs one query because `ChangeLogMixin.__init__` eagerly
+   resolves `first_provider` (affects every Route changelist); and
+   `ChangeLogMixin.save()` writes its `ActivityLog` row without a savepoint,
+   the same transaction-poisoning hazard fixed in `_log_auto_assignment`.
+
 ## 9. Decisions log
 
 | Decision | Chosen | Alternatives considered |
