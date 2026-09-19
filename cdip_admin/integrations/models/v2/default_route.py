@@ -18,6 +18,7 @@ import logging
 from typing import NamedTuple, Optional
 
 from django.apps import apps
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,12 @@ def decide_default_route(integration, *, leaving_route=None, joining_route=None,
     when a choice has to be made and this route is among the candidates, it wins
     (§4.1 rows 1–2: "provider joins a route" → that route).
 
+    Candidate selection prefers routes that deliver (have at least one
+    destination) whenever any candidate does, regardless of whether the current
+    default is set, valid, or NULL — an empty route is only chosen when none of
+    the candidates deliver. ``joining_route`` then narrows within that
+    preference, so an empty joining route never beats a delivering one.
+
     Raises ``AmbiguousDefaultRouteError`` when several routes could be the new
     default and ``joining_route`` does not disambiguate.
     """
@@ -90,6 +97,10 @@ def decide_default_route(integration, *, leaving_route=None, joining_route=None,
         candidates = others_that_deliver  # §4 clause 3: empty default beside a delivering route
     else:
         candidates = list(routes.values())
+
+    delivering = [c for c in candidates if route_has_destinations(c)]
+    if delivering:
+        candidates = delivering  # no-op when `current` was set: already delivering-only above
 
     if joining_route is not None and any(c.pk == joining_route.pk for c in candidates):
         candidates = [c for c in candidates if c.pk == joining_route.pk]
@@ -126,20 +137,27 @@ def resolve_default_route(integration, *, leaving_route=None, joining_route=None
 def _log_auto_assignment(integration, route, previous_id, via):
     ActivityLog = apps.get_model("activity_log", "ActivityLog")
     try:
-        ActivityLog.objects.create(
-            log_level=ActivityLog.LogLevels.WARNING,
-            log_type=ActivityLog.LogTypes.EVENT,
-            origin=ActivityLog.Origin.PORTAL,
-            integration=integration,
-            value=DEFAULT_ROUTE_AUTO_ASSIGNED,
-            title=f"Default route set to '{route.name}'"[:200],
-            details={
-                "route_id": str(route.pk),
-                "via": via,
-                "previous_default_route_id": str(previous_id) if previous_id else None,
-            },
-            is_reversible=False,
-        )
+        # A savepoint: on Postgres a failed INSERT aborts the surrounding
+        # transaction, and this call runs inside the caller's transaction
+        # (an m2m signal's atomic(savepoint=False) block, the Collector's
+        # atomic, or the admin's). Without a savepoint to roll back to, a
+        # logging failure would poison that transaction and fail the
+        # caller's next query too — logging must never undo the repair.
+        with transaction.atomic():
+            ActivityLog.objects.create(
+                log_level=ActivityLog.LogLevels.WARNING,
+                log_type=ActivityLog.LogTypes.EVENT,
+                origin=ActivityLog.Origin.PORTAL,
+                integration=integration,
+                value=DEFAULT_ROUTE_AUTO_ASSIGNED,
+                title=f"Default route set to '{route.name}'"[:200],
+                details={
+                    "route_id": str(route.pk),
+                    "via": via,
+                    "previous_default_route_id": str(previous_id) if previous_id else None,
+                },
+                is_reversible=False,
+            )
     except Exception:  # logging must never undo a repair
         logger.exception(
             "Could not log default route auto-assignment",

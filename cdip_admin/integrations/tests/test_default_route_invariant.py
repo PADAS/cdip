@@ -6,6 +6,7 @@ starting state is exactly what it says, even once the receivers exist.
 import uuid
 
 import pytest
+from django.db import transaction
 
 from activity_log.models import ActivityLog
 from integrations.models import (
@@ -176,6 +177,27 @@ def test_decide_excludes_leaving_and_excluded_routes(make_provider, make_destina
     assert decision.changed is True
 
 
+def test_decide_null_default_prefers_the_route_that_delivers(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    make_route("Empty", providers=[provider])
+    real = make_route("Real", providers=[provider], destinations=[er])
+
+    decision = decide_default_route(provider)
+
+    assert decision.route == real
+    assert decision.changed is True
+
+
+def test_decide_null_default_does_not_pick_an_empty_joining_route_over_a_delivering_one(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    real = make_route("Real", providers=[provider], destinations=[er])
+    joining_empty = make_route("Joining empty", providers=[provider])
+
+    decision = decide_default_route(provider, joining_route=joining_empty)
+
+    assert decision.route == real
+
+
 # --- resolve_default_route ---------------------------------------------------
 
 def test_resolve_assigns_and_logs_once(make_provider, make_route):
@@ -228,6 +250,37 @@ def test_resolve_to_null_does_not_log(make_provider, make_route):
     provider.refresh_from_db()
     assert provider.default_route is None
     assert auto_assign_logs(provider).count() == 0
+
+
+def test_resolve_survives_a_failed_activity_log_write(make_provider, make_route, mocker):
+    """A failed log INSERT must neither undo the repair nor poison the caller's transaction.
+
+    Only the auto-assignment log write (value=DEFAULT_ROUTE_AUTO_ASSIGNED) is made to
+    fail; ``Integration`` also carries ``ChangeLogMixin``, which makes its own
+    unrelated ``ActivityLog.objects.create`` call from ``save()`` on every save
+    (including the ``integration.save(update_fields=["default_route"])`` this
+    resolve does) and must be left alone so it doesn't abort the transaction first.
+    """
+    provider = make_provider()
+    route = make_route("Only", providers=[provider])
+
+    from django.db import connection
+
+    original_create = ActivityLog.objects.create
+
+    def failing_insert(**kwargs):
+        if kwargs.get("value") != DEFAULT_ROUTE_AUTO_ASSIGNED:
+            return original_create(**kwargs)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1/0")   # IntegrityError/DataError-class failure inside the transaction
+
+    mocker.patch("activity_log.models.ActivityLog.objects.create", side_effect=failing_insert)
+
+    with transaction.atomic():
+        assert resolve_default_route(provider, via="unit_test") == route
+        provider.refresh_from_db()          # would raise TransactionManagementError if poisoned
+
+    assert provider.default_route == route
 
 
 # --- entry point 1: a provider joins a route ---------------------------------
