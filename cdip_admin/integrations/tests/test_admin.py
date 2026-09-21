@@ -356,3 +356,157 @@ def test_provider_inline_formset_refuses_ambiguous_addition(organization, integr
 
     assert not formset.is_valid()
     assert any("Cannot choose a default route" in e for e in formset.non_form_errors())
+
+
+def test_integration_admin_form_refuses_change_from_delivering_stored_default(
+    organization, integration_type_lotek, integrations_list_er
+):
+    """The stored default (R1) already delivers, so deciding against it (rather
+    than against the submitted value) would short-circuit with no error, let an
+    empty route through, and only raise later from the post_save receiver."""
+    from integrations.admin import IntegrationAdminForm
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Delivering default", base_url="https://api.test.lotek.com")
+    r1, r2 = (Route.objects.create(owner=organization, name=n) for n in ("R1", "R2"))
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r) for r in (r1, r2)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r) for r in (r1, r2)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=r1)
+    provider.refresh_from_db()
+    empty = Route.objects.create(owner=organization, name="Empty")
+
+    form = IntegrationAdminForm(instance=provider, data={
+        "type": str(provider.type_id), "owner": str(provider.owner_id), "name": provider.name,
+        "base_url": provider.base_url, "enabled": "on", "default_route": str(empty.pk), "additional": "{}",
+    })
+
+    assert not form.is_valid()
+    assert any("Cannot choose a default route" in e for e in form.errors["default_route"])
+
+
+def test_integration_admin_form_allows_switching_between_delivering_routes(
+    organization, integration_type_lotek, integrations_list_er
+):
+    from integrations.admin import IntegrationAdminForm
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Delivering default", base_url="https://api.test.lotek.com")
+    r1, r2 = (Route.objects.create(owner=organization, name=n) for n in ("R1", "R2"))
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r) for r in (r1, r2)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r) for r in (r1, r2)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=r1)
+    provider.refresh_from_db()
+
+    form = IntegrationAdminForm(instance=provider, data={
+        "type": str(provider.type_id), "owner": str(provider.owner_id), "name": provider.name,
+        "base_url": provider.base_url, "enabled": "on", "default_route": str(r2.pk), "additional": "{}",
+    })
+
+    assert form.is_valid(), form.errors
+
+
+def test_integration_admin_form_refuses_override_of_submitted_empty_default(
+    organization, integration_type_lotek, integrations_list_er
+):
+    """R1 is the provider's only route and already delivers. Submitting an
+    empty route the provider isn't even a member of does not raise
+    AmbiguousDefaultRouteError -- decide_default_route just returns R1 -- so
+    accepting it would let the save's receivers silently re-point the default
+    back to R1, overriding the submitted choice without feedback."""
+    from integrations.admin import IntegrationAdminForm
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Single delivering", base_url="https://api.test.lotek.com")
+    r1 = Route.objects.create(owner=organization, name="R1")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r1)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r1)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=r1)
+    provider.refresh_from_db()
+    empty = Route.objects.create(owner=organization, name="Empty")
+
+    form = IntegrationAdminForm(instance=provider, data={
+        "type": str(provider.type_id), "owner": str(provider.owner_id), "name": provider.name,
+        "base_url": provider.base_url, "enabled": "on", "default_route": str(empty.pk), "additional": "{}",
+    })
+
+    assert not form.is_valid()
+    assert any("R1" in e for e in form.errors["default_route"])
+
+
+def test_admin_bulk_delete_refused_from_pre_delete_path_reports_no_success(
+    admin_client, organization, integration_type_lotek, integrations_list_er
+):
+    """default NULL, provider on R1, R2, R3 (all delivering). Bulk-deleting R1
+    alone passes collection (the provider's default isn't R1) and is only
+    refused later, from pre_delete(RouteProvider) -- which must be caught at
+    confirmation time so the bulk action never reaches its unconditional
+    "Successfully deleted" message."""
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Bulk null default", base_url="https://api.test.lotek.com")
+    routes = []
+    for name in ("R1", "R2", "R3"):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=r)])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=r)])
+        routes.append(r)
+    r1 = routes[0]
+    url = reverse("admin:integrations_route_changelist")
+
+    response = admin_client.post(
+        url,
+        {"action": "delete_selected", "_selected_action": [str(r1.pk)], "post": "yes"},
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert Route.objects.filter(pk=r1.pk).exists()
+    messages = [str(m) for m in response.context["messages"]]
+    assert any("Cannot choose a default route" in m for m in messages), messages
+    assert not any("Successfully deleted" in m for m in messages), messages
+
+
+def test_provider_inline_formset_refuses_repointing_existing_link(
+    organization, integration_type_lotek, integrations_list_er
+):
+    """Repointing an existing row's integration is a leave (old integration)
+    plus a join (new integration) that an UPDATE save would skip: post_save
+    fires with created=False and does nothing, so the old integration keeps a
+    default pointing at a route it no longer belongs to. Refusing is simpler
+    and safer than validating both sides."""
+    from integrations.admin import RouteProviderInlineFormSet
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Sole route provider", base_url="https://api.test.lotek.com")
+    other = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Other integration", base_url="https://api.test.lotek.com")
+    route = Route.objects.create(owner=organization, name="R")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=route)])
+    RouteDestination.objects.bulk_create([RouteDestination(integration=integrations_list_er[0], route=route)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=route)
+    link = RouteProvider.objects.get(integration=provider, route=route)
+    FormSet = inlineformset_factory(
+        Route, RouteProvider, formset=RouteProviderInlineFormSet, fields=("integration",), extra=0, can_delete=True,
+    )
+    prefix = FormSet.get_default_prefix()
+    data = {
+        f"{prefix}-TOTAL_FORMS": "1", f"{prefix}-INITIAL_FORMS": "1",
+        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+        f"{prefix}-0-id": str(link.pk), f"{prefix}-0-integration": str(other.pk),
+    }
+
+    formset = FormSet(data, instance=route)
+
+    assert not formset.is_valid()
+    assert any("deleting this row" in e for e in formset.non_form_errors())
+    link.refresh_from_db()
+    assert link.integration_id == provider.pk
+
+
+def test_provider_inline_formset_accepts_untouched_existing_link(organization, integration_type_lotek):
+    from integrations.admin import RouteProviderInlineFormSet
+    provider = Integration.objects.create(type=integration_type_lotek, owner=organization, name="Untouched", base_url="https://api.test.lotek.com")
+    route = Route.objects.create(owner=organization, name="R")
+    RouteProvider.objects.bulk_create([RouteProvider(integration=provider, route=route)])
+    Integration.objects.filter(pk=provider.pk).update(default_route=route)
+    link = RouteProvider.objects.get(integration=provider, route=route)
+    FormSet = inlineformset_factory(Route, RouteProvider, formset=RouteProviderInlineFormSet, fields=("integration",), extra=0, can_delete=True)
+    prefix = FormSet.get_default_prefix()
+    data = {
+        f"{prefix}-TOTAL_FORMS": "1", f"{prefix}-INITIAL_FORMS": "1",
+        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000",
+        f"{prefix}-0-id": str(link.pk), f"{prefix}-0-integration": str(provider.pk),
+    }
+
+    formset = FormSet(data, instance=route)
+
+    assert formset.is_valid(), formset.errors
