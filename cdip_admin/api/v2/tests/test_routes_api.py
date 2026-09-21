@@ -5,7 +5,7 @@ from django.urls import reverse
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 from integrations.models import (
-    Route, RouteConfiguration, get_user_routes_qs
+    Route, RouteConfiguration, get_user_routes_qs, Integration, ensure_default_route
 )
 
 
@@ -1124,3 +1124,77 @@ def test_cannot_delete_unrelated_route_configuration_as_org_admin(
     assert response.status_code == status.HTTP_404_NOT_FOUND
     route_2.refresh_from_db()
     assert route_2.configuration is not None
+
+
+# --- GUNDI-5731: POST /v2/routes/ must maintain Integration.default_route -----
+
+def _post_route(api_client, user, owner, providers, destinations, name="Route"):
+    api_client.force_authenticate(user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": name,
+            "owner": str(owner.id),
+            "data_providers": [str(p.id) for p in providers],
+            "destinations": [str(d.id) for d in destinations],
+            "additional": {},
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    return Route.objects.get(id=response.json()["id"])
+
+
+def test_create_route_sets_default_for_provider_without_one(
+    api_client, superuser, organization, integration_type_lotek, integrations_list_er
+):
+    """GUNDI-5731 scenario 1: a connection created without a default route,
+    then 'Create Route' with a destination → that route becomes the default."""
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization,
+        name="Lotek without default", base_url="https://api.test.lotek.com",
+    )
+    assert provider.default_route is None
+
+    route = _post_route(api_client, superuser, organization, [provider], [integrations_list_er[0]])
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+
+
+def test_create_route_switches_empty_placeholder_default_to_new_route(
+    api_client, superuser, organization, integration_type_lotek, integrations_list_er
+):
+    """GUNDI-5731 scenario 2 (spec §2.3): connection created WITH an empty
+    default route, then 'Create Route + destination' → the default must move to
+    the route carrying the destinations, not stay on the empty one."""
+    provider = Integration.objects.create(
+        type=integration_type_lotek, owner=organization,
+        name="Lotek with placeholder", base_url="https://api.test.lotek.com",
+    )
+    ensure_default_route(integration=provider)
+    placeholder = provider.default_route
+    assert not placeholder.destinations.exists()
+
+    route = _post_route(api_client, superuser, organization, [provider], [integrations_list_er[0]])
+
+    provider.refresh_from_db()
+    assert provider.default_route == route
+    assert Route.objects.filter(pk=placeholder.pk).exists()  # the placeholder is left alone
+
+
+def test_create_reverse_flow_route_sets_default_for_destination_site(
+    api_client, superuser, organization, integration_type_er, provider_lotek_panthera
+):
+    """GUNDI-5731 entry point 2 (handleEnableReverseFlow): an ER site that so far
+    was destination-only becomes a provider on a new route → that route is its default."""
+    er_site = Integration.objects.create(
+        type=integration_type_er, owner=organization,
+        name="ER site enabling reverse flow", base_url="https://reverse.pamdas.org",
+    )
+    assert er_site.default_route is None
+
+    route = _post_route(api_client, superuser, organization, [er_site], [provider_lotek_panthera], name="Reverse")
+
+    er_site.refresh_from_db()
+    assert er_site.default_route == route
