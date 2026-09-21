@@ -1,11 +1,15 @@
 import json
+import uuid
 from io import StringIO
 
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from integrations.models import IntegrationAction, IntegrationConfiguration
+from activity_log.models import ActivityLog
+from integrations.models import (
+    IntegrationAction, IntegrationConfiguration, Integration, Route, RouteProvider, RouteDestination,
+)
 
 
 pytestmark = pytest.mark.django_db
@@ -193,3 +197,105 @@ def test_call_set_action_configs_command_with_integration_type(
     ).first()
     assert new_config is not None
     assert new_config.data == json.loads(config_json)
+
+
+# --- check_default_routes -------------------------------------------------------
+
+@pytest.fixture
+def broken_providers(organization, integration_type_lotek, destination_movebank):
+    def provider(name):
+        return Integration.objects.create(
+            type=integration_type_lotek, owner=organization, name=name, base_url="https://api.test.lotek.com",
+        )
+
+    def route(name, providers=(), destinations=()):
+        r = Route.objects.create(owner=organization, name=name)
+        RouteProvider.objects.bulk_create([RouteProvider(integration=p, route=r) for p in providers])
+        RouteDestination.objects.bulk_create([RouteDestination(integration=d, route=r) for d in destinations])
+        return r
+
+    fixable = provider("Fixable")                      # NULL default, one route → repairable
+    fixable_route = route("Fixable route", providers=[fixable], destinations=[destination_movebank])
+
+    ambiguous = provider("Ambiguous")                  # NULL default, two delivering routes → needs a human
+    route("Amb A", providers=[ambiguous], destinations=[destination_movebank])
+    route("Amb B", providers=[ambiguous], destinations=[destination_movebank])
+
+    fine = provider("Fine")
+    fine_route = route("Fine route", providers=[fine], destinations=[destination_movebank])
+    Integration.objects.filter(pk=fine.pk).update(default_route=fine_route)
+
+    return {"fixable": fixable, "fixable_route": fixable_route, "ambiguous": ambiguous, "fine": fine}
+
+
+def _run(*args):
+    out, err = StringIO(), StringIO()
+    call_command("check_default_routes", *args, stdout=out, stderr=err)
+    return out.getvalue(), err.getvalue()
+
+
+def test_check_default_routes_dry_run_lists_violators_and_exits_nonzero(broken_providers):
+    out = StringIO()
+    with pytest.raises(CommandError, match="2 provider"):
+        call_command("check_default_routes", stdout=out)
+
+    text = out.getvalue()
+    assert str(broken_providers["fixable"].id) in text and "missing" in text
+    assert str(broken_providers["ambiguous"].id) in text
+    assert str(broken_providers["fine"].id) not in text
+    broken_providers["fixable"].refresh_from_db()
+    assert broken_providers["fixable"].default_route is None          # dry run wrote nothing
+
+
+def test_check_default_routes_exits_zero_when_clean(broken_providers):
+    out, _ = _run("--integration", str(broken_providers["fine"].id))
+    assert "No default route violations" in out
+
+
+def test_check_default_routes_fix_repairs_unambiguous_and_lists_ambiguous(broken_providers):
+    out = StringIO()
+    with pytest.raises(CommandError, match="1 provider"):
+        call_command("check_default_routes", "--fix", stdout=out)
+
+    fixable = broken_providers["fixable"]
+    fixable.refresh_from_db()
+    assert fixable.default_route == broken_providers["fixable_route"]
+    log = ActivityLog.objects.get(integration=fixable, value="default_route_auto_assigned")
+    assert log.details["via"] == "check_default_routes"
+    broken_providers["ambiguous"].refresh_from_db()
+    assert broken_providers["ambiguous"].default_route is None
+    text = out.getvalue()
+    assert "fixed" in text and "ambiguous" in text and "Amb A" in text and "Amb B" in text
+
+
+def test_check_default_routes_fix_exits_zero_when_everything_was_repaired(broken_providers):
+    out, _ = _run("--fix", "--integration", str(broken_providers["fixable"].id))
+    assert "fixed" in out
+
+
+def test_check_default_routes_integration_scope(broken_providers):
+    out = StringIO()
+    with pytest.raises(CommandError, match="1 provider"):
+        call_command("check_default_routes", "--integration", str(broken_providers["ambiguous"].id), stdout=out)
+    assert str(broken_providers["fixable"].id) not in out.getvalue()
+
+
+def test_check_default_routes_unknown_integration_is_an_error(broken_providers):
+    with pytest.raises(CommandError, match="not found"):
+        call_command("check_default_routes", "--integration", str(uuid.uuid4()), stdout=StringIO())
+
+
+def test_check_default_routes_json_output(broken_providers):
+    out = StringIO()
+    with pytest.raises(CommandError):
+        call_command("check_default_routes", "--json", stdout=out)
+
+    report = json.loads(out.getvalue())
+    by_id = {entry["id"]: entry for entry in report}
+    fixable = by_id[str(broken_providers["fixable"].id)]
+    assert fixable["violation"] == "missing"
+    assert fixable["default_route"] is None
+    assert fixable["candidates"] == [
+        {"id": str(broken_providers["fixable_route"].id), "name": "Fixable route", "destination_count": 1}
+    ]
+    assert set(fixable) >= {"id", "name", "type", "owner", "default_route", "violation", "candidates"}

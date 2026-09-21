@@ -13,7 +13,8 @@ from core.utils import timezone_from_offset, parse_crontab_schedule_from_dict
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
     Source, SourceState, SourceConfiguration, SourceFilter, ensure_default_route, RouteConfiguration, \
     get_user_integrations_qs, \
-    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus
+    GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus, \
+    AmbiguousDefaultRouteError
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
 from django.conf import settings
@@ -48,6 +49,19 @@ class DuplicateSourceError(drf_exceptions.APIException):
 class DuplicateSourceFilterError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "conflict"
+
+
+class AmbiguousDefaultRouteConflict(drf_exceptions.APIException):
+    """409 for a route change that would leave a provider without a clear default
+    route (spec §5.1). Body: {"detail": ..., "candidates": [{"id", "name"}]}."""
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "ambiguous_default_route"
+
+    def __init__(self, error: AmbiguousDefaultRouteError):
+        super().__init__(detail={
+            "detail": str(error),
+            "candidates": [{"id": str(route.pk), "name": route.name} for route in error.candidates],
+        })
 
 
 class UserWorkspaceSerializer(serializers.ModelSerializer):
@@ -883,7 +897,7 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = (
-            "id", "external_id", "status", "provider", "destinations", "routing_rules",
+            "id", "external_id", "name", "status", "provider", "destinations", "routing_rules",
             "update_frequency", "last_update", "created_at"
         )
 
@@ -930,8 +944,9 @@ class SourceCreateSerializer(serializers.ModelSerializer):
         model = Source
         fields = ("id", "provider", "external_id", "name")
         # A duplicate is a conflict with existing state, not a malformed request, so it is
-        # answered 409 in validate() below. DRF would otherwise derive a
+        # answered 409 in validate()/create() below. DRF would otherwise derive a
         # UniqueTogetherValidator from the model's unique_together and answer 400 first.
+        # Dropping the validators moves the uniqueness guarantee to the DB constraint.
         validators = []
 
     def validate_provider(self, value):
@@ -944,14 +959,32 @@ class SourceCreateSerializer(serializers.ModelSerializer):
             )
         return value
 
+    @staticmethod
+    def _duplicate_error():
+        return DuplicateSourceError(detail={
+            "external_id": ["A source with this external ID already exists for this provider."]
+        })
+
     def validate(self, attrs):
-        if Source.objects.filter(
-            integration=attrs["integration"], external_id=attrs["external_id"]
+        integration = attrs.get("integration")
+        external_id = attrs.get("external_id")
+        if integration and external_id and Source.objects.filter(
+            integration=integration, external_id=external_id
         ).exists():
-            raise DuplicateSourceError(detail={
-                "external_id": ["A source with this external ID already exists for this provider."]
-            })
+            raise self._duplicate_error()
         return attrs
+
+    def create(self, validated_data):
+        # The check in validate() loses to a concurrent POST: two clients (or a client and
+        # ingestion) both pass it, and the second insert hits the (integration, external_id)
+        # unique constraint. That constraint is the only real guard left once validators are
+        # off, so its violation answers the same 409 the check does, not a 500. The savepoint
+        # keeps the outer ATOMIC_REQUESTS transaction usable after the failed insert.
+        try:
+            with transaction.atomic():
+                return super().create(validated_data)
+        except IntegrityError:
+            raise self._duplicate_error()
 
     def to_representation(self, instance):
         return SourceRetrieveSerializer(instance=instance, context=self.context).data

@@ -426,6 +426,16 @@ EMAIL_ALERT_RECIPIENTS = env.list("EMAIL_ALERT_RECIPIENTS", default=["support@ea
 EMAIL_ALERT_INCLUDE_DISABLED = env.bool("EMAIL_ALERT_INCLUDE_DISABLED", False)
 PORTAL_BASE_URL = env.str("PORTAL_BASE_URL", "https://gundiservice.org")  # to render links to the portal in emails
 
+# Public entry points handed to data providers. Defaults are production;
+# dev and stage override them, so a conversion run there does not emit
+# production URLs.
+GUNDI_WEBHOOKS_BASE_URL = env.str(
+    "GUNDI_WEBHOOKS_BASE_URL", "https://hooks.gundiservice.org"
+)
+GUNDI_SENSORS_BASE_URL = env.str(
+    "GUNDI_SENSORS_BASE_URL", "https://sensors.api.gundiservice.org"
+)
+
 # Used for storing files such as report attachments
 DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 GS_BUCKET_NAME = env.str("GS_BUCKET_NAME", "cdip-files-dev")

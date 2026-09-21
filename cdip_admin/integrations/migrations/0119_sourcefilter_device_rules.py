@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ("integrations", "0117_alter_integrationaction_type"),
+        ("integrations", "0118_integration_default_route_on_delete"),
     ]
 
     operations = [

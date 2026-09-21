@@ -28,6 +28,8 @@ from integrations.tasks import (
 from deployments.utils import create_dispatcher_for_integration
 from activity_log.mixins import ChangeLogMixin
 
+from .default_route import reassign_default_route
+
 
 logger = logging.getLogger(__name__)
 
@@ -297,7 +299,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         "integrations.Route",
         blank=True,
         null=True,
-        on_delete=models.SET_NULL,
+        on_delete=reassign_default_route,
         related_name="integrations_by_rule",
         verbose_name="Default Routing Rule",
     )

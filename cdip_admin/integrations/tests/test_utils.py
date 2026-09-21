@@ -4,7 +4,7 @@ import json
 import pytest
 
 from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api_consumer_info, patch_api_consumer_info, \
-    get_prefix_from_integration_type, convert_legacy_topic_name
+    get_prefix_from_integration_type, convert_legacy_topic_name, KONG_REQUEST_TIMEOUT
 
 pytestmark = pytest.mark.django_db
 
@@ -26,7 +26,9 @@ def test_create_api_consumer_for_v1_integration(mocker, inbound_integration_awt,
         "username": f"integration:{inbound_integration_awt.id}",
         "custom_id": expected_custom_id,
     }
-    mock_kong_consumers_api_requests.post.assert_called_once_with(expected_url, data=expected_data)
+    mock_kong_consumers_api_requests.post.assert_called_once_with(
+        expected_url, data=expected_data, timeout=KONG_REQUEST_TIMEOUT
+    )
 
 
 def test_create_api_consumer_for_v2_integration(mocker, provider_ats, mock_kong_consumers_api_requests):
@@ -46,7 +48,9 @@ def test_create_api_consumer_for_v2_integration(mocker, provider_ats, mock_kong_
         "username": f"integration:{provider_ats.id}",
         "custom_id": expected_custom_id,
     }
-    mock_kong_consumers_api_requests.post.assert_called_once_with(expected_url, data=expected_data)
+    mock_kong_consumers_api_requests.post.assert_called_once_with(
+        expected_url, data=expected_data, timeout=KONG_REQUEST_TIMEOUT
+    )
 
 
 def test_get_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_requests, mock_api_consumer_info):
@@ -56,7 +60,9 @@ def test_get_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_req
 
     assert result == mock_api_consumer_info
     expected_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(provider_ats.id)}"
-    mock_kong_consumers_api_requests.get.assert_called_once_with(expected_url)
+    mock_kong_consumers_api_requests.get.assert_called_once_with(
+        expected_url, timeout=KONG_REQUEST_TIMEOUT
+    )
 
 
 def test_patch_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_requests):
@@ -67,7 +73,9 @@ def test_patch_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_r
 
     assert result == mock_kong_consumers_api_requests.patch.return_value
     expected_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(provider_ats.id)}"
-    mock_kong_consumers_api_requests.patch.assert_called_once_with(expected_url, data=data)
+    mock_kong_consumers_api_requests.patch.assert_called_once_with(
+        expected_url, data=data, timeout=KONG_REQUEST_TIMEOUT
+    )
 
 
 @pytest.mark.parametrize("integration_type, expected_prefix", [

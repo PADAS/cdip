@@ -1,11 +1,15 @@
 import django_celery_beat
 import psycopg2
 from django.contrib import admin
-from django.db import IntegrityError
-from django.db.models import F
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from collections import defaultdict
+from django.db.models import F, Prefetch
 from django.forms import ModelForm
+from django.forms.models import BaseInlineFormSet
+from django.http import HttpResponseRedirect
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django_celery_beat.admin import PeriodicTaskAdmin
 from django_celery_beat.models import PeriodicTask
 from simple_history.admin import SimpleHistoryAdmin
@@ -30,10 +34,16 @@ from .models import (
     IntegrationConfiguration,
     Route,
     RouteConfiguration,
+    RouteProvider,
+    RouteDestination,
     SourceFilter, Source, SourceState, SourceConfiguration,
     GundiTrace,
     IntegrationWebhook,
     WebhookConfiguration,
+    AmbiguousDefaultRouteError,
+    decide_default_route,
+    DefaultRouteState,
+    filter_by_default_route_state,
 )
 
 from .forms import (
@@ -288,20 +298,103 @@ class IntegrationActionAdmin(admin.ModelAdmin):
 
 
 
+class IntegrationAdminForm(ModelForm):
+    """Refuse (as a form error, before anything is saved) setting a
+    ``default_route`` that ``decide_default_route`` would refuse as ambiguous
+    (spec §5.1). Raising from a post_save receiver instead would surface as a
+    500 from the admin's change form.
+
+    The decision is made against the *submitted* value, not the stored one:
+    ``_post_clean`` assigns ``cleaned_data`` to the instance only after all
+    field cleaners run, so ``self.instance.default_route_id`` still holds the
+    old value here. Deciding against the old value would short-circuit
+    whenever it already delivers, regardless of what is being submitted."""
+
+    class Meta:
+        model = Integration
+        fields = "__all__"
+
+    def clean_default_route(self):
+        route = self.cleaned_data.get("default_route")
+        if route is not None and self.instance.pk is not None:
+            self.instance.default_route = route  # _post_clean would assign this anyway
+            try:
+                decision = decide_default_route(self.instance, joining_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(
+                    "This route has no destinations while another of this "
+                    f"provider's routes does. {error}"
+                )
+            if decision.route is not None and decision.route.pk != route.pk:
+                # decide_default_route silently prefers a delivering route over
+                # the submitted empty one; surface that instead of letting the
+                # save's receivers override the user's choice without feedback.
+                raise ValidationError(
+                    f"This route has no destinations while '{decision.route.name}' "
+                    f"does; choose '{decision.route.name}' or add destinations to "
+                    "this route first."
+                )
+        return route
+
+
+def _integration_labels_by_route(through_model, route_ids):
+    """{route_id: "Name (Type), Name (Type)"} for the given routes, in one query.
+
+    Reads the through table with .values_list() so neither Route nor Integration
+    is instantiated: Route.__init__ runs ChangeLogMixin, which queries
+    first_provider per instance (see GundiTraceAdmin.get_queryset).
+    """
+    labels = defaultdict(list)
+    rows = (
+        through_model.objects.filter(route_id__in=route_ids)
+        .order_by("integration__name")
+        .values_list("route_id", "integration__name", "integration__type__name")
+    )
+    for route_id, name, type_name in rows:
+        labels[route_id].append(f"{name} ({type_name})")
+    return {route_id: ", ".join(names) for route_id, names in labels.items()}
+
+
+class DefaultRouteStateFilter(admin.SimpleListFilter):
+    """One click to the providers violating the default-route invariant (spec §5.3).
+    Choices map one-to-one onto the clauses of providers_without_valid_default_route()."""
+    title = "Default route"
+    parameter_name = "default_route_state"
+
+    def lookups(self, request, model_admin):
+        return (
+            (DefaultRouteState.VALID.value, "Valid"),
+            (DefaultRouteState.MISSING.value, "Missing (NULL)"),
+            (DefaultRouteState.NOT_MEMBER.value, "Not one of its routes"),
+            (DefaultRouteState.EMPTY_DEFAULT.value, "Empty while another route delivers"),
+        )
+
+    def queryset(self, request, queryset):
+        try:
+            state = DefaultRouteState(self.value())
+        except ValueError:
+            return queryset
+        return filter_by_default_route_state(queryset, state)
+
+
 @admin.register(Integration)
 class IntegrationAdmin(admin.ModelAdmin):
+    form = IntegrationAdminForm
     list_display = (
         "id",
         "type",
         "owner",
         "name",
         "enabled",
+        "default_route_link",
         "api_key",  # ToDo: Add an endpoint to manage API Keys to manage them through the Portal UI?
         "created_at",
     )
+    list_select_related = ("type", "owner")
     list_filter = (
         "owner",
         "type",
+        DefaultRouteStateFilter,
         "created_at",
     )
     search_fields = (
@@ -311,9 +404,69 @@ class IntegrationAdmin(admin.ModelAdmin):
         "type__name",
         "type__value",
     )
+    # AJAX search box instead of a <select> of every Route (needs RouteAdmin.search_fields).
+    autocomplete_fields = ("default_route",)
+    readonly_fields = ("routes_as_provider_panel", "routes_as_destination_panel")
     inlines = [
         DispatcherDeploymentInline,
     ]
+
+    def get_queryset(self, request):
+        # Pull the default route's name in via the join rather than via
+        # ``list_select_related``. Constructing a ``Route`` instance runs
+        # ``ChangeLogMixin.__init__``, which resolves the route's first
+        # provider (a query) before Django populates the FK cache -- so it
+        # costs a query per row that select_related cannot prevent (see
+        # GundiTraceAdmin.get_queryset for the same issue with Source).
+        # Annotating avoids building the instances at all.
+        return super().get_queryset(request).annotate(
+            _default_route_name=F("default_route__name")
+        )
+
+    @admin.display(description="Default route", ordering="default_route__name")
+    def default_route_link(self, obj):
+        if obj.default_route_id is None:
+            return "—"
+        url = reverse("admin:integrations_route_change", args=[obj.default_route_id])
+        return format_html('<a href="{}">{}</a>', url, obj._default_route_name)
+
+    @admin.display(description="Routes as provider")
+    def routes_as_provider_panel(self, obj):
+        """provider → route → destinations, default marked ★ (spec §5.3)."""
+        if obj.pk is None:
+            return "—"
+        routes = list(obj.routing_rules_by_provider.order_by("name").values("pk", "name"))
+        if not routes:
+            return "Not a provider on any route (default route not required)."
+        destinations = _integration_labels_by_route(RouteDestination, [r["pk"] for r in routes])
+        rows = [
+            (
+                "★ " if route["pk"] == obj.default_route_id else "",
+                reverse("admin:integrations_route_change", args=[route["pk"]]),
+                route["name"],
+                destinations.get(route["pk"], "no destinations"),
+            )
+            for route in routes
+        ]
+        return format_html("<ul>{}</ul>", format_html_join("", '<li>{}<a href="{}">{}</a> → {}</li>', rows))
+
+    @admin.display(description="Routes as destination")
+    def routes_as_destination_panel(self, obj):
+        if obj.pk is None:
+            return "—"
+        routes = list(obj.routing_rules_by_destination.order_by("name").values("pk", "name"))
+        if not routes:
+            return "Not a destination on any route."
+        providers = _integration_labels_by_route(RouteProvider, [r["pk"] for r in routes])
+        rows = [
+            (
+                providers.get(route["pk"], "no providers"),
+                reverse("admin:integrations_route_change", args=[route["pk"]]),
+                route["name"],
+            )
+            for route in routes
+        ]
+        return format_html("<ul>{}</ul>", format_html_join("", '<li>{} → <a href="{}">{}</a></li>', rows))
 
     def delete_model(self, request, obj):
         try:  # Is there a deployment?
@@ -437,8 +590,57 @@ class WebhookConfigurationAdmin(admin.ModelAdmin):
     )
 
 
+class RouteProviderInlineFormSet(BaseInlineFormSet):
+    """Refuse (as a form error, before anything is saved) a provider change on
+    a route -- removal, addition, or repointing -- when that would leave a
+    default route ambiguous (spec §5.1). Raising from the pre_delete/post_save
+    receiver instead would poison the admin's surrounding transaction (removal)
+    or surface as a 500 from the change form (addition).
+
+    Repointing an existing row's ``integration`` is a leave (of the old
+    integration) plus a join (of the new one), but the save is an UPDATE, so
+    ``post_save(RouteProvider)`` fires with ``created=False`` and checks
+    neither side. That is refused outright rather than decided, since deciding
+    it would mean running both the leave and the join checks against a link
+    that has not moved yet."""
+
+    def clean(self):
+        super().clean()
+        route = self.instance
+        if route.pk is None:
+            return
+        for form in self.deleted_forms:
+            link = form.instance
+            if link.pk is None:
+                continue
+            try:
+                decide_default_route(link.integration, leaving_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(str(error))
+        for form in self.forms:
+            if form in self.deleted_forms:
+                continue
+            link = form.instance
+            if link.pk is not None:
+                if form.cleaned_data and "integration" in form.changed_data:
+                    raise ValidationError(
+                        "Change a provider by deleting this row and adding a "
+                        "new one; editing the integration in place would skip "
+                        "the default-route checks."
+                    )
+                continue  # an existing link, not a new one -- nothing is joining
+            integration = form.cleaned_data.get("integration") if form.cleaned_data else None
+            if integration is None:
+                continue
+            try:
+                decide_default_route(integration, joining_route=route)
+            except AmbiguousDefaultRouteError as error:
+                raise ValidationError(str(error))
+
+
 class RouteProviderInline(admin.TabularInline):
     model = Route.data_providers.through
+    formset = RouteProviderInlineFormSet
     # Without this, every inline row renders a <select> of *every* Integration,
     # and Integration.__str__ touches owner.name/type.name (not select_related),
     # making the Route change page an N+1 storm that times out in production.
@@ -455,9 +657,17 @@ class RouteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "owner",
+        "providers_display",
+        "destinations_display",
+        "default_for_display",
     )
     list_filter = (
         "owner",
+    )
+    search_fields = (
+        "id",
+        "name",
     )
     # Render owner/configuration as AJAX search boxes instead of dropdowns that
     # eagerly load every Organization/RouteConfiguration on the change page.
@@ -469,6 +679,107 @@ class RouteAdmin(admin.ModelAdmin):
         RouteProviderInline,
         RouteDestinationInline,
     )
+    list_select_related = ("owner",)
+    readonly_fields = ("default_route_for_panel",)
+
+    def get_queryset(self, request):
+        # The three new columns walk M2M/reverse FK relations; prefetch so the
+        # changelist stays at a flat query count.
+        # Prefetch querysets use Integration.objects.all() rather than
+        # .only("id", "name") -- Integration.__init__ does not query, so
+        # instantiating full rows is cheap, and .only() here would conflict
+        # with default_route_for_panel's select_related("type") on the same
+        # cached queryset (deferred fields can't be select_related).
+        return super().get_queryset(request).prefetch_related(
+            Prefetch("data_providers", queryset=Integration.objects.all()),
+            Prefetch("destinations", queryset=Integration.objects.all()),
+            Prefetch("integrations_by_rule", queryset=Integration.objects.all()),
+        )
+
+    @admin.display(description="Providers")
+    def providers_display(self, obj):
+        return ", ".join(i.name for i in obj.data_providers.all()) or "—"
+
+    @admin.display(description="Destinations")
+    def destinations_display(self, obj):
+        return ", ".join(i.name for i in obj.destinations.all()) or "—"
+
+    @admin.display(description="Default for")
+    def default_for_display(self, obj):
+        return ", ".join(i.name for i in obj.integrations_by_rule.all()) or "—"
+
+    @admin.display(description="Default route for")
+    def default_route_for_panel(self, obj):
+        """Integrations whose default this route is — the fact that matters before deleting it."""
+        if obj.pk is None:
+            return "—"
+        rows = [
+            (reverse("admin:integrations_integration_change", args=[i.pk]), i.name)
+            for i in obj.integrations_by_rule.select_related("type").order_by("name")
+        ]
+        if not rows:
+            return "No integration uses this route as its default."
+        return format_html("<ul>{}</ul>", format_html_join("", '<li><a href="{}">{}</a></li>', rows))
+
+    # -- default route refusals (spec §5.1) ---------------------------------
+    # Deleting a route can be refused when a provider on it would be left with
+    # an ambiguous default (AmbiguousDefaultRouteError). Both refusal paths
+    # below are now caught at confirmation time, in get_deleted_objects():
+    #
+    # 1. reassign_default_route (the FK's on_delete callable) can raise while
+    #    Collector.collect() walks the FK from a provider whose *default_route*
+    #    is one of the routes being deleted.
+    #
+    # 2. A provider whose default_route is NOT one of the routes being deleted,
+    #    but who is a provider on ≥2 OTHER delivering routes among them, passes
+    #    collection cleanly (its FK isn't touched); get_deleted_objects()
+    #    catches this too by explicitly re-deciding for every provider on the
+    #    routes being deleted, excluding all of them, the same way
+    #    pre_delete(RouteProvider) would when the delete actually ran.
+    #
+    # Both the single-object delete view and the "Delete selected" action call
+    # get_deleted_objects() to render the confirmation page *before*
+    # delete_model/delete_queryset ever run, so catching either path here --
+    # the same way Django itself turns a ProtectedError from collect() into a
+    # "protected" list instead of a 500 -- stops the delete before anything is
+    # touched: nothing is deletable, no LogEntry or success message is written,
+    # and the admin's own "cannot delete" path renders.
+    #
+    # delete_model()/delete_queryset()/response_delete() below remain as a
+    # backstop for anything that slips through -- e.g. a provider added
+    # between rendering the confirmation page and posting it.
+
+    def get_deleted_objects(self, objs, request):
+        try:
+            result = super().get_deleted_objects(objs, request)
+            route_ids = {obj.pk for obj in objs}
+            for integration in Integration.objects.filter(
+                routing_rules_by_provider__in=route_ids
+            ).distinct():
+                decide_default_route(integration, exclude_route_ids=route_ids)
+            return result
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+            return [], {}, set(), [str(error)]
+
+    def delete_model(self, request, obj):
+        try:
+            with transaction.atomic():
+                super().delete_model(request, obj)
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                super().delete_queryset(request, queryset)
+        except AmbiguousDefaultRouteError as error:
+            messages.error(request, str(error))
+
+    def response_delete(self, request, obj_display, obj_id):
+        if Route.objects.filter(pk=obj_id).exists():  # refused above: no success message, back to the route
+            return HttpResponseRedirect(reverse("admin:integrations_route_change", args=[obj_id]))
+        return super().response_delete(request, obj_display, obj_id)
 
 
 @admin.register(RouteConfiguration)

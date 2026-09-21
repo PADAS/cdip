@@ -1,7 +1,10 @@
+from unittest import mock
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from api.v2.serializers import SourceCreateSerializer
 from integrations.models import Source
 
 
@@ -452,10 +455,11 @@ def _test_create_source(api_client, user, provider, external_id="new-collar-001"
     # The write response is rendered with the retrieve serializer, so the UI can use it
     # without a follow-up GET.
     for field in (
-        "id", "external_id", "status", "provider", "destinations",
+        "id", "external_id", "name", "status", "provider", "destinations",
         "routing_rules", "update_frequency", "last_update", "created_at",
     ):
         assert field in response_data
+    assert response_data["name"] == (name or "")
     return source
 
 
@@ -518,6 +522,26 @@ def test_create_duplicate_source_is_rejected(
     )
     assert response.status_code == status.HTTP_409_CONFLICT, response.content
     assert "already exists" in response.content.decode()
+
+
+def test_create_duplicate_source_losing_a_race_is_still_a_conflict(
+        api_client, org_admin_user, organization, provider_lotek_panthera, lotek_sources
+):
+    # Simulate the racing POST that slips past the existence check in validate(): the insert
+    # then hits the unique constraint, which must surface as the same 409 rather than a 500.
+    existing = lotek_sources[0]
+    with mock.patch.object(
+        SourceCreateSerializer, "validate", side_effect=lambda attrs: attrs
+    ):
+        response = _post_source(
+            api_client, org_admin_user, str(provider_lotek_panthera.id),
+            external_id=existing.external_id,
+        )
+    assert response.status_code == status.HTTP_409_CONFLICT, response.content
+    assert "already exists" in response.content.decode()
+    assert Source.objects.filter(
+        integration=provider_lotek_panthera, external_id=existing.external_id
+    ).count() == 1
 
 
 def test_create_source_reusing_external_id_from_another_provider(

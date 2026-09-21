@@ -14,6 +14,10 @@ from deployments.utils import get_default_topic_name
 KONG_PROXY_URL = settings.KONG_PROXY_URL
 CONSUMERS_PATH = "/consumers"
 KEYS_PATH = "/key-auth"
+# Kong calls had no timeout, so an unreachable admin API hung the caller
+# indefinitely rather than raising -- including management commands that
+# mint API keys after committing their work.
+KONG_REQUEST_TIMEOUT = 10
 INTEGRATION_TYPES_PATH = "/integration-types/"
 
 logger = logging.getLogger(__name__)
@@ -44,7 +48,7 @@ def create_api_consumer(integration):
 
     post_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}"
 
-    response = requests.post(post_url, data=post_data)
+    response = requests.post(post_url, data=post_data, timeout=KONG_REQUEST_TIMEOUT)
 
     if not response.ok and response.status_code != 409:
         logger.error("Failed to create API consumer. %s", response.text)
@@ -55,7 +59,8 @@ def create_api_consumer(integration):
 
 def get_api_consumer_info(integration):
     response = requests.get(
-        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}"
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}",
+        timeout=KONG_REQUEST_TIMEOUT,
     )
     response.raise_for_status()
     return response.json()
@@ -63,7 +68,7 @@ def get_api_consumer_info(integration):
 
 def patch_api_consumer_info(integration, data):
     patch_url = f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}"
-    response = requests.patch(patch_url, data=data)
+    response = requests.patch(patch_url, data=data, timeout=KONG_REQUEST_TIMEOUT)
     response.raise_for_status()
     return response
 
@@ -73,7 +78,7 @@ def create_api_key(integration):
         f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}"
     )
 
-    response = requests.post(api_key_url)
+    response = requests.post(api_key_url, timeout=KONG_REQUEST_TIMEOUT)
 
     if not response.ok:
         raise ConsumerCreationError
@@ -89,7 +94,8 @@ def get_api_key(integration):
 
     # obtain key if permission checks pass
     response = requests.get(
-        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}"
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}",
+        timeout=KONG_REQUEST_TIMEOUT,
     )
 
     if response.ok:
@@ -190,7 +196,8 @@ def register_integration_type_in_kong(integration_type):
         data={
             "integration_type": integration_type.value,
             "url": integration_type.service_url,
-        }
+        },
+        timeout=KONG_REQUEST_TIMEOUT,
     )
     response.raise_for_status()
     return response
