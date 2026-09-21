@@ -583,9 +583,6 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "last_update_delivered_at",
         "is_duplicate",
         "has_error",
-        "is_filtered",
-        "filtered_at",
-        "filtered_by",
         "created_by",
     )
     search_fields = (

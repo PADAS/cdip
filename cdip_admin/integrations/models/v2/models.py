@@ -995,16 +995,6 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")
     is_duplicate = models.BooleanField(default=False)
-    # A routing filter dropped this observation for this destination. Deliberately not
-    # folded into has_error: a filtered drop is not a failure, and has_error feeds the
-    # connection health calculation, so a working blacklist would mark a healthy
-    # connection unhealthy.
-    is_filtered = models.BooleanField(default=False)
-    filtered_at = models.DateTimeField(blank=True, null=True, db_index=True)
-    # Which kind of rule dropped it. Free-form rather than choices: the value is authored
-    # by the routing service, and a kind this portal does not know yet must still be
-    # recorded rather than rejected.
-    filtered_by = models.CharField(max_length=32, null=True, blank=True)
 
     class Meta:
         indexes = [
