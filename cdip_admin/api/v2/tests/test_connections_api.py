@@ -483,7 +483,9 @@ def test_filter_connections_by_status_unhealthy_as_superuser(
         filters={
             "status": ConnectionStatus.UNHEALTHY.value
         },
-        expected_integrations=[connection_with_unhealthy_provider, connection_with_unhealthy_destination]
+        # An unhealthy (shared) destination must NOT make the connection unhealthy.
+        # Only a connection whose provider is unhealthy is reported as unhealthy.
+        expected_integrations=[connection_with_unhealthy_provider]
     )
 
 
@@ -498,5 +500,29 @@ def test_filter_connections_by_status_needs_review_as_superuser(
         filters={
             "status": ConnectionStatus.NEEDS_REVIEW.value
         },
-        expected_integrations=[connection_with_disabled_destination]  # provider OK but destination disabled
+        # Provider OK but a destination needs attention (disabled or unhealthy)
+        expected_integrations=[connection_with_unhealthy_destination, connection_with_disabled_destination]
     )
+
+
+def _get_connection_status(api_client, user, connection):
+    api_client.force_authenticate(user)
+    response = api_client.get(reverse("connections-list"))
+    assert response.status_code == status.HTTP_200_OK
+    connections = {c["id"]: c for c in response.json()["results"]}
+    return connections[str(connection.id)]["status"]
+
+
+def test_connection_status_field_reflects_shared_destination_as_needs_review(
+        api_client, superuser, organization,
+        connection_with_unhealthy_provider, connection_with_unhealthy_destination,
+):
+    # A connection whose provider has errors is unhealthy
+    assert _get_connection_status(
+        api_client, superuser, connection_with_unhealthy_provider
+    ) == ConnectionStatus.UNHEALTHY.value
+    # A connection with a healthy provider but an unhealthy (shared) destination
+    # must surface as "needs review", not "unhealthy".
+    assert _get_connection_status(
+        api_client, superuser, connection_with_unhealthy_destination
+    ) == ConnectionStatus.NEEDS_REVIEW.value
