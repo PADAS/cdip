@@ -1,6 +1,6 @@
 from enum import Enum
 
-from django.db.models import Subquery, Q
+from django.db.models import Subquery, Q, Exists, OuterRef, ExpressionWrapper, BooleanField
 from datetime import timezone, timedelta, datetime
 from activity_log.models import ActivityLog
 from organizations.models import Organization
@@ -15,6 +15,103 @@ class ConnectionStatus(str, Enum):
     UNHEALTHY = "unhealthy"
     DISABLED = "disabled"
     NEEDS_REVIEW = "needs_review"
+
+
+class DefaultRouteState(str, Enum):
+    """Where an integration stands against the default-route invariant (spec §4).
+    Only meaningful for providers; destination-only integrations are exempt."""
+    VALID = "valid"
+    MISSING = "missing"              # §4 clause 1: default_route is NULL
+    NOT_MEMBER = "not_member"        # §4 clause 2: not a provider on its default route
+    EMPTY_DEFAULT = "empty_default"  # §4 clause 3: default has no destinations while another route does
+
+
+DEFAULT_ROUTE_STATUS_DETAILS = {
+    DefaultRouteState.MISSING: (
+        "No default route — data from this provider cannot be routed. "
+        "Assign one in Admin → Integration, or run check_default_routes --fix."
+    ),
+    DefaultRouteState.NOT_MEMBER: (
+        "Default route is not one of this provider's routes — data from this provider cannot be routed. "
+        "Assign one in Admin → Integration, or run check_default_routes --fix."
+    ),
+    DefaultRouteState.EMPTY_DEFAULT: (
+        "Default route has no destinations while another route does — data from this provider is not delivered. "
+        "Assign one in Admin → Integration, or run check_default_routes --fix."
+    ),
+}
+
+_DEFAULT_ROUTE_STATE_ANNOTATION = {
+    DefaultRouteState.MISSING: "default_route_missing",
+    DefaultRouteState.NOT_MEMBER: "default_route_not_member",
+    DefaultRouteState.EMPTY_DEFAULT: "default_route_empty",
+}
+
+
+def annotate_default_route_state(queryset):
+    """Annotate an Integration queryset with three booleans, one per §4 clause.
+
+    Each is an Exists() subquery, so the whole thing stays one SQL statement.
+    Used by the status pipeline, the admin filter and check_default_routes so
+    the three cannot disagree about what "broken" means.
+    """
+    RouteProvider = apps.get_model("integrations", "RouteProvider")
+    RouteDestination = apps.get_model("integrations", "RouteDestination")
+    is_member_of_default = Exists(
+        RouteProvider.objects.filter(integration_id=OuterRef("pk"), route_id=OuterRef("default_route_id"))
+    )
+    default_has_destinations = Exists(
+        RouteDestination.objects.filter(route_id=OuterRef("default_route_id"))
+    )
+    some_route_has_destinations = Exists(
+        RouteDestination.objects.filter(route__routeprovider__integration_id=OuterRef("pk"))
+    )
+    has_default = Q(default_route__isnull=False)
+    return queryset.annotate(
+        default_route_missing=ExpressionWrapper(Q(default_route__isnull=True), output_field=BooleanField()),
+        default_route_not_member=ExpressionWrapper(has_default & ~is_member_of_default, output_field=BooleanField()),
+        default_route_empty=ExpressionWrapper(
+            has_default & is_member_of_default & ~default_has_destinations & some_route_has_destinations,
+            output_field=BooleanField(),
+        ),
+    )
+
+
+def _providers_only(queryset):
+    return queryset.filter(routing_rules_by_provider__isnull=False).distinct()
+
+
+def filter_by_default_route_state(queryset, state):
+    """Restrict an Integration queryset to providers in the given state."""
+    annotated = annotate_default_route_state(_providers_only(queryset))
+    if state == DefaultRouteState.VALID:
+        return annotated.filter(default_route_missing=False, default_route_not_member=False, default_route_empty=False)
+    return annotated.filter(**{_DEFAULT_ROUTE_STATE_ANNOTATION[DefaultRouteState(state)]: True})
+
+
+def providers_without_valid_default_route():
+    """Providers violating §4 (any clause). One statement, no Python loop."""
+    Integration = apps.get_model("integrations", "Integration")
+    return annotate_default_route_state(Integration.providers.all()).filter(
+        Q(default_route_missing=True) | Q(default_route_not_member=True) | Q(default_route_empty=True)
+    )
+
+
+def get_default_route_state(integration):
+    """State of one integration, or None when it is a provider on no route (exempt)."""
+    Integration = apps.get_model("integrations", "Integration")
+    row = annotate_default_route_state(Integration.providers.filter(pk=integration.pk)).values(
+        "default_route_missing", "default_route_not_member", "default_route_empty",
+    ).first()
+    if row is None:
+        return None
+    if row["default_route_missing"]:
+        return DefaultRouteState.MISSING
+    if row["default_route_not_member"]:
+        return DefaultRouteState.NOT_MEMBER
+    if row["default_route_empty"]:
+        return DefaultRouteState.EMPTY_DEFAULT
+    return DefaultRouteState.VALID
 
 
 def ensure_default_route(integration, route_name=None):
@@ -99,6 +196,16 @@ def calculate_integration_status(integration_id):
     if not integration.enabled:
         integration_status.status = IntegrationStatus.Status.DISABLED
         integration_status.status_details = "Integration is disabled"
+        integration_status.save()
+        return integration_status.status
+
+    # A broken default route is the *cause* of downstream errors, so it is
+    # checked before the dispatcher / error-threshold branches and names itself
+    # (spec §5.2). Destination-only integrations return None here and are exempt.
+    default_route_state = get_default_route_state(integration)
+    if default_route_state is not None and default_route_state != DefaultRouteState.VALID:
+        integration_status.status = IntegrationStatus.Status.UNHEALTHY
+        integration_status.status_details = DEFAULT_ROUTE_STATUS_DETAILS[default_route_state]
         integration_status.save()
         return integration_status.status
 
