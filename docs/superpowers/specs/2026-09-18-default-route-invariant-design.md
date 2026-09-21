@@ -1,7 +1,7 @@
 # Default route invariant: enforce, detect, see
 
 **Date:** 2026-09-18
-**Status:** Approved design. Implementation plan: `docs/superpowers/plans/2026-09-18-default-route-invariant.md`
+**Status:** Implemented. Delivered in #475 (enforce on join), #477 (enforce on leave/delete), #478 (detect), #479 (admin visibility) and the admin follow-up #481, all merged 2026-09-21. §8a records where the code departs from the text below. Implementation plan: `docs/superpowers/plans/2026-09-18-default-route-invariant.md`
 **Ticket:** [GUNDI-5731](https://allenai.atlassian.net/browse/GUNDI-5731) — *Default routing rule stays empty after creating a route from a new connection* (blocks GUNDI-5730)
 **Related PRs:** #469, #470, #472 (the management-command instance of this bug, all merged)
 
@@ -174,11 +174,13 @@ relationship still exists and "other routes" is computable; a raised
 `AmbiguousDefaultRouteError` aborts the operation inside the caller's
 transaction.
 
-**Entry point 3 — a route is deleted.** Not a signal. A `pre_delete(Route)`
-receiver that reassigns defaults would be **silently undone**: Django's deletion
-`Collector` records the `SET_NULL` field update *by primary key* at collection
-time and applies it after `pre_delete` has run. The correct hook is Django's own:
-replace `on_delete=SET_NULL` with a custom callable
+**Entry point 3 — a route is deleted.** Not a signal. Replace
+`on_delete=SET_NULL` with a custom callable. (This section originally argued that
+a `pre_delete(Route)` receiver would be silently undone by the deletion
+`Collector`; §8a item 2 records that this race does not occur in Django 4.2. The
+callable stays because a refusal must be raised at *collection* time, before the
+collector's `atomic(savepoint=False)` block, and because every route in the same
+delete must be excluded from the candidates at once.)
 
 ```python
 def reassign_default_route(collector, field, sub_objs, using):
@@ -329,15 +331,18 @@ logged and ambiguous ones need a human to choose.
 
 **Delivery — four PRs, each independently useful, in this order:**
 
-| PR | Contents | Closes |
-|---|---|---|
-| 1 | `resolve_default_route()`, `AmbiguousDefaultRouteError`, entry points 1 and 4, the two GUNDI-5731 API tests | GUNDI-5731 |
-| 2 | Entry points 2 and 3 (custom `on_delete` + migration), refusal surfacing in admin and API | |
-| 3 | Shared queryset, status-pipeline branch, `check_default_routes` | |
-| 4 | Admin visibility | |
+| PR | Contents | Closes | Delivered |
+|---|---|---|---|
+| 1 | `resolve_default_route()`, `AmbiguousDefaultRouteError`, entry points 1 and 4, the two GUNDI-5731 API tests | GUNDI-5731 | #475, merged 2026-09-21 |
+| 2 | Entry points 2 and 3 (custom `on_delete` + migration), refusal surfacing in admin and API | | #477, merged 2026-09-21; admin follow-up #481 |
+| 3 | Shared queryset, status-pipeline branch, `check_default_routes` | | #478, merged 2026-09-21 |
+| 4 | Admin visibility | | #479, merged 2026-09-21 |
 
 After PR 3 lands: run `check_default_routes` dev → stage → prod and **read the
-output** before `--fix`.
+output** before `--fix`. Do it immediately after each deploy: the new
+`calculate_integration_status()` branch flips every existing violator to
+`UNHEALTHY` on the first beat cycle, which shows in the portal and in the
+unhealthy-connections email before anyone has looked at the audit (#478).
 
 ## 8. Risks and accepted limits
 
@@ -358,7 +363,7 @@ output** before `--fix`.
   the invariant still holds (default is a member); they can re-point the default
   in admin.
 
-## 8a. Amendments from implementation (2026-09-18, PRs #475, #477, #478)
+## 8a. Amendments from implementation (2026-09-18 to 2026-09-21, PRs #475, #477, #478, #479, #481)
 
 Recorded so this document stops disagreeing with the code.
 
@@ -387,21 +392,40 @@ Recorded so this document stops disagreeing with the code.
    considered; an empty route is chosen only when no candidate delivers. Without
    this, a provider with a NULL default joining an empty route beside a
    delivering one would have been "healed" into the §4 clause 3 violation.
-5. **Admin refusals are caught in `get_deleted_objects`** (Django runs the
-   deletion collector there, before `delete_model`), reusing Django's own
-   "protected objects" page; `delete_model`/`delete_queryset` remain for the
-   refusals raised from `pre_delete` during the delete itself. Provider additions
-   and the Integration form's `default_route` field are validated in the form
-   (`clean`) so an ambiguous choice is a form error, not a 500.
+5. **Admin refusals are decided on the confirmation page.** `RouteAdmin.
+   get_deleted_objects` (where Django runs the deletion collector, before
+   `delete_model`) catches the collection-time refusal *and* pre-decides for every
+   provider on the selected routes, so the refusal that would otherwise come from
+   `pre_delete(RouteProvider)` during the delete is also surfaced there, through
+   Django's own "protected objects" page, with no `LogEntry` and no "Successfully
+   deleted" message (#481; #477 alone let the bulk action print success after a
+   refusal). `delete_model`/`delete_queryset` remain as backstops. Provider
+   additions and the Integration form's `default_route` field are validated in
+   the form (`clean`) so an ambiguous choice is a form error, not a 500; the form
+   decides against the *submitted* value, and also refuses when the resolver
+   would silently redirect the choice to a different route, naming it (#481).
+   Editing the `integration` of an existing provider inline row is refused
+   (delete and re-add instead), because that UPDATE fires no receiver and would
+   leave the old integration with a default it no longer belongs to (#481).
 6. **Additional accepted limit (§8):** a route *losing* its last destination
    (`destinations.remove()`, the destination inline, deleting a destination
    integration) can create a clause 3 violation that only the beat-cycle
    detector catches; §4.1 has no row for it.
-7. **Pre-existing, out of scope, filed as follow-ups:** every `Route`
-   instantiation costs one query because `ChangeLogMixin.__init__` eagerly
-   resolves `first_provider` (affects every Route changelist); and
-   `ChangeLogMixin.save()` writes its `ActivityLog` row without a savepoint,
-   the same transaction-poisoning hazard fixed in `_log_auto_assignment`.
+7. **Pre-existing, out of scope, filed as follow-ups:** every `Route`,
+   `Source`, `SourceFilter` and `RouteConfiguration` instantiation costs one
+   query because `ChangeLogMixin.__init__` eagerly resolves its
+   `integration_field` (affects every changelist of those models; #479's admin
+   columns read the default route through an annotated name rather than
+   `select_related` to avoid paying it per row); and `ChangeLogMixin.save()`
+   writes its `ActivityLog` row without a savepoint, the same
+   transaction-poisoning hazard fixed in `_log_auto_assignment`.
+8. **Detection is one SQL statement.** `providers_without_valid_default_route()`
+   is an annotated queryset with three `Exists()` clauses; each clause is also
+   exposed separately (`DefaultRouteState`, `filter_by_default_route_state`,
+   `get_default_route_state`) so the admin filter can offer one option per
+   clause. `check_default_routes` exits 1 while violators remain (`CommandError`),
+   so it can gate a deploy; `--fix` repairs each integration in its own
+   transaction with `via="check_default_routes"` (#478).
 
 ## 9. Decisions log
 
@@ -411,7 +435,7 @@ Recorded so this document stops disagreeing with the code.
 | Violation policy | Self-heal unambiguous, refuse ambiguous | Always self-heal (deterministic pick); never self-heal |
 | Detection channel | Existing status pipeline + command | ActivityLog error threshold; dedicated alerting |
 | Visibility | Django admin + command | CLI only; portal graph page |
-| Route deletion hook | Custom `on_delete` callable | `pre_delete(Route)` receiver (undone by collector); `PROTECT` (blocks the legitimate case) |
+| Route deletion hook | Custom `on_delete` callable | `pre_delete(Route)` receiver (a refusal raised there lands inside the collector's atomic block — §8a.2); `PROTECT` (blocks the legitimate case) |
 | Delivery | Four PRs, ticket fix first | Single PR |
 
 ## 10. References

@@ -1,5 +1,7 @@
 # Default Route Invariant Implementation Plan
 
+> **Status (2026-09-21): delivered.** PR 1 → #475, PR 2 → #477 (+ admin follow-up #481), PR 3 → #478, PR 4 → #479, all merged to `main`. The checkboxes below are left as written; this document is kept as the record of how the work was sequenced. Where the shipped code departs from the steps here, the spec's §8a is authoritative.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make `Integration.default_route` a real invariant — enforced on every code path that changes the provider↔route relationship, detected by the status pipeline and an audit command, and visible in Django admin — closing GUNDI-5731.
