@@ -467,3 +467,221 @@ def test_raw_integration_save_is_skipped(make_provider, make_route):
     provider.save_base(raw=True)
 
     assert not RouteProvider.objects.filter(integration=provider, route=route).exists()
+
+
+# --- entry point 2: a provider leaves a route ----------------------------------
+
+@pytest.fixture
+def provider_on_three_delivering_routes(make_provider, make_destination, make_route):
+    """default=R1; also on R2 and R3; all three deliver. Removing from R1 is ambiguous."""
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    r3 = make_route("R3", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+    return provider, r1, r2, r3
+
+
+def test_remove_from_default_route_with_one_other_reassigns(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    r1.data_providers.remove(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route == r2
+    log = auto_assign_logs(provider).get()
+    assert log.details["via"] == "route_provider_removed"
+    assert log.details["previous_default_route_id"] == str(r1.pk)
+
+
+def test_remove_from_default_route_with_several_others_refuses(provider_on_three_delivering_routes):
+    provider, r1, r2, r3 = provider_on_three_delivering_routes
+
+    with pytest.raises(AmbiguousDefaultRouteError) as excinfo:
+        with transaction.atomic():
+            r1.data_providers.remove(provider)
+
+    assert {r.pk for r in excinfo.value.candidates} == {r2.pk, r3.pk}
+    provider.refresh_from_db()
+    assert provider.default_route == r1
+    assert RouteProvider.objects.filter(integration=provider, route=r1).exists()
+
+
+def test_remove_from_only_route_nulls_default(make_provider, make_route):
+    provider = make_provider()
+    only = make_route("Only", providers=[provider])
+    set_default(provider, only)
+
+    only.data_providers.remove(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route is None
+    assert auto_assign_logs(provider).count() == 0
+
+
+def test_remove_from_non_default_route_keeps_default(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    default = make_route("Default", providers=[provider], destinations=[er])
+    other = make_route("Other", providers=[provider], destinations=[er])
+    set_default(provider, default)
+
+    other.data_providers.remove(provider)
+
+    provider.refresh_from_db()
+    assert provider.default_route == default
+    assert auto_assign_logs(provider).count() == 0
+
+
+def test_clear_providers_nulls_default_of_single_route_provider(make_provider, make_route):
+    provider = make_provider()
+    only = make_route("Only", providers=[provider])
+    set_default(provider, only)
+
+    only.data_providers.clear()
+
+    provider.refresh_from_db()
+    assert provider.default_route is None
+
+
+def test_reverse_clear_nulls_default(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    make_route("R2", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    provider.routing_rules_by_provider.clear()
+
+    provider.refresh_from_db()
+    assert provider.default_route is None
+
+
+def test_set_replacing_provider_reassigns_the_leaver(make_provider, make_destination, make_route):
+    leaver, newcomer, er = make_provider("Leaver"), make_provider("Newcomer"), make_destination()
+    r1 = make_route("R1", providers=[leaver], destinations=[er])
+    r2 = make_route("R2", providers=[leaver], destinations=[er])
+    set_default(leaver, r1)
+
+    r1.data_providers.set([newcomer])
+
+    leaver.refresh_from_db(); newcomer.refresh_from_db()
+    assert leaver.default_route == r2
+    assert newcomer.default_route == r1
+
+
+def test_route_provider_queryset_delete_reassigns(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    RouteProvider.objects.filter(integration=provider, route=r1).delete()
+
+    provider.refresh_from_db()
+    assert provider.default_route == r2
+    assert auto_assign_logs(provider).count() == 1
+
+
+def test_deleting_the_integration_itself_is_not_blocked(provider_on_three_delivering_routes):
+    provider, *_ = provider_on_three_delivering_routes
+    provider_id = provider.pk
+
+    provider.delete()
+
+    assert not Integration.objects.filter(pk=provider_id).exists()
+
+
+# --- entry point 3: a route is deleted (custom on_delete) -----------------------
+
+def test_reassignment_survives_deleting_the_default_route(make_provider, make_destination, make_route):
+    """A pre_delete(Route) receiver would be undone by the collector's SET_NULL;
+    the custom on_delete must not be."""
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    r1.delete()
+
+    provider.refresh_from_db()
+    assert provider.default_route == r2
+    log = auto_assign_logs(provider).get()
+    assert log.details["via"] == "route_deleted"
+
+
+def test_deleting_the_only_route_nulls_default(make_provider, make_route):
+    provider = make_provider()
+    only = make_route("Only", providers=[provider])
+    set_default(provider, only)
+
+    only.delete()
+
+    provider.refresh_from_db()
+    assert provider.default_route is None
+    assert auto_assign_logs(provider).count() == 0
+
+
+def test_deleting_default_route_with_several_others_refuses(provider_on_three_delivering_routes):
+    provider, r1, r2, r3 = provider_on_three_delivering_routes
+
+    with pytest.raises(AmbiguousDefaultRouteError) as excinfo:
+        r1.delete()
+
+    assert {r.pk for r in excinfo.value.candidates} == {r2.pk, r3.pk}
+    assert Route.objects.filter(pk=r1.pk).exists()
+    provider.refresh_from_db()
+    assert provider.default_route == r1
+
+
+def test_queryset_delete_spanning_routes_excludes_doomed_from_candidates(provider_on_three_delivering_routes):
+    provider, r1, r2, r3 = provider_on_three_delivering_routes
+
+    Route.objects.filter(pk__in=[r1.pk, r2.pk]).delete()
+
+    provider.refresh_from_db()
+    assert provider.default_route == r3
+    assert auto_assign_logs(provider).count() == 1
+
+
+def test_deleting_a_non_default_route_keeps_default(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    default = make_route("Default", providers=[provider], destinations=[er])
+    other = make_route("Other", providers=[provider], destinations=[er])
+    set_default(provider, default)
+
+    other.delete()
+
+    provider.refresh_from_db()
+    assert provider.default_route == default
+
+
+def test_deleting_the_organization_cascades_without_refusal(provider_on_three_delivering_routes, organization):
+    """Routes and integrations go together; nothing to reassign, nothing to refuse."""
+    provider, *_ = provider_on_three_delivering_routes
+    assert provider.owner_id == organization.pk
+
+    organization.delete()
+
+    assert not Integration.objects.filter(pk=provider.pk).exists()
+
+
+def test_default_route_fk_uses_the_custom_on_delete():
+    from integrations.models.v2.default_route import reassign_default_route
+    field = Integration._meta.get_field("default_route")
+    assert field.remote_field.on_delete is reassign_default_route
+
+
+def test_reverse_remove_of_several_routes_excludes_all_of_them(make_provider, make_destination, make_route):
+    provider, er = make_provider(), make_destination()
+    r1 = make_route("R1", providers=[provider], destinations=[er])
+    r2 = make_route("R2", providers=[provider], destinations=[er])
+    r3 = make_route("R3", providers=[provider], destinations=[er])
+    set_default(provider, r1)
+
+    provider.routing_rules_by_provider.remove(r1, r2)
+
+    provider.refresh_from_db()
+    assert provider.default_route == r3
+    assert auto_assign_logs(provider).count() == 1
