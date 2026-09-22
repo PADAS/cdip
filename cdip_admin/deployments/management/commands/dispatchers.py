@@ -7,10 +7,14 @@ from deployments.utils import (
     create_dispatcher_for_integration,
     get_dispatcher_defaults_from_gcp_secrets,
     get_default_dispatcher_name,
+    subscription_is_drained,
 )
 from deployments.tasks import deploy_serverless_dispatcher
 from integrations.models import Integration, OutboundIntegrationConfiguration
 from integrations.utils import get_dispatcher_topic_default_name
+
+
+SHARED_POOL_COOLING_DAYS = 7
 
 
 class Command(BaseCommand):
@@ -97,6 +101,30 @@ class Command(BaseCommand):
             type=str,
             help="Select a single integration by ID",
         )
+        parser.add_argument(
+            "--migrate-to-shared",
+            action="store_true",
+            default=False,
+            help="Move ER integrations onto the shared dispatcher pool topic (old dispatchers are kept for rollback)",
+        )
+        parser.add_argument(
+            "--rollback-shared",
+            action="store_true",
+            default=False,
+            help="Restore an integration's pre-migration topic (requires --integration; only while the old dispatcher still exists)",
+        )
+        parser.add_argument(
+            "--teardown-migrated",
+            action="store_true",
+            default=False,
+            help="Tear down old dispatchers of integrations migrated to the shared pool after the cooling period",
+        )
+        parser.add_argument(
+            "--cooling-days",
+            type=int,
+            default=None,
+            help="Override the shared-pool teardown cooling period (default 7 days). Use with care.",
+        )
 
     def handle(self, *args, **options):
 
@@ -147,15 +175,31 @@ class Command(BaseCommand):
                     source_field = "source_code_path" if type_cleaned == "earth_ranger"  else "docker_image_url"
                     source_lookup = f"{related_dispatcher_field}__configuration__deployment_settings__{source_field}"
                     source_outdated_q = ~Q(**{source_lookup: source})
-                    integrations_to_update = IntegrationModel.objects.filter(
+                    integrations_qs = IntegrationModel.objects.filter(
                         integration_type_q & source_outdated_q
-                    ).order_by("name")[:options["max"]]
+                    )
                     new_settings = {"source_code_path": source} if type_cleaned == "earth_ranger" else {"docker_image_url": source}
                 else:
-                    integrations_to_update = IntegrationModel.objects.filter(
+                    integrations_qs = IntegrationModel.objects.filter(
                         integration_type_q
-                    ).order_by("name")[:options["max"]]
+                    )
                     new_settings = None
+                if options.get("v2") and type_cleaned == "earth_ranger" and settings.ER_SHARED_DISPATCHER_TOPIC:
+                    # Redeploying (--update-source/--recreate) a migrated integration's
+                    # old function would re-derive its topic from additional.topic -
+                    # which is now the SHARED topic - attaching a zombie push
+                    # subscription to the shared root and duplicating delivery of
+                    # all shared-pool traffic. This hazard is ER-specific (only ER
+                    # integrations are migrated onto ER_SHARED_DISPATCHER_TOPIC), so
+                    # scope the exclusion to the earth_ranger type - otherwise a
+                    # non-ER integration whose topic happens to coincide with the
+                    # shared topic value could be filtered out incorrectly. Exclude
+                    # anything already on, or migrated onto, the shared pool.
+                    shared = settings.ER_SHARED_DISPATCHER_TOPIC
+                    integrations_qs = integrations_qs.exclude(
+                        Q(additional__topic=shared) | Q(additional__has_key="shared_pool_migrated_at")
+                    )
+                integrations_to_update = integrations_qs.order_by("name")[:options["max"]]
             else:
                 self.stdout.write("Please specify an integration ID or a type")
                 return
@@ -169,6 +213,22 @@ class Command(BaseCommand):
                     integrations=integrations_to_update,
                     deployment_settings=new_settings
                 )
+        elif options["migrate_to_shared"]:
+            if not self._require_shared_topic():
+                return
+            self.migrate_to_shared(
+                self._get_migratable_er_integrations(
+                    max_count=options["max"], integration_id=options.get("integration")
+                )
+            )
+        elif options["rollback_shared"]:
+            if not self._require_shared_topic():
+                return
+            self.rollback_shared(integration_id=options.get("integration"))
+        elif options["teardown_migrated"]:
+            if not self._require_shared_topic():
+                return
+            self.teardown_migrated(options=options)
         self.stdout.write(self.style.SUCCESS("Done."))
 
     def list_deployments(self, options):
@@ -473,3 +533,192 @@ class Command(BaseCommand):
                 self.stdout.write(f"Integration {integration_id} v2 not found")
                 return None
         return integration
+
+    def _require_shared_topic(self):
+        if not settings.ER_SHARED_DISPATCHER_TOPIC:
+            self.stderr.write(
+                "ER_SHARED_DISPATCHER_TOPIC is not set - shared-pool verbs are disabled in this environment."
+            )
+            return False
+        return True
+
+    def _get_migratable_er_integrations(self, max_count, integration_id=None):
+        if max_count is not None and max_count <= 0:
+            return []
+        shared = settings.ER_SHARED_DISPATCHER_TOPIC
+        qs = Integration.objects.filter(dispatcher_by_integration__isnull=False)
+        if integration_id:
+            qs = qs.filter(id=integration_id)
+        candidates = []
+        for integration in qs.order_by("name"):
+            if not integration.is_er_site:
+                continue
+            additional = integration.additional or {}
+            if additional.get("dedicated_dispatcher"):
+                continue
+            if additional.get("topic") == shared:
+                continue  # already migrated (or manually moved); teardown handles it
+            candidates.append(integration)
+            if len(candidates) >= max_count:
+                break
+        return candidates
+
+    def migrate_to_shared(self, integrations):
+        from django.utils import timezone
+        shared = settings.ER_SHARED_DISPATCHER_TOPIC
+        self.stdout.write(self.style.SUCCESS(
+            f"Migrating {len(integrations)} ER integrations to shared topic {shared}..."
+        ))
+        for integration in integrations:
+            try:
+                additional = integration.additional or {}
+                deployment = integration.dispatcher_by_integration
+                pre_migration_topic = additional.get("topic") or deployment.topic_name
+                if not pre_migration_topic:
+                    self.stderr.write(
+                        f"Error migrating {integration.name} ({integration.id}): "
+                        "cannot determine pre-migration topic; skipping."
+                    )
+                    continue
+                updated = {
+                    **additional,
+                    "broker": "gcp_pubsub",
+                    "topic": shared,
+                    "pre_migration_topic": pre_migration_topic,
+                    "shared_pool_migrated_at": timezone.now().isoformat(),
+                }
+                Integration.objects.filter(pk=integration.pk).update(additional=updated)
+                self.stdout.write(
+                    f"Migrated {integration.name} ({integration.id}) from {pre_migration_topic}. "
+                    f"Old dispatcher {deployment.name} kept for rollback."
+                )
+            except Exception as e:
+                self.stderr.write(f"Error migrating {integration.name} ({integration.id}): {e}")
+                continue
+
+    def rollback_shared(self, integration_id):
+        if not integration_id:
+            self.stderr.write("--rollback-shared requires --integration <id>")
+            return
+        integration = Integration.objects.filter(id=integration_id).first()
+        if not integration:
+            self.stderr.write(f"Integration {integration_id} not found")
+            return
+        additional = integration.additional or {}
+        pre_migration_topic = additional.get("pre_migration_topic")
+        if not pre_migration_topic:
+            self.stderr.write(f"{integration.name} has no pre_migration_topic recorded - nothing to roll back")
+            return
+        if not Integration.objects.filter(pk=integration.pk, dispatcher_by_integration__isnull=False).exists():
+            self.stderr.write(
+                f"The old dispatcher for {integration.name} no longer exists (torn down). "
+                "Recovery is manual: restore additional[\"topic\"] to the old dedicated topic first, then deploy a dedicated dispatcher (--deploy skips integrations with broker=gcp_pubsub, so adjust additional accordingly)."
+            )
+            return
+        updated = {k: v for k, v in additional.items() if k not in ("pre_migration_topic", "shared_pool_migrated_at")}
+        updated["topic"] = pre_migration_topic
+        Integration.objects.filter(pk=integration.pk).update(additional=updated)
+        self.stdout.write(self.style.SUCCESS(
+            f"Rolled back {integration.name} to {pre_migration_topic}. The dormant dispatcher resumes consuming."
+        ))
+
+    def teardown_migrated(self, options):
+        """Tear down the pre-migration dispatcher for ER integrations that
+        have been on the shared pool long enough for their old push
+        subscription to be confidently drained.
+
+        ``--max`` semantics: items that consume the batch are ones where a
+        real decision got made - refused (deployment records the shared
+        topic), undrained (or the drain check errored), or freshly stamped
+        on first sight. Items that are scanned but not counted are the ones
+        skipped before any such decision: not an ER site, not migrated, or
+        still within the cooling period.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+
+        shared = settings.ER_SHARED_DISPATCHER_TOPIC
+        cooling_days = options.get("cooling_days")
+        if cooling_days is None:
+            cooling_days = SHARED_POOL_COOLING_DAYS
+        else:
+            self.stdout.write(self.style.WARNING(
+                f"Cooling period OVERRIDDEN to {cooling_days} days (default {SHARED_POOL_COOLING_DAYS})."
+            ))
+        cutoff = timezone.now() - timedelta(days=cooling_days)
+
+        qs = Integration.objects.filter(dispatcher_by_integration__isnull=False)
+        if integration_id := options.get("integration"):
+            qs = qs.filter(id=integration_id)
+        processed = 0
+        for integration in qs.order_by("name"):
+            if processed >= options["max"]:
+                break
+            if not integration.is_er_site:
+                continue
+            additional = integration.additional or {}
+            if additional.get("topic") != shared:
+                continue  # not migrated
+            try:
+                deployment = integration.dispatcher_by_integration
+                stamp = additional.get("shared_pool_migrated_at")
+                if not stamp:
+                    # Manually migrated before this tooling existed: start its
+                    # cooling clock now instead of tearing down blind.
+                    Integration.objects.filter(pk=integration.pk).update(additional={
+                        **additional, "shared_pool_migrated_at": timezone.now().isoformat(),
+                    })
+                    self.stdout.write(
+                        f"{integration.name}: no migration stamp; stamped now, teardown after cooling period."
+                    )
+                    processed += 1
+                    continue
+                from datetime import datetime, timezone as dt_timezone
+                migrated_at = datetime.fromisoformat(stamp)
+                if timezone.is_naive(migrated_at):
+                    # Hand-edited stamps (e.g. set manually before this tooling
+                    # existed) may lack a timezone offset. Treat them as UTC
+                    # rather than skipping the integration forever, since
+                    # `cutoff` (derived from timezone.now()) is always aware
+                    # and an aware/naive comparison would raise TypeError.
+                    migrated_at = timezone.make_aware(migrated_at, dt_timezone.utc)
+                if migrated_at > cutoff:
+                    continue  # still cooling
+                # SAFETY: deleting a deployment deletes its recorded topic
+                # (deployments/tasks.py). Never delete one recording the shared
+                # topic. _require_shared_topic already guarantees `shared` is
+                # non-empty, so the equality check alone is sufficient here.
+                if deployment.topic_name == shared:
+                    self.stderr.write(self.style.ERROR(
+                        f"REFUSING teardown for {integration.name}: deployment {deployment.name} records the "
+                        f"SHARED TOPIC as its own topic. Deleting it would destroy the shared pipeline. "
+                        "Fix the deployment row manually."
+                    ))
+                    processed += 1
+                    continue
+                # deployment.name is nullable; deploy derives a default via
+                # get_default_dispatcher_name when it's falsy without persisting
+                # it. Mirror that here so a name-less row is still teardownable.
+                deployment_name = deployment.name or get_default_dispatcher_name(integration=integration)
+                subscription_name = f"{deployment_name[:250]}-sub".replace("--", "-")
+                if not subscription_is_drained(subscription_name, deployment.configuration):
+                    self.stdout.write(
+                        f"{integration.name}: old subscription {subscription_name} not drained yet; skipping."
+                    )
+                    processed += 1
+                    continue
+                # Detach without save signals, then delete (fires the teardown task)
+                DispatcherDeployment.objects.filter(pk=deployment.pk).update(integration=None)
+                deployment.refresh_from_db()
+                deployment.delete()
+                cleaned = {k: v for k, v in additional.items() if k not in ("pre_migration_topic", "shared_pool_migrated_at")}
+                Integration.objects.filter(pk=integration.pk).update(additional=cleaned)
+                self.stdout.write(self.style.SUCCESS(
+                    f"Teardown triggered for {integration.name}'s old dispatcher {deployment.name} "
+                    f"(topic {deployment.topic_name})."
+                ))
+                processed += 1
+            except Exception as e:
+                self.stderr.write(f"Error tearing down {integration.name} ({integration.id}): {e}")
+                processed += 1
+                continue
