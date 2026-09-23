@@ -13,7 +13,7 @@
   margin-top: 0;
 }
 
-/* Card */
+/* Card, with the Gundi mark drawn above the title */
 .login-pf-page .card-pf {
   max-width: 400px;
   margin: 0 auto;
@@ -23,8 +23,29 @@
   border-radius: var(--gundi-radius-card);
   box-shadow: var(--gundi-shadow-card);
 }
+.login-pf-page .card-pf::before {
+  content: "";
+  display: block;
+  width: 58px;
+  height: 48px;
+  margin: 0 auto 20px;
+  background: url("../img/gundi-mark.png") no-repeat center / contain;
+}
 .login-pf-page .login-pf-header {
   margin-bottom: 0;
+}
+/* Login page title. Keycloak 11 titles the login page with doLogIn, the same key as the submit
+   button, so the h1 text is hidden and "Welcome" drawn in its place. Keycloak 26 has its own key
+   (loginAccountTitle in messages_en.properties). */
+body:has(#kc-form-login) .login-pf-page #kc-page-title {
+  font-size: 0;
+  line-height: 0;
+}
+body:has(#kc-form-login) .login-pf-page #kc-page-title::before {
+  content: "Welcome";
+  display: block;
+  font-size: 26px;
+  line-height: 1.3;
 }
 
 /* Inputs */

@@ -48,14 +48,21 @@ body#keycloak-bg {
   overflow: hidden;
 }
 .pf-v5-c-login__main-header {
+  --pf-v5-c-login__main-header--ColumnGap: 0; /* the empty locale-menu column otherwise nudges the title left */
   border-top: 0;                             /* remove the thick coloured top band the parent draws */
   padding-top: 32px;
 }
+.pf-v5-c-login__main-header::before {
+  content: "";
+  display: block;
+  grid-column: 1 / -1;                       /* the header is a title + locale-menu grid; span it */
+  width: 58px;
+  height: 48px;
+  margin: 0 auto 20px;
+  background: url("../img/gundi-mark.png") no-repeat center / contain;
+}
 .pf-v5-c-login__main-body {
   padding-bottom: 24px;
-}
-.pf-v5-c-login__header {
-  padding-bottom: 0;
 }
 
 /* Inputs: PF5 draws the border on the wrapping span via ::after */
