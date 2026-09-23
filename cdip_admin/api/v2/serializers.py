@@ -1000,7 +1000,10 @@ class SourceSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Source
-        fields = ("id", "external_id", "name", "last_update")
+        # created_via rides along so the UI can badge hand-created devices inside a
+        # rule's own device list, not only in the full catalogue.
+        fields = ("id", "external_id", "name", "last_update", "created_via")
+        read_only_fields = ("created_via",)
 
     def get_last_update(self, obj):
         try:
