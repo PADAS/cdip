@@ -1,0 +1,3 @@
+/* Shared Gundi rules. Only stable #kc-* ids, element, attribute and pseudo selectors.
+   Framework classes (PatternFly 3 / 5) belong in kc11.css / kc26.css.
+   Enforced by keycloak/tests/check-css.sh. Filled in Task 4. */

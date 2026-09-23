@@ -26,10 +26,15 @@ while read -r a; do
   curl -sf -o /dev/null "$url" || fail "asset not served: $url"
 done <<<"$assets"
 
-# 3. Every url(...) inside our stylesheets (fonts, logo) must be served.
+# 3. Every url(...) inside OUR stylesheets (fonts, logo) must be served.
+#    Only tokens/gundi/kc11/kc26: the parent theme's own stylesheet is also served under
+#    our theme path and stock Keycloak 11's login.css carries a dead image reference.
 while read -r a; do
   [[ -z $a ]] && continue
-  [[ $a == *login/gundi/css/*.css ]] || continue
+  case $a in
+    *login/gundi/css/tokens.css|*login/gundi/css/gundi.css|*login/gundi/css/kc11.css|*login/gundi/css/kc26.css) ;;
+    *) continue ;;
+  esac
   css_url=$a; [[ $a == /* ]] && css_url="$base$a"
   css_dir=${css_url%/*}
   refs=$(curl -sf "$css_url" | grep -oE 'url\(["'"'"']?[^)"'"'"']+' | sed -E 's/^url\(["'"'"']?//' | sort -u || true)
