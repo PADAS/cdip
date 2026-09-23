@@ -98,14 +98,27 @@
   color: var(--gundi-primary);
 }
 
-/* Alerts as inline bands with a status-coloured left border */
+/* Alerts as inline bands with a status-coloured left border.
+   PatternFly 3 absolutely positions the icon and reserves room for it with a 47px left
+   padding; the icon is laid out as a flex item instead so the padding stays uniform. */
 .login-pf-page .alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   border: 0;
   border-left: 4px solid var(--gundi-text-secondary);
   border-radius: var(--gundi-radius-control);
   padding: 12px 14px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--gundi-text);
   background: var(--gundi-info-bg);
+}
+.login-pf-page .alert > .pficon {
+  position: static;
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 20px;
 }
 .login-pf-page .alert-error {
   background: var(--gundi-error-bg);
