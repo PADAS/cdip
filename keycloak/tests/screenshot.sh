@@ -26,10 +26,10 @@ shot() { # <name> <WxH> <url>
 # --disable-web-security lets the file:// page load the theme's fonts cross-origin.
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-shot_login_error() {
+shot_login_error() (
   local jar html page action
   jar=$(mktemp) && html="$out/$version-login-error.html"
-  trap 'rm -f "$jar" "$html"' RETURN EXIT
+  trap 'rm -f "$jar" "$html"' EXIT
   page=$(curl -sf -c "$jar" "$local_auth?client_id=cdip-kong-gateway&response_type=code&scope=openid&$ok_redirect") \
     || fail "login page did not return 200 on port $port"
   action=$(grep -o 'action="[^"]*"' <<<"$page" | head -1 | sed 's/^action="//;s/"$//;s/&amp;/\&/g') \
@@ -42,7 +42,7 @@ shot_login_error() {
     --no-sandbox --headless --disable-gpu --hide-scrollbars --disable-web-security --virtual-time-budget=3000 \
     --window-size=1280,900 --screenshot="/out/$version-login-error.png" "file:///out/$version-login-error.html" >/dev/null 2>&1
   echo "wrote $out/$version-login-error.png"
-}
+)
 
 shot login          1280,900 "$auth?client_id=cdip-kong-gateway&response_type=code&scope=openid&$ok_redirect"
 shot login-mobile   375,812  "$auth?client_id=cdip-kong-gateway&response_type=code&scope=openid&$ok_redirect"
