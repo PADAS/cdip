@@ -18,7 +18,7 @@ for css in tokens gundi "$version"; do
 done
 
 # 2. Every /resources/ asset the page links must be served.
-assets=$(grep -oE '(href|src)="[^"]*/resources/[^"]+"' <<<"$html" | sed -E 's/^(href|src)="//; s/"$//' | sort -u)
+assets=$(grep -oE '(href|src)="[^"]*/resources/[^"]+"' <<<"$html" | sed -E 's/^(href|src)="//; s/"$//' | sort -u || true)
 [[ -n $assets ]] || fail "no /resources/ links found in login page"
 while read -r a; do
   [[ -z $a ]] && continue
@@ -49,8 +49,8 @@ grep -qE '<title>[[:space:]]*Sign in to Gundi[[:space:]]*</title>' <<<"$html" ||
 if [[ $version == kc26 ]]; then
   # The h1 text follows a newline (and, in dev mode, a <!-- template: … --> comment) after the
   # opening tag, so collapse newlines and allow whitespace/comments before matching.
-  tr -d '\n' <<<"$html" | grep -qE 'id="kc-page-title"[^>]*>([[:space:]]|<!--[^>]*-->)*Sign in to Gundi' \
-    || fail "loginAccountTitle override missing on kc26 (h1 #kc-page-title does not read 'Sign in to Gundi')"
+  tr -d '\n' <<<"$html" | grep -qE 'id="kc-page-title"[^>]*>([[:space:]]|<!--[^>]*-->)*Welcome' \
+    || fail "loginAccountTitle override missing on kc26 (h1 #kc-page-title does not read 'Welcome')"
 fi
 grep -q 'id="kc-page-title"' <<<"$html" || fail "kc-page-title element missing"
 

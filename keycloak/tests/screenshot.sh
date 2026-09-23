@@ -24,18 +24,23 @@ shot() { # <name> <WxH> <url>
 # The invalid-credentials alert only exists on the POST response, so the form is submitted with
 # curl and the returned HTML is rendered from disk. <base> points resources at the live server;
 # --disable-web-security lets the file:// page load the theme's fonts cross-origin.
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
 shot_login_error() {
-  local jar html action
+  local jar html page action
   jar=$(mktemp) && html="$out/$version-login-error.html"
-  action=$(curl -s -c "$jar" "$local_auth?client_id=cdip-kong-gateway&response_type=code&scope=openid&$ok_redirect" \
-    | grep -o 'action="[^"]*"' | head -1 | sed 's/^action="//;s/"$//;s/&amp;/\&/g')
-  curl -s -b "$jar" -c "$jar" -X POST --data-urlencode "username=theme-tester" --data-urlencode "password=wrong" "$action" \
-    | sed "s#<head>#<head><base href=\"http://host.docker.internal:$port/\">#" > "$html"
-  rm -f "$jar"
+  trap 'rm -f "$jar" "$html"' RETURN EXIT
+  page=$(curl -sf -c "$jar" "$local_auth?client_id=cdip-kong-gateway&response_type=code&scope=openid&$ok_redirect") \
+    || fail "login page did not return 200 on port $port"
+  action=$(grep -o 'action="[^"]*"' <<<"$page" | head -1 | sed 's/^action="//;s/"$//;s/&amp;/\&/g') \
+    || fail "no form action found in the login page"
+  curl -sf -b "$jar" -c "$jar" -X POST --data-urlencode "username=theme-tester" --data-urlencode "password=wrong" "$action" \
+    | sed -E "s#<head([^>]*)>#<head\\1><base href=\"http://host.docker.internal:$port/\">#" > "$html" \
+    || fail "login POST failed"
+  grep -q '<base href=' "$html" || fail "no <head> found to inject <base> into"
   docker run --rm --add-host=host.docker.internal:host-gateway -v "$out:/out" zenika/alpine-chrome:latest \
     --no-sandbox --headless --disable-gpu --hide-scrollbars --disable-web-security --virtual-time-budget=3000 \
     --window-size=1280,900 --screenshot="/out/$version-login-error.png" "file:///out/$version-login-error.html" >/dev/null 2>&1
-  rm -f "$html"
   echo "wrote $out/$version-login-error.png"
 }
 

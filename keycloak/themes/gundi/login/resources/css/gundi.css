@@ -26,9 +26,11 @@ body {
   text-align: center;
   margin: 0 0 24px;
 }
-/* Login page only: "Sign in to Gundi" subtitle under the h1. The login form's id exists on
-   both versions and only on the login page, so its presence identifies the page. */
-body:has(#kc-form-login) #kc-page-title::after {
+/* Login page only: "Sign in to Gundi" subtitle under the h1. Keycloak 26 tags the body with a
+   page id. Keycloak 11 has no page marker, so the login form's presence identifies the page via
+   :has(); :is() is forgiving, so a browser without :has() still applies the 26 branch.
+   The copy must match loginTitle in messages/messages_en.properties. */
+:is(body[data-page-id="login-login"], body:has(#kc-form-login)) #kc-page-title::after {
   content: "Sign in to Gundi";
   display: block;
   margin-top: 8px;

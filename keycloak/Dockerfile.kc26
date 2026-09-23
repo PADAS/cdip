@@ -2,6 +2,7 @@
 # Build from the repo root:   docker build -f keycloak/Dockerfile.kc26 -t gundi-keycloak:kc26 .
 # Deliberately does not run `kc.sh build`; the upgrade design owns the optimized-build decision
 # and can layer on top of this image or copy the theme folder into its own.
+# The FROM tag is parsed by .github/workflows/keycloak-theme.yml to version the pushed image.
 FROM quay.io/keycloak/keycloak:26.7
 
 COPY --chown=1000:0 keycloak/themes/gundi/login/resources  /opt/keycloak/themes/gundi/login/resources

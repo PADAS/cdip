@@ -35,11 +35,19 @@
   margin-bottom: 0;
 }
 /* Login page title. Keycloak 11 titles the login page with doLogIn, the same key as the submit
-   button, so the h1 text is hidden and "Welcome" drawn in its place. Keycloak 26 has its own key
-   (loginAccountTitle in messages_en.properties). */
+   button, so the h1 text is hidden and "Welcome" drawn in its place. visibility: hidden keeps
+   "Log In" out of the accessible name; the pseudo-elements opt back in, so assistive tech reads
+   "Welcome Sign in to Gundi". Keycloak 26 has its own key (loginAccountTitle in
+   messages_en.properties). Without :has() support the h1 falls back to the stock "Log In"; 11 is
+   the outgoing version, so no further fallback is provided. */
 body:has(#kc-form-login) .login-pf-page #kc-page-title {
   font-size: 0;
   line-height: 0;
+  visibility: hidden;
+}
+body:has(#kc-form-login) .login-pf-page #kc-page-title::before,
+body:has(#kc-form-login) .login-pf-page #kc-page-title::after {
+  visibility: visible;
 }
 body:has(#kc-form-login) .login-pf-page #kc-page-title::before {
   content: "Welcome";
