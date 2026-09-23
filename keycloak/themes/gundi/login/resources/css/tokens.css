@@ -1,1 +1,41 @@
-/* Gundi design tokens shared by both Keycloak versions. Filled in Task 3. */
+/* Gundi design tokens shared by both Keycloak versions.
+   Colour values come from gundi-portal/tailwind.config.js (names in comments). */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/Inter-SemiBold.woff2") format("woff2");
+}
+
+:root {
+  --gundi-primary: #006842;            /* route-green */
+  --gundi-primary-hover: #00520c;      /* dark-green */
+  --gundi-text: #222222;               /* off-black */
+  --gundi-text-secondary: #63666A;     /* secondary-text */
+  --gundi-field-outline: #b1b3b3;      /* field-outline */
+  --gundi-divider: #dddddd;            /* divider-lines */
+  --gundi-error: #D0031B;              /* remove-red */
+  --gundi-error-bg: #FDF2F4;           /* remove-red-bg */
+  --gundi-success-bg: #E8F2E9;         /* light-green */
+  --gundi-warning: #9d6900;            /* warning-dark-yellow */
+  --gundi-warning-bg: #fdfaf4;         /* warning-yellow */
+  --gundi-info-bg: #f2f6fc;            /* light-blue-50 */
+  --gundi-page-bg: #f7f9f7;            /* white-green */
+  --gundi-card-bg: #ffffff;
+
+  --gundi-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+  --gundi-radius-card: 8px;
+  --gundi-radius-control: 4px;
+  --gundi-focus-ring: rgba(0, 104, 66, 0.3);
+  --gundi-shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
