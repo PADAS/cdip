@@ -53,14 +53,16 @@ If the pod reports `ImagePullBackOff`, the node service account lacks read acces
 repository; the portal in the same cluster pulls from `gundi/admin-portal`, so compare that Deployment's
 `imagePullSecrets`. Roll back (below) rather than leaving the Deployment in that state.
 
-Verify the stock page still renders (realms are not flipped yet):
+Verify the pod is serving pages (realms are not flipped yet):
 
 ```bash
-curl -sf -o /dev/null -w '%{http_code}\n' \
+curl -s -o /dev/null -w '%{http_code}\n' \
   'https://cdip-auth.pamdas.org/auth/realms/cdip-dev/protocol/openid-connect/auth?client_id=cdip-admin-portal&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fexample.invalid%2F'
 ```
 
-Expected `200` (Keycloak renders an error page for the bad redirect, which is fine here).
+Expected `400`. Keycloak answers a bad `redirect_uri` with its "We are sorry" error page and HTTP 400 on both
+11 and 26; the rendered error page is what proves the pod is up. A `5xx`, a connection error, or an empty
+response means the swap broke something: roll back.
 
 ### 3. Stage on the `cdip-dev` realm
 

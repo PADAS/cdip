@@ -47,7 +47,10 @@ done <<<"$assets"
 # 4. Copy overrides.
 grep -qE '<title>[[:space:]]*Sign in to Gundi[[:space:]]*</title>' <<<"$html" || fail "<title> override missing"
 if [[ $version == kc26 ]]; then
-  grep -q 'Sign in to Gundi' <<<"$html" || fail "loginAccountTitle override missing on kc26"
+  # The h1 text follows a newline (and, in dev mode, a <!-- template: … --> comment) after the
+  # opening tag, so collapse newlines and allow whitespace/comments before matching.
+  tr -d '\n' <<<"$html" | grep -qE 'id="kc-page-title"[^>]*>([[:space:]]|<!--[^>]*-->)*Sign in to Gundi' \
+    || fail "loginAccountTitle override missing on kc26 (h1 #kc-page-title does not read 'Sign in to Gundi')"
 fi
 grep -q 'id="kc-page-title"' <<<"$html" || fail "kc-page-title element missing"
 

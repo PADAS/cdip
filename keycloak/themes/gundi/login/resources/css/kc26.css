@@ -27,6 +27,14 @@ body#keycloak-bg {
   background: var(--gundi-page-bg);
 }
 
+/* The parent theme fixes the grid track at 34rem (544px) with no media query, which
+   overflows any viewport narrower than that. Let the track shrink with the viewport. */
+.pf-v5-c-login__container {
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 34rem);
+}
+
 /* Card */
 .pf-v5-c-login__main {
   width: 100%;                               /* error/info pages would otherwise shrink to content */
@@ -143,10 +151,14 @@ body#keycloak-bg {
   --pf-v5-c-alert__icon--Color: var(--gundi-text-secondary);
 }
 
-/* Phones */
+/* Phones: 16px gutter comes from the container so the card never exceeds the viewport */
 @media (max-width: 480px) {
+  .pf-v5-c-login__container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
   .pf-v5-c-login__main {
-    margin-left: 16px;
-    margin-right: 16px;
+    margin-left: 0;
+    margin-right: 0;
   }
 }
