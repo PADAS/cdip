@@ -1,0 +1,89 @@
+name: Keycloak Gundi theme images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'keycloak/**'
+      - '.github/workflows/keycloak-theme.yml'
+  pull_request:
+    paths:
+      - 'keycloak/**'
+      - '.github/workflows/keycloak-theme.yml'
+
+jobs:
+  test:
+    # Builds each image locally (no push), boots it with the dev realm, and runs the smoke test.
+    # The shared build_docker workflow always pushes, so it must not run before this passes.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: kc11
+            port: 8081
+          - version: kc26
+            port: 8082
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cascade guard (shared stylesheet has no framework classes)
+        run: keycloak/tests/check-css.sh
+
+      - name: Build image
+        run: docker build -f keycloak/Dockerfile.${{ matrix.version }} -t gundi-keycloak:${{ matrix.version }} .
+
+      - name: Start Keycloak 11
+        if: matrix.version == 'kc11'
+        run: |
+          docker run -d --name kc -p 8081:8080 \
+            -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin -e DB_VENDOR=h2 \
+            -e KEYCLOAK_IMPORT=/tmp/realm.json \
+            -v "$PWD/keycloak/dev/realm-with-theme.json:/tmp/realm.json:ro" \
+            gundi-keycloak:kc11 -b 0.0.0.0
+
+      - name: Start Keycloak 26
+        if: matrix.version == 'kc26'
+        run: |
+          docker run -d --name kc -p 8082:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            -e KC_HTTP_RELATIVE_PATH=/auth \
+            -v "$PWD/keycloak/dev/realm-with-theme.json:/opt/keycloak/data/import/realm.json:ro" \
+            gundi-keycloak:kc26 start-dev --import-realm
+
+      - name: Wait for Keycloak
+        run: keycloak/tests/wait-ready.sh http://localhost:${{ matrix.port }}/auth/realms/cdip-dev 300
+
+      - name: Smoke test
+        run: keycloak/tests/smoke.sh http://localhost:${{ matrix.port }} cdip-dev ${{ matrix.version }}
+
+      - name: Keycloak logs
+        if: failure()
+        run: docker logs kc
+
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.vars.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: vars
+        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  push:
+    # Only from main, only after both smoke tests pass. Nothing deploys; see keycloak/RUNBOOK.md.
+    if: github.ref == 'refs/heads/main'
+    needs: [test, vars]
+    strategy:
+      matrix:
+        include:
+          - version: kc11
+            keycloak: "11.0.2"
+          - version: kc26
+            keycloak: "26.7"
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v11
+    with:
+      workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+      repository: europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/keycloak
+      tag: ${{ matrix.keycloak }}-gundi-${{ needs.vars.outputs.sha }}
+      dockerfile: keycloak/Dockerfile.${{ matrix.version }}
