@@ -78,6 +78,9 @@ keycloak/
   compose.theme-dev.yml                local KC 11 + KC 26 with theme bind-mounted
   dev/realm-with-theme.json            dev realm export + loginTheme + test user
   tests/smoke.sh                       asserts theme assets load
+  tests/check-css.sh                   cascade guard: no framework classes in gundi.css
+  tests/wait-ready.sh                  polls a realm URL until Keycloak answers
+  tests/screenshot.sh                  headless Chrome screenshot of login and error pages
   RUNBOOK.md                           prod rollout and rollback commands
 ```
 
@@ -163,7 +166,10 @@ in `tokens.css`. The login page must not depend on a third-party CDN.
   and a neutral gray respectively.
 
 **Copy.** `messages/messages_en.properties` overrides one key:
-`loginAccountTitle=Sign in to Gundi`. All other strings stay stock.
+`loginAccountTitle=Sign in to Gundi`. Keycloak 26 titles the login page with that
+key. Keycloak 11 has no such key; its login page reuses `doLogIn`, the button
+label, for the title, so overriding it would also rename the button. On 11 the
+title therefore stays the stock "Log In". All other strings stay stock on both.
 
 **Accessibility.** Body text and primary green on white both exceed WCAG AA
 contrast. Every interactive control keeps a visible focus indicator. No
@@ -238,7 +244,8 @@ image is consumed by the upgrade work.
    `login/gundi/css/gundi.css`, and the version stylesheet.
 3. Fetch every `<link rel="stylesheet">`, `url(...)` font, and the logo image
    referenced from the theme and assert HTTP 200 for each.
-4. Assert the body contains `Sign in to Gundi`.
+4. On 26, assert the body contains `Sign in to Gundi`. On 11, assert the page
+   title element `id="kc-page-title"` is present.
 
 A wrong `parent=`, a mistyped `styles=` path, or a missing font all fail this test.
 A silently unstyled page is the most common theme failure and the one this guards.
@@ -256,9 +263,15 @@ A silently unstyled page is the most common theme failure and the one this guard
   and `KC_HTTP_RELATIVE_PATH=/auth` so URLs match prod.
 
 Both use the embedded H2 database; no Postgres needed. `keycloak/dev/realm-with-theme.json`
-is a copy of `cdip-dev-realm.json` with `"loginTheme": "gundi"` and a test user
+is a copy of `cdip-dev-realm.json` with `"loginTheme": "gundi"`, `"sslRequired": "none"`
+so a containerized browser can reach it over plain HTTP, and a test user
 `theme-tester` carrying the `UPDATE_PASSWORD` and `CONFIGURE_TOTP` required
 actions. Editing any CSS file and reloading the browser shows the change on both.
+
+`keycloak/tests/screenshot.sh` renders the login page and the error page of a
+running instance to PNG with a headless Chrome container, so an implementer
+without a browser can check the result. Pages behind a form submission (update
+password, OTP, info) are walked by hand per the verification table.
 
 ### Prod rollout (Keycloak 11)
 
