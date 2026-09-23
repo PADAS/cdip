@@ -1,0 +1,39 @@
+# Keycloak 11 and 26 side by side with the gundi login theme bind-mounted for live editing.
+# From the repo root:   docker compose -f keycloak/compose.theme-dev.yml up
+#   KC 11 -> http://localhost:8081/auth      KC 26 -> http://localhost:8082/auth
+#   admin console: admin / admin             realm: cdip-dev (users: dev, theme-tester / theme-tester)
+# Edit any file under themes/gundi and reload the browser; both versions run with theme caching off.
+services:
+  kc11:
+    image: quay.io/keycloak/keycloak:11.0.2
+    platform: linux/amd64          # no arm64 build exists; runs emulated on Apple Silicon
+    ports:
+      - "8081:8080"
+    environment:
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+      DB_VENDOR: h2
+      KEYCLOAK_IMPORT: /tmp/realm.json
+    command:
+      - -b
+      - 0.0.0.0
+      - -Dkeycloak.theme.staticMaxAge=-1
+      - -Dkeycloak.theme.cacheThemes=false
+      - -Dkeycloak.theme.cacheTemplates=false
+    volumes:
+      - ./dev/realm-with-theme.json:/tmp/realm.json:ro
+      - ./themes/gundi:/opt/jboss/keycloak/themes/gundi:ro   # theme.properties is the KC 11 variant
+
+  kc26:
+    image: quay.io/keycloak/keycloak:26.7
+    ports:
+      - "8082:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_RELATIVE_PATH: /auth   # match prod URL shape
+    command: ["start-dev", "--import-realm"]   # start-dev disables theme caching
+    volumes:
+      - ./dev/realm-with-theme.json:/opt/keycloak/data/import/realm.json:ro
+      - ./themes/gundi:/opt/keycloak/themes/gundi:ro
+      - ./themes/gundi/login/theme.kc26.properties:/opt/keycloak/themes/gundi/login/theme.properties:ro   # KC 26 variant over the default
