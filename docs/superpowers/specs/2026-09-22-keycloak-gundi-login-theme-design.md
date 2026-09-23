@@ -194,7 +194,7 @@ to the manual walk.
 `Dockerfile.kc11`:
 
 ```
-FROM <kc11 base image>:11.0.2
+FROM quay.io/keycloak/keycloak:11.0.2
 COPY keycloak/themes/gundi /opt/jboss/keycloak/themes/gundi
 RUN mv /opt/jboss/keycloak/themes/gundi/login/theme.kc11.properties \
        /opt/jboss/keycloak/themes/gundi/login/theme.properties \
@@ -206,10 +206,10 @@ copying to `/opt/keycloak/themes/gundi`. It does not run `kc.sh build`; the
 upgrade design owns the optimized-build decision and can layer on top of this
 image or copy the theme folder into its own.
 
-The 11 base image must be confirmed at implementation time from the running prod
-Deployment (`kubectl get deploy keycloak -n cdip-auth -o jsonpath='{.spec.template.spec.containers[0].image}'`).
-The manifest copy in `padas/keycloak.yaml` says `jboss/keycloak:11.0.2`; the
-upgrade design says `quay.io/keycloak/keycloak:11.0.2`. Use whatever prod runs.
+The 11 base image is `quay.io/keycloak/keycloak:11.0.2`, confirmed from the
+running prod Deployment on 2026-09-22. The stale manifest copy in
+`padas/keycloak.yaml` says `jboss/keycloak:11.0.2` and should not be used as a
+reference. Both images share the same `/opt/jboss/keycloak` layout.
 
 ### CI
 
@@ -308,9 +308,9 @@ the upgrade work must:
 
 ## Risks
 
-- **Base image mismatch.** Building from the wrong 11 image (`jboss/` vs `quay.io/`)
-  could change the WildFly configuration prod relies on. Mitigation: read the
-  image from the live Deployment before building.
+- **Base image drift.** If prod's image ever changes, a theme image built from the
+  old base would change the WildFly configuration prod relies on. Mitigation: the
+  runbook re-reads the image from the live Deployment before each build.
 - **Realm points at a missing theme.** Happens only if the realm is flipped before
   the image swap, or the 26 upgrade ships without the theme. Mitigation: runbook
   ordering and the hand-off requirement above.
