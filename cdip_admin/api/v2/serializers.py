@@ -898,8 +898,9 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         model = Source
         fields = (
             "id", "external_id", "name", "status", "provider", "destinations", "routing_rules",
-            "update_frequency", "last_update", "created_at"
+            "update_frequency", "last_update", "created_at", "created_via"
         )
+        read_only_fields = ("created_via",)
 
     def get_status(self, obj):
         # ToDo: revisit this once we implement status at the source level
@@ -975,6 +976,9 @@ class SourceCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        # This endpoint is the ONLY writer of "manual" — assigned here rather than
+        # accepted from the payload, so the origin can't be forged or edited later.
+        validated_data["created_via"] = Source.CreationOrigins.MANUAL
         # The check in validate() loses to a concurrent POST: two clients (or a client and
         # ingestion) both pass it, and the second insert hits the (integration, external_id)
         # unique constraint. That constraint is the only real guard left once validators are

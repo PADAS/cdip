@@ -882,7 +882,20 @@ class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
 
 class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    class CreationOrigins(models.TextChoices):
+        INGESTION = "ingestion", "Discovered by the integration"
+        MANUAL = "manual", "Created by a user"
+
     name = models.CharField(max_length=200, blank=True)
+    # Immutable once created: a source born from a user stays "manual" even after
+    # the integration starts sending data for it, so support can always tell the
+    # two apart. Ingestion's get_or_create never touches existing rows and creates
+    # with the default, and no update serializer exposes the field.
+    created_via = models.CharField(
+        max_length=20,
+        choices=CreationOrigins.choices,
+        default=CreationOrigins.INGESTION,
+    )
     external_id = models.CharField(
         max_length=200,
         verbose_name="External Source ID",
