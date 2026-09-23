@@ -1,0 +1,9 @@
+# Production Keycloak 11 image with the Gundi login theme baked in.
+# Build from the repo root:   docker build -f keycloak/Dockerfile.kc11 -t gundi-keycloak:kc11 .
+# The base image runs as uid 1000, so files are chowned to it. Only the KC 11 properties
+# file is copied, renamed to theme.properties. No RUN step, no shell, nothing else changes.
+FROM quay.io/keycloak/keycloak:11.0.2
+
+COPY --chown=1000:0 keycloak/themes/gundi/login/resources  /opt/jboss/keycloak/themes/gundi/login/resources
+COPY --chown=1000:0 keycloak/themes/gundi/login/messages   /opt/jboss/keycloak/themes/gundi/login/messages
+COPY --chown=1000:0 keycloak/themes/gundi/login/theme.kc11.properties /opt/jboss/keycloak/themes/gundi/login/theme.properties
