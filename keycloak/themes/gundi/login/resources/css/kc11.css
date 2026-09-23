@@ -1,1 +1,145 @@
-/* Keycloak 11 (PatternFly 3) class overrides for the Gundi theme. Filled in Task 5. */
+/* Keycloak 11 (PatternFly 3) class overrides for the Gundi theme. Loads after gundi.css. */
+
+/* Flat page background instead of the keycloak-bg.png photo */
+.login-pf body {
+  background: var(--gundi-page-bg);
+}
+.login-pf-page {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+/* Ids that exist only on 11 */
+#kc-content-wrapper {
+  margin-top: 0;
+}
+
+/* Card */
+.login-pf-page .card-pf {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 32px 32px 24px;
+  background: var(--gundi-card-bg);
+  border: 1px solid var(--gundi-divider);
+  border-radius: var(--gundi-radius-card);
+  box-shadow: var(--gundi-shadow-card);
+}
+.login-pf-page .login-pf-header {
+  margin-bottom: 0;
+}
+
+/* Inputs */
+.card-pf .form-control {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--gundi-field-outline);
+  border-radius: var(--gundi-radius-control);
+  box-shadow: none;
+  background: #ffffff;
+  font-family: var(--gundi-font);
+  font-size: 15px;
+  color: var(--gundi-text);
+}
+.card-pf .form-control:focus {
+  border-color: var(--gundi-primary);
+  box-shadow: 0 0 0 3px var(--gundi-focus-ring);
+  outline: 0;
+}
+.card-pf .control-label {
+  font-family: var(--gundi-font);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gundi-text);
+  margin-bottom: 6px;
+}
+.card-pf .form-group {
+  margin-bottom: 16px;
+}
+
+/* Buttons (the primary submit is styled by #kc-login in gundi.css; these cover other pages) */
+.login-pf-page .btn {
+  font-family: var(--gundi-font);
+  font-weight: 600;
+  border-radius: var(--gundi-radius-control);
+}
+.login-pf-page .btn-primary,
+.login-pf-page .btn-primary:focus {
+  background: var(--gundi-primary);
+  border-color: var(--gundi-primary);
+  color: #ffffff;
+}
+.login-pf-page .btn-primary:hover,
+.login-pf-page .btn-primary:active {
+  background: var(--gundi-primary-hover);
+  border-color: var(--gundi-primary-hover);
+}
+.login-pf-page .btn-default {
+  background: #ffffff;
+  border-color: var(--gundi-field-outline);
+  color: var(--gundi-primary);
+}
+.login-pf-page .btn-default:hover {
+  border-color: var(--gundi-primary);
+  color: var(--gundi-primary-hover);
+}
+#kc-form-buttons {
+  margin-top: 8px;
+}
+
+/* Remember me + forgot password row */
+#kc-form-options .checkbox input[type="checkbox"] {
+  accent-color: var(--gundi-primary);
+}
+#kc-form-options .checkbox label {
+  color: var(--gundi-text-secondary);
+  font-size: 14px;
+}
+.login-pf-page .login-pf-settings a,
+.login-pf-page .login-pf-signup a {
+  color: var(--gundi-primary);
+}
+
+/* Alerts as inline bands with a status-coloured left border */
+.login-pf-page .alert {
+  border: 0;
+  border-left: 4px solid var(--gundi-text-secondary);
+  border-radius: var(--gundi-radius-control);
+  padding: 12px 14px;
+  color: var(--gundi-text);
+  background: var(--gundi-info-bg);
+}
+.login-pf-page .alert-error {
+  background: var(--gundi-error-bg);
+  border-left-color: var(--gundi-error);
+}
+.login-pf-page .alert-error .pficon {
+  color: var(--gundi-error);
+}
+.login-pf-page .alert-success {
+  background: var(--gundi-success-bg);
+  border-left-color: var(--gundi-primary);
+}
+.login-pf-page .alert-success .pficon {
+  color: var(--gundi-primary);
+}
+.login-pf-page .alert-warning {
+  background: var(--gundi-warning-bg);
+  border-left-color: var(--gundi-warning);
+}
+.login-pf-page .alert-warning .pficon {
+  color: var(--gundi-warning);
+}
+.login-pf-page .alert-info {
+  background: var(--gundi-info-bg);
+  border-left-color: var(--gundi-text-secondary);
+}
+
+/* Phones */
+@media (max-width: 480px) {
+  .login-pf-page {
+    padding-top: 24px;
+  }
+  .login-pf-page .card-pf {
+    margin: 0 16px;
+    padding: 24px 20px;
+  }
+}
