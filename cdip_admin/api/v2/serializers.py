@@ -11,11 +11,13 @@ from accounts.utils import add_or_create_user_in_org
 from accounts.models import AccountProfileOrganization, AccountProfile, UserAgreement, EULA
 from core.utils import timezone_from_offset, parse_crontab_schedule_from_dict
 from integrations.models import IntegrationConfiguration, IntegrationType, IntegrationAction, Integration, Route, \
-    Source, SourceState, SourceConfiguration, ensure_default_route, RouteConfiguration, get_user_integrations_qs, \
+    Source, SourceState, SourceConfiguration, SourceFilter, ensure_default_route, RouteConfiguration, \
+    get_user_integrations_qs, \
     GundiTrace, WebhookConfiguration, IntegrationWebhook, IntegrationStatus, ConnectionStatus, \
     AmbiguousDefaultRouteError
 from integrations.utils import register_integration_type_in_kong
 from organizations.models import Organization
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -28,6 +30,11 @@ from .utils import send_events_to_routing, send_attachments_to_routing, send_obs
 
 User = get_user_model()
 
+# The external_id ingestion assigns when a client submits without a source. It is a
+# real Source row, so a whitelist that omits it silently drops every sourceless
+# submission from that provider.
+DEFAULT_SOURCE_EXTERNAL_ID = "default-source"
+
 
 class DuplicateIntegrationError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
@@ -35,6 +42,11 @@ class DuplicateIntegrationError(drf_exceptions.APIException):
 
 
 class DuplicateSourceError(drf_exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "conflict"
+
+
+class DuplicateSourceFilterError(drf_exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "conflict"
 
@@ -886,8 +898,9 @@ class SourceRetrieveSerializer(serializers.ModelSerializer):
         model = Source
         fields = (
             "id", "external_id", "name", "status", "provider", "destinations", "routing_rules",
-            "update_frequency", "last_update", "created_at"
+            "update_frequency", "last_update", "created_at", "created_via"
         )
+        read_only_fields = ("created_via",)
 
     def get_status(self, obj):
         # ToDo: revisit this once we implement status at the source level
@@ -963,6 +976,9 @@ class SourceCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        # This endpoint is the ONLY writer of "manual" — assigned here rather than
+        # accepted from the payload, so the origin can't be forged or edited later.
+        validated_data["created_via"] = Source.CreationOrigins.MANUAL
         # The check in validate() loses to a concurrent POST: two clients (or a client and
         # ingestion) both pass it, and the second insert hits the (integration, external_id)
         # unique constraint. That constraint is the only real guard left once validators are
@@ -976,6 +992,216 @@ class SourceCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return SourceRetrieveSerializer(instance=instance, context=self.context).data
+
+
+class SourceSummarySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    last_update = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Source
+        # created_via rides along so the UI can badge hand-created devices inside a
+        # rule's own device list, not only in the full catalogue.
+        fields = ("id", "external_id", "name", "last_update", "created_via")
+        read_only_fields = ("created_via",)
+
+    def get_last_update(self, obj):
+        try:
+            source_state = obj.state
+        except SourceState.DoesNotExist:
+            return "unknown"
+        else:
+            return source_state.data.get("last_data_received", "unknown")
+
+
+class DestinationSummarySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = Integration
+        fields = ("id", "name")
+
+
+class SourceFilterSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    destination = DestinationSummarySerializer(read_only=True)
+    # Annotated on the queryset; falls back to a COUNT when the serializer is used on an
+    # instance straight from a write, where the annotation is absent.
+    sources_count = serializers.SerializerMethodField()
+    providers = serializers.SerializerMethodField()
+    excludes_default_source = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SourceFilter
+        fields = (
+            "id", "destination", "type", "mode", "enabled", "name", "description",
+            "sources_count", "providers", "excludes_default_source", "updated_at",
+        )
+
+    def get_sources_count(self, obj):
+        annotated = getattr(obj, "sources_count", None)
+        return annotated if annotated is not None else obj.sources.count()
+
+    @staticmethod
+    def _annotated_ids(obj, attribute, fallback):
+        # Annotated on the queryset by RouteFiltersView; recomputed when the serializer is
+        # used on an instance straight from a write, where the annotation is absent.
+        values = getattr(obj, attribute) if hasattr(obj, attribute) else fallback()
+        return {str(value) for value in (values or []) if value}
+
+    def _covered_provider_ids(self, obj):
+        return self._annotated_ids(
+            obj, "provider_ids",
+            lambda: obj.sources.values_list("integration_id", flat=True).distinct(),
+        )
+
+    def _provider_ids_naming_their_default_source(self, obj):
+        return self._annotated_ids(
+            obj, "default_source_provider_ids",
+            lambda: obj.sources.filter(
+                external_id=DEFAULT_SOURCE_EXTERNAL_ID
+            ).values_list("integration_id", flat=True).distinct(),
+        )
+
+    def get_providers(self, obj):
+        # The set of providers a rule actually covers. A rule only affects the providers
+        # whose sources it names, and the paginated source list no longer lets the client
+        # work this out for itself.
+        provider_ids = self._covered_provider_ids(obj)
+        names = dict(self.context.get("provider_names") or {})
+        unnamed = provider_ids - names.keys()
+        if unnamed:
+            names.update({
+                str(p.id): p.name for p in Integration.objects.filter(id__in=unnamed)
+            })
+        return sorted(
+            ({"id": pid, "name": names.get(pid, "")} for pid in provider_ids),
+            key=lambda provider: (provider["name"], provider["id"]),
+        )
+
+    def get_excludes_default_source(self, obj):
+        if obj.mode != SourceFilter.FilterModes.WHITELIST:
+            return False
+        # Answered from the rule's own sources, not from whether a `default-source` row
+        # exists yet. Ingestion creates that row the first time a provider reports without
+        # one, so keying off its existence would stay silent for a whitelist written before
+        # any sourceless data arrives, which is exactly when the operator can still fix it.
+        # The rule is scoped to the providers it names: one it does not cover is untouched,
+        # not omitted.
+        return bool(
+            self._covered_provider_ids(obj)
+            - self._provider_ids_naming_their_default_source(obj)
+        )
+
+
+class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    destination = serializers.PrimaryKeyRelatedField(queryset=Integration.objects.all())
+    # The block cdip-routing reads (RouteRetrieveFullWithFiltersSerializer.get_filters) is
+    # keyed by destination alone, so it carries one filter per arrow. The model's unique
+    # constraint is wider, reserving room for a second type on the same arrow, so until
+    # that wire contract grows a type dimension only list filters may be created: a second
+    # type would pass the constraint and then silently displace the list rule from the
+    # payload, dropping the whitelist without any error.
+    type = serializers.ChoiceField(
+        choices=[SourceFilter.SourceFilterTypes.SOURCE_LIST],
+        default=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+    )
+    source_ids = serializers.PrimaryKeyRelatedField(
+        source="sources", many=True, queryset=Source.objects.all(), write_only=True
+    )
+
+    class Meta:
+        model = SourceFilter
+        fields = (
+            "id", "destination", "type", "mode", "enabled", "name", "description", "source_ids"
+        )
+        # `selector` is deliberately not exposed. For type="list" the M2M is the single way
+        # to say which devices a rule covers; offering both would allow two rules in one row
+        # that disagree with each other.
+
+    @property
+    def _route(self):
+        return self.context["route"]
+
+    def validate_destination(self, value):
+        if not self._route.destinations.filter(id=value.id).exists():
+            raise drf_exceptions.ValidationError(
+                "This destination is not one of the route's destinations."
+            )
+        return value
+
+    def validate_source_ids(self, value):
+        if not value:
+            raise drf_exceptions.ValidationError("At least one source is required.")
+        if len(value) > settings.SOURCE_FILTER_MAX_SOURCES:
+            raise drf_exceptions.ValidationError(
+                f"A filter may reference at most {settings.SOURCE_FILTER_MAX_SOURCES} sources."
+            )
+        provider_ids = set(self._route.data_providers.values_list("id", flat=True))
+        # Reported by id, not by external_id: source_ids resolves against every Source in
+        # the system, so echoing the device identifier would hand a caller the name of a
+        # device in another organization.
+        strangers = sorted(
+            {str(s.id) for s in value if s.integration_id not in provider_ids}
+        )
+        if strangers:
+            raise drf_exceptions.ValidationError(
+                f"These sources belong to a provider that is not on this route: {strangers}"
+            )
+        return value
+
+    def validate(self, attrs):
+        destination = attrs.get("destination") or getattr(self.instance, "destination", None)
+        # `type` carries a model default, so DRF leaves it out of validated_data when the
+        # client omits it — the database applies it at save time. Resolving it here keeps
+        # the duplicate check looking for the row that will actually be written.
+        filter_type = (
+            attrs.get("type")
+            or getattr(self.instance, "type", None)
+            or SourceFilter.SourceFilterTypes.SOURCE_LIST
+        )
+        duplicates = SourceFilter.objects.filter(
+            routing_rule=self._route, destination=destination, type=filter_type
+        )
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise self._duplicate_error()
+        return attrs
+
+    @staticmethod
+    def _duplicate_error():
+        return DuplicateSourceFilterError(detail={
+            "destination": [
+                "This destination already has a filter of this type on this route."
+            ]
+        })
+
+    def create(self, validated_data):
+        validated_data["routing_rule"] = self._route
+        return self._save_translating_conflicts(super().create, validated_data)
+
+    def update(self, instance, validated_data):
+        # A PUT may move the filter onto another destination, so it races the constraint
+        # the same way a create does.
+        return self._save_translating_conflicts(super().update, instance, validated_data)
+
+    def _save_translating_conflicts(self, write, *args):
+        # The check in validate() is not atomic with the write, so a concurrent request
+        # reaches unique_source_filter_per_route_destination_type. DRF derives no validator
+        # from that constraint (routing_rule is not a serializer field), which leaves the
+        # database as the only guard: answer its violation with the 409 validate() promises
+        # instead of letting IntegrityError surface as a 500. The savepoint keeps the outer
+        # ATOMIC_REQUESTS transaction usable after the failed write.
+        try:
+            with transaction.atomic():
+                return write(*args)
+        except IntegrityError:
+            raise self._duplicate_error()
+
+    def to_representation(self, instance):
+        return SourceFilterSerializer(instance=instance, context=self.context).data
 
 
 # All stream types the platform routes (GUNDI-5548: includes txt, obvu, att —
@@ -1309,7 +1535,28 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return super().create(self._materialize_validated_data(validated_data))
 
     def update(self, instance: Route, validated_data: dict) -> Route:
-        return super().update(instance, self._materialize_validated_data(validated_data))
+        with transaction.atomic():
+            route = super().update(instance, self._materialize_validated_data(validated_data))
+            self._prune_filters(route)
+        return route
+
+    @staticmethod
+    def _prune_filters(route: Route) -> None:
+        """Drop the parts of a route's filters that the route no longer covers.
+
+        Narrowing `destinations` or `data_providers` only rewrites the route's own M2M rows.
+        A SourceFilter points at the Integration, which still exists, so the rule survives:
+        it keeps shipping in the block routing reads, it can no longer be saved back through
+        the API, and re-adding the destination silently puts the old rule back in force on
+        an arrow the operator believes is new.
+        """
+        route.source_filters.exclude(destination__in=route.destinations.all()).delete()
+        for source_filter in route.source_filters.prefetch_related("sources"):
+            orphaned = source_filter.sources.exclude(
+                integration__in=route.data_providers.all()
+            )
+            if orphaned.exists():
+                source_filter.sources.remove(*orphaned)
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
@@ -1328,8 +1575,55 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
-            # "filters"  # ToDo: Support "filters" or "rules"
+            # No "filters" here on purpose — see RouteDetailSerializer.
         )
+
+
+class RouteDetailSerializer(RouteRetrieveFullSerializer):
+    """Route retrieve, carrying the filter block cdip-routing evaluates.
+
+    Separate from the list representation because a route may hold several filters of up to
+    SOURCE_FILTER_MAX_SOURCES devices each, and a page of routes would multiply that for a
+    view that never needs the device lists.
+    """
+
+    filters = serializers.SerializerMethodField()
+
+    class Meta(RouteRetrieveFullSerializer.Meta):
+        fields = RouteRetrieveFullSerializer.Meta.fields + ("filters",)
+
+    def get_filters(self, obj):
+        # Grouped by provider on the wire although the model is not. `external_id` is unique
+        # only within a provider, so a flat list would let a second provider's
+        # identically-named device satisfy a whitelist written for the first. The provider
+        # keys are also the scope of the rule: a provider absent from the map is untouched
+        # by it.
+        filters = {}
+        destination_ids = {destination.id for destination in obj.destinations.all()}
+        for source_filter in obj.source_filters.all():
+            # Keyed by destination, so only one filter per arrow fits. Other types describe
+            # their selection in `selector`, which this block does not carry, and emitting
+            # one here would displace the list rule for the same destination.
+            if source_filter.type != SourceFilter.SourceFilterTypes.SOURCE_LIST:
+                continue
+            # Route update prunes filters whose destination it drops, but a removal that
+            # bypasses the API (the admin, a shell, a data migration) leaves the row
+            # pointing at an Integration that still exists, so nothing deletes it. Routing
+            # is never told to filter an arrow the route no longer has.
+            if source_filter.destination_id not in destination_ids:
+                continue
+            by_provider = {}
+            for source in source_filter.sources.all():
+                by_provider.setdefault(str(source.integration_id), []).append(
+                    source.external_id
+                )
+            filters[str(source_filter.destination_id)] = {
+                "type": source_filter.type,
+                "mode": source_filter.mode,
+                "enabled": source_filter.enabled,
+                "by_provider": by_provider,
+            }
+        return filters
 
 
 class KeyRelatedField(serializers.RelatedField):
@@ -1391,7 +1685,7 @@ class GundiTraceSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     source = serializers.CharField(
         write_only=True,
-        default="default-source"
+        default=DEFAULT_SOURCE_EXTERNAL_ID
     )
 
     def validate(self, data):
@@ -1513,7 +1807,7 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         if not self.instance:
             source, created = Source.objects.get_or_create(
                 integration=data["integration"],
-                external_id=data.get("source", "default-source")
+                external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID)
             )
             data["source"] = source
         return data
@@ -1603,7 +1897,7 @@ class ObservationCreateSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data.get("source", "default-source"),
+            external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID),
             defaults={
                 "name": data.get("source_name", "")
             }
@@ -1784,7 +2078,7 @@ class TextMessageSerializer(GundiTraceSerializer):
         # Get or create sources as they are discovered
         source, created = Source.objects.get_or_create(
             integration=data["integration"],
-            external_id=data.get("source", "default-source"),
+            external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID),
             defaults={
                 "name": data.get("source_name", "")
             }

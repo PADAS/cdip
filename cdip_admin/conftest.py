@@ -32,7 +32,6 @@ from integrations.models import (
     IntegrationConfiguration,
     Route,
     SourceFilter,
-    ListFilter,
     Source,
     SourceState,
     SourceConfiguration,
@@ -2240,14 +2239,16 @@ def route_1(
     rule.data_providers.add(provider_lotek_panthera)
     rule.destinations.add(*integrations_list_er)
     # Filter data coming only from a subset of sources
-    SourceFilter.objects.create(
+    source_filter = SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        mode=SourceFilter.FilterModes.WHITELIST,
         name="Panthera Male Pumas",
         description="Select collars on male pumas in panthera reserve",
         order_number=1,
-        selector=ListFilter(ids=[d.external_id for d in lotek_sources]).dict(),
         routing_rule=rule,
+        destination=integrations_list_er[0],
     )
+    source_filter.sources.set(lotek_sources)
     return rule
 
 
@@ -2296,14 +2297,16 @@ def route_2(
     route.data_providers.add(provider_movebank_ewt)
     route.destinations.add(integrations_list_er[5])
     # Filter data coming only from a subset of sources
-    SourceFilter.objects.create(
+    source_filter = SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        mode=SourceFilter.FilterModes.WHITELIST,
         name="EWT Baby Elephants",
         description="Select collars on baby elephants in EWT reserve",
         order_number=1,
-        selector=ListFilter(ids=[d.external_id for d in movebank_sources]).dict(),
         routing_rule=route,
+        destination=integrations_list_er[5],
     )
+    source_filter.sources.set(movebank_sources)
     # Add a custom configuration
     route.configuration = er_route_configuration_elephants
     route.save()
