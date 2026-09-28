@@ -29,6 +29,7 @@ admin_portal:
     GS_BUCKET_NAME: "cdip-files-stage"
     BUCKET_NAME: "cdip-files-stage"
     DISPATCHER_DEFAULTS_SECRET: "er-dispatcher-defaults-stage"  # pragma: allowlist secret
+    ER_SHARED_DISPATCHER_TOPIC: "destination-earthranger-stage"
     MOVEBANK_DISPATCHER_DEFAULT_TOPIC: "destination-movebank-stage"
     DISPATCHER_DEFAULTS_SECRET_SMART: "sm-dispatcher-defaults-stage"  # pragma: allowlist secret
     DISPATCHER_DEFAULTS_SECRET_WPSWATCH: "wps-dispatcher-defaults-stage"  # pragma: allowlist secret
