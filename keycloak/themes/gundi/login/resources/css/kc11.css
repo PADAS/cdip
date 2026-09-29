@@ -4,7 +4,14 @@
 .login-pf body {
   background: var(--gundi-page-bg);
 }
+/* PatternFly 3 anchors the login page to the top; centre the card in the viewport instead.
+   Auto margins on the card (not justify-content: center) so a viewport shorter than the card
+   scrolls rather than clipping the card's top edge. */
 .login-pf-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
   padding-top: 48px;
   padding-bottom: 48px;
 }
@@ -16,7 +23,8 @@
 /* Card, with the Gundi mark drawn above the title */
 .login-pf-page .card-pf {
   max-width: 400px;
-  margin: 0 auto;
+  width: 100%;
+  margin: auto;
   padding: 32px 32px 24px;
   background: var(--gundi-card-bg);
   border: 1px solid var(--gundi-divider);
@@ -181,7 +189,8 @@ body:has(#kc-form-login) .login-pf-page #kc-page-title::before {
     padding-top: 24px;
   }
   .login-pf-page .card-pf {
-    margin: 0 16px;
+    width: auto;
+    margin: auto 16px;
     padding: 24px 20px;
   }
 }
