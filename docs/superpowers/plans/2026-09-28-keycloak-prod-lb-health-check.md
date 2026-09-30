@@ -328,7 +328,7 @@ Users who loaded the login page before this change still hold the 30-day copy of
 
 ## Step 6: keep the manifests, remove the backups
 
-`manifests/` now describes what prod runs and holds no credentials. Put it in a repo so the next change starts from it instead of a fresh export. Future image swaps should edit `deployment.yaml` and apply it, not use `kubectl set image`, or the file drifts again.
+`manifests/` now describes what prod runs and holds no credentials. It is committed as `keycloak/prod/` in the cdip repo (branch `docs/keycloak-prod-lb-health-check`), with a README describing the diff-then-apply workflow. The runbook's image-swap step now edits `keycloak/prod/deployment.yaml` instead of using `kubectl set image`, so the files stop drifting. Delete `~/keycloak-prod-2026-09-28/manifests/` once the branch is merged, and work from the repo copy.
 
 Once prod has run cleanly for a day, delete the raw backup, which still holds the old plain values:
 
