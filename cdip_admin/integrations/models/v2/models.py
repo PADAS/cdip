@@ -901,7 +901,8 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             )
         except Exception:  # Logging must never break the operation itself
             logger.warning(
-                f"Activity Log > Error recording source membership change for {self}."
+                f"Activity Log > Error recording source membership change for {self}.",
+                exc_info=True,
             )
 
 

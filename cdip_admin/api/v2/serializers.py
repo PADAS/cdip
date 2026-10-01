@@ -1180,27 +1180,32 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data["routing_rule"] = self._route
-        instance = self._save_translating_conflicts(super().create, validated_data)
-        self._sync_covered_providers(instance)
-        instance.log_sources_changed(added=instance.sources.all())
+        # One transaction for row + M2M + scope + audit: a failure after the M2M
+        # write must not commit a source list with a stale scope or no log entry -
+        # ATOMIC_REQUESTS is off in this project.
+        with transaction.atomic():
+            instance = self._save_translating_conflicts(super().create, validated_data)
+            self._sync_covered_providers(instance)
+            instance.log_sources_changed(added=instance.sources.all())
         return instance
 
     def update(self, instance, validated_data):
         # A PUT may move the filter onto another destination, so it races the constraint
         # the same way a create does.
         sources_changed = "sources" in validated_data
-        before = set(instance.sources.all()) if sources_changed else set()
-        instance = self._save_translating_conflicts(super().update, instance, validated_data)
-        # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
-        # source_ids must not recompute it from the surviving rows, or it would quietly
-        # drop a provider whose last source left via a delete cascade.
-        if sources_changed:
-            self._sync_covered_providers(instance)
-            after = set(instance.sources.all())
-            if before != after:
-                instance.log_sources_changed(
-                    added=after - before, removed=before - after
-                )
+        with transaction.atomic():
+            before = set(instance.sources.all()) if sources_changed else set()
+            instance = self._save_translating_conflicts(super().update, instance, validated_data)
+            # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
+            # source_ids must not recompute it from the surviving rows, or it would quietly
+            # drop a provider whose last source left via a delete cascade.
+            if sources_changed:
+                self._sync_covered_providers(instance)
+                after = set(instance.sources.all())
+                if before != after:
+                    instance.log_sources_changed(
+                        added=after - before, removed=before - after
+                    )
         return instance
 
     @staticmethod
@@ -1214,8 +1219,8 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         # reaches unique_source_filter_per_route_destination_type. DRF derives no validator
         # from that constraint (routing_rule is not a serializer field), which leaves the
         # database as the only guard: answer its violation with the 409 validate() promises
-        # instead of letting IntegrityError surface as a 500. The savepoint keeps the outer
-        # ATOMIC_REQUESTS transaction usable after the failed write.
+        # instead of letting IntegrityError surface as a 500. The savepoint keeps the
+        # caller's enclosing transaction usable after the failed write.
         try:
             with transaction.atomic():
                 return write(*args)
@@ -1557,9 +1562,13 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return super().create(self._materialize_validated_data(validated_data))
 
     def update(self, instance: Route, validated_data: dict) -> Route:
+        # Only an update that touches the route's own M2Ms can orphan a filter;
+        # a name-only PATCH must not pay for (or race with) the prune.
+        shape_changed = "destinations" in validated_data or "data_providers" in validated_data
         with transaction.atomic():
             route = super().update(instance, self._materialize_validated_data(validated_data))
-            self._prune_filters(route)
+            if shape_changed:
+                self._prune_filters(route)
         return route
 
     @staticmethod
@@ -1572,8 +1581,14 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         the API, and re-adding the destination silently puts the old rule back in force on
         an arrow the operator believes is new.
         """
-        route.source_filters.exclude(destination__in=route.destinations.all()).delete()
-        for source_filter in route.source_filters.prefetch_related("sources"):
+        # Instance deletes, not a queryset delete: ChangeLogMixin only logs from the
+        # overridden delete(), so a bulk delete would erase a whole rule - a larger
+        # policy change than the membership edits that are audited - without a trace.
+        for source_filter in route.source_filters.exclude(
+            destination__in=route.destinations.all()
+        ):
+            source_filter.delete()
+        for source_filter in route.source_filters.all():
             orphaned = list(
                 source_filter.sources.exclude(
                     integration__in=route.data_providers.all()
@@ -1650,11 +1665,10 @@ class RouteDetailSerializer(RouteRetrieveFullSerializer):
             # sources ships as [] (a whitelist that allows nothing), not as absent
             # (a rule that doesn't speak). Deleting the last allowed device must
             # never open the gate for the provider's other devices.
+            # .all() so the view's prefetch is honoured; values_list would re-query.
             by_provider = {
-                str(provider_id): []
-                for provider_id in source_filter.covered_providers.values_list(
-                    "id", flat=True
-                )
+                str(provider.id): []
+                for provider in source_filter.covered_providers.all()
             }
             for source in source_filter.sources.all():
                 by_provider.setdefault(str(source.integration_id), []).append(

@@ -511,7 +511,11 @@ class RoutesView(viewsets.ModelViewSet):
                 Prefetch(
                     "source_filters__sources",
                     queryset=Source.objects.only("id", "integration_id", "external_id"),
-                )
+                ),
+                Prefetch(
+                    "source_filters__covered_providers",
+                    queryset=Integration.objects.only("id"),
+                ),
             )
         return queryset
 

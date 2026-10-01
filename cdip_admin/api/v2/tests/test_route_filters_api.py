@@ -394,6 +394,13 @@ def test_narrowing_the_route_destinations_prunes_the_orphaned_filters(
 
     assert response.status_code == status.HTTP_200_OK, response.content
     assert not SourceFilter.objects.filter(id=source_filter.id).exists()
+    # Erasing a whole rule is a larger policy change than the membership edits that
+    # are audited, so the prune must delete per instance - a queryset delete bypasses
+    # ChangeLogMixin and would leave no trace.
+    assert ActivityLog.objects.filter(
+        value="sourcefilter_deleted",
+        details__instance_pk=str(source_filter.id),
+    ).exists()
 
 
 def test_narrowing_the_route_providers_drops_their_sources_from_the_filters(

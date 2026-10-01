@@ -801,6 +801,7 @@ class SourceFilterAdmin(admin.ModelAdmin):
         "id",
         "order_number",
         "type",
+        "mode",
         "name",
         "description"
     )
@@ -808,6 +809,11 @@ class SourceFilterAdmin(admin.ModelAdmin):
         "type",
         "routing_rule",
     )
+    # Membership is edited only through the API: it keeps covered_providers in
+    # sync and writes the audit entry, neither of which an admin save does. The
+    # default M2M widgets would also enumerate every Source/Integration in the DB.
+    exclude = ("sources", "covered_providers")
+    raw_id_fields = ("routing_rule", "destination")
 
 
 @admin.register(Source)
