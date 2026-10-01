@@ -2249,6 +2249,10 @@ def route_1(
         destination=integrations_list_er[0],
     )
     source_filter.sources.set(lotek_sources)
+    # Mirrors what the API write / 0121 backfill maintain in real data.
+    source_filter.covered_providers.set(
+        {source.integration_id for source in lotek_sources}
+    )
     return rule
 
 
@@ -2307,6 +2311,10 @@ def route_2(
         destination=integrations_list_er[5],
     )
     source_filter.sources.set(movebank_sources)
+    # Mirrors what the API write / 0121 backfill maintain in real data.
+    source_filter.covered_providers.set(
+        {source.integration_id for source in movebank_sources}
+    )
     # Add a custom configuration
     route.configuration = er_route_configuration_elephants
     route.save()

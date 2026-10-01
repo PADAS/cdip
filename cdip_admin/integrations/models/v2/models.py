@@ -847,6 +847,17 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         related_name="source_filters_by_source",
         verbose_name="Sources"
     )
+    # The rule's provider scope, persisted apart from source membership: a Source
+    # delete cascades out of `sources`, but the provider stays covered, so an
+    # emptied whitelist keeps allowing nothing instead of silently allowing the
+    # provider's every other device. API writes that change the source list
+    # recompute it (a deliberate edit redefines the scope); cascades never touch it.
+    covered_providers = models.ManyToManyField(
+        "integrations.Integration",
+        blank=True,
+        related_name="source_filters_covering_provider",
+        verbose_name="Covered Providers",
+    )
     enabled = models.BooleanField(default=True)
     integration_field = "routing_rule__first_provider"
 

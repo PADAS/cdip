@@ -1148,6 +1148,25 @@ def test_route_detail_carries_the_filters_block(
     }
 
 
+def test_deleting_the_last_whitelisted_source_keeps_the_provider_restricted(
+        api_client, superuser, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    # The regression: provider scope used to be derived from surviving sources, so the
+    # delete cascade of a whitelist's last device erased the provider from the block and
+    # routing fell back to default-allow for its every other device. The persisted scope
+    # must keep the provider in the block as "named with zero devices" — allows nothing.
+    for source in lotek_sources:
+        source.delete()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    source_filter = route_1.source_filters.get()
+    rule = response.json()["filters"][str(source_filter.destination_id)]
+    assert rule["by_provider"] == {str(provider_lotek_panthera.id): []}
+
+
 def test_route_list_does_not_carry_the_filters_block(
         api_client, superuser, organization, route_1, lotek_sources
 ):

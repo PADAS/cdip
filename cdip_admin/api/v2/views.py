@@ -424,12 +424,12 @@ class RouteFiltersView(viewsets.ModelViewSet):
             # records the aggregates as if they were edited fields, and the activity log
             # cannot serialize them.
             return queryset
-        # `providers` and `excludes_default_source` both describe the rule's own sources, so
-        # they are aggregated here rather than derived per row: a page of rules used to cost
-        # two extra queries for every rule on it.
+        # `providers` and `excludes_default_source` describe the rule's persisted scope and
+        # its sources; aggregated here rather than derived per row: a page of rules used to
+        # cost two extra queries for every rule on it.
         return queryset.annotate(
             sources_count=Count("sources", distinct=True),
-            provider_ids=ArrayAgg("sources__integration_id", distinct=True),
+            provider_ids=ArrayAgg("covered_providers__id", distinct=True),
             default_source_provider_ids=ArrayAgg(
                 "sources__integration_id",
                 distinct=True,

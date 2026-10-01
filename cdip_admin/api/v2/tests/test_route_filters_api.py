@@ -449,6 +449,48 @@ def test_deleting_a_source_removes_it_from_the_filter(
     assert SourceFilter.objects.filter(id=source_filter.id).exists()
 
 
+def test_a_source_delete_cascade_does_not_shrink_the_scope(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        provider_lotek_panthera
+):
+    # Scope is persisted apart from membership: losing the provider's last source to a
+    # cascade must keep the provider covered, and a PATCH that doesn't touch source_ids
+    # must not recompute the scope from the now-empty list.
+    source_filter = route_1.source_filters.get()
+    for source in lotek_sources:
+        source.delete()
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        _detail_url(route_1, source_filter), data={"name": "renamed"}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    providers = {provider["id"] for provider in response.json()["providers"]}
+    assert providers == {str(provider_lotek_panthera.id)}
+
+
+def test_a_deliberate_source_edit_redefines_the_scope(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        movebank_sources, provider_lotek_panthera, provider_movebank_ewt
+):
+    # The counterpart: when the client rewrites source_ids, the scope follows the new
+    # list — a provider whose devices were all removed on purpose is no longer covered.
+    route_1.data_providers.add(provider_movebank_ewt)
+    source_filter = route_1.source_filters.get()
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"source_ids": [str(movebank_sources[0].id)]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    providers = {provider["id"] for provider in response.json()["providers"]}
+    assert providers == {str(provider_movebank_ewt.id)}
+
+
 # ---- Paged sources --------------------------------------------------------
 
 

@@ -1052,7 +1052,7 @@ class SourceFilterSerializer(serializers.ModelSerializer):
     def _covered_provider_ids(self, obj):
         return self._annotated_ids(
             obj, "provider_ids",
-            lambda: obj.sources.values_list("integration_id", flat=True).distinct(),
+            lambda: obj.covered_providers.values_list("id", flat=True),
         )
 
     def _provider_ids_naming_their_default_source(self, obj):
@@ -1180,12 +1180,27 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data["routing_rule"] = self._route
-        return self._save_translating_conflicts(super().create, validated_data)
+        instance = self._save_translating_conflicts(super().create, validated_data)
+        self._sync_covered_providers(instance)
+        return instance
 
     def update(self, instance, validated_data):
         # A PUT may move the filter onto another destination, so it races the constraint
         # the same way a create does.
-        return self._save_translating_conflicts(super().update, instance, validated_data)
+        sources_changed = "sources" in validated_data
+        instance = self._save_translating_conflicts(super().update, instance, validated_data)
+        # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
+        # source_ids must not recompute it from the surviving rows, or it would quietly
+        # drop a provider whose last source left via a delete cascade.
+        if sources_changed:
+            self._sync_covered_providers(instance)
+        return instance
+
+    @staticmethod
+    def _sync_covered_providers(instance):
+        instance.covered_providers.set(
+            {source.integration_id for source in instance.sources.all()}
+        )
 
     def _save_translating_conflicts(self, write, *args):
         # The check in validate() is not atomic with the write, so a concurrent request
@@ -1557,6 +1572,13 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             )
             if orphaned.exists():
                 source_filter.sources.remove(*orphaned)
+            # A provider leaving the route leaves the rule's scope with it — unlike a
+            # source-delete cascade, which empties the list but keeps the provider covered.
+            off_route = source_filter.covered_providers.exclude(
+                id__in=route.data_providers.all()
+            )
+            if off_route.exists():
+                source_filter.covered_providers.remove(*off_route)
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
@@ -1612,7 +1634,16 @@ class RouteDetailSerializer(RouteRetrieveFullSerializer):
             # is never told to filter an arrow the route no longer has.
             if source_filter.destination_id not in destination_ids:
                 continue
-            by_provider = {}
+            # Seeded from the persisted scope: a covered provider with no surviving
+            # sources ships as [] (a whitelist that allows nothing), not as absent
+            # (a rule that doesn't speak). Deleting the last allowed device must
+            # never open the gate for the provider's other devices.
+            by_provider = {
+                str(provider_id): []
+                for provider_id in source_filter.covered_providers.values_list(
+                    "id", flat=True
+                )
+            }
             for source in source_filter.sources.all():
                 by_provider.setdefault(str(source.integration_id), []).append(
                     source.external_id
