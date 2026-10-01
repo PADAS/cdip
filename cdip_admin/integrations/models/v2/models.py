@@ -876,6 +876,34 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.name} {self.mode} {self.type}"
 
+    def log_sources_changed(self, added=(), removed=(), cause=None):
+        # Membership changes ARE policy changes - shrinking a whitelist tightens it,
+        # shrinking a blacklist loosens it (proposal decision 10) - but ChangeLogMixin
+        # only diffs instance attributes on save(), so the M2M is invisible to it.
+        # Every path that rewrites membership calls this: the API serializer, the
+        # Source-delete cascade, and the route-narrowing prune.
+        try:
+            changes = {
+                "sources_added": sorted(s.external_id for s in added),
+                "sources_removed": sorted(s.external_id for s in removed),
+                "destination_id": str(self.destination_id),
+                "mode": self.mode,
+            }
+            if cause:
+                changes["cause"] = cause
+            self.log_activity(
+                integration=self._get_related_integration(),
+                action="sources_changed",
+                changes=changes,
+                is_reversible=False,
+                user=self.get_user(),
+                id_display=self.get_id_display(),
+            )
+        except Exception:  # Logging must never break the operation itself
+            logger.warning(
+                f"Activity Log > Error recording source membership change for {self}."
+            )
+
 
 class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     name = models.CharField(max_length=200, blank=True)

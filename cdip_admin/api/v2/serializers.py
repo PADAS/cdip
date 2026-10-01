@@ -1182,18 +1182,25 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         validated_data["routing_rule"] = self._route
         instance = self._save_translating_conflicts(super().create, validated_data)
         self._sync_covered_providers(instance)
+        instance.log_sources_changed(added=instance.sources.all())
         return instance
 
     def update(self, instance, validated_data):
         # A PUT may move the filter onto another destination, so it races the constraint
         # the same way a create does.
         sources_changed = "sources" in validated_data
+        before = set(instance.sources.all()) if sources_changed else set()
         instance = self._save_translating_conflicts(super().update, instance, validated_data)
         # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
         # source_ids must not recompute it from the surviving rows, or it would quietly
         # drop a provider whose last source left via a delete cascade.
         if sources_changed:
             self._sync_covered_providers(instance)
+            after = set(instance.sources.all())
+            if before != after:
+                instance.log_sources_changed(
+                    added=after - before, removed=before - after
+                )
         return instance
 
     @staticmethod
@@ -1567,11 +1574,16 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         """
         route.source_filters.exclude(destination__in=route.destinations.all()).delete()
         for source_filter in route.source_filters.prefetch_related("sources"):
-            orphaned = source_filter.sources.exclude(
-                integration__in=route.data_providers.all()
+            orphaned = list(
+                source_filter.sources.exclude(
+                    integration__in=route.data_providers.all()
+                )
             )
-            if orphaned.exists():
+            if orphaned:
                 source_filter.sources.remove(*orphaned)
+                source_filter.log_sources_changed(
+                    removed=orphaned, cause="provider_removed_from_route"
+                )
             # A provider leaving the route leaves the rule's scope with it — unlike a
             # source-delete cascade, which empties the list but keeps the provider covered.
             off_route = source_filter.covered_providers.exclude(

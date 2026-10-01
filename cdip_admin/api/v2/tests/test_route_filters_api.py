@@ -6,6 +6,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
+from activity_log.models import ActivityLog
 from api.v2.serializers import SourceFilterCreateUpdateSerializer
 from integrations.models import Source, SourceFilter
 
@@ -447,6 +448,65 @@ def test_deleting_a_source_removes_it_from_the_filter(
     source_filter.refresh_from_db()
     assert removed.id not in set(source_filter.sources.values_list("id", flat=True))
     assert SourceFilter.objects.filter(id=source_filter.id).exists()
+
+
+def _membership_logs():
+    return ActivityLog.objects.filter(value="sourcefilter_sources_changed")
+
+
+def test_editing_the_source_list_is_recorded_in_the_activity_log(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    # Membership changes ARE policy changes (decision 10), and ChangeLogMixin cannot
+    # see the M2M: a PATCH touching only source_ids must leave an audit entry.
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"source_ids": [str(lotek_sources[0].id)]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    log = _membership_logs().first()
+    assert log, "no activity entry for the membership change"
+    assert log.log_type == ActivityLog.LogTypes.DATA_CHANGE
+    assert log.origin == ActivityLog.Origin.PORTAL
+    removed = {s.external_id for s in lotek_sources[1:]}
+    assert set(log.details["changes"]["sources_removed"]) == removed
+    assert log.details["changes"]["sources_added"] == []
+
+
+def test_creating_a_filter_records_its_initial_device_list(
+        api_client, org_admin_user, organization, route_1, integrations_list_er, lotek_sources
+):
+    # route_1 already carries a filter on integrations_list_er[0]; use a free destination.
+    response = _post(
+        api_client, org_admin_user, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:2]),
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    log = _membership_logs().first()
+    assert log
+    assert set(log.details["changes"]["sources_added"]) == {
+        s.external_id for s in lotek_sources[:2]
+    }
+
+
+def test_a_source_delete_cascade_is_recorded_in_the_activity_log(
+        organization, route_1, lotek_sources
+):
+    # The cascade changes routing policy without any API call; the pre_delete
+    # receiver is the only chance to record which rules lost the device.
+    removed = lotek_sources[0]
+    external_id = removed.external_id
+    removed.delete()
+
+    log = _membership_logs().first()
+    assert log
+    assert log.details["changes"]["sources_removed"] == [external_id]
+    assert log.details["changes"]["cause"] == "source_deleted"
 
 
 def test_a_source_delete_cascade_does_not_shrink_the_scope(
