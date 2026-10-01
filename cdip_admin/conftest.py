@@ -4559,3 +4559,51 @@ def outbound_integrations_list_wpswatch(
         )
         integrations.append(integration)
     return integrations
+
+
+@pytest.fixture
+def lotek_observation_filtered_event(mocker, lotek_observation_trace, integrations_list_er):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "a3f0f9d1-9f2a-4f5b-8f61-6a2e3a7c0d11",
+        "timestamp": "2026-09-30 18:10:00.000000+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationFiltered",
+        "payload": {
+            "gundi_id": str(lotek_observation_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(lotek_observation_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "external_source_id": str(lotek_observation_trace.source.external_id),
+            "observation_type": "obv",
+            "filtered_by": "device_blacklist",
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message
+
+
+@pytest.fixture
+def lotek_observation_filtered_event_second_destination(
+        mocker, lotek_observation_trace, integrations_list_er
+):
+    # Same observation filtered for another destination, after the first
+    # trace row was already bound elsewhere.
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "b4c1e8a2-0d3b-4c6a-9e72-7b3f4b8d1e22",
+        "timestamp": "2026-09-30 18:10:05.000000+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationFiltered",
+        "payload": {
+            "gundi_id": str(lotek_observation_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(lotek_observation_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[1].id),
+            "external_source_id": str(lotek_observation_trace.source.external_id),
+            "observation_type": "obv",
+            "filtered_by": "device_whitelist",
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message
