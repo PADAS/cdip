@@ -4566,7 +4566,7 @@ def lotek_observation_filtered_event(mocker, lotek_observation_trace, integratio
     message = mocker.MagicMock()
     event_dict = {
         "event_id": "a3f0f9d1-9f2a-4f5b-8f61-6a2e3a7c0d11",
-        "timestamp": "2026-09-30 18:10:00.000000+00:00",
+        "timestamp": "2026-09-30 18:10:00.123456+00:00",
         "schema_version": "v1",
         "event_type": "ObservationFiltered",
         "payload": {
@@ -4592,7 +4592,7 @@ def lotek_observation_filtered_event_second_destination(
     message = mocker.MagicMock()
     event_dict = {
         "event_id": "b4c1e8a2-0d3b-4c6a-9e72-7b3f4b8d1e22",
-        "timestamp": "2026-09-30 18:10:05.000000+00:00",
+        "timestamp": "2026-09-30 18:10:05.654321+00:00",
         "schema_version": "v1",
         "event_type": "ObservationFiltered",
         "payload": {

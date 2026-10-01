@@ -965,6 +965,12 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")
     is_duplicate = models.BooleanField(default=False)
+    # A discarded observation was dropped on purpose by a routing rule — the
+    # timestamp doubles as the flag, and it is not an error: has_error and the
+    # connection health calculation must stay unaffected.
+    discarded_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    # Which kind of rule dropped it; values mirror gundi-core's ObservationFilterReason.
+    discard_reason = models.CharField(max_length=32, blank=True, default="")
 
     class Meta:
         indexes = [

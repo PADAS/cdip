@@ -50,6 +50,8 @@ def handle_observation_filtered_event(event_dict: dict):
     trace = bound or unbound
     if trace:
         trace.destination_id = destination_id
+        trace.discarded_at = event.timestamp
+        trace.discard_reason = event_data.filtered_by or ""
         trace.save()
     else:
         base = traces.first()
@@ -61,6 +63,8 @@ def handle_observation_filtered_event(event_dict: dict):
             created_by=base.created_by,
             data_provider=base.data_provider,
             destination_id=destination_id,
+            discarded_at=event.timestamp,
+            discard_reason=event_data.filtered_by or "",
         )
 
     # Filtering is configured behavior, not a failure: INFO, and never

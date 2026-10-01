@@ -20,9 +20,12 @@ def test_process_observation_filtered_event(
 ):
     process_event(lotek_observation_filtered_event)
 
-    event_data = json.loads(lotek_observation_filtered_event.data)["payload"]
+    event = json.loads(lotek_observation_filtered_event.data)
+    event_data = event["payload"]
     lotek_observation_trace.refresh_from_db()
     assert str(lotek_observation_trace.destination.id) == str(event_data["destination_id"])
+    assert str(lotek_observation_trace.discarded_at) == event["timestamp"]
+    assert lotek_observation_trace.discard_reason == event_data["filtered_by"]
     # Filtering is not a delivery and not an error
     assert lotek_observation_trace.delivered_at is None
     assert lotek_observation_trace.has_error is False
@@ -58,6 +61,8 @@ def test_process_observation_filtered_event_with_second_destination(
     assert str(new_trace.destination.id) == str(second_destination_id)
     assert new_trace.data_provider == lotek_observation_trace.data_provider
     assert new_trace.source == lotek_observation_trace.source
+    assert new_trace.discarded_at is not None
+    assert new_trace.discard_reason == "device_whitelist"
     assert ActivityLog.objects.filter(value="observation_filtered").count() == 2
 
 
