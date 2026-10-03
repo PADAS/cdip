@@ -484,3 +484,8 @@ OBSERVATIONS_BATCH_THRESHOLD = env.int("OBSERVATIONS_BATCH_THRESHOLD", 10)
 OBSERVATIONS_BATCH_MAX_ITEMS = env.int("OBSERVATIONS_BATCH_MAX_ITEMS", 500)
 # Events on configuration changes (for integrations, routing, etc..)
 CONFIGURATION_EVENTS_TOPIC = env.str("CONFIGURATION_EVENTS_TOPIC", "configuration-events-prod")
+
+# Upper bound on how many sources one routing filter may reference. The binding
+# constraint is the serialized route payload, which cdip-routing fetches and caches on
+# every config load — not database size, since the M2M rows are cheap.
+SOURCE_FILTER_MAX_SOURCES = env.int("SOURCE_FILTER_MAX_SOURCES", 1000)

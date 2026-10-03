@@ -804,10 +804,18 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         GEO_BOUNDARY = "geoboundary", "GEO Boundary"
         TIME = "time", "Timeframe"
 
+    class FilterModes(models.TextChoices):
+        WHITELIST = "whitelist", "Whitelist"
+        BLACKLIST = "blacklist", "Blacklist"
+
     type = models.CharField(
         max_length=20,
         choices=SourceFilterTypes.choices,
         default=SourceFilterTypes.SOURCE_LIST
+    )
+    mode = models.CharField(
+        max_length=20,
+        choices=FilterModes.choices,
     )
     order_number = models.PositiveIntegerField(default=0, db_index=True)
     name = models.CharField(max_length=200, blank=True)
@@ -825,13 +833,77 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         related_name="source_filters",
         verbose_name="Routing Rule"
     )
+    destination = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="source_filters_by_destination",
+        verbose_name="Destination"
+    )
+    # Populated for type="list". The other filter types describe their selection in
+    # `selector` instead, which is why this is blank-able rather than required.
+    sources = models.ManyToManyField(
+        "integrations.Source",
+        blank=True,
+        related_name="source_filters_by_source",
+        verbose_name="Sources"
+    )
+    # The rule's provider scope, persisted apart from source membership: a Source
+    # delete cascades out of `sources`, but the provider stays covered, so an
+    # emptied whitelist keeps allowing nothing instead of silently allowing the
+    # provider's every other device. API writes that change the source list
+    # recompute it (a deliberate edit redefines the scope); cascades never touch it.
+    covered_providers = models.ManyToManyField(
+        "integrations.Integration",
+        blank=True,
+        related_name="source_filters_covering_provider",
+        verbose_name="Covered Providers",
+    )
+    enabled = models.BooleanField(default=True)
     integration_field = "routing_rule__first_provider"
 
     class Meta:
         ordering = ("routing_rule", "order_number",)
+        constraints = [
+            # One list filter per arrow, carrying exactly one mode, so whitelist and
+            # blacklist cannot coexist on the same route/destination pair. `type` is part
+            # of the key so a future geoboundary filter can share the arrow with this one.
+            models.UniqueConstraint(
+                fields=("routing_rule", "destination", "type"),
+                name="unique_source_filter_per_route_destination_type",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.name} {self.type}"
+        return f"{self.name} {self.mode} {self.type}"
+
+    def log_sources_changed(self, added=(), removed=(), cause=None):
+        # Membership changes ARE policy changes - shrinking a whitelist tightens it,
+        # shrinking a blacklist loosens it (proposal decision 10) - but ChangeLogMixin
+        # only diffs instance attributes on save(), so the M2M is invisible to it.
+        # Every path that rewrites membership calls this: the API serializer, the
+        # Source-delete cascade, and the route-narrowing prune.
+        try:
+            changes = {
+                "sources_added": sorted(s.external_id for s in added),
+                "sources_removed": sorted(s.external_id for s in removed),
+                "destination_id": str(self.destination_id),
+                "mode": self.mode,
+            }
+            if cause:
+                changes["cause"] = cause
+            self.log_activity(
+                integration=self._get_related_integration(),
+                action="sources_changed",
+                changes=changes,
+                is_reversible=False,
+                user=self.get_user(),
+                id_display=self.get_id_display(),
+            )
+        except Exception:  # Logging must never break the operation itself
+            logger.warning(
+                f"Activity Log > Error recording source membership change for {self}.",
+                exc_info=True,
+            )
 
 
 class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
@@ -850,7 +922,20 @@ class SourceConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
 
 class Source(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    class CreationOrigins(models.TextChoices):
+        INGESTION = "ingestion", "Discovered by the integration"
+        MANUAL = "manual", "Created by a user"
+
     name = models.CharField(max_length=200, blank=True)
+    # Immutable once created: a source born from a user stays "manual" even after
+    # the integration starts sending data for it, so support can always tell the
+    # two apart. Ingestion's get_or_create never touches existing rows and creates
+    # with the default, and no update serializer exposes the field.
+    created_via = models.CharField(
+        max_length=20,
+        choices=CreationOrigins.choices,
+        default=CreationOrigins.INGESTION,
+    )
     external_id = models.CharField(
         max_length=200,
         verbose_name="External Source ID",
