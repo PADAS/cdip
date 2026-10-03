@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='gunditrace',
             name='discarded_at',
-            field=models.DateTimeField(blank=True, db_index=True, null=True),
+            field=models.DateTimeField(blank=True, null=True),
         ),
     ]

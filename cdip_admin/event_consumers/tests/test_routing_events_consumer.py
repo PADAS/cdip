@@ -69,12 +69,14 @@ def test_process_observation_filtered_event_with_second_destination(
 def test_process_observation_filtered_event_is_idempotent(
         lotek_observation_trace, lotek_observation_filtered_event
 ):
-    # PubSub is at-least-once: a redelivered event must not add trace rows
+    # PubSub is at-least-once: a redelivered event must not add trace rows,
+    # and must not duplicate the user-visible audit entry either.
     process_event(lotek_observation_filtered_event)
     process_event(lotek_observation_filtered_event)
 
     traces = GundiTrace.objects.filter(object_id=lotek_observation_trace.object_id)
     assert traces.count() == 1
+    assert ActivityLog.objects.filter(value="observation_filtered").count() == 1
 
 
 def test_filtered_event_for_unknown_observation_is_ignored(
@@ -139,3 +141,84 @@ def test_invalid_json_is_discarded(mocker):
 
     assert message.ack.called
     assert not message.nack.called
+
+
+def test_activity_log_title_fits_its_column(
+        lotek_observation_trace, lotek_observation_filtered_event, integrations_list_er
+):
+    # Integration.base_url alone may be 200 chars; an oversized title would fail
+    # the insert after the trace was saved and the ack would lose the log.
+    destination = integrations_list_er[0]
+    # Long enough that the generated title overflows 200, while the URL itself
+    # still fits every column it touches on save.
+    destination.base_url = "https://" + "x" * 180
+    destination.save()
+    process_event(lotek_observation_filtered_event)
+
+    log = ActivityLog.objects.filter(value="observation_filtered").first()
+    assert log
+    assert len(log.title) <= 200
+    assert log.title.endswith("...")
+
+
+# --- resilience to DB connection loss (mirrors the sibling consumers) ---
+
+from django.db import InterfaceError, OperationalError
+
+
+@pytest.mark.parametrize("db_error", [
+    InterfaceError("connection already closed"),
+    OperationalError("server closed the connection unexpectedly"),
+])
+def test_transient_db_error_nacks_message_for_redelivery(
+        mocker, db_error, lotek_observation_trace, lotek_observation_filtered_event
+):
+    # A dead DB connection must trigger redelivery, not a silent drop.
+    mocker.patch.dict(
+        "event_consumers.routing_events_consumer.event_handlers",
+        {"ObservationFiltered": (mocker.MagicMock(side_effect=db_error), {"v1"})},
+    )
+    process_event(lotek_observation_filtered_event)
+    lotek_observation_filtered_event.nack.assert_called_once()
+    lotek_observation_filtered_event.ack.assert_not_called()
+
+
+def test_transient_db_error_resets_connections(
+        mocker, lotek_observation_trace, lotek_observation_filtered_event
+):
+    mocked_close = mocker.patch(
+        "event_consumers.routing_events_consumer.refresh_db_connections"
+    )
+    mocker.patch.dict(
+        "event_consumers.routing_events_consumer.event_handlers",
+        {"ObservationFiltered": (mocker.MagicMock(side_effect=InterfaceError("connection already closed")), {"v1"})},
+    )
+    process_event(lotek_observation_filtered_event)
+    # Once on entry (routine refresh) + once after the failure (drop the dead connection)
+    assert mocked_close.call_count == 2
+
+
+def test_unexpected_error_still_acks_message(
+        mocker, lotek_observation_trace, lotek_observation_filtered_event
+):
+    # Non-DB errors keep the log-and-ack behavior: without a dead-letter topic,
+    # nacking them would loop a poison message forever.
+    mocker.patch.dict(
+        "event_consumers.routing_events_consumer.event_handlers",
+        {"ObservationFiltered": (mocker.MagicMock(side_effect=ValueError("boom")), {"v1"})},
+    )
+    process_event(lotek_observation_filtered_event)
+    lotek_observation_filtered_event.ack.assert_called_once()
+    lotek_observation_filtered_event.nack.assert_not_called()
+
+
+def test_successful_processing_acks_message_exactly_once(
+        mocker, lotek_observation_trace, lotek_observation_filtered_event
+):
+    mocked_close = mocker.patch(
+        "event_consumers.routing_events_consumer.refresh_db_connections"
+    )
+    process_event(lotek_observation_filtered_event)
+    lotek_observation_filtered_event.ack.assert_called_once()
+    lotek_observation_filtered_event.nack.assert_not_called()
+    mocked_close.assert_called_once()  # routine per-message refresh

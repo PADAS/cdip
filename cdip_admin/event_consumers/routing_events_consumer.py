@@ -7,7 +7,7 @@ logging_settings.init()
 django.setup()  # To use the django ORM
 from google.cloud import pubsub_v1
 from django.conf import settings
-from django.db import InterfaceError, OperationalError
+from django.db import InterfaceError, OperationalError, transaction
 from event_consumers.db_utils import refresh_db_connections
 from gundi_core import events as system_events
 from integrations.models import GundiTrace
@@ -24,6 +24,14 @@ data_type_str_map = {
 }
 
 
+def _clean_event_title(title: str) -> str:
+    # ActivityLog.title is varchar(200) and a destination base_url alone may
+    # be 200 chars; an oversized title would fail the insert AFTER the trace
+    # was saved and the generic ack would lose the log for good.
+    title = title.strip()
+    return title if len(title) < 200 else f"{title[:197]}..."
+
+
 def handle_observation_filtered_event(event_dict: dict):
     event = system_events.ObservationFiltered.parse_obj(event_dict)
     event_data = event.payload
@@ -34,58 +42,73 @@ def handle_observation_filtered_event(event_dict: dict):
         f"filtered_by: {event_data.filtered_by}",
         extra={"event": event_dict}
     )
-    traces = GundiTrace.objects.filter(object_id=gundi_id)
-    if not traces.exists():  # This shouldn't happen
-        logger.warning(f"Unknown Observation with id {gundi_id}. Event Ignored.")
-        return
-
-    # A filtered observation was dropped before transform/dispatch, so the trace
-    # for this destination is usually still the unbound ingestion row. Bind it,
-    # or add a row when other destinations already claimed the existing ones.
-    bound = next(
-        (t for t in traces if t.destination_id and str(t.destination_id) == destination_id),
-        None,
-    )
-    unbound = next((t for t in traces if not t.destination_id), None)
-    trace = bound or unbound
-    if trace:
-        trace.destination_id = destination_id
-        trace.discarded_at = event.timestamp
-        trace.discard_reason = event_data.filtered_by or ""
-        trace.save()
-    else:
-        base = traces.first()
-        trace = GundiTrace.objects.create(
-            object_id=base.object_id,
-            object_type=base.object_type,
-            source=base.source,
-            related_to=event_data.related_to or None,
-            created_by=base.created_by,
-            data_provider=base.data_provider,
-            destination_id=destination_id,
-            discarded_at=event.timestamp,
-            discard_reason=event_data.filtered_by or "",
+    # One transaction with the rows locked: StreamingPull runs callbacks
+    # concurrently, so two destinations' events for the same observation would
+    # otherwise both pick the same unbound row and overwrite each other. The
+    # lock also makes trace update + activity log atomic — a redelivery can
+    # neither duplicate the log nor skip it.
+    with transaction.atomic():
+        traces = list(
+            GundiTrace.objects.select_for_update().filter(object_id=gundi_id)
         )
+        if not traces:  # This shouldn't happen
+            logger.warning(f"Unknown Observation with id {gundi_id}. Event Ignored.")
+            return
 
-    # Filtering is configured behavior, not a failure: INFO, and never
-    # has_error, so connection health is unaffected.
-    data_type = data_type_str_map.get(trace.object_type, "Data")
-    destination_str = trace.destination.base_url if trace.destination else destination_id
-    title = f"{data_type} {gundi_id} filtered out for '{destination_str}'"
-    log_data = {
-        **event_dict["payload"],
-        "source_external_id": str(trace.source.external_id) if trace.source else None,
-    }
-    ActivityLog.objects.create(
-        log_level=ActivityLog.LogLevels.INFO,
-        log_type=ActivityLog.LogTypes.EVENT,
-        origin=ActivityLog.Origin.TRANSFORMER,
-        integration=trace.data_provider,
-        value="observation_filtered",
-        title=title,
-        details=log_data,
-        is_reversible=False
-    )
+        # A filtered observation was dropped before transform/dispatch, so the
+        # trace for this destination is usually still the unbound ingestion row.
+        # Bind it, or add a row when other destinations already claimed the
+        # existing ones.
+        bound = next(
+            (t for t in traces if t.destination_id and str(t.destination_id) == destination_id),
+            None,
+        )
+        if bound and bound.discarded_at:
+            # Pub/Sub is at-least-once: the trace state is the durable dedup —
+            # an already-marked destination means this event was processed, and
+            # repeating the activity log would duplicate audit entries.
+            logger.info(f"Trace already marked for gundi_id {gundi_id}, destination {destination_id}. Event Ignored.")
+            return
+        unbound = next((t for t in traces if not t.destination_id), None)
+        trace = bound or unbound
+        if trace:
+            trace.destination_id = destination_id
+            trace.discarded_at = event.timestamp
+            trace.discard_reason = event_data.filtered_by or ""
+            trace.save()
+        else:
+            base = traces[0]
+            trace = GundiTrace.objects.create(
+                object_id=base.object_id,
+                object_type=base.object_type,
+                source=base.source,
+                related_to=event_data.related_to or None,
+                created_by=base.created_by,
+                data_provider=base.data_provider,
+                destination_id=destination_id,
+                discarded_at=event.timestamp,
+                discard_reason=event_data.filtered_by or "",
+            )
+
+        # Filtering is configured behavior, not a failure: INFO, and never
+        # has_error, so connection health is unaffected.
+        data_type = data_type_str_map.get(trace.object_type, "Data")
+        destination_str = trace.destination.base_url if trace.destination else destination_id
+        title = _clean_event_title(f"{data_type} {gundi_id} filtered out for '{destination_str}'")
+        log_data = {
+            **event_dict["payload"],
+            "source_external_id": str(trace.source.external_id) if trace.source else None,
+        }
+        ActivityLog.objects.create(
+            log_level=ActivityLog.LogLevels.INFO,
+            log_type=ActivityLog.LogTypes.EVENT,
+            origin=ActivityLog.Origin.TRANSFORMER,
+            integration=trace.data_provider,
+            value="observation_filtered",
+            title=title,
+            details=log_data,
+            is_reversible=False
+        )
 
 
 # Schema versions are validated per event type, not globally: each event in
