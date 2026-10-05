@@ -84,8 +84,13 @@ With `search` declared:
 - **Input-driven fetch**: input changes at or above `min_chars` debounce
   (~300 ms) into a fetch whose `config_overrides` are
   `{...resolvedParams, [search.param]: inputText}`.
-- **Latest-query-wins**: responses for superseded queries are discarded; only
-  the response matching the current input renders.
+- **Latest-request-wins**: a response renders only if it answers the
+  complete current request — resolved params *and* query. Any change to
+  either (new input text, or a `$data` dependency changing while the text
+  stays the same) invalidates every in-flight request immediately, before
+  any debounce, and the new request is refetched. Matching on input text
+  alone is not enough: the same text can have requests in flight for two
+  different parent values.
 - **Caching**: client-side cache keyed on the complete request —
   `(integration_id, action, merged config_overrides)`, i.e. the resolved
   params plus `{search.param: query}` — honoring `cache_ttl_seconds`. Keying
@@ -117,10 +122,13 @@ a field's published type (string → array, Section 4) breaks existing saved
 configurations on the portal side, not just the runner side.
 `IntegrationCreateUpdateSerializer.validate` calls
 `action.validate_configuration(...)` (plain `jsonschema.validate` against the
-registered schema) on every create/update, before the runner ever sees the
-data. Once re-registration publishes the array schema, an integration whose
-stored config still holds `{"taxa": "123,456"}` fails validation on *any*
-save — including an operator editing an unrelated setting. The runner's
+registered schema) for each entry in the request's `configurations` list,
+before the runner ever sees the data. A PATCH that omits `configurations`
+skips this, but the portal's config editor resubmits the full configuration
+list on every save. Once re-registration publishes the array schema, an
+integration whose stored config still holds `{"taxa": "123,456"}` therefore
+fails validation on any portal save — including an operator editing an
+unrelated setting in the same form. The runner's
 coercing pre-validator cannot help; it runs too late.
 
 cdip therefore ships an idempotent management command that rewrites stored
@@ -136,8 +144,9 @@ python manage.py normalize_config_field_to_list \
   the runner's existing "blank means no filter" semantics); wraps scalar
   leftovers in a one-element list; leaves values that are already lists
   untouched.
-- Writes through the model (`save()`) so the change lands in the
-  activity log / simple-history like any other edit; `--dry-run` prints the
+- Writes through the model (`save()`) so `ChangeLogMixin` records the
+  change in the activity log like any other edit (v2 `IntegrationConfiguration`
+  has no django-simple-history tracking, so there is no historical record); `--dry-run` prints the
   before/after per configuration without writing.
 - Scoped by flags rather than hard-coded to iNat, because any future
   string → array reshape for a dropdown hits the same validation wall.
@@ -207,7 +216,8 @@ reference-data PR #29):
   nothing, second run is a no-op); and the end-to-end regression — register
   the string schema, save `{"taxa": "123,456", ...}`, re-register the action
   with the array schema, run the command, then update the integration via the
-  v2 API changing an *unrelated* setting and assert it validates and persists
+  v2 API with a request that resubmits the `configurations` list (as a
+  portal save does) while changing an *unrelated* setting and assert it validates and persists
   `["123", "456"]`. The same test asserts that without the command the update
   is rejected, pinning down why the step exists.
 
