@@ -75,7 +75,7 @@ a working (non-typeahead) dropdown or an empty list, not an error.
 ## Section 2 — Portal widget behavior (gundi-portal)
 
 `ReferenceSelectWidget` changes only when `search` is present in the
-annotation; without it, behavior is byte-for-byte today's.
+annotation; without it, existing behavior is unchanged.
 
 With `search` declared:
 
@@ -86,10 +86,11 @@ With `search` declared:
   `{...resolvedParams, [search.param]: inputText}`.
 - **Latest-query-wins**: responses for superseded queries are discarded; only
   the response matching the current input renders.
-- **Caching**: client-side cache keyed on
-  `(integration_id, action, resolved params, query)`, honoring
-  `cache_ttl_seconds` — the same cache as today with the query folded into the
-  key.
+- **Caching**: client-side cache keyed on the complete request —
+  `(integration_id, action, merged config_overrides)`, i.e. the resolved
+  params plus `{search.param: query}` — honoring `cache_ttl_seconds`. Keying
+  on the merged overrides (not on the query text alone) keeps two fields that
+  reuse one action with different `search.param` names from colliding.
 - **Unchanged**: free-text entry (`allow_free_text`), cold-start loading
   escalation copy, provider-target (`target: "provider"`) union-and-dedupe,
   fetch-failure degradation to plain text with retry.
@@ -99,16 +100,56 @@ With `search` declared:
   have happened). A future `resolve` block — an annotation-declared lookup of
   options by stored value — is the designed fix; it is out of scope here.
 
-## Section 3 — cdip (this repo): no code change
+## Section 3 — cdip (this repo)
 
-The execute proxy (`ActionTriggerView.execute`) already passes
-`config_overrides` through verbatim, and PR #461 authorizes reference-action
-execution for config editors. Typeahead traffic is just more frequent execute
-calls; the widget's debounce, `min_chars` gate, and TTL cache bound the rate.
-No server-side rate limiting is added now — revisit only if runner load or
-activity-log volume shows a real problem. This document lives in cdip because
-the platform owns the contract; the implementation work lands in gundi-portal
-and the integration repos.
+**Search contract: no code change.** The execute proxy
+(`ActionTriggerView.execute`) already passes `config_overrides` through
+verbatim, and PR #461 authorizes reference-action execution for config
+editors. Typeahead traffic is just more frequent execute calls; the widget's
+debounce, `min_chars` gate, and TTL cache bound the rate. No server-side rate
+limiting is added now — revisit only if runner load or activity-log volume
+shows a real problem. This document lives in cdip because the platform owns
+the contract; the search implementation lands in gundi-portal and the
+integration repos.
+
+**Saved-data normalization for the iNat `taxa` reshape: required.** Changing
+a field's published type (string → array, Section 4) breaks existing saved
+configurations on the portal side, not just the runner side.
+`IntegrationCreateUpdateSerializer.validate` calls
+`action.validate_configuration(...)` (plain `jsonschema.validate` against the
+registered schema) on every create/update, before the runner ever sees the
+data. Once re-registration publishes the array schema, an integration whose
+stored config still holds `{"taxa": "123,456"}` fails validation on *any*
+save — including an operator editing an unrelated setting. The runner's
+coercing pre-validator cannot help; it runs too late.
+
+cdip therefore ships an idempotent management command that rewrites stored
+values for one (integration type, action, field):
+
+```
+python manage.py normalize_config_field_to_list \
+    --integration-type <inat-type-value> --action pull_events --field taxa [--dry-run]
+```
+
+- Splits comma-separated strings on `,`, strips whitespace, drops empties
+  (`"123, 456"` → `["123", "456"]`; `""`/`"  "`/`",,"` → key removed, matching
+  the runner's existing "blank means no filter" semantics); wraps scalar
+  leftovers in a one-element list; leaves values that are already lists
+  untouched.
+- Writes through the model (`save()`) so the change lands in the
+  activity log / simple-history like any other edit; `--dry-run` prints the
+  before/after per configuration without writing.
+- Scoped by flags rather than hard-coded to iNat, because any future
+  string → array reshape for a dropdown hits the same validation wall.
+
+It is run immediately after the runner's re-registration (Rollout step 4).
+Not a Django data migration: migrations run on cdip deploy, which is not
+ordered with runner re-registration, and normalizing before the array schema
+is published would make those configs fail the *old* string schema instead.
+In the window between re-registration and the command run, saves of
+un-normalized configs fail with a schema error rather than corrupting data;
+the runner's string-coercing pre-validator keeps scheduled pulls working
+throughout, since pulls read stored config without jsonschema validation.
 
 ## Section 4 — Proving consumer: iNaturalist `list_taxa`
 
@@ -159,20 +200,35 @@ reference-data PR #29):
   coercion matrix (legacy comma-string, list, empty, scalar); drift-test
   extension for `list_taxa` and the `search.param` assertions; existing
   pull-events tests keep passing with the joined-string call site.
-- **cdip**: nothing new; PR #461's execute-authorization tests already cover
-  the invocation path.
+- **cdip**: nothing new for the search path (PR #461's execute-authorization
+  tests cover it). For the normalization command: the conversion matrix
+  (comma-string with spaces, blank/commas-only, scalar, already-a-list,
+  missing key, other integration types/actions untouched, `--dry-run` writes
+  nothing, second run is a no-op); and the end-to-end regression — register
+  the string schema, save `{"taxa": "123,456", ...}`, re-register the action
+  with the array schema, run the command, then update the integration via the
+  v2 API changing an *unrelated* setting and assert it validates and persists
+  `["123", "456"]`. The same test asserts that without the command the update
+  is rejected, pinning down why the step exists.
 
 ## Rollout
 
 1. This spec merges to cdip main (docs only).
 2. gundi-portal ships the widget change (inert until an annotation declares
    `search`).
-3. The iNat runner ships `list_taxa` + the taxa reshape + annotation; on
+3. cdip ships `normalize_config_field_to_list` (any time before step 4).
+4. The iNat runner ships `list_taxa` + the taxa reshape + annotation; on
    re-registration, taxa becomes a typeahead multi-select in portals running
-   the new widget and a degraded-but-working field elsewhere.
+   the new widget and a degraded-but-working field elsewhere. **Immediately
+   after re-registration**, run the command (`--dry-run` first) against the
+   environment's iNat integrations. The runner's conditional
+   `required`/`then` branch must also move from
+   `{"type": "string", "pattern": ...}` to `{"type": "array", "minItems": 1}`
+   so a blank list still counts as "no taxa".
 
-Order matters only between 2 and 3 for UX polish (shipping 3 first gives old
-widgets the degraded dropdown — harmless). Related open item carried over from
+Order between 2 and 4 matters only for UX polish (shipping 4 first gives old
+widgets the degraded dropdown — harmless). Step 3 must precede 4, and the
+command run must follow re-registration directly. Related open item carried over from
 the original RFC, unaffected by this design: `$data` resolution semantics from
 a primitive array element (the iNat and cmore repos assume resolution starts
 at the containing array).
