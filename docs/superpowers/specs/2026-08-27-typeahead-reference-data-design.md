@@ -124,11 +124,12 @@ configurations on the portal side, not just the runner side.
 `action.validate_configuration(...)` (plain `jsonschema.validate` against the
 registered schema) for each entry in the request's `configurations` list,
 before the runner ever sees the data. A PATCH that omits `configurations`
-skips this, but the portal's config editor resubmits the full configuration
-list on every save. Once re-registration publishes the array schema, an
-integration whose stored config still holds `{"taxa": "123,456"}` therefore
-fails validation on any portal save — including an operator editing an
-unrelated setting in the same form. The runner's
+(e.g. renaming the connection) skips this. But any request that includes the
+`pull_events` configuration resubmits its whole `data` object, stored `taxa`
+included. Once re-registration publishes the array schema, an integration
+whose stored config still holds `{"taxa": "123,456"}` therefore fails
+validation whenever that configuration is saved — including an operator
+changing only an unrelated field such as `days_to_load`. The runner's
 coercing pre-validator cannot help; it runs too late.
 
 cdip therefore ships an idempotent management command that rewrites stored
@@ -216,8 +217,8 @@ reference-data PR #29):
   nothing, second run is a no-op); and the end-to-end regression — register
   the string schema, save `{"taxa": "123,456", ...}`, re-register the action
   with the array schema, run the command, then update the integration via the
-  v2 API with a request that resubmits the `configurations` list (as a
-  portal save does) while changing an *unrelated* setting and assert it validates and persists
+  v2 API with a request that includes the `pull_events` configuration
+  while changing only an *unrelated* field in it and assert it validates and persists
   `["123", "456"]`. The same test asserts that without the command the update
   is rejected, pinning down why the step exists.
 
