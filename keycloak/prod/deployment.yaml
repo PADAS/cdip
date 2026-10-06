@@ -6,6 +6,7 @@ metadata:
   name: keycloak
   namespace: cdip-auth
 spec:
+  progressDeadlineSeconds: 600
   replicas: 1
   revisionHistoryLimit: 10
   selector:
@@ -18,6 +19,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-09-16T02:08:20Z"
       labels:
         app: keycloak
     spec:
@@ -43,8 +46,6 @@ spec:
             secretKeyRef:
               name: keycloak-credentials
               key: KEYCLOAK_PASSWORD
-        # Required behind the GCE LB: Keycloak builds redirect URIs from
-        # X-Forwarded-* instead of the pod address.
         - name: PROXY_ADDRESS_FORWARDING
           value: "true"
         - name: DB_VENDOR
@@ -67,20 +68,13 @@ spec:
               key: DB_PASSWORD
         - name: JAVA_OPTS
           value: -Xms1g -Xmx3g -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError
-            -Dkeycloak.profile.feature.upload_scripts=enabled
-        # The image tag is owned by the rollout procedure in keycloak/RUNBOOK.md
-        # (kubectl set image with a tag from the "Keycloak Gundi theme images" CI
-        # run); keep this line in sync with what is live when editing anything else.
+            -Dkeycloak.profile.feature.upload_scripts=enabled -Dkeycloak.theme.staticMaxAge=3600
         image: europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/keycloak:11.0.2-gundi-438715d
         imagePullPolicy: IfNotPresent
-        # Single replica: the sleep keeps the old pod serving while the LB NEG
-        # deprograms, so rollouts don't drop in-flight logins.
         lifecycle:
           preStop:
             exec:
-              command:
-              - sleep
-              - "20"
+              command: ["sleep", "20"]
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -115,6 +109,11 @@ spec:
           requests:
             cpu: "2"
             memory: 4Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
       terminationGracePeriodSeconds: 60
       tolerations:
       - effect: NoSchedule

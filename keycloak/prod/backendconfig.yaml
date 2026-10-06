@@ -4,19 +4,13 @@ metadata:
   name: keycloak
   namespace: cdip-auth
 spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /auth/realms/master
+    port: 8080
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 1
+    unhealthyThreshold: 2
   connectionDraining:
     drainingTimeoutSec: 30
-  # LB health checks hit the NEG directly and bypass Cloud Armor, so this path
-  # keeps working even once /auth/realms/master is blocked publicly.
-  healthCheck:
-    checkIntervalSec: 5
-    healthyThreshold: 1
-    port: 8080
-    requestPath: /auth/realms/master
-    timeoutSec: 3
-    type: HTTP
-    unhealthyThreshold: 2
-  # Master-realm lockdown attachment point (policy not created yet; scope
-  # decision pending — see docs/ideation/2026-09-30-keycloak-master-realm-lockdown.md):
-  # securityPolicy:
-  #   name: keycloak-master-lockdown
