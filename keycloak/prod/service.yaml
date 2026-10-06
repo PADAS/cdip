@@ -1,0 +1,21 @@
+# ClusterIP on purpose: the GKE Ingress reaches the pods through NEGs, so the
+# Service needs no node ports or load balancer of its own.
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cloud.google.com/backend-config: '{"default": "keycloak"}'
+    cloud.google.com/neg: '{"ingress":true}'
+  labels:
+    app: keycloak
+  name: keycloak
+  namespace: cdip-auth
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: keycloak

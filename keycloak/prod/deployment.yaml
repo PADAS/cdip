@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keycloak
+  name: keycloak
+  namespace: cdip-auth
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: keycloak
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: workload
+                operator: In
+                values:
+                - auth
+            weight: 100
+      containers:
+      - env:
+        - name: KEYCLOAK_USER
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: KEYCLOAK_USER
+        - name: KEYCLOAK_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: KEYCLOAK_PASSWORD
+        # Required behind the GCE LB: Keycloak builds redirect URIs from
+        # X-Forwarded-* instead of the pod address.
+        - name: PROXY_ADDRESS_FORWARDING
+          value: "true"
+        - name: DB_VENDOR
+          value: POSTGRES
+        - name: DB_ADDR
+          value: 172.22.160.3
+        - name: DB_DATABASE
+          value: cdip_auth_db
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: DB_USER
+        - name: DB_SCHEMA
+          value: public
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: DB_PASSWORD
+        - name: JAVA_OPTS
+          value: -Xms1g -Xmx3g -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError
+            -Dkeycloak.profile.feature.upload_scripts=enabled
+        # The image tag is owned by the rollout procedure in keycloak/RUNBOOK.md
+        # (kubectl set image with a tag from the "Keycloak Gundi theme images" CI
+        # run); keep this line in sync with what is live when editing anything else.
+        image: europe-west3-docker.pkg.dev/serca-artifact-registry/gundi/keycloak:11.0.2-gundi-438715d
+        imagePullPolicy: IfNotPresent
+        # Single replica: the sleep keeps the old pod serving while the LB NEG
+        # deprograms, so rollouts don't drop in-flight logins.
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - sleep
+              - "20"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /auth/realms/master
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 120
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: keycloak
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /auth/realms/master
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 4
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+          requests:
+            cpu: "2"
+            memory: 4Gi
+      terminationGracePeriodSeconds: 60
+      tolerations:
+      - effect: NoSchedule
+        key: dedicated
+        operator: Equal
+        value: auth
