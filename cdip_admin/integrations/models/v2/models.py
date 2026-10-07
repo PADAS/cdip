@@ -813,10 +813,11 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         choices=SourceFilterTypes.choices,
         default=SourceFilterTypes.SOURCE_LIST
     )
-    mode = models.CharField(
-        max_length=20,
-        choices=FilterModes.choices,
-    )
+    # No `choices` on the column: mode is cross-type but its valid values are
+    # per filter TYPE, so each type's serializer constrains its own (the list
+    # type accepts FilterModes). Model choices would add no DB constraint and
+    # would cost a no-op migration every time a future type adds a mode.
+    mode = models.CharField(max_length=20)
     order_number = models.PositiveIntegerField(default=0, db_index=True)
     name = models.CharField(max_length=200, blank=True)
     description = models.TextField(

@@ -1148,6 +1148,9 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         choices=[SourceFilter.SourceFilterTypes.SOURCE_LIST],
         default=SourceFilter.SourceFilterTypes.SOURCE_LIST,
     )
+    # Explicit, not model-derived: the column carries no choices (valid modes are
+    # per filter type), so this serializer — the list type's — declares its own.
+    mode = serializers.ChoiceField(choices=SourceFilter.FilterModes.choices)
     source_ids = BulkPrimaryKeyRelatedField(
         source="sources", queryset=Source.objects.all(), write_only=True
     )

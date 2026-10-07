@@ -798,3 +798,16 @@ def test_narrowing_the_route_providers_audits_the_scope_even_with_no_surviving_s
     assert log.details["changes"]["sources_removed"] == []
     source_filter.refresh_from_db()
     assert set(source_filter.covered_providers.values_list("id", flat=True)) == {provider_movebank_ewt.id}
+
+
+def test_reject_an_unknown_mode(
+        api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
+):
+    # The column carries no choices; this serializer (the list type's) is the
+    # validation layer, so an unknown mode must still answer 400.
+    response = _post(
+        api_client, superuser, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:1], mode="allowlist"),
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "is not a valid choice" in response.content.decode()
