@@ -1129,6 +1129,8 @@ class BulkPrimaryKeyRelatedField(serializers.Field):
                 resolved.append(found[key])
         return resolved
 
+    # Plain Field.get_value: JSON payloads only — the stock ManyRelatedField's
+    # HTML-form handling is deliberately not carried over.
     def to_representation(self, value):
         return [obj.pk for obj in value.all()]
 
@@ -1225,7 +1227,10 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             instance = self._save_translating_conflicts(super().create, validated_data)
             self._sync_covered_providers(instance)
-            instance.log_sources_changed(added=instance.sources.all())
+            instance.log_sources_changed(
+                added=instance.sources.all(),
+                providers_joined_scope=instance.covered_providers.all(),
+            )
         return instance
 
     def update(self, instance, validated_data):
@@ -1647,18 +1652,25 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
                     integration__in=route.data_providers.all()
                 )
             )
-            if orphaned:
-                source_filter.sources.remove(*orphaned)
-                source_filter.log_sources_changed(
-                    removed=orphaned, cause="provider_removed_from_route"
-                )
             # A provider leaving the route leaves the rule's scope with it — unlike a
             # source-delete cascade, which empties the list but keeps the provider covered.
-            off_route = source_filter.covered_providers.exclude(
-                id__in=route.data_providers.all()
+            off_route = list(
+                source_filter.covered_providers.exclude(
+                    id__in=route.data_providers.all()
+                )
             )
-            if off_route.exists():
+            if orphaned:
+                source_filter.sources.remove(*orphaned)
+            if off_route:
                 source_filter.covered_providers.remove(*off_route)
+            if orphaned or off_route:
+                # `or off_route`: a cascade-emptied provider has no orphaned sources
+                # left, yet its departure from the scope is the policy change worth
+                # recording - on a whitelist it is the whole feed.
+                source_filter.log_sources_changed(
+                    removed=orphaned, cause="provider_removed_from_route",
+                    providers_left_scope=off_route,
+                )
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):

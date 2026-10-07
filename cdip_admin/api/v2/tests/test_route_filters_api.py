@@ -742,3 +742,59 @@ def test_a_filter_rendered_straight_from_a_write_still_reports_its_providers(
     assert [p["id"] for p in body["providers"]] == [str(provider_lotek_panthera.id)]
     assert body["excludes_default_source"] is True
     assert body["sources_count"] == 2
+
+
+def test_bulk_source_ids_rejects_a_non_list_and_bad_item_types(
+        api_client, superuser, organization, route_1, integrations_list_er
+):
+    api_client.force_authenticate(superuser)
+    for bad in ("not-a-list", [123], [{"id": "x"}], ["not-a-uuid"]):
+        response = api_client.post(
+            _list_url(route_1),
+            data={"destination": str(integrations_list_er[1].id), "mode": "whitelist", "source_ids": bad},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, (bad, response.content)
+
+
+def test_bulk_source_ids_dedupes_preserving_order(
+        api_client, superuser, organization, route_1, integrations_list_er, lotek_sources
+):
+    response = _post(
+        api_client, superuser, route_1,
+        _payload(integrations_list_er[1], [lotek_sources[0], lotek_sources[0], lotek_sources[1]]),
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    created = SourceFilter.objects.get(id=response.json()["id"])
+    assert set(created.sources.values_list("id", flat=True)) == {lotek_sources[0].id, lotek_sources[1].id}
+
+
+def test_narrowing_the_route_providers_audits_the_scope_even_with_no_surviving_sources(
+        api_client, superuser, organization, route_1, lotek_sources,
+        movebank_sources, provider_lotek_panthera, provider_movebank_ewt
+):
+    # The cascade-emptied case: lotek's sources are all deleted (scope persists),
+    # then the provider leaves the route. No orphaned sources exist, but the
+    # scope shrink is the policy change and must still leave an audit entry.
+    route_1.data_providers.add(provider_movebank_ewt)
+    source_filter = route_1.source_filters.get()
+    source_filter.sources.add(movebank_sources[0])
+    source_filter.covered_providers.add(provider_movebank_ewt)
+    for source in lotek_sources:
+        source.delete()
+    ActivityLog.objects.filter(value="sourcefilter_sources_changed").delete()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"data_providers": [str(provider_movebank_ewt.id)]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    log = ActivityLog.objects.filter(value="sourcefilter_sources_changed").first()
+    assert log, "scope shrink left no audit entry"
+    assert log.details["changes"]["providers_left_scope"] == [provider_lotek_panthera.name]
+    assert log.details["changes"]["sources_removed"] == []
+    source_filter.refresh_from_db()
+    assert set(source_filter.covered_providers.values_list("id", flat=True)) == {provider_movebank_ewt.id}
