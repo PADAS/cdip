@@ -894,6 +894,8 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
         "last_update_delivered_at",
         "is_duplicate",
         "has_error",
+        "discarded_at",
+        "discard_reason",
         "created_by",
     )
     search_fields = (
@@ -917,6 +919,7 @@ class GundiTraceAdmin(SimpleHistoryAdmin):
     list_filter = (
         ("created_at", CustomDateFilter),
         ("delivered_at", CustomDateFilter),
+        ("discarded_at", admin.EmptyFieldListFilter),
         "has_error",
         "is_duplicate",
         "object_type",

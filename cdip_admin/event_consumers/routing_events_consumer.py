@@ -75,14 +75,18 @@ def handle_observation_filtered_event(event_dict: dict):
             trace.destination_id = destination_id
             trace.discarded_at = event.timestamp
             trace.discard_reason = event_data.filtered_by or ""
-            trace.save()
+            # update_fields: the dispatcher consumer reads these same rows without
+            # a lock and does full-row saves; writing only our columns keeps a
+            # stale full-row save elsewhere from clearing the discard mark (and
+            # vice versa, ours from clobbering delivery fields).
+            trace.save(update_fields=["destination_id", "discarded_at", "discard_reason", "updated_at"])
         else:
             base = traces[0]
             trace = GundiTrace.objects.create(
                 object_id=base.object_id,
                 object_type=base.object_type,
                 source=base.source,
-                related_to=event_data.related_to or None,
+                related_to=event_data.related_to or base.related_to,
                 created_by=base.created_by,
                 data_provider=base.data_provider,
                 destination_id=destination_id,
@@ -90,8 +94,9 @@ def handle_observation_filtered_event(event_dict: dict):
                 discard_reason=event_data.filtered_by or "",
             )
 
-        # Filtering is configured behavior, not a failure: INFO, and never
-        # has_error, so connection health is unaffected.
+        # Filtering is configured behavior, not a failure: DEBUG like per-delivery
+        # entries (a chatty provider's drops must not be the loudest thing in the
+        # activity log), and never has_error, so connection health is unaffected.
         data_type = data_type_str_map.get(trace.object_type, "Data")
         destination_str = trace.destination.base_url if trace.destination else destination_id
         title = _clean_event_title(f"{data_type} {gundi_id} filtered out for '{destination_str}'")
@@ -100,7 +105,7 @@ def handle_observation_filtered_event(event_dict: dict):
             "source_external_id": str(trace.source.external_id) if trace.source else None,
         }
         ActivityLog.objects.create(
-            log_level=ActivityLog.LogLevels.INFO,
+            log_level=ActivityLog.LogLevels.DEBUG,
             log_type=ActivityLog.LogTypes.EVENT,
             origin=ActivityLog.Origin.TRANSFORMER,
             integration=trace.data_provider,

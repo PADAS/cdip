@@ -37,7 +37,8 @@ def test_process_observation_filtered_event(
     ).first()
     assert activity_log
     assert activity_log.log_type == ActivityLog.LogTypes.EVENT
-    assert activity_log.log_level == ActivityLog.LogLevels.INFO
+    # DEBUG like per-delivery entries: drops must not outshout deliveries.
+    assert activity_log.log_level == ActivityLog.LogLevels.DEBUG
     assert activity_log.origin == ActivityLog.Origin.TRANSFORMER
     assert activity_log.value == "observation_filtered"
     assert activity_log.details == event_data
