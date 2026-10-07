@@ -58,3 +58,36 @@ def test_filter_traces_as_superuser(
         },
         expected_traces=[event_delivered_trace2]
     )
+
+
+def test_trace_retrieve_exposes_the_discard_fields(
+        api_client, superuser, lotek_observation_trace
+):
+    # A filtered trace must not look identical to one still in flight: the
+    # timestamp is the flag, the reason says which rule kind dropped it.
+    lotek_observation_trace.discarded_at = "2026-10-07T00:00:00Z"
+    lotek_observation_trace.discard_reason = "device_whitelist"
+    lotek_observation_trace.save(update_fields=["discarded_at", "discard_reason"])
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("traces-list"), data={"object_id": str(lotek_observation_trace.object_id)}
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+    body = response.json()["results"][0]
+    assert body["discarded_at"] is not None
+    assert body["discard_reason"] == "device_whitelist"
+
+
+def test_traces_can_be_filtered_by_discarded(
+        api_client, superuser, lotek_observation_trace, trap_tagger_event_trace
+):
+    lotek_observation_trace.discarded_at = "2026-10-07T00:00:00Z"
+    lotek_observation_trace.save(update_fields=["discarded_at"])
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("traces-list"), data={"discarded_at__isnull": False})
+    assert response.status_code == status.HTTP_200_OK, response.content
+    object_ids = {row["object_id"] for row in response.json()["results"]}
+    assert str(lotek_observation_trace.object_id) in object_ids
+    assert str(trap_tagger_event_trace.object_id) not in object_ids

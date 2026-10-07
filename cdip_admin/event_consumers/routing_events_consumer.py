@@ -75,10 +75,10 @@ def handle_observation_filtered_event(event_dict: dict):
             trace.destination_id = destination_id
             trace.discarded_at = event.timestamp
             trace.discard_reason = event_data.filtered_by or ""
-            # update_fields: the dispatcher consumer reads these same rows without
-            # a lock and does full-row saves; writing only our columns keeps a
-            # stale full-row save elsewhere from clearing the discard mark (and
-            # vice versa, ours from clobbering delivery fields).
+            # update_fields constrains only THIS writer: ours cannot clobber
+            # delivery fields. The reverse race remains - the dispatcher consumer
+            # reads these rows unlocked and full-row-saves (GUNDI-5785), so until
+            # that lands a stale dispatcher save can still erase a discard mark.
             trace.save(update_fields=["destination_id", "discarded_at", "discard_reason", "updated_at"])
         else:
             base = traces[0]
