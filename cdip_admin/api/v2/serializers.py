@@ -1154,11 +1154,20 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     source_ids = BulkPrimaryKeyRelatedField(
         source="sources", queryset=Source.objects.all(), write_only=True
     )
+    # The rule's provider scope, explicit on the wire (review option 1): scope is
+    # never a side effect of the source list. Omitted on create it defaults to the
+    # submitted sources' providers; omitted on update it inherits the current
+    # scope — so removing a provider's last device keeps the provider covered
+    # ({P: []}, a whitelist that allows nothing) instead of reopening its feed.
+    provider_ids = BulkPrimaryKeyRelatedField(
+        queryset=Integration.objects.all(), write_only=True, required=False
+    )
 
     class Meta:
         model = SourceFilter
         fields = (
-            "id", "destination", "type", "mode", "enabled", "name", "description", "source_ids"
+            "id", "destination", "type", "mode", "enabled", "name", "description",
+            "source_ids", "provider_ids",
         )
         # `selector` is deliberately not exposed. For type="list" the M2M is the single way
         # to say which devices a rule covers; offering both would allow two rules in one row
@@ -1176,8 +1185,8 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_source_ids(self, value):
-        if not value:
-            raise drf_exceptions.ValidationError("At least one source is required.")
+        # An empty list is legal only when the rule still covers providers —
+        # that cross-field rule lives in validate().
         if len(value) > settings.SOURCE_FILTER_MAX_SOURCES:
             raise drf_exceptions.ValidationError(
                 f"A filter may reference at most {settings.SOURCE_FILTER_MAX_SOURCES} sources."
@@ -1212,6 +1221,45 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
             duplicates = duplicates.exclude(pk=self.instance.pk)
         if duplicates.exists():
             raise self._duplicate_error()
+
+        requested_scope = attrs.get("provider_ids")
+        submitted_sources = attrs.get("sources")
+        if requested_scope is not None:
+            route_providers = set(self._route.data_providers.values_list("id", flat=True))
+            strangers = sorted(str(p.id) for p in requested_scope if p.id not in route_providers)
+            if strangers:
+                raise drf_exceptions.ValidationError({
+                    "provider_ids": f"These providers are not on this route: {strangers}"
+                })
+        if requested_scope is not None:
+            effective_scope = {p.id for p in requested_scope}
+        elif self.instance is None:
+            effective_scope = {s.integration_id for s in (submitted_sources or [])}
+        else:
+            effective_scope = set(self.instance.covered_providers.values_list("id", flat=True))
+        # Reject, don't widen: a source outside the effective scope means the
+        # payload's intent is ambiguous — the client must name the provider in
+        # provider_ids in the same request. Silent widening would be safe for
+        # the gate but hides the scope change from the author.
+        if submitted_sources:
+            outside = sorted(
+                {str(s.id) for s in submitted_sources if s.integration_id not in effective_scope}
+            )
+            if outside:
+                raise drf_exceptions.ValidationError({
+                    "source_ids": "These sources belong to providers outside the rule's scope — "
+                                  f"include their providers in provider_ids: {outside}"
+                })
+        resolved_sources = (
+            submitted_sources if submitted_sources is not None
+            else (self.instance.sources.exists() if self.instance else False)
+        )
+        if not resolved_sources and not effective_scope:
+            raise drf_exceptions.ValidationError({
+                "source_ids": "At least one source is required, or name the covered "
+                              "providers explicitly in provider_ids."
+            })
+        self._effective_scope_ids = effective_scope
         return attrs
 
     @staticmethod
@@ -1223,13 +1271,14 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         })
 
     def create(self, validated_data):
+        validated_data.pop("provider_ids", None)  # not a model field; resolved in validate()
         validated_data["routing_rule"] = self._route
         # One transaction for row + M2M + scope + audit: a failure after the M2M
         # write must not commit a source list with a stale scope or no log entry -
         # ATOMIC_REQUESTS is off in this project.
         with transaction.atomic():
             instance = self._save_translating_conflicts(super().create, validated_data)
-            self._sync_covered_providers(instance)
+            instance.covered_providers.set(self._effective_scope_ids)
             instance.log_sources_changed(
                 added=instance.sources.all(),
                 providers_joined_scope=instance.covered_providers.all(),
@@ -1239,34 +1288,30 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # A PUT may move the filter onto another destination, so it races the constraint
         # the same way a create does.
+        requested_scope = validated_data.pop("provider_ids", None)
         sources_changed = "sources" in validated_data
         with transaction.atomic():
             before = set(instance.sources.all()) if sources_changed else set()
-            scope_before = set(instance.covered_providers.all()) if sources_changed else set()
+            scope_before = set(instance.covered_providers.all())
             instance = self._save_translating_conflicts(super().update, instance, validated_data)
-            # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
-            # source_ids must not recompute it from the surviving rows, or it would quietly
-            # drop a provider whose last source left via a delete cascade.
-            if sources_changed:
-                self._sync_covered_providers(instance)
-                after = set(instance.sources.all())
-                if before != after:
-                    # A provider leaving the scope changes more than membership — on a
-                    # whitelist it reopens that provider's whole feed — so the audit
-                    # entry names it, not just the removed devices.
-                    scope_after = set(instance.covered_providers.all())
-                    instance.log_sources_changed(
-                        added=after - before, removed=before - after,
-                        providers_left_scope=scope_before - scope_after,
-                        providers_joined_scope=scope_after - scope_before,
-                    )
+            # Scope is explicit: only provider_ids changes it. A source edit that
+            # omits it inherits the current scope, so removing a provider's last
+            # device keeps the provider covered ({P: []} stays closed) — never a
+            # recomputation from whatever rows survived.
+            if requested_scope is not None:
+                instance.covered_providers.set(self._effective_scope_ids)
+            after = set(instance.sources.all()) if sources_changed else before
+            scope_after = set(instance.covered_providers.all())
+            if before != after or scope_before != scope_after:
+                # A provider leaving the scope changes more than membership — on a
+                # whitelist it reopens that provider's whole feed — so the audit
+                # entry names it, not just the removed devices.
+                instance.log_sources_changed(
+                    added=after - before, removed=before - after,
+                    providers_left_scope=scope_before - scope_after,
+                    providers_joined_scope=scope_after - scope_before,
+                )
         return instance
-
-    @staticmethod
-    def _sync_covered_providers(instance):
-        instance.covered_providers.set(
-            {source.integration_id for source in instance.sources.all()}
-        )
 
     def _save_translating_conflicts(self, write, *args):
         # The check in validate() is not atomic with the write, so a concurrent request

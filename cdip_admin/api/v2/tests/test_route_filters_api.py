@@ -537,25 +537,121 @@ def test_a_source_delete_cascade_does_not_shrink_the_scope(
     assert providers == {str(provider_lotek_panthera.id)}
 
 
-def test_a_deliberate_source_edit_redefines_the_scope(
+def test_dropping_a_provider_from_scope_requires_saying_so(
         api_client, org_admin_user, organization, route_1, lotek_sources,
         movebank_sources, provider_lotek_panthera, provider_movebank_ewt
 ):
-    # The counterpart: when the client rewrites source_ids, the scope follows the new
-    # list — a provider whose devices were all removed on purpose is no longer covered.
+    # Scope is explicit (review option 1): rewriting source_ids alone cannot move
+    # the rule onto another provider — the payload must name the new scope, and a
+    # source outside the effective scope is rejected rather than silently widened.
     route_1.data_providers.add(provider_movebank_ewt)
     source_filter = route_1.source_filters.get()
-
     api_client.force_authenticate(org_admin_user)
-    response = api_client.patch(
+
+    ambiguous = api_client.patch(
         _detail_url(route_1, source_filter),
         data={"source_ids": [str(movebank_sources[0].id)]},
         format="json",
     )
+    assert ambiguous.status_code == status.HTTP_400_BAD_REQUEST, ambiguous.content
+    assert "outside the rule's scope" in ambiguous.content.decode()
+
+    explicit = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={
+            "source_ids": [str(movebank_sources[0].id)],
+            "provider_ids": [str(provider_movebank_ewt.id)],
+        },
+        format="json",
+    )
+    assert explicit.status_code == status.HTTP_200_OK, explicit.content
+    providers = {provider["id"] for provider in explicit.json()["providers"]}
+    assert providers == {str(provider_movebank_ewt.id)}
+    log = ActivityLog.objects.filter(value="sourcefilter_sources_changed").order_by("-created_at").first()
+    assert log.details["changes"]["providers_left_scope"] == [provider_lotek_panthera.name]
+
+
+def test_removing_the_last_device_keeps_the_provider_covered(
+        api_client, org_admin_user, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    # The deliberate-edit twin of the cascade case (review P2): emptying the list
+    # without touching provider_ids inherits the scope — the gate stays closed.
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        _detail_url(route_1, source_filter), data={"source_ids": []}, format="json"
+    )
 
     assert response.status_code == status.HTTP_200_OK, response.content
-    providers = {provider["id"] for provider in response.json()["providers"]}
-    assert providers == {str(provider_movebank_ewt.id)}
+    body = response.json()
+    assert body["sources_count"] == 0
+    assert {p["id"] for p in body["providers"]} == {str(provider_lotek_panthera.id)}
+
+
+def test_an_empty_whitelist_ships_closed_on_the_wire(
+        api_client, superuser, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(superuser)
+    emptied = api_client.patch(
+        _detail_url(route_1, source_filter), data={"source_ids": []}, format="json"
+    )
+    assert emptied.status_code == status.HTTP_200_OK, emptied.content
+
+    detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    rule = detail.json()["filters"][str(source_filter.destination_id)]
+    assert rule["by_provider"] == {str(provider_lotek_panthera.id): []}
+
+
+def test_create_with_explicit_scope_and_no_devices(
+        api_client, superuser, organization, route_1, integrations_list_er, provider_lotek_panthera
+):
+    # {P: []} is a writable state now, not one only cascades produce.
+    response = _post(
+        api_client, superuser, route_1,
+        _payload(integrations_list_er[1], [], provider_ids=[str(provider_lotek_panthera.id)]),
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    assert response.json()["sources_count"] == 0
+    assert {p["id"] for p in response.json()["providers"]} == {str(provider_lotek_panthera.id)}
+
+
+def test_reject_scope_providers_not_on_the_route(
+        api_client, superuser, organization, other_organization, route_1,
+        integrations_list_er, lotek_sources, provider_movebank_ewt
+):
+    response = _post(
+        api_client, superuser, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:1],
+                 provider_ids=[str(provider_movebank_ewt.id)]),
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "not on this route" in response.content.decode()
+
+
+def test_resaving_a_cascade_emptied_whitelist_round_trips(
+        api_client, org_admin_user, organization, route_1, lotek_sources, provider_lotek_panthera
+):
+    # Idempotency: after the cascade empties the list, writing back exactly what
+    # the API returns must succeed — the state is first-class now, not 400.
+    source_filter = route_1.source_filters.get()
+    for source in lotek_sources:
+        source.delete()
+
+    api_client.force_authenticate(org_admin_user)
+    read = api_client.get(_detail_url(route_1, source_filter)).json()
+    response = api_client.put(
+        _detail_url(route_1, source_filter),
+        data={
+            "destination": read["destination"]["id"],
+            "mode": read["mode"],
+            "source_ids": [],
+            "provider_ids": [p["id"] for p in read["providers"]],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert {p["id"] for p in response.json()["providers"]} == {str(provider_lotek_panthera.id)}
 
 
 # ---- Paged sources --------------------------------------------------------
