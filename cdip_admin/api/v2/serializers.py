@@ -1102,15 +1102,24 @@ class BulkPrimaryKeyRelatedField(serializers.Field):
         "not_a_list": 'Expected a list of ids but got type "{input_type}".',
         "incorrect_type": "Incorrect type. Expected pk value, received {data_type}.",
         "does_not_exist": 'Invalid pks - objects do not exist: {pk_values}.',
+        "max_items": "At most {limit} ids may be submitted.",
     }
 
-    def __init__(self, queryset, **kwargs):
+    # max_items may be a callable so the limit is read per request, not at
+    # import — tests and ops patch the Django setting at runtime.
+    def __init__(self, queryset, max_items=None, **kwargs):
         self.queryset = queryset
+        self.max_items = max_items
         super().__init__(**kwargs)
 
     def to_internal_value(self, data):
         if not isinstance(data, list):
             self.fail("not_a_list", input_type=type(data).__name__)
+        # Checked before resolution: the cap exists to bound work, so an
+        # oversized list must fail before it costs a {limit}-sized IN query.
+        limit = self.max_items() if callable(self.max_items) else self.max_items
+        if limit is not None and len(data) > limit:
+            self.fail("max_items", limit=limit)
         keys = []
         for item in data:
             try:
@@ -1152,7 +1161,11 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     # per filter type), so this serializer — the list type's — declares its own.
     mode = serializers.ChoiceField(choices=SourceFilter.FilterModes.choices)
     source_ids = BulkPrimaryKeyRelatedField(
-        source="sources", queryset=Source.objects.all(), write_only=True
+        source="sources", queryset=Source.objects.all(), write_only=True,
+        max_items=lambda: settings.SOURCE_FILTER_MAX_SOURCES,
+        error_messages={
+            "max_items": "A filter may reference at most {limit} sources."
+        },
     )
     # The rule's provider scope, explicit on the wire (review option 1). Omitted
     # on create it defaults to the submitted sources' providers; omitted on
@@ -1161,7 +1174,8 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     # nothing) instead of reopening its feed. Submitted sources' providers are
     # always unioned in; only an explicit provider_ids can shrink the scope.
     provider_ids = BulkPrimaryKeyRelatedField(
-        queryset=Integration.objects.all(), write_only=True, required=False
+        queryset=Integration.objects.all(), write_only=True, required=False,
+        max_items=lambda: settings.SOURCE_FILTER_MAX_SOURCES,
     )
 
     class Meta:
@@ -1187,11 +1201,8 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_source_ids(self, value):
         # An empty list is legal only when the rule still covers providers —
-        # that cross-field rule lives in validate().
-        if len(value) > settings.SOURCE_FILTER_MAX_SOURCES:
-            raise drf_exceptions.ValidationError(
-                f"A filter may reference at most {settings.SOURCE_FILTER_MAX_SOURCES} sources."
-            )
+        # that cross-field rule lives in validate(). The cap is enforced by the
+        # field itself, before the ids resolve.
         provider_ids = set(self._route.data_providers.values_list("id", flat=True))
         # Reported by id, not by external_id: source_ids resolves against every Source in
         # the system, so echoing the device identifier would hand a caller the name of a
@@ -1232,20 +1243,14 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
                 raise drf_exceptions.ValidationError({
                     "provider_ids": f"These providers are not on this route: {strangers}"
                 })
-        if requested_scope is not None:
-            effective_scope = {p.id for p in requested_scope}
-        elif self.instance is None:
-            effective_scope = {s.integration_id for s in (submitted_sources or [])}
+        if self.instance is not None:
+            inherited_scope = self.instance.covered_providers.values_list("id", flat=True)
+            kept_providers = self.instance.sources.values_list("integration_id", flat=True)
         else:
-            effective_scope = set(self.instance.covered_providers.values_list("id", flat=True))
-        # Union, never implicit shrink: a submitted source's provider is always
-        # covered. Widening can only restrict (a newly named provider's unlisted
-        # devices stop passing a whitelist) — it can never open a gate — while
-        # SHRINKING the scope always requires provider_ids, so dropping a
-        # provider stays an explicit act. Scope ⊇ sources' providers holds by
-        # construction.
-        if submitted_sources:
-            effective_scope |= {s.integration_id for s in submitted_sources}
+            inherited_scope, kept_providers = (), ()
+        effective_scope = self._union_scope(
+            requested_scope, submitted_sources, inherited_scope, kept_providers
+        )
         resolved_sources = (
             submitted_sources if submitted_sources is not None
             else (self.instance.sources.exists() if self.instance else False)
@@ -1265,6 +1270,27 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
                 "This destination already has a filter of this type on this route."
             ]
         })
+
+    @staticmethod
+    def _union_scope(requested_scope, submitted_sources, inherited_scope, kept_provider_ids):
+        # Union, never implicit shrink: the scope starts from provider_ids when
+        # given (the only way to shrink), else from the inherited scope, and the
+        # providers of the sources the write KEEPS — the submitted list, or the
+        # existing rows when source_ids is omitted — are always unioned in.
+        # Widening can only restrict (a newly named provider's unlisted devices
+        # stop passing a whitelist), never open a gate, and scope ⊇ sources'
+        # providers holds by construction: provider_ids alone can never strand
+        # a source outside the scope, which would desync covered_providers from
+        # the by_provider block routing reads.
+        scope = (
+            {p.id for p in requested_scope}
+            if requested_scope is not None else set(inherited_scope)
+        )
+        if submitted_sources is not None:
+            scope |= {s.integration_id for s in submitted_sources}
+        else:
+            scope |= set(kept_provider_ids)
+        return scope
 
     def create(self, validated_data):
         validated_data.pop("provider_ids", None)  # not a model field; resolved in validate()
@@ -1287,16 +1313,22 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         requested_scope = validated_data.pop("provider_ids", None)
         sources_changed = "sources" in validated_data
         with transaction.atomic():
+            # Recomputed under the row lock, not reused from validate(): that ran
+            # on an unlocked snapshot, so a concurrent write committed in between
+            # (an explicit shrink, a source edit) would otherwise be silently
+            # reverted by this one.
+            SourceFilter.objects.select_for_update().get(pk=instance.pk)
             before = set(instance.sources.all()) if sources_changed else set()
             scope_before = set(instance.covered_providers.all())
+            effective_scope = self._union_scope(
+                requested_scope,
+                validated_data.get("sources") if sources_changed else None,
+                {p.pk for p in scope_before},
+                instance.sources.values_list("integration_id", flat=True),
+            )
             instance = self._save_translating_conflicts(super().update, instance, validated_data)
-            # The effective scope is inherited ∪ submitted sources' providers
-            # (plus provider_ids when given): a source edit can widen it but
-            # never shrink it, so removing a provider's last device keeps the
-            # provider covered ({P: []} stays closed) — never a recomputation
-            # from whatever rows survived.
             if requested_scope is not None or sources_changed:
-                instance.covered_providers.set(self._effective_scope_ids)
+                instance.covered_providers.set(effective_scope)
             after = set(instance.sources.all()) if sources_changed else before
             scope_after = set(instance.covered_providers.all())
             if before != after or scope_before != scope_after:

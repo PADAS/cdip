@@ -537,6 +537,50 @@ def test_a_source_delete_cascade_does_not_shrink_the_scope(
     assert providers == {str(provider_lotek_panthera.id)}
 
 
+def test_provider_ids_alone_cannot_strand_existing_sources_outside_the_scope(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        movebank_sources, provider_lotek_panthera, provider_movebank_ewt
+):
+    # Scope >= sources' providers must hold even when source_ids is omitted:
+    # naming only the new provider unions the kept sources' provider back in,
+    # so covered_providers can never disagree with the by_provider block
+    # routing reads (a later source cascade would silently reopen the feed).
+    route_1.data_providers.add(provider_movebank_ewt)
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"provider_ids": [str(provider_movebank_ewt.id)]},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    providers = {provider["id"] for provider in response.json()["providers"]}
+    assert providers == {str(provider_lotek_panthera.id), str(provider_movebank_ewt.id)}
+    log = ActivityLog.objects.filter(value="sourcefilter_sources_changed").order_by("-created_at").first()
+    assert log.details["changes"]["providers_joined_scope"] == [provider_movebank_ewt.name]
+    assert "providers_left_scope" not in log.details["changes"]
+
+
+def test_an_empty_provider_ids_falls_back_to_the_sources_providers(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        provider_lotek_panthera
+):
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"provider_ids": []},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    providers = {provider["id"] for provider in response.json()["providers"]}
+    assert providers == {str(provider_lotek_panthera.id)}
+
+
 def test_sources_widen_the_scope_but_only_provider_ids_shrinks_it(
         api_client, org_admin_user, organization, route_1, lotek_sources,
         movebank_sources, provider_lotek_panthera, provider_movebank_ewt
