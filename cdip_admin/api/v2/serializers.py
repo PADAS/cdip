@@ -1154,11 +1154,12 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     source_ids = BulkPrimaryKeyRelatedField(
         source="sources", queryset=Source.objects.all(), write_only=True
     )
-    # The rule's provider scope, explicit on the wire (review option 1): scope is
-    # never a side effect of the source list. Omitted on create it defaults to the
-    # submitted sources' providers; omitted on update it inherits the current
-    # scope — so removing a provider's last device keeps the provider covered
-    # ({P: []}, a whitelist that allows nothing) instead of reopening its feed.
+    # The rule's provider scope, explicit on the wire (review option 1). Omitted
+    # on create it defaults to the submitted sources' providers; omitted on
+    # update it inherits the current scope — so removing a provider's last
+    # device keeps the provider covered ({P: []}, a whitelist that allows
+    # nothing) instead of reopening its feed. Submitted sources' providers are
+    # always unioned in; only an explicit provider_ids can shrink the scope.
     provider_ids = BulkPrimaryKeyRelatedField(
         queryset=Integration.objects.all(), write_only=True, required=False
     )
@@ -1237,19 +1238,14 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
             effective_scope = {s.integration_id for s in (submitted_sources or [])}
         else:
             effective_scope = set(self.instance.covered_providers.values_list("id", flat=True))
-        # Reject, don't widen: a source outside the effective scope means the
-        # payload's intent is ambiguous — the client must name the provider in
-        # provider_ids in the same request. Silent widening would be safe for
-        # the gate but hides the scope change from the author.
+        # Union, never implicit shrink: a submitted source's provider is always
+        # covered. Widening can only restrict (a newly named provider's unlisted
+        # devices stop passing a whitelist) — it can never open a gate — while
+        # SHRINKING the scope always requires provider_ids, so dropping a
+        # provider stays an explicit act. Scope ⊇ sources' providers holds by
+        # construction.
         if submitted_sources:
-            outside = sorted(
-                {str(s.id) for s in submitted_sources if s.integration_id not in effective_scope}
-            )
-            if outside:
-                raise drf_exceptions.ValidationError({
-                    "source_ids": "These sources belong to providers outside the rule's scope — "
-                                  f"include their providers in provider_ids: {outside}"
-                })
+            effective_scope |= {s.integration_id for s in submitted_sources}
         resolved_sources = (
             submitted_sources if submitted_sources is not None
             else (self.instance.sources.exists() if self.instance else False)
@@ -1294,11 +1290,12 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
             before = set(instance.sources.all()) if sources_changed else set()
             scope_before = set(instance.covered_providers.all())
             instance = self._save_translating_conflicts(super().update, instance, validated_data)
-            # Scope is explicit: only provider_ids changes it. A source edit that
-            # omits it inherits the current scope, so removing a provider's last
-            # device keeps the provider covered ({P: []} stays closed) — never a
-            # recomputation from whatever rows survived.
-            if requested_scope is not None:
+            # The effective scope is inherited ∪ submitted sources' providers
+            # (plus provider_ids when given): a source edit can widen it but
+            # never shrink it, so removing a provider's last device keeps the
+            # provider covered ({P: []} stays closed) — never a recomputation
+            # from whatever rows survived.
+            if requested_scope is not None or sources_changed:
                 instance.covered_providers.set(self._effective_scope_ids)
             after = set(instance.sources.all()) if sources_changed else before
             scope_after = set(instance.covered_providers.all())

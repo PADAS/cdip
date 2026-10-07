@@ -537,35 +537,36 @@ def test_a_source_delete_cascade_does_not_shrink_the_scope(
     assert providers == {str(provider_lotek_panthera.id)}
 
 
-def test_dropping_a_provider_from_scope_requires_saying_so(
+def test_sources_widen_the_scope_but_only_provider_ids_shrinks_it(
         api_client, org_admin_user, organization, route_1, lotek_sources,
         movebank_sources, provider_lotek_panthera, provider_movebank_ewt
 ):
-    # Scope is explicit (review option 1): rewriting source_ids alone cannot move
-    # the rule onto another provider — the payload must name the new scope, and a
-    # source outside the effective scope is rejected rather than silently widened.
+    # Scope is explicit in one direction only (review option 1, union variant):
+    # submitted sources' providers are always unioned in — widening can never
+    # open a gate — while dropping a provider requires saying so in provider_ids.
     route_1.data_providers.add(provider_movebank_ewt)
     source_filter = route_1.source_filters.get()
     api_client.force_authenticate(org_admin_user)
 
-    ambiguous = api_client.patch(
+    widened = api_client.patch(
         _detail_url(route_1, source_filter),
         data={"source_ids": [str(movebank_sources[0].id)]},
         format="json",
     )
-    assert ambiguous.status_code == status.HTTP_400_BAD_REQUEST, ambiguous.content
-    assert "outside the rule's scope" in ambiguous.content.decode()
+    assert widened.status_code == status.HTTP_200_OK, widened.content
+    providers = {provider["id"] for provider in widened.json()["providers"]}
+    # lotek keeps covered ({P: []}) even though its devices left the list.
+    assert providers == {str(provider_lotek_panthera.id), str(provider_movebank_ewt.id)}
+    log = ActivityLog.objects.filter(value="sourcefilter_sources_changed").order_by("-created_at").first()
+    assert log.details["changes"]["providers_joined_scope"] == [provider_movebank_ewt.name]
 
-    explicit = api_client.patch(
+    shrunk = api_client.patch(
         _detail_url(route_1, source_filter),
-        data={
-            "source_ids": [str(movebank_sources[0].id)],
-            "provider_ids": [str(provider_movebank_ewt.id)],
-        },
+        data={"provider_ids": [str(provider_movebank_ewt.id)]},
         format="json",
     )
-    assert explicit.status_code == status.HTTP_200_OK, explicit.content
-    providers = {provider["id"] for provider in explicit.json()["providers"]}
+    assert shrunk.status_code == status.HTTP_200_OK, shrunk.content
+    providers = {provider["id"] for provider in shrunk.json()["providers"]}
     assert providers == {str(provider_movebank_ewt.id)}
     log = ActivityLog.objects.filter(value="sourcefilter_sources_changed").order_by("-created_at").first()
     assert log.details["changes"]["providers_left_scope"] == [provider_lotek_panthera.name]
