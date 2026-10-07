@@ -74,9 +74,9 @@ def test_cannot_list_filters_of_another_org_route(
 ):
     api_client.force_authenticate(org_admin_user)
     response = api_client.get(_list_url(route_2))
-    assert response.status_code in (
-        status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND
-    ), response.content
+    # Deterministic: the route resolves through get_user_routes_qs, so a foreign
+    # route is a 404, never a 403 that would confirm it exists.
+    assert response.status_code == status.HTTP_404_NOT_FOUND, response.content
 
 
 # ---- Creating -------------------------------------------------------------

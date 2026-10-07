@@ -1094,6 +1094,45 @@ class SourceFilterSerializer(serializers.ModelSerializer):
         )
 
 
+class BulkPrimaryKeyRelatedField(serializers.Field):
+    # One query for the whole id list. The stock many=True relation validates
+    # each id with its own get(pk=...), so a write at the 1000-device cap costs
+    # 1000 round trips before validate_source_ids even runs.
+    default_error_messages = {
+        "not_a_list": 'Expected a list of ids but got type "{input_type}".',
+        "incorrect_type": "Incorrect type. Expected pk value, received {data_type}.",
+        "does_not_exist": 'Invalid pks - objects do not exist: {pk_values}.',
+    }
+
+    def __init__(self, queryset, **kwargs):
+        self.queryset = queryset
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, list):
+            self.fail("not_a_list", input_type=type(data).__name__)
+        keys = []
+        for item in data:
+            try:
+                keys.append(uuid.UUID(str(item)))
+            except (ValueError, AttributeError, TypeError):
+                self.fail("incorrect_type", data_type=type(item).__name__)
+        found = {obj.pk: obj for obj in self.queryset.filter(pk__in=keys)}
+        missing = sorted({str(key) for key in keys if key not in found})
+        if missing:
+            self.fail("does_not_exist", pk_values=", ".join(missing))
+        # Original order, de-duplicated — the M2M ignores duplicates anyway.
+        seen, resolved = set(), []
+        for key in keys:
+            if key not in seen:
+                seen.add(key)
+                resolved.append(found[key])
+        return resolved
+
+    def to_representation(self, value):
+        return [obj.pk for obj in value.all()]
+
+
 class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     destination = serializers.PrimaryKeyRelatedField(queryset=Integration.objects.all())
@@ -1107,8 +1146,8 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         choices=[SourceFilter.SourceFilterTypes.SOURCE_LIST],
         default=SourceFilter.SourceFilterTypes.SOURCE_LIST,
     )
-    source_ids = serializers.PrimaryKeyRelatedField(
-        source="sources", many=True, queryset=Source.objects.all(), write_only=True
+    source_ids = BulkPrimaryKeyRelatedField(
+        source="sources", queryset=Source.objects.all(), write_only=True
     )
 
     class Meta:
@@ -1195,6 +1234,7 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         sources_changed = "sources" in validated_data
         with transaction.atomic():
             before = set(instance.sources.all()) if sources_changed else set()
+            scope_before = set(instance.covered_providers.all()) if sources_changed else set()
             instance = self._save_translating_conflicts(super().update, instance, validated_data)
             # Scope follows only deliberate source-list edits. A PATCH that doesn't touch
             # source_ids must not recompute it from the surviving rows, or it would quietly
@@ -1203,8 +1243,14 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
                 self._sync_covered_providers(instance)
                 after = set(instance.sources.all())
                 if before != after:
+                    # A provider leaving the scope changes more than membership — on a
+                    # whitelist it reopens that provider's whole feed — so the audit
+                    # entry names it, not just the removed devices.
+                    scope_after = set(instance.covered_providers.all())
                     instance.log_sources_changed(
-                        added=after - before, removed=before - after
+                        added=after - before, removed=before - after,
+                        providers_left_scope=scope_before - scope_after,
+                        providers_joined_scope=scope_after - scope_before,
                     )
         return instance
 
@@ -1224,8 +1270,15 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 return write(*args)
-        except IntegrityError:
-            raise self._duplicate_error()
+        except IntegrityError as error:
+            # Only the uniqueness race is a 409. The atomic block also covers the
+            # sources M2M, so any other integrity failure (a Source deleted between
+            # validation and insert, a future constraint) must not be dressed up as
+            # a duplicate the client would pointlessly retry.
+            constraint = getattr(getattr(error.__cause__, "diag", None), "constraint_name", None)
+            if constraint == "unique_source_filter_per_route_destination_type":
+                raise self._duplicate_error()
+            raise
 
     def to_representation(self, instance):
         return SourceFilterSerializer(instance=instance, context=self.context).data

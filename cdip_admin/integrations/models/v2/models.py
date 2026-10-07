@@ -876,7 +876,8 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def __str__(self):
         return f"{self.name} {self.mode} {self.type}"
 
-    def log_sources_changed(self, added=(), removed=(), cause=None):
+    def log_sources_changed(self, added=(), removed=(), cause=None,
+                            providers_left_scope=(), providers_joined_scope=()):
         # Membership changes ARE policy changes - shrinking a whitelist tightens it,
         # shrinking a blacklist loosens it (proposal decision 10) - but ChangeLogMixin
         # only diffs instance attributes on save(), so the M2M is invisible to it.
@@ -889,6 +890,10 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
                 "destination_id": str(self.destination_id),
                 "mode": self.mode,
             }
+            if providers_left_scope:
+                changes["providers_left_scope"] = sorted(p.name for p in providers_left_scope)
+            if providers_joined_scope:
+                changes["providers_joined_scope"] = sorted(p.name for p in providers_joined_scope)
             if cause:
                 changes["cause"] = cause
             self.log_activity(

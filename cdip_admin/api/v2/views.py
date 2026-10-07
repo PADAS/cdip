@@ -429,11 +429,12 @@ class RouteFiltersView(viewsets.ModelViewSet):
         # cost two extra queries for every rule on it.
         return queryset.annotate(
             sources_count=Count("sources", distinct=True),
-            provider_ids=ArrayAgg("covered_providers__id", distinct=True),
+            provider_ids=ArrayAgg("covered_providers__id", distinct=True, default=None),
             default_source_provider_ids=ArrayAgg(
                 "sources__integration_id",
                 distinct=True,
                 filter=Q(sources__external_id=v2_serializers.DEFAULT_SOURCE_EXTERNAL_ID),
+                default=None,
             ),
         )
 
