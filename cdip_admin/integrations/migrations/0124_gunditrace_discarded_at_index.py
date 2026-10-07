@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("integrations", "0119_gunditrace_discard_fields"),
+        ("integrations", "0123_gunditrace_discard_fields"),
     ]
 
     operations = [

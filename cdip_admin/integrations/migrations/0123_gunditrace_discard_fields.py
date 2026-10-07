@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('integrations', '0118_integration_default_route_on_delete'),
+        ('integrations', '0122_sourcefilter_mode_no_choices'),
     ]
 
     operations = [
