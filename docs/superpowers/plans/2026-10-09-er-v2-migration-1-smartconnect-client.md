@@ -15,7 +15,7 @@
 - The sanitize rule is load-bearing and must stay byte-for-byte: `re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower()`, falling back to `"_"` when the result is empty.
 - Values longer than 100 characters are shortened to the first 91 characters, an underscore, and the first 8 hex characters of the SHA-256 of the full sanitized string. Total length is exactly 100.
 - `requires-python = ">=3.10,<4.0"` stays as is.
-- Version bump is `1.14.0` to `1.15.0` in `pyproject.toml` only; the package has no changelog file.
+- Version bump is `1.14.0` to `1.15.0` in three places, the repo's convention (see commit b35b1c7): `pyproject.toml`, `__version__` in `smartconnect/__init__.py`, and the project entry in `uv.lock` via `uv lock`. `tests/test_smartconnect.py::test_version_matches_pyproject` and the release workflow's `uv sync --locked` both fail otherwise. The package has no changelog file.
 
 ## Review Focus
 
@@ -364,21 +364,29 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `pyproject.toml:3`
+- Modify: `smartconnect/__init__.py:23`
+- Regenerate: `uv.lock`
 
-- [ ] **Step 1: Bump the version**
+- [ ] **Step 1: Bump the version in all three places**
 
-Change line 3 of `pyproject.toml` from `version = "1.14.0"` to `version = "1.15.0"`.
+Change line 3 of `pyproject.toml` from `version = "1.14.0"` to `version = "1.15.0"`, change `__version__ = '1.14.0'` to `'1.15.0'` in `smartconnect/__init__.py`, then run `uv lock` so the lockfile's own project entry moves to 1.15.0 (nothing else should change).
 
-- [ ] **Step 2: Build check**
+- [ ] **Step 2: Release-gate check**
 
-Run: `cd /Users/chrisdo/padas/smartconnect-client && uv build && ls dist/ | grep 1.15.0`
-Expected: `smartconnect_client-1.15.0-py3-none-any.whl` and the sdist listed.
+Run exactly what `.github/workflows/release.yml` runs before publishing:
+
+```bash
+cd /Users/chrisdo/padas/smartconnect-client
+uv lock --check && uv run pytest -q && uv build && ls dist/ | grep 1.15.0
+```
+
+Expected: lock check exits 0, the suite passes (including `test_version_matches_pyproject`), and `smartconnect_client-1.15.0-py3-none-any.whl` plus the sdist are listed.
 
 - [ ] **Step 3: Commit and open the PR**
 
 ```bash
 cd /Users/chrisdo/padas/smartconnect-client
-git add pyproject.toml
+git add pyproject.toml smartconnect/__init__.py uv.lock
 git commit -m "chore: bump version to 1.15.0
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
