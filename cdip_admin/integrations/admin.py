@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from collections import defaultdict
 from django.db.models import F, Prefetch
+from django import forms as django_forms
 from django.forms import ModelForm
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponseRedirect
@@ -795,12 +796,25 @@ class RouteConfigAdmin(admin.ModelAdmin):
     )
 
 
+class SourceFilterAdminForm(ModelForm):
+    # The column carries no choices (valid modes are per filter type, enforced
+    # by each type's serializer) — mirror the list type's set here so the admin
+    # cannot store a mode the API would reject.
+    mode = django_forms.ChoiceField(choices=SourceFilter.FilterModes.choices)
+
+    class Meta:
+        model = SourceFilter
+        exclude = ("sources", "covered_providers")
+
+
 @admin.register(SourceFilter)
 class SourceFilterAdmin(admin.ModelAdmin):
+    form = SourceFilterAdminForm
     list_display = (
         "id",
         "order_number",
         "type",
+        "mode",
         "name",
         "description"
     )
@@ -808,6 +822,11 @@ class SourceFilterAdmin(admin.ModelAdmin):
         "type",
         "routing_rule",
     )
+    # Membership is edited only through the API: it keeps covered_providers in
+    # sync and writes the audit entry, neither of which an admin save does. The
+    # default M2M widgets would also enumerate every Source/Integration in the DB.
+    exclude = ("sources", "covered_providers")
+    raw_id_fields = ("routing_rule", "destination")
 
 
 @admin.register(Source)
