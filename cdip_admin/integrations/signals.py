@@ -130,11 +130,21 @@ def _reconsider_providers_of(route):
         resolve_default_route(integration, joining_route=route, via="route_destination_added")
 
 
+def _ensure_push_data_broker_config(integration_ids):
+    """cdip-routing publishes to a destination's `additional.topic`, so a
+    destination created before its type registered a push action needs one
+    the moment it is routed to. Re-read from the DB so a caller's cached
+    instance doesn't write a stale `additional` back."""
+    for integration in Integration.objects.filter(pk__in=integration_ids).select_related("type"):
+        integration.ensure_push_data_broker_config()
+
+
 @receiver(post_save, sender=RouteDestination)
 def on_route_destination_saved(sender, instance, created, raw=False, **kwargs):
     if raw or not created:
         return
     _reconsider_providers_of(instance.route)
+    _ensure_push_data_broker_config([instance.integration_id])
 
 
 @receiver(m2m_changed, sender=RouteDestination)
@@ -144,6 +154,7 @@ def on_route_destinations_m2m_changed(sender, instance, action, reverse, pk_set,
     routes = Route.objects.filter(pk__in=pk_set) if reverse else [instance]
     for route in routes:
         _reconsider_providers_of(route)
+    _ensure_push_data_broker_config([instance.pk] if reverse else pk_set or [])
 
 
 @receiver(post_save, sender=Integration)

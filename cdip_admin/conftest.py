@@ -1311,6 +1311,36 @@ def inreach_connection(
 
 
 @pytest.fixture
+def integration_type_generic_webhooks():
+    return IntegrationType.objects.create(
+        name="Generic Webhooks",
+        value="generic_webhooks",
+        description="Custom webhooks, inbound and outbound.",
+    )
+
+
+@pytest.fixture
+def generic_webhooks_integration_predating_push_action(other_organization, integration_type_generic_webhooks):
+    integration = Integration.objects.create(
+        type=integration_type_generic_webhooks,
+        name="Outbound Webhook",
+        owner=other_organization,
+    )
+    IntegrationAction.objects.create(
+        integration_type=integration_type_generic_webhooks,
+        type=IntegrationAction.ActionTypes.PUSH_DATA,
+        name="Deliver",
+        value="deliver",
+    )
+    return integration
+
+
+@pytest.fixture
+def empty_route_other_org(other_organization):
+    return Route.objects.create(name="Outbound route", owner=other_organization)
+
+
+@pytest.fixture
 def mb_action_push_observations(integration_type_movebank):
     return IntegrationAction.objects.create(
         integration_type=integration_type_movebank,

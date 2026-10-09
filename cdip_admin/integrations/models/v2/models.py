@@ -346,9 +346,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             calculate_integration_statuses([str(self.id)])
         if created:
             # Deploy serverless dispatchers for destinations
-            if settings.GCP_ENVIRONMENT_ENABLED and any(
-                    [self.is_er_site, self.is_smart_site, self.is_wpswatch_site, self.is_traptagger_site]
-            ):
+            if settings.GCP_ENVIRONMENT_ENABLED and self.has_deployed_dispatcher:
                 create_dispatcher_for_integration(self)
 
             # Create default healthcheck settings and status
@@ -447,6 +445,33 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def has_push_data_support(self):
         return self.type.actions.filter(type=IntegrationAction.ActionTypes.PUSH_DATA).exists()
+
+    @property
+    def has_deployed_dispatcher(self):
+        return any([self.is_er_site, self.is_smart_site, self.is_wpswatch_site, self.is_traptagger_site])
+
+    def missing_push_data_broker_config(self):
+        """The `additional` keys cdip-routing needs to publish to this integration and that are unset.
+
+        Dispatcher-deployed types are excluded: their topic name has a random
+        suffix fixed when the dispatcher is deployed, so a recomputed name would
+        point routing at a topic that doesn't exist.
+        """
+        if self.has_deployed_dispatcher or not self.has_push_data_support:
+            return {}
+        missing = {}
+        if not self.additional.get("topic"):
+            missing["topic"] = get_dispatcher_topic_default_name(integration=self, gundi_version="v2")
+        if not self.additional.get("broker"):
+            missing["broker"] = "gcp_pubsub"
+        return missing
+
+    def ensure_push_data_broker_config(self):
+        missing = self.missing_push_data_broker_config()
+        if missing:
+            self.additional.update(missing)
+            self.save(update_fields=["additional"])
+        return missing
 
     def create_missing_configurations(self, actions=None):
         # Pass `actions` to skip the per-call type.actions query when a caller
