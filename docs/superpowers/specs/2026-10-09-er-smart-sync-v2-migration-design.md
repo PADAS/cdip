@@ -34,7 +34,10 @@ change in the payload SMART receives.
 ## Non-goals
 
 - Consolidated configurable-model variants (`cm_variant_mode=consolidate`).
-  The portal keeps today's one-type-per-CM layout.
+  When several nodes of a configurable model map to the same SMART category,
+  the portal keeps today's layout of one ER event type per node. Consolidate
+  mode would replace those with one type per group plus a discriminator
+  dropdown, changing event type values on every synced site.
 - Converting v1 event types that were not created by the SMART sync.
 - Fixing the `cryptography` pin that breaks a full `pip-compile` under
   Python 3.11. It is pre-existing and unrelated.
