@@ -6,13 +6,14 @@
 
 **Architecture:** Two commits in one PR. First a platform bump: Python 3.8 to 3.10 and the dependency chain that smartconnect-client 1.15 requires (httpx 0.28, which drags FastAPI, Starlette, uvicorn, the OpenTelemetry packages and the gundi clients forward). Then the transformer change: both `_resolve_attribute` methods collect the matched attribute's option keys and translate the value through a small module-level helper that logs and passes the value through on failure.
 
-**Tech Stack:** Python 3.10, FastAPI, pydantic 1.x, pytest-asyncio, uv for dependency resolution. Repo: `/Users/chrisdo/padas/cdip-routing` (branch off `main`). CI runs `pytest` then builds `docker/Dockerfile`.
+**Tech Stack:** Python 3.10, FastAPI, pydantic 1.x, pytest-asyncio, uv for dependency resolution. Repo: `/Users/chrisdo/padas/cdip-routing` (branch off `origin/main` after `git fetch`; the local `main` is behind). CI runs the suite through the reusable `.github/workflows/_tests.yml` (called by `tests.yml` on PRs and by `main.yml` before the image build).
 
 **Spec:** `docs/superpowers/specs/2026-10-09-er-smart-sync-v2-migration-design.md` in PADAS/cdip, section "3. cdip-routing". Depends on part 1 (smartconnect-client 1.15.0 on PyPI). Must deploy before any portal site syncs as v2 (part 4).
 
 ## Global Constraints
 
-- Target interpreter is Python 3.10 everywhere: `docker/Dockerfile`, `.github/workflows/main.yml`, and the `.python-version` file. 3.11 is blocked by aioredis 2.0.1, which fails at import there.
+- Target interpreter is Python 3.10 everywhere: `docker/Dockerfile`, `.github/workflows/_tests.yml`, the `.python-version` file, the lockfile header, `AGENTS.md` and `docs/python-version.md`. 3.11 is blocked by aioredis 2.0.1, which fails at import there.
+- `gundi-core` stays at `1.13.0`, the pin main moved to on 2026-09-18 for batch envelopes. Do not let the upgrade pull it anywhere else.
 - Exact pins in `requirements.in` as today; `requirements.txt` is regenerated, never hand-edited.
 - Existing v1 sites must see no change: an ER value that equals a SMART option key is returned untouched. The helper tries the exact match first.
 - On a lookup failure the value is passed through unchanged and an error is logged with the attribute key and the value, so SMART's rejection stays observable.
@@ -34,8 +35,10 @@
 - Modify: `requirements.in`
 - Regenerate: `requirements.txt`
 - Modify: `docker/Dockerfile:1`
-- Modify: `.github/workflows/main.yml:38`
+- Modify: `.github/workflows/_tests.yml:23-26`
 - Modify: `.python-version`
+- Modify: `AGENTS.md:27-28,59-60,64`
+- Modify: `docs/python-version.md`
 
 **Interfaces:**
 - Produces: `smartconnect-client==1.15.0` importable; Python 3.10 runtime.
@@ -60,7 +63,7 @@ https://github.com/PADAS/er-client/releases/download/v1.3.0/earthranger_client-1
 smartconnect-client==1.15.0
 gundi-client==1.1.0
 gundi-client-v2==3.7.1
-gundi-core==1.11.3
+gundi-core==1.13.0
 opentelemetry-api==1.45.1
 opentelemetry-sdk==1.45.1
 opentelemetry-exporter-gcp-trace==1.15.0
@@ -79,15 +82,62 @@ backoff==2.2.1
 
 ```bash
 cd /Users/chrisdo/padas/cdip-routing
-git checkout -b feature/er-v2-choice-values main
+git fetch origin && git checkout -b feature/er-v2-choice-values origin/main
 echo "3.10" > .python-version
 sed -i '' 's/^FROM python:3.8-slim/FROM python:3.10-slim/' docker/Dockerfile
-sed -i '' "s/python-version: '3.8'/python-version: '3.10'/" .github/workflows/main.yml
-uv pip compile --python-version 3.10 requirements.in -o requirements.txt
-grep -nE "^(httpx|redis|smartconnect-client|gundi-client-v2|fastapi|opentelemetry-api)==" requirements.txt
+sed -i '' "s/python-version: '3.8'/python-version: '3.10'/" .github/workflows/_tests.yml
+uv pip compile --python-version 3.10 -o requirements.txt requirements.in
+grep -nE "^(httpx|redis|smartconnect-client|gundi-client-v2|gundi-core|fastapi|opentelemetry-api)==" requirements.txt
 ```
 
-Expected pins: httpx 0.28.1, redis 6.4.0, smartconnect-client 1.15.0, gundi-client-v2 3.7.1, fastapi 0.125.0, opentelemetry-api 1.45.1. If `marshmallow` resolves to 4.x the compile is wrong (smartconnect-client pins it below 4); stop and check the smartconnect-client version that was picked.
+Expected pins: httpx 0.28.1, redis 6.4.0, smartconnect-client 1.15.0, gundi-client-v2 3.7.1, gundi-core 1.13.0, fastapi 0.125.0, opentelemetry-api 1.45.1.
+
+Then fix the three places that state the version in prose:
+
+- `.github/workflows/_tests.yml` lines 23 to 25: replace the comment with `# Matches the runtime image (docker/Dockerfile: python:3.10-slim). See docs/python-version.md.`
+- `AGENTS.md` line 27 to 28: `python3.8` becomes `python3.10`; line 59: `**Python 3.8**` becomes `**Python 3.10**`; line 60: replace "the upgrade path to 3.11 is written up" with "3.11 is blocked by aioredis until the client moves to redis.asyncio"; line 64: `--python-version 3.8` becomes `--python-version 3.10`.
+- `docs/python-version.md`: replace the whole file with:
+
+```markdown
+# Python version
+
+## Current state
+
+cdip-routing targets **Python 3.10** (since 2026-10, PR "Resolve ER v2 choice
+values to SMART option keys"):
+- `docker/Dockerfile` → `python:3.10-slim`
+- `requirements.txt` is compiled with `uv pip compile --python-version 3.10`
+- CI (`.github/workflows/_tests.yml`) runs the suite on 3.10 to match
+
+The move off 3.8 was forced by smartconnect-client 1.15 (`requires-python >= 3.10`),
+which routing needs for `resolve_option_key`. The same change lifted httpx to 0.28
+and the chain it drags (FastAPI, Starlette, uvicorn, OpenTelemetry, gundi-client,
+gundi-client-v2, redis-py 6).
+
+## Why not 3.11 yet
+
+`aioredis==2.0.1` (archived upstream, last release 2021) declares its timeout
+exception with both `asyncio.TimeoutError` and the builtin `TimeoutError` as
+bases. Python 3.11 made those the same class, so the package fails at import
+with `TypeError: duplicate base class TimeoutError`. Nothing in routing's code
+triggers it; importing the package is enough.
+
+## Path to 3.11
+
+redis-py absorbed aioredis in 4.2 and routing already carries redis-py 6, so:
+
+1. `app/core/utils.py`: replace `aioredis.from_url(...)` with
+   `redis.asyncio.from_url(...)` (same arguments); drop `aioredis` from
+   `requirements.in`. Every method routing calls (get, set, setex, incr, decr,
+   expire, pipeline) has the same async signature; explicit closes become
+   `aclose()`.
+2. `docker/Dockerfile` → `python:3.11-slim`; `.python-version` → `3.11`.
+3. `uv pip compile --python-version 3.11 -o requirements.txt requirements.in`.
+4. `.github/workflows/_tests.yml` → `python-version: '3.11'`; update `AGENTS.md`.
+5. Run `pytest` and smoke the Redis client against a real server once.
+
+Do it as its own PR so the interpreter change can be reverted independently.
+``` If `marshmallow` resolves to 4.x the compile is wrong (smartconnect-client pins it below 4); stop and check the smartconnect-client version that was picked.
 
 - [ ] **Step 3: Drop the unused walrus import**
 
@@ -101,7 +151,7 @@ rm -rf venv && uv venv --python 3.10 venv && uv pip install --python venv/bin/py
 venv/bin/python -m pytest -q
 ```
 
-Expected: 83 passed. The known-good resolution this plan was written against passed 83 on 3.10 with these pins (verified 2026-10-09 in a scratch venv).
+Expected: 96 passed. The same resolution against `origin/main` as of 2026-10-09 (gundi-core 1.13.0 included) passed 96 in a scratch venv.
 
 - [ ] **Step 5: Smoke the Redis client against a real server**
 
@@ -125,7 +175,7 @@ Expected: `ttl 5` and `incr 1`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add requirements.in requirements.txt docker/Dockerfile .github/workflows/main.yml .python-version app/core/utils.py
+git add requirements.in requirements.txt docker/Dockerfile .github/workflows/_tests.yml .python-version app/core/utils.py AGENTS.md docs/python-version.md
 git commit -m "Move to Python 3.10 and smartconnect-client 1.15
 
 Lifts httpx to 0.28 (FastAPI 0.125, Starlette 0.50, OpenTelemetry 1.45,
@@ -321,7 +371,7 @@ Make the identical replacement in `SMARTTransformerV2._resolve_attribute` (lines
 - [ ] **Step 4: Run the suite**
 
 Run: `venv/bin/python -m pytest -q`
-Expected: 83 previously passing plus 6 new, all passed. `test_transform_events_for_smart` still asserts `{"ageofsign": "days", "species": "lion"}` because both are exact option keys.
+Expected: 96 previously passing plus 6 new, all passed. `test_transform_events_for_smart` still asserts `{"ageofsign": "days", "species": "lion"}` because both are exact option keys.
 
 - [ ] **Step 5: Commit**
 

@@ -302,7 +302,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Files:**
 - Rewrite: `cdip_admin/sync_integrations/er_smart_sync.py` (841 lines become ~80)
 - Delete: `cdip_admin/sync_integrations/tests/test_er_smart_sync.py`
-- Modify: `cdip_admin/cdip_admin/settings.py` (after `RAW_OBSERVATIONS_TOPIC`, line 473)
+- Modify: `cdip_admin/cdip_admin/settings.py` (after `RAW_OBSERVATIONS_TOPIC`, line 477)
 - Test: `cdip_admin/sync_integrations/tests/test_sync_config.py`
 
 **Interfaces:**
@@ -424,7 +424,7 @@ Expected: `ImportError: cannot import name 'build_sync_config'`
 
 - [ ] **Step 3: Add the setting**
 
-In `cdip_admin/cdip_admin/settings.py` after `RAW_OBSERVATIONS_TOPIC` (line 473):
+In `cdip_admin/cdip_admin/settings.py` after `RAW_OBSERVATIONS_TOPIC` (line 477):
 
 ```python
 # EarthRanger event type API version used when pushing SMART data models.
