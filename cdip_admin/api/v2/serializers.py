@@ -2323,6 +2323,10 @@ class GundiTraceRetrieveSerializer(serializers.Serializer):
     updated_at = serializers.DateTimeField(read_only=True, source="object_updated_at")
     is_duplicate = serializers.BooleanField(read_only=True)
     has_error = serializers.BooleanField(read_only=True)
+    # A discard is deliberate (a routing rule), not an error: the timestamp is
+    # the flag, so staff can tell "dropped" from "still in flight".
+    discarded_at = serializers.DateTimeField(read_only=True)
+    discard_reason = serializers.CharField(read_only=True)
 
 
 class ActivityLogBaseSerializer(serializers.Serializer):

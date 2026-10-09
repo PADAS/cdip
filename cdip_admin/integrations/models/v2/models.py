@@ -1056,11 +1056,25 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     has_error = models.BooleanField(default=False)
     error = models.CharField(max_length=500, null=True, blank=True, default="")
     is_duplicate = models.BooleanField(default=False)
+    # A discarded observation was dropped on purpose by a routing rule — the
+    # timestamp doubles as the flag, and it is not an error: has_error and the
+    # connection health calculation must stay unaffected. Its index is partial
+    # (discarded non-null rows only — the selective side) and built CONCURRENTLY
+    # in its own non-atomic migration, so the build never blocks ingestion
+    # writes on the largest table (proposal §6).
+    discarded_at = models.DateTimeField(blank=True, null=True)
+    # Which kind of rule dropped it; values mirror gundi-core's ObservationFilterReason.
+    discard_reason = models.CharField(max_length=32, blank=True, default="")
 
     class Meta:
         indexes = [
             models.Index(fields=["created_at"]),
             models.Index(fields=["updated_at"]),
+            models.Index(
+                fields=["discarded_at"],
+                name="gunditrace_discarded_idx",
+                condition=models.Q(discarded_at__isnull=False),
+            ),
         ]
         ordering = ("-created_at", )
 
