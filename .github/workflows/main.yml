@@ -4,6 +4,9 @@ on:
     branches:
       - main
       - 'release-**'
+      # Hackathon (outbound webhooks): build and deploy this branch to gundi-dev
+      # only. Stage/prod stay gated on release-**. Remove before merging.
+      - hackathon-outbound-webhooks
 env:
   TRACING_ENABLED: ${{secrets.TRACING_ENABLED}}
   PUBSUB_ENABLED: ${{secrets.PUBSUB_ENABLED}}
@@ -37,7 +40,8 @@ jobs:
     # PADAS/serca-argocd-apps:gundi/admin-portal/values-gundi-dev.yaml and lets
     # ArgoCD's automated selfHeal pick up the change.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
-    if: startsWith(github.ref, 'refs/heads/main')
+    # Hackathon: also deploys hackathon-outbound-webhooks to dev. Remove before merging.
+    if: startsWith(github.ref, 'refs/heads/main') || github.ref == 'refs/heads/hackathon-outbound-webhooks'
     needs: [vars, build]
     with:
       app-name: admin-portal
