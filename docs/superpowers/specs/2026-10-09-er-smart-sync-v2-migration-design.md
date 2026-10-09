@@ -119,9 +119,9 @@ migrate_legacy_v1: bool = True  # only consulted when event_type_version == "v2"
 
 In `ERSmartSynchronizer.synchronize_datamodel`, when the version is v2 and
 the flag is on, fetch v1 event types once per run alongside the existing v2
-snapshot. In `push_smart_ca_datamodel_to_earthranger`, after the target
-event types for the CA (or CA+CM) are computed and before the choices
-upsert:
+snapshot. In `push_smart_ca_datamodel_to_earthranger`, after the choices
+upsert and after the target event types for the CA (or CA+CM) are built,
+before create-or-update:
 
 1. Intersect the target values with the v1 snapshot values. SMART-derived
    values start with the CA UUID (and CM UUID), so a hand-built v1 type can
@@ -167,9 +167,16 @@ after the attribute is found in the CM or CA data model:
   (SMART rejects the observation) stays observable rather than silently
   dropping the field.
 
-Bump the smartconnect-client pin from 1.7.0 to the release carrying
-`resolve_option_key`. Existing v1 sites are unaffected because their values
-match exactly on step 1.
+Bump the smartconnect-client pin from the 1.7.0 wheel to 1.15.0. That
+release requires Python 3.10 and httpx 0.28, so the same PR moves routing
+from Python 3.8 to 3.10 and lifts the chain httpx drags along (FastAPI,
+Starlette, uvicorn, the OpenTelemetry packages, gundi-client 1.1.0,
+gundi-client-v2 3.7.1, redis 6) and drops the unused walrus dependency.
+Verified 2026-10-09: the full routing suite passes on that set, every
+gundi client method routing calls still exists, and aioredis 2.0.1 works
+against Redis 7 with redis-py 6 installed. 3.11 stays out of scope because
+aioredis 2.0.1 fails at import there. Existing v1 sites are unaffected by
+the lookup because their values match exactly on step 1.
 
 This deploys **before** any site syncs as v2.
 
@@ -249,8 +256,10 @@ Preconditions:
 
 Order:
 
-1. Deploy cdip-routing with the reverse lookup. No behaviour change for v1
-   sites.
+1. Deploy cdip-routing with the reverse lookup and the platform bump. Soak
+   on stage first: confirm spans still reach Cloud Trace after the
+   OpenTelemetry jump, and push one SMART event through a v1 and a v2
+   connection. No behaviour change for v1 sites.
 2. Deploy the portal. Trigger `sync_er_smart_datamodels` manually for one
    ER integration and review the run summary (`event_types_migrated`,
    `event_types_skipped_by_conflict` should be zero afterwards). Push one
@@ -274,8 +283,8 @@ only in-place escape hatch and is meaningless after 2026-10-15.
   routing logs the error with the attribute name. Detecting the collision
   during the push, as a warning in the run summary, is a small follow-up in
   er-smart-sync and is not required for the sunset.
-- **Option keys longer than 91 characters.** The library shortens the ER
-  value with a hash suffix. `resolve_option_key` must apply the same
+- **Option keys longer than 100 characters.** The library shortens the ER
+  value to a 91-character prefix plus a hash suffix. `resolve_option_key` must apply the same
   shortening when computing the sanitized form, so the shared helper in
   smartconnect-client owns that rule as well.
 - **Duplicate Choice lists** left by ER's migrator. Cosmetic in the ER
