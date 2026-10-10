@@ -289,3 +289,11 @@ only in-place escape hatch and is meaningless after 2026-10-15.
   smartconnect-client owns that rule as well.
 - **Duplicate Choice lists** left by ER's migrator. Cosmetic in the ER
   admin; no functional impact.
+- **Types ER cannot persist.** ER's migrator writes each inline enum key
+  into its own Choice table unsanitized, and that column is 100 characters.
+  A SMART TREE leaf with a dotted path over that length fails the migrate
+  call for its whole event type, every run, and the library aborts that CA's
+  push each time. The rollout plan checks for this with a dry-run migrate
+  against a TREE-bearing tenant before the portal goes live; if any such
+  type exists, it needs an ER-side fix or a decision to deactivate the v1
+  record and create the v2 type fresh.

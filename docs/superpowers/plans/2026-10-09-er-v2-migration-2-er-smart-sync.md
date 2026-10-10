@@ -745,11 +745,15 @@ BODY
 )"
 ```
 
-After merge: set the changelog date in a follow-up commit if needed, then
+Tagging is gated on smartconnect-client 1.15.0 being on PyPI (`pip index versions smartconnect-client`). Once it is, on the merged `main`:
 
 ```bash
 git checkout main && git pull
-git tag v0.5.0 && git push origin v0.5.0
+uv lock                      # moves the tracked uv.lock from smartconnect-client 1.14.0 to 1.15.0
+sed -i '' 's/## 0.5.0 — <release date>/## 0.5.0 — '"$(date +%F)"'/' docs/changelog.md
+uv lock --check && uv run pytest -q
+git commit -am "Release 0.5.0: lock smartconnect-client 1.15.0, date the changelog"
+git push && git tag v0.5.0 && git push origin v0.5.0
 ```
 
 and confirm `pip index versions er-smart-sync` shows 0.5.0. Part 4 depends on it.

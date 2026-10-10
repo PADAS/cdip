@@ -738,6 +738,15 @@ BODY
 
 1. cdip-routing part 3 is live in prod.
 2. Every prod ER site the portal syncs runs ER 2.146.1 or newer. List them from the portal DB (enabled `InboundIntegrationConfiguration` rows of type `earth_ranger` linked to an enabled `smart_connect` outbound) and check each site's `/api/v1.0/status` version.
+3. ER's migrator can fail to persist a type whose inline enum holds a key longer than 100 characters (it writes the raw SMART key into its own Choice table, varchar(100); deep TREE leaves can exceed that). Before the portal runs for real, call the migrate endpoint with `dry_run: true` against one representative prod tenant that has TREE attributes and confirm no result carries a `PERSIST_FAILED` or `CHOICE_CREATION_FAILED` error. If any do, those types need an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout; the portal would otherwise abort that CA's push on every run.
+
+```bash
+curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json" \
+  -X POST "https://<site>.pamdas.org/api/v2.0/activity/eventtypes/migrate/" \
+  -d '{"dry_run": true, "event_types": []}' | jq '.data[] | select(.errors|length>0) | {event_type, errors}'
+```
+
+An empty `event_types` list makes ER evaluate every v1 type in the tenant.
 
 - [ ] **Step 3: First run, one site**
 
