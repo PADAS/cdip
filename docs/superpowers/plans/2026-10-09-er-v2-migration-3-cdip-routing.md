@@ -405,12 +405,15 @@ BODY
 )"
 ```
 
-- [ ] **Step 2: Stage soak checklist (before the prod deploy)**
+- [ ] **Step 2: Stage soak checklist (before approving prod)**
 
-After the stage deploy from `main`:
+A push to `release-**` runs stage-deploy, then waits on the `prod` GitHub environment's required reviewers before prod-deploy. Run this soak in that window (a push to `main` deploys dev only).
 
-1. Confirm spans arrive: open Cloud Trace in the stage project and find a `transform_observation` span newer than the deploy. The OpenTelemetry jump is the one change the suite cannot cover.
-2. Push one ER event with a TREE-valued attribute through a v1 SMART connection on stage and confirm SMART Connect accepts the waypoint (no `Unknown option` rejection in the dispatcher logs).
-3. Confirm the portal and route lookups still resolve: one event each through a Gundi v1 and a Gundi v2 SMART connection, since gundi-client-v2 jumped a major version.
+1. **Flush stale SMART data model cache** in the stage routing Redis (REDIS_DB 3). smartconnect-client caches data models with no TTL, and entries written by the old 1.7.0 client carry MLIST attributes with `options: None` and top-level-only tree configs. Delete `cache:smart-ca:*:datamodel` and `cache:smart-ca:*:cdm:*` (`redis-cli -n 3 --scan --pattern 'cache:smart-ca:*:datamodel' | xargs -r redis-cli -n 3 del`, same for the cdm pattern), then after one event confirm a rebuilt entry carries `config_id` on its CM attributes. Repeat in prod right after the prod deploy.
+2. **Tracing:** find a `transform_observation` span newer than the deploy in the stage project's Cloud Trace.
+3. **Latency:** compare SMART event processing time and Cloud Run request latency before and after the deploy, and the dead-letter count.
+4. **Portal lookups:** one event each through a Gundi v1 and a Gundi v2 SMART connection; search logs for `OIDC discovery failed`, `AuthenticationError`, `Error while getting connection from the portal` (gundi-client-v2 3.x).
+5. **Error volume:** count `Could not map ER choice value` over the soak; on v1-only traffic it should be near zero.
+6. **TREE end to end:** push one ER event with a TREE-valued attribute through a v1 SMART connection and confirm SMART Connect accepts it.
 
-Then promote to prod. Part 4 may start its prod rollout once this is live.
+Then approve prod. Part 4 may start its prod rollout once routing is live in prod and its cache is flushed.

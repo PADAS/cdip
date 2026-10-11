@@ -257,9 +257,13 @@ Preconditions:
 Order:
 
 1. Deploy cdip-routing with the reverse lookup and the platform bump. Soak
-   on stage first: confirm spans still reach Cloud Trace after the
-   OpenTelemetry jump, and push one SMART event through a v1 and a v2
-   connection. No behaviour change for v1 sites.
+   on stage before approving prod: confirm spans still reach Cloud Trace
+   after the OpenTelemetry jump, and push one SMART event through a v1 and a
+   v2 connection. Right after each environment's deploy, flush the SMART data
+   model cache in routing's Redis (`cache:smart-ca:*:datamodel`,
+   `cache:smart-ca:*:cdm:*`): entries written by the old client have no TTL
+   and lack MLIST options, which the reverse lookup now depends on. No
+   behaviour change for v1 sites.
 2. Deploy the portal. Trigger `sync_er_smart_datamodels` manually for one
    ER integration and review the run summary (`event_types_migrated`,
    `event_types_skipped_by_conflict` should be zero afterwards). Push one
