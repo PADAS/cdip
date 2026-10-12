@@ -132,7 +132,9 @@ def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-# Hard limit: the library's retries swallow SoftTimeLimitExceeded; it checkpoints per event and the datamodel push is idempotent, so a hard kill is safe.
+# Hard limit on the three sync tasks: the library's retries swallow
+# SoftTimeLimitExceeded; it checkpoints per event and the datamodel push is
+# idempotent, so a hard kill is safe.
 @shared_task(
     base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
 )
