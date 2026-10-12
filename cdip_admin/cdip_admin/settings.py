@@ -476,6 +476,10 @@ MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC",
 
 # Sensors API to Routing
 RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-prod")
+# EarthRanger event type API version used when pushing SMART data models.
+# v1 writes end with ER's 2026-10-15 sunset; keep "v2" unless an emergency
+# rollback for one environment is needed before that date.
+ER_SMART_SYNC_EVENT_TYPE_VERSION = env.str("ER_SMART_SYNC_EVENT_TYPE_VERSION", default="v2")
 # Batch envelope publishing (docs/superpowers/specs/2026-07-29-pipeline-batch-envelope-design.md).
 # List-POSTs with at least this many non-duplicate observations publish
 # ObservationsBatchReceived envelopes instead of per-item events. This is the
