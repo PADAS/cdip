@@ -737,8 +737,9 @@ BODY
 - [ ] **Step 2: Preconditions before the prod deploy**
 
 1. cdip-routing part 3 is live in prod.
-2. Every prod ER site the portal syncs runs ER 2.146.1 or newer. List them from the portal DB (enabled `InboundIntegrationConfiguration` rows of type `earth_ranger` linked to an enabled `smart_connect` outbound) and check each site's `/api/v1.0/status` version.
-3. ER's migrator can fail to persist a type whose inline enum holds a key longer than 100 characters (it writes the raw SMART key into its own Choice table, varchar(100); deep TREE leaves can exceed that). Before the portal runs for real, call the migrate endpoint with `dry_run: true` against one representative prod tenant that has TREE attributes and confirm no result carries a `PERSIST_FAILED` or `CHOICE_CREATION_FAILED` error. If any do, those types need an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout; the portal would otherwise abort that CA's push on every run.
+2. The celery worker's `REDIS_DB` is the database the old synchronizer wrote `er.function.state.*` to (`KEYS er.function.state.*` in that db returns the integrations); the charts set `REDIS_DB: "0"`.
+3. Every prod ER site the portal syncs runs ER 2.146.1 or newer. List them from the portal DB (enabled `InboundIntegrationConfiguration` rows of type `earth_ranger` linked to an enabled `smart_connect` outbound) and check each site's `/api/v1.0/status` version.
+4. ER's migrator can fail to persist a type whose inline enum holds a key longer than 100 characters (it writes the raw SMART key into its own Choice table, varchar(100); deep TREE leaves can exceed that). Before the portal runs for real, call the migrate endpoint with `dry_run: true` against one representative prod tenant that has TREE attributes and confirm no result carries a `PERSIST_FAILED` or `CHOICE_CREATION_FAILED` error. If any do, those types need an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout; the portal would otherwise abort that CA's push on every run.
 
 ```bash
 curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json" \
@@ -748,9 +749,19 @@ curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json
 
 An empty `event_types` list makes ER evaluate every v1 type in the tenant.
 
-- [ ] **Step 3: First run, one site**
+- [ ] **Step 3: Refresh the portal's SMART data model cache**
 
-After the prod deploy, from a portal pod:
+Right after each environment's portal deploy and before any datamodel sync runs (pause the Beat schedule or do this immediately): either run `maintain_smart_integrations` and wait for it to finish, or delete the cache keys in the portal's Redis:
+
+```bash
+redis-cli -h $REDIS_HOST -n $REDIS_DB --scan --pattern 'cache:smart-ca:*' | xargs -r redis-cli -h $REDIS_HOST -n $REDIS_DB del
+```
+
+Entries written by smartconnect-client 1.11 have no TTL and lack the CM node `id` the split-mode slug uses; pushing from one creates display-only slugs that are duplicated once the cache refreshes. Verify: `GET cache:smart-ca:na:cdm:<a cm uuid>` contains `"id"` under its categories.
+
+- [ ] **Step 4: First run, one site**
+
+After the cache refresh, from a portal pod:
 
 ```bash
 python manage.py runsync_command --smart_integration_id <id> --er_integration_id <id>

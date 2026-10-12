@@ -264,16 +264,38 @@ Order:
    `cache:smart-ca:*:cdm:*`): entries written by the old client have no TTL
    and lack MLIST options, which the reverse lookup now depends on. No
    behaviour change for v1 sites.
-2. Deploy the portal. Trigger `sync_er_smart_datamodels` manually for one
-   ER integration and review the run summary (`event_types_migrated`,
+2. Deploy the portal, then, before any datamodel sync runs, refresh the
+   portal's own SMART data model cache: either run
+   `maintain_smart_integrations` and wait for it to finish, or delete
+   `cache:smart-ca:*` in the portal's Redis (`REDIS_HOST`, db
+   `REDIS_DB`). Entries written by smartconnect-client 1.11 have no TTL
+   and predate the CM node `id`, per-node option `config_id` and the CM
+   TREE fix; a split-mode push from a stale entry would create event
+   types under display-only slugs that get duplicated once the cache
+   refreshes. Verify one key first: `GET cache:smart-ca:na:cdm:<uuid>`
+   should contain `"id"` under its categories. Also confirm the celery
+   worker's `REDIS_DB` is the database the old synchronizer wrote
+   `er.function.state.*` to (the charts set `0`), or last-poll state
+   does not carry over and the library falls back to its default
+   lookback.
+3. Trigger `sync_er_smart_datamodels` manually for one ER integration
+   and review the run summary (`event_types_migrated`,
    `event_types_skipped_by_conflict` should be zero afterwards). Push one
    test patrol with a mixed-case or TREE option through to SMART.
-3. Let Beat run the remaining sites on schedule.
+4. Let Beat run the remaining sites on schedule.
 
 Rollback: redeploy the previous portal image. Migrated v2 types stay v2;
 reads are unaffected and v1 writes stop at the sunset regardless, so there
 is no data to undo. Setting `ER_SMART_SYNC_EVENT_TYPE_VERSION=v1` is the
 only in-place escape hatch and is meaningless after 2026-10-15.
+
+Known library follow-ups (er-smart-sync 0.5.1), not blocking the sunset:
+the patrol publish path catches every exception as "message too large"
+and still advances `patrol_last_poll_at`, so a Pub/Sub outage that
+outlasts the publisher's retries loses those patrols; `_retry` catches
+Celery's `SoftTimeLimitExceeded`, which is why the portal adds a hard
+`time_limit`; and `process_event` spans no longer carry the ER event
+attributes the old `enrich_span_from_er_event` set.
 
 ## Risks
 
