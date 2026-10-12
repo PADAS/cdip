@@ -266,16 +266,18 @@ Order:
    behaviour change for v1 sites.
 2. Deploy the portal. The first sync task on the new image flushes the
    portal's SMART data model cache itself: `build_synchronizer` calls
-   `ensure_smart_cache_generation()`, which compares the marker
-   `cache:smart-ca:generation` with the installed smartconnect-client
-   version and deletes every `cache:smart-ca:*` entry when they differ.
+   `ensure_smart_cache_generation()`, which deletes every
+   `cache:smart-ca:*` entry on each worker process's first task, whenever
+   the marker `cache:smart-ca:generation` (`<version>@<epoch>`) is not the
+   installed smartconnect-client version, and for an hour after an
+   upgrade; a redeploy after a rollback therefore starts clean too.
    Entries written by smartconnect-client 1.11 have no TTL and predate
    the CM node `id`, per-node option `config_id` and the CM TREE fix; a
    split-mode push from a stale entry would create event types under
    display-only slugs that get duplicated once the cache refreshes, and
    Beat keeps firing during the rollout, so the flush cannot depend on a
    person's timing. Verify after the first task: `GET
-   cache:smart-ca:generation` returns `1.15.0` (the worker log also
+   cache:smart-ca:generation` returns `1.15.0@<epoch>` (the worker log also
    shows "Flushed N smartconnect data model cache entries").
    `maintain_smart_integrations` is an optional warm-up. Also confirm the
    celery worker's `REDIS_DB` is the database the old synchronizer wrote
