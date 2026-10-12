@@ -264,17 +264,21 @@ Order:
    `cache:smart-ca:*:cdm:*`): entries written by the old client have no TTL
    and lack MLIST options, which the reverse lookup now depends on. No
    behaviour change for v1 sites.
-2. Deploy the portal, then, before any datamodel sync runs, refresh the
-   portal's own SMART data model cache: either run
-   `maintain_smart_integrations` and wait for it to finish, or delete
-   `cache:smart-ca:*` in the portal's Redis (`REDIS_HOST`, db
-   `REDIS_DB`). Entries written by smartconnect-client 1.11 have no TTL
-   and predate the CM node `id`, per-node option `config_id` and the CM
-   TREE fix; a split-mode push from a stale entry would create event
-   types under display-only slugs that get duplicated once the cache
-   refreshes. Verify one key first: `GET cache:smart-ca:na:cdm:<uuid>`
-   should contain `"id"` under its categories. Also confirm the celery
-   worker's `REDIS_DB` is the database the old synchronizer wrote
+2. Deploy the portal. The first sync task on the new image flushes the
+   portal's SMART data model cache itself: `build_synchronizer` calls
+   `ensure_smart_cache_generation()`, which compares the marker
+   `cache:smart-ca:generation` with the installed smartconnect-client
+   version and deletes every `cache:smart-ca:*` entry when they differ.
+   Entries written by smartconnect-client 1.11 have no TTL and predate
+   the CM node `id`, per-node option `config_id` and the CM TREE fix; a
+   split-mode push from a stale entry would create event types under
+   display-only slugs that get duplicated once the cache refreshes, and
+   Beat keeps firing during the rollout, so the flush cannot depend on a
+   person's timing. Verify after the first task: `GET
+   cache:smart-ca:generation` returns `1.15.0` (the worker log also
+   shows "Flushed N smartconnect data model cache entries").
+   `maintain_smart_integrations` is an optional warm-up. Also confirm the
+   celery worker's `REDIS_DB` is the database the old synchronizer wrote
    `er.function.state.*` to (the charts set `0`), or last-poll state
    does not carry over and the library falls back to its default
    lookback.

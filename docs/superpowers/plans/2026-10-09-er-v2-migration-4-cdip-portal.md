@@ -749,15 +749,15 @@ curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json
 
 An empty `event_types` list makes ER evaluate every v1 type in the tenant.
 
-- [ ] **Step 3: Refresh the portal's SMART data model cache**
+- [ ] **Step 3: Confirm the SMART data model cache was flushed**
 
-Right after each environment's portal deploy and before any datamodel sync runs (pause the Beat schedule or do this immediately): either run `maintain_smart_integrations` and wait for it to finish, or delete the cache keys in the portal's Redis:
+The flush is automatic: `build_synchronizer` calls `sync_integrations.smart_cache.ensure_smart_cache_generation()`, which deletes every `cache:smart-ca:*` entry once per installed smartconnect-client version (marker `cache:smart-ca:generation`). Entries written by smartconnect-client 1.11 have no TTL and lack the CM node `id` the split-mode slug uses; pushing from one would create display-only slugs that are duplicated once the cache refreshes. After the first sync task on the new image, verify in the portal's Redis:
 
 ```bash
-redis-cli -h $REDIS_HOST -n $REDIS_DB --scan --pattern 'cache:smart-ca:*' | xargs -r redis-cli -h $REDIS_HOST -n $REDIS_DB del
+redis-cli -h $REDIS_HOST -n $REDIS_DB GET cache:smart-ca:generation   # 1.15.0
 ```
 
-Entries written by smartconnect-client 1.11 have no TTL and lack the CM node `id` the split-mode slug uses; pushing from one creates display-only slugs that are duplicated once the cache refreshes. Verify: `GET cache:smart-ca:na:cdm:<a cm uuid>` contains `"id"` under its categories.
+and look for `Flushed N smartconnect data model cache entries` in the worker log. `maintain_smart_integrations` is an optional warm-up afterwards.
 
 - [ ] **Step 4: First run, one site**
 
