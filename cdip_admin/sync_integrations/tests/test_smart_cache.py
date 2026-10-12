@@ -1,5 +1,8 @@
 from fnmatch import fnmatch
 
+import pytest
+
+from sync_integrations import smart_cache
 from sync_integrations.smart_cache import (
     CACHE_PATTERN,
     GENERATION_KEY,
@@ -8,6 +11,28 @@ from sync_integrations.smart_cache import (
 )
 
 T0 = 1_800_000_000.0
+
+
+@pytest.fixture(autouse=True)
+def fresh_process(monkeypatch):
+    # Each test behaves like a worker process that has already flushed once,
+    # except the one that exercises the per-process first flush.
+    monkeypatch.setattr(smart_cache, "_flushed_in_this_process", True)
+
+
+def test_new_process_flushes_once_even_when_the_marker_looks_settled(monkeypatch):
+    # A redeploy after a rollback: the old image repopulated the cache under a
+    # marker that already looks settled for this version.
+    monkeypatch.setattr(smart_cache, "_flushed_in_this_process", False)
+    client = FakeRedis({GENERATION_KEY: f"1.15.0@{T0}", "cache:smart-ca:ca-1:datamodel": "{}"})
+
+    later = T0 + 10 * UPGRADE_GRACE_SECONDS
+    assert ensure_smart_cache_generation(client=client, version="1.15.0", now=later) is True
+    assert "cache:smart-ca:ca-1:datamodel" not in client.data
+    assert client.data[GENERATION_KEY] == f"1.15.0@{later}".encode()
+    # Second call in the same process, past the window: no-op.
+    client.set("cache:smart-ca:ca-1:datamodel", "{}")
+    assert ensure_smart_cache_generation(client=client, version="1.15.0", now=later + UPGRADE_GRACE_SECONDS + 1) is False
 
 
 class FakeRedis:

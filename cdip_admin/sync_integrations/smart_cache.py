@@ -20,6 +20,10 @@ CACHE_PATTERN = "cache:smart-ca:*"
 # Longer than a rolling worker deployment: old workers can repopulate the cache
 # until their last pod stops, so every task in this window flushes again.
 UPGRADE_GRACE_SECONDS = 3600
+# Each worker process flushes once on its first task and restarts the grace
+# window, so a redeploy after a rollback (which repopulates the cache in the
+# old shape under a marker that already looks settled) still starts clean.
+_flushed_in_this_process = False
 
 
 def _parse_marker(raw) -> tuple[str | None, float | None]:
@@ -43,11 +47,12 @@ def ensure_smart_cache_generation(
     Uses the same Redis client smartconnect-client reads through, so the
     database is right by construction. Returns True when a flush happened.
     """
+    global _flushed_in_this_process
     client = client if client is not None else smart_cache
     now = time.time() if now is None else now
     current, upgraded_at = _parse_marker(client.get(GENERATION_KEY))
     settled = upgraded_at is not None and now - upgraded_at > UPGRADE_GRACE_SECONDS
-    if current == version and settled:
+    if current == version and settled and _flushed_in_this_process:
         return False
     deleted = 0
     for key in client.scan_iter(match=CACHE_PATTERN):
@@ -55,10 +60,11 @@ def ensure_smart_cache_generation(
         if name != GENERATION_KEY:
             client.delete(key)
             deleted += 1
-    if current != version or upgraded_at is None:
-        # First task on the new client: start the grace period. Later flushes
-        # inside the window keep the original stamp so the window ends.
+    if current != version or upgraded_at is None or not _flushed_in_this_process:
+        # First task on the new client or in this process: (re)start the grace
+        # period. Later flushes inside the window keep the stamp so it ends.
         client.set(GENERATION_KEY, f"{version}@{now}")
+    _flushed_in_this_process = True
     logger.warning(
         "Flushed %d smartconnect data model cache entries: cache generation %s -> %s",
         deleted,
