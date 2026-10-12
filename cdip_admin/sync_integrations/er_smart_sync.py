@@ -14,6 +14,7 @@ from er_smart_sync.config import EarthRangerConfig, SmartConnectConfig, SyncConf
 from er_smart_sync.synchronizer import ERSmartSynchronizer
 
 from core.utils import get_publisher
+from sync_integrations.smart_cache import ensure_smart_cache_generation
 from sync_integrations.state import RedisStateStore
 from sync_integrations.tracing import PortalTracing
 
@@ -52,6 +53,9 @@ def build_sync_config(*, smart_config, er_config) -> SyncConfig:
 
 
 def build_synchronizer(*, smart_config, er_config) -> ERSmartSynchronizer:
+    # Runs before the library fetches anything, so a client upgrade never
+    # serves a stale cached data model to the first sync after a deploy.
+    ensure_smart_cache_generation()
     return ERSmartSynchronizer(
         config=build_sync_config(smart_config=smart_config, er_config=er_config),
         publisher=get_publisher(),

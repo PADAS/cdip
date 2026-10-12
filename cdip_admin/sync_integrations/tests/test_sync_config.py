@@ -83,11 +83,13 @@ def test_build_synchronizer_wires_portal_adapters(mocker, smart_integration, er_
     storage = mocker.MagicMock()
     mocker.patch("sync_integrations.er_smart_sync.get_publisher", return_value=publisher)
     mocker.patch("sync_integrations.er_smart_sync.get_cloud_storage", return_value=storage)
+    cache_guard = mocker.patch("sync_integrations.er_smart_sync.ensure_smart_cache_generation")
     er_client_cls = mocker.patch("er_smart_sync.synchronizer.ERClient")
     smart_client_cls = mocker.patch("er_smart_sync.synchronizer.SmartClient")
 
     sync = build_synchronizer(smart_config=smart_integration, er_config=er_integration)
 
+    cache_guard.assert_called_once_with()
     assert sync.publisher is publisher
     assert sync.file_storage is storage
     assert isinstance(sync.state_store, RedisStateStore)
