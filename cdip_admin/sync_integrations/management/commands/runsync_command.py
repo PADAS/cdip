@@ -6,7 +6,7 @@ from integrations.models import (
     OutboundIntegrationConfiguration,
     InboundIntegrationConfiguration,
 )
-from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
+from sync_integrations.er_smart_sync import build_synchronizer
 from sync_integrations.tasks import run_er_smart_sync_integrations
 
 logger = logging.getLogger(__name__)
@@ -59,10 +59,7 @@ class Command(BaseCommand):
                 )
                 return
 
-            er_smart_sync = ER_SMART_Synchronizer(
-                smart_config=smart_config, er_config=er_config
-            )
-            er_smart_sync.synchronize_datamodel()
+            build_synchronizer(smart_config=smart_config, er_config=er_config).synchronize_datamodel()
         else:
             print('Running all sync integrations.')
             run_er_smart_sync_integrations()

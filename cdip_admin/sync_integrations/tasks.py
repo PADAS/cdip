@@ -2,6 +2,7 @@ import logging
 import time
 from functools import wraps
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from celery_once import QueueOnce
 from celery import shared_task, chain, group
@@ -10,7 +11,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration,\
     InboundIntegrationType, OutboundIntegrationType, Device
 
-from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
+from sync_integrations.er_smart_sync import build_synchronizer
 from sync_integrations.utils import (
     maintain_smart_integration,
 )
@@ -57,13 +58,21 @@ def handle_timeout_exceptions(func):
 
 @shared_task(base=QueueOnce, once={"graceful": True})
 @handle_timeout_exceptions
-def synchronize_smart_datamodels(integration_id:str):
-
+def synchronize_smart_datamodels(integration_id: str):
     smart_config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
     logger.info('Synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
-    datamodel_synchronizer = ER_SMART_Synchronizer(smart_config=smart_config)
-    datamodel_synchronizer.synchronize_datamodel()
+    er_integration_id = (smart_config.additional or {}).get("er_integration_id")
+    try:
+        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
+    except (InboundIntegrationConfiguration.DoesNotExist, ValidationError, ValueError):
+        logger.error(
+            "SMART integration %s (%s) has no valid additional.er_integration_id (%r); skipping",
+            smart_config.name, smart_config.id, er_integration_id,
+        )
+        return
+
+    build_synchronizer(smart_config=smart_config, er_config=er_config).synchronize_datamodel()
     logger.info('Finished synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
 
@@ -141,7 +150,7 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
         return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing Data Models for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -178,13 +187,13 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
         return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.synchronize_er_events_to_smart_connect(config=er_configuration)
+        er_smart_sync.synchronize_er_events()
 
         logger.info("Finished synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -214,13 +223,13 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
         return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing EarthRanger patrols for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.synchronize_er_patrols_to_smart_connect(config=er_configuration)
+        er_smart_sync.synchronize_er_patrols()
 
         logger.info("Finished synchronizing EarthRanger patrols for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
