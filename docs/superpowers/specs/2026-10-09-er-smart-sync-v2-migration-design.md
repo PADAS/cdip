@@ -289,10 +289,14 @@ reads are unaffected and v1 writes stop at the sunset regardless, so there
 is no data to undo. Setting `ER_SMART_SYNC_EVENT_TYPE_VERSION=v1` is the
 only in-place escape hatch and is meaningless after 2026-10-15.
 
-Known library follow-ups (er-smart-sync 0.5.1), not blocking the sunset:
-the patrol publish path catches every exception as "message too large"
-and still advances `patrol_last_poll_at`, so a Pub/Sub outage that
-outlasts the publisher's retries loses those patrols; `_retry` catches
+Fixed in er-smart-sync 0.5.1 (the version the portal pins): the 0.5.0
+patrol publish path caught every exception as "message too large" and
+still advanced `patrol_last_poll_at`, so a Pub/Sub outage that outlasted
+the publisher's retries lost those patrols. 0.5.1 skips only an
+exception named `MessageTooLargeError` and re-raises everything else, so
+the window is retried next run.
+
+Known library follow-ups, not blocking the sunset: `_retry` catches
 Celery's `SoftTimeLimitExceeded`, which is why the portal adds a hard
 `time_limit`; and `process_event` spans no longer carry the ER event
 attributes the old `enrich_span_from_er_event` set.
