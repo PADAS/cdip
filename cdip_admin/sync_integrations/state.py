@@ -3,7 +3,9 @@
 Keeps the key and JSON shape the previous synchronizer used
 (``er.function.state.<integration_id>`` holding ``event_last_poll_at`` and
 ``patrol_last_poll_at``), so last-poll timestamps carry over with no
-backfill.
+backfill, provided ``settings.REDIS_DB`` matches the Redis database the old
+synchronizer wrote to. Otherwise the store starts empty and the library falls
+back to its default lookback.
 """
 from er_smart_sync.state import SyncState
 

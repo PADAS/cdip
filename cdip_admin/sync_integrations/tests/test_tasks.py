@@ -74,3 +74,13 @@ def test_synchronize_smart_datamodels_without_valid_er_integration_logs_and_retu
     tasks.synchronize_smart_datamodels(str(outbound_integration_smart.id))
     tasks.build_synchronizer.assert_not_called()
     assert "er_integration_id" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "task", [tasks.sync_er_smart_datamodels, tasks.sync_er_events, tasks.sync_er_patrols]
+)
+def test_sync_tasks_keep_the_soft_limit_and_gain_a_hard_limit(task):
+    # The library's retries swallow SoftTimeLimitExceeded, so only the hard
+    # limit bounds a run.
+    assert task.soft_time_limit == 1800
+    assert task.time_limit == 2100

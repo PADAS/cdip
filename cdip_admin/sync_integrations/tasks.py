@@ -132,7 +132,10 @@ def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+# Hard limit: the library's retries swallow SoftTimeLimitExceeded; it checkpoints per event and the datamodel push is idempotent, so a hard kill is safe.
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize SMART data models and patrol data models to EarthRanger."""
@@ -169,7 +172,9 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger events to SMART."""
@@ -205,7 +210,9 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger patrols to SMART."""
