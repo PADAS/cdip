@@ -21,7 +21,7 @@
 
 ## Review Focus
 
-1. ER's v1 list endpoint answering with an error after the sunset must not stop the v2 push; the run proceeds with nothing to migrate. Pinned in Task 3.
+1. ER's v1 list endpoint failing (missing on an old release, or a transient error; it stays readable after the 2026-10-15 sunset, which ends only v1 writes) must not stop the v2 push; the run proceeds with nothing to migrate. Pinned in Task 3.
 2. A value already converted by someone else between the snapshot and the call comes back with an `errors` entry; the run must treat the CA as failed and retry cleanly next time rather than crash. Pinned in Task 3 (error path).
 3. `DryRunERClient` returns a dict, not a list, from `_post`; the migrate step must treat that as "nothing happened". Pinned in Task 3.
 4. v1 types that are not in this run's build output (inactive SMART categories, hand-made types) must never be sent to migrate. Pinned in Task 3 (intersection test).
@@ -265,7 +265,7 @@ class TestLegacyV1Migration:
         )
 
     def test_snapshot_failure_is_non_fatal(self, sync_config_v2, mock_er_client):
-        # After ER's v1 sunset the list endpoint errors; the v2 push must go on.
+        # A transient list failure must not block the v2 push.
         mock_er_client.get_event_types.side_effect = Exception("410 Gone")
         sync = self._sync(sync_config_v2, mock_er_client)
         assert sync._fetch_legacy_v1_snapshot() == []
@@ -443,9 +443,11 @@ Add these methods after `push_smart_ca_datamodel_to_earthranger` (before `calcul
     def _fetch_legacy_v1_snapshot(self) -> list:
         """v1 event types in the tenant, or [] when none can be listed.
 
-        After EarthRanger's v1 sunset the v1 list endpoint stops answering.
-        That must not block the v2 push, so a failure degrades to "nothing
-        to migrate" with a warning.
+        The v1 list stays readable after EarthRanger's 2026-10-15 sunset
+        (only v1 writes end), so a failure here is a missing endpoint on an
+        old release or a transient error. Neither should block the v2
+        push: it degrades to "nothing to migrate", colliding values are
+        skipped by the conflict path, and the next run retries.
         """
         if not self._migration_enabled():
             return []
