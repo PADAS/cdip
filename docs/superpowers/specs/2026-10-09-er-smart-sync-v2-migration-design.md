@@ -183,7 +183,7 @@ This deploys **before** any site syncs as v2.
 ### 4. cdip (this repo)
 
 **Dependencies.** `dependencies/requirements.in`: remove the `dasclient` and
-`smartconnect_client` GitHub wheels, add `er-smart-sync==0.5.0`. This pulls
+`smartconnect_client` GitHub wheels, add `er-smart-sync==0.5.1`. This pulls
 `earthranger-client` and `smartconnect-client>=1.14`. A narrow dependency
 dry run against the current pins succeeded with no changes to existing
 packages.
@@ -252,7 +252,7 @@ Preconditions:
 1. All production ER sites that the portal syncs run ER 2.146.1 or newer,
    the first release with the migrate endpoint. Verify before step 4.
 2. smartconnect-client released with `resolve_option_key`.
-3. er-smart-sync 0.5.0 released.
+3. er-smart-sync 0.5.1 released.
 
 Order:
 
