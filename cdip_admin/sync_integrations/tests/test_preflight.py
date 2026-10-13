@@ -8,6 +8,7 @@ from integrations.models import Device, DeviceGroup
 from sync_integrations.management.commands.er_smart_sync_preflight import (
     summarize_dry_run,
     sync_pairs,
+    version_tuple,
 )
 from sync_integrations.tasks import er_integrations_for
 
@@ -146,4 +147,24 @@ def test_command_reports_unreachable_site_and_fails(requests_mock, pair):
     requests_mock.get(f"{SITE}/api/v1.0/status", exc=ConnectionError("refused"))
 
     with pytest.raises(CommandError):
+        call_command("er_smart_sync_preflight", stdout=StringIO())
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("release-2.148.1-a15e403", (2, 148, 1)),
+        ("2.146.1", (2, 146, 1)),
+        ("v2.130.0", (2, 130, 0)),
+        ("", ()),
+    ],
+)
+def test_version_tuple_reads_the_dotted_number_only(raw, expected):
+    assert version_tuple(raw) == expected
+
+
+def test_command_treats_release_prefixed_old_version_as_low(requests_mock, pair):
+    _site(requests_mock, "release-2.140.0-abc123")
+
+    with pytest.raises(CommandError, match="1 preflight failure"):
         call_command("er_smart_sync_preflight", stdout=StringIO())

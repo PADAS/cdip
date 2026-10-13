@@ -11,6 +11,7 @@ depends only on Django, requests and the integration models: no erclient,
 no er-smart-sync, and a local copy of the pair query when the shared helper
 is not yet present.
 """
+import re
 from urllib.parse import urlparse
 
 import requests
@@ -103,13 +104,13 @@ def migrate_dry_run(base_url: str, headers: dict) -> list:
 
 
 def version_tuple(version: str) -> tuple:
-    parts = []
-    for piece in version.split("."):
-        digits = "".join(ch for ch in piece if ch.isdigit())
-        if not digits:
-            break
-        parts.append(int(digits))
-    return tuple(parts)
+    """Numeric tuple of the first dotted number in an ER version string.
+
+    ER reports strings like ``release-2.148.1-a15e403``; only ``2.148.1``
+    matters.
+    """
+    match = re.search(r"\d+(?:\.\d+)+", version or "")
+    return tuple(int(n) for n in match.group(0).split(".")) if match else ()
 
 
 def summarize_dry_run(results: list, max_value_length: int) -> dict:
