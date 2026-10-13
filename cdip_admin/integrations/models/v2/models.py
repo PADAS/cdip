@@ -853,6 +853,12 @@ class SourceFilter(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     # emptied whitelist keeps allowing nothing instead of silently allowing the
     # provider's every other device. API writes that change the source list
     # recompute it (a deliberate edit redefines the scope); cascades never touch it.
+    # Whitelists cover sourceless data by default: events may arrive without a
+    # source field and are filed under "default-source" by ingestion - data the
+    # rule's author never saw as a device and cannot be expected to list. The
+    # inclusion happens at serialization time (never as membership), so device
+    # lists and counters stay untouched; API clients opt out with false.
+    include_default_source = models.BooleanField(default=True)
     covered_providers = models.ManyToManyField(
         "integrations.Integration",
         blank=True,
