@@ -284,11 +284,17 @@ Order:
    `er.function.state.*` to (the charts set `0`), or last-poll state
    does not carry over and the library falls back to its default
    lookback.
-3. Trigger `sync_er_smart_datamodels` manually for one ER integration
+3. Hold back any site the preflight flagged: set `"er_smart_sync_paused":
+   true` in that SMART integration's `additional`; the Beat fan-out skips
+   it and nothing else about the integration changes. On 2026-10-13 that is
+   WPS Laramie Ridge, whose SMART-derived v1 types carry enum keys longer
+   than ER's `Choice.value` varchar(100); it rejoins once ER can persist
+   them.
+4. Trigger `sync_er_smart_datamodels` manually for one ER integration
    and review the run summary (`event_types_migrated`,
    `event_types_skipped_by_conflict` should be zero afterwards). Push one
    test patrol with a mixed-case or TREE option through to SMART.
-4. Let Beat run the remaining sites on schedule.
+5. Let Beat run the remaining sites on schedule.
 
 Rollback: redeploy the previous portal image. Migrated v2 types stay v2;
 reads are unaffected and v1 writes stop at the sunset regardless, so there

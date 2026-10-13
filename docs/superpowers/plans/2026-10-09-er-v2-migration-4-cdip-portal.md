@@ -755,6 +755,12 @@ curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json
   | select((.errors|length>0) or (.long_values|length>0))'
 ```
 
+4. Preflight result on prod, 2026-10-13: all reachable sites on ER 2.148.1; Lalibela, Coralina, smart-integration clean; gkepf and Kariega clean for SMART-derived types (their hand-made v1 types with `schema_transform` are not the portal's). Three actions before the deploy:
+   - **WPS Laramie Ridge** (SMART integration `3e8f69ad-06a8-4b39-9243-34a75f8ed441`, CA `273807b3-…`): 42 SMART-derived v1 types carry enum keys longer than ER's `Choice.value` varchar(100), which cannot be widened in time, so ER's migrator would fail `choice_creation_failed` and the portal would abort that CA every cycle. Hold it out of the first rollout: set `"er_smart_sync_paused": true` in that SMART integration's `additional` (admin JSON editor). The Beat fan-out skips it with a warning and the preflight reports it as paused. Re-enable after an ER-side fix (wider column or migrator-side key shortening).
+   - **Tanglewood** (`7338ce58-29cb-40c4-a061-815a5b4a1335`): DNS is gone; disable that ER integration.
+   - **TPFA** (`695408e7-a4bd-4751-830c-0a5d9e68bed2`): no token and the password grant returns 400; set a token on the ER integration.
+   Then rerun the preflight: expected `… 1 paused, … 0 failure(s)`.
+
 - [ ] **Step 3: Confirm the SMART data model cache was flushed**
 
 The flush is automatic: `build_synchronizer` calls `sync_integrations.smart_cache.ensure_smart_cache_generation()`, which deletes every `cache:smart-ca:*` entry on each worker process's first task and whenever the marker `cache:smart-ca:generation` (`<version>@<epoch>`) is not the installed smartconnect-client version or is less than an hour old. Entries written by smartconnect-client 1.11 have no TTL and lack the CM node `id` the split-mode slug uses; pushing from one would create display-only slugs that are duplicated once the cache refreshes. After the first sync task on the new image, verify in the portal's Redis:
