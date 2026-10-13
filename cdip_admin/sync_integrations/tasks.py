@@ -250,6 +250,24 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
+def er_integrations_for(smart_integration):
+    """The enabled ER integrations a SMART integration syncs with.
+
+    An ER integration qualifies when one of the SMART integration's device
+    groups is its default device group, or holds one of its devices. The
+    sync task and the preflight command share this so they cannot drift.
+    """
+    device_groups = smart_integration.devicegroups.all()
+    devices = Device.objects.filter(
+        devicegroup__in=device_groups,
+        inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER,
+    ).order_by('inbound_configuration_id').distinct('inbound_configuration_id').values('inbound_configuration_id')
+    idlist = [dev.get('inbound_configuration_id') for dev in devices]
+    return InboundIntegrationConfiguration.objects.filter(
+        enabled=True,
+        type__slug=InboundIntegrationType.EARTHRANGER,
+    ).filter(Q(default_devicegroup__in=device_groups) | Q(id__in=idlist))
+
 @shared_task(base=QueueOnce, once={"graceful": True})
 @handle_timeout_exceptions
 def run_er_smart_sync_integration(*, smart_integration_id=None):
@@ -265,24 +283,8 @@ def run_er_smart_sync_integration(*, smart_integration_id=None):
 
     logger.info(f"Starting ER smart sync integration for {smart_integration.name} ({smart_integration.id}) with endpoint {smart_integration.endpoint}")
 
-    device_groups = smart_integration.devicegroups.all()
-
-    # Get all devices that are in the device groups and have an EarthRanger inbound integration
-    devices = Device.objects.filter(devicegroup__in=device_groups,
-                                    inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER).order_by(
-        'inbound_configuration_id').distinct('inbound_configuration_id').values('inbound_configuration_id')
-
-    idlist = [dev.get('inbound_configuration_id') for dev in devices]
-
-    # Also include any Inbound Configuration that is associated by its default device group.
-    er_integrations = InboundIntegrationConfiguration.objects.filter(
-        enabled=True,
-        type__slug=InboundIntegrationType.EARTHRANGER).filter(
-        Q(default_devicegroup__in=device_groups) | Q(id__in=idlist)
-    )
-
     # Create task chains for each ER integration
-    for er_configuration in er_integrations:
+    for er_configuration in er_integrations_for(smart_integration):
         logger.info("Creating sync chain for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
