@@ -738,8 +738,13 @@ BODY
 
 1. cdip-routing part 3 is live in prod.
 2. The celery worker's `REDIS_DB` is the database the old synchronizer wrote `er.function.state.*` to (`KEYS er.function.state.*` in that db returns the integrations); the charts set `REDIS_DB: "0"`.
-3. Every prod ER site the portal syncs runs ER 2.146.1 or newer. List them from the portal DB (enabled `InboundIntegrationConfiguration` rows of type `earth_ranger` linked to an enabled `smart_connect` outbound) and check each site's `/api/v1.0/status` version.
-4. ER's migrator writes each inline enum key into its Choice table (`value` is varchar(100)); deep TREE leaves can exceed that, and the portal would then abort that CA's push on every run. A dry run stops before persistence, so `persist_failed` / `choice_creation_failed` never appear in it; the raw keys do, under `hardcoded_choices[].choices[].value`. Before the portal runs for real, dry-run the migrate endpoint against one representative prod tenant with TREE attributes and confirm the command below prints nothing (no type with an error code, no choice value over 100 characters). Error codes to expect otherwise: `schema_parse`, `schema_transform`, `unsupported_features`, the `choice_resolution_*` / `dependency_*` / `dynamic_choice_*` family, `exception`; `version_validation` means the type is already v2 and is fine. Warnings do not block. Any type that fails needs an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout.
+3. From a portal pod, run the preflight. It walks the same SMART -> ER pairs the Beat schedule chains, checks each site is on ER 2.146.1 or newer (the first release with the migrate endpoint), and with `--migrate-dry-run` evaluates every v1 event type on each site without writing anything:
+
+```bash
+python manage.py er_smart_sync_preflight --migrate-dry-run
+```
+
+It exits non-zero and names the type when a dry run returns an error code (`version_validation` means already v2 and is fine) or when an inline enum key is longer than 100 characters, which ER's Choice table (`value` varchar(100)) could not persist on the live run; a dry run stops before persistence, so that length check is the only early warning. Any such type needs an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout; the portal would otherwise abort that CA's push on every run. The equivalent manual check against one site:
 
 ```bash
 curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json" \
@@ -749,8 +754,6 @@ curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json
     long_values: [.hardcoded_choices[].choices[].value | select(length > 100)]}
   | select((.errors|length>0) or (.long_values|length>0))'
 ```
-
-An empty `event_types` list makes ER evaluate every v1 type in the tenant.
 
 - [ ] **Step 3: Confirm the SMART data model cache was flushed**
 
