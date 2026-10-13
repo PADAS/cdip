@@ -44,6 +44,9 @@ TIMEOUT = 120
 CLIENT_ID = "das_web_client"
 # "already v2" from ER's migrator: nothing to convert, not a failure.
 ALREADY_V2 = "version_validation"
+# SMART-derived event type values start with the conservation area UUID; only
+# those are sent to the migrate endpoint by the portal, so only those block.
+SMART_DERIVED = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 
 def sync_pairs(smart_integration_id=None):
@@ -114,10 +117,15 @@ def version_tuple(version: str) -> tuple:
 
 
 def summarize_dry_run(results: list, max_value_length: int) -> dict:
-    """Per-type problems from a dry run: error codes and over-long choice values."""
-    problems = {}
+    """Per-type problems from a dry run: error codes and over-long choice values.
+
+    ``problems`` holds SMART-derived types (the ones the portal migrates);
+    ``other_problems`` holds hand-made v1 types, reported but not counted.
+    """
+    problems, other_problems = {}, {}
     already_v2 = 0
     for result in results:
+        value = result.get("event_type") or ""
         codes = [e.get("code") for e in result.get("errors") or []]
         if codes == [ALREADY_V2]:
             already_v2 += 1
@@ -129,8 +137,14 @@ def summarize_dry_run(results: list, max_value_length: int) -> dict:
             if len(choice.get("value") or "") > max_value_length
         ]
         if codes or long_values:
-            problems[result.get("event_type")] = {"errors": codes, "long_values": long_values}
-    return {"evaluated": len(results), "already_v2": already_v2, "problems": problems}
+            bucket = problems if SMART_DERIVED.match(value) else other_problems
+            bucket[value] = {"errors": codes, "long_values": long_values}
+    return {
+        "evaluated": len(results),
+        "already_v2": already_v2,
+        "problems": problems,
+        "other_problems": other_problems,
+    }
 
 
 class Command(BaseCommand):
@@ -144,6 +158,10 @@ class Command(BaseCommand):
         )
         parser.add_argument("--min-er-version", default="2.146.1")
         parser.add_argument("--max-choice-value-length", type=int, default=100)
+        parser.add_argument(
+            "--show-values", action="store_true",
+            help="Print the over-long choice values themselves (distinct, per site).",
+        )
 
     def handle(self, *args, **options):
         pairs = sync_pairs(options["smart_integration_id"])
@@ -171,18 +189,27 @@ class Command(BaseCommand):
                     )
                     line += (
                         f"; dry run: {summary['evaluated']} v1 types evaluated, "
-                        f"{summary['already_v2']} already v2, {len(summary['problems'])} with problems"
+                        f"{summary['already_v2']} already v2, "
+                        f"{len(summary['problems'])} SMART-derived with problems, "
+                        f"{len(summary['other_problems'])} other v1 types with problems (not migrated by the portal)"
                     )
-                    for value, problem in summary["problems"].items():
-                        detail = []
-                        if problem["errors"]:
-                            detail.append("errors=" + ",".join(problem["errors"]))
-                        if problem["long_values"]:
-                            detail.append(
-                                f"{len(problem['long_values'])} choice value(s) over "
-                                f"{options['max_choice_value_length']} chars"
-                            )
-                        self.stdout.write(f"    {value}: " + "; ".join(detail))
+                    long_values_seen = set()
+                    for label, bucket in (("", summary["problems"]), ("(other) ", summary["other_problems"])):
+                        for value, problem in bucket.items():
+                            detail = []
+                            if problem["errors"]:
+                                detail.append("errors=" + ",".join(problem["errors"]))
+                            if problem["long_values"]:
+                                detail.append(
+                                    f"{len(problem['long_values'])} choice value(s) over "
+                                    f"{options['max_choice_value_length']} chars"
+                                )
+                                long_values_seen.update(problem["long_values"])
+                            self.stdout.write(f"    {label}{value}: " + "; ".join(detail))
+                    if options["show_values"] and long_values_seen:
+                        self.stdout.write(f"    {len(long_values_seen)} distinct over-long choice value(s):")
+                        for long_value in sorted(long_values_seen):
+                            self.stdout.write(f"      [{len(long_value)}] {long_value}")
                     failures += len(summary["problems"])
                 self.stdout.write(line)
                 checked_sites[er.id] = line.strip()

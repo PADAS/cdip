@@ -50,26 +50,32 @@ def test_disabled_er_integration_is_not_a_pair(
     assert sync_pairs() == []
 
 
+CA = "273807b3-2c53-42fd-beac-704f25b30721"
+
+
 def test_summarize_dry_run_flags_error_codes_and_long_values():
     results = [
-        {"event_type": "clean", "errors": [], "warnings": [{"code": "schema_transform"}], "hardcoded_choices": []},
-        {"event_type": "already", "errors": [{"code": "version_validation"}], "hardcoded_choices": []},
-        {"event_type": "broken", "errors": [{"code": "schema_parse"}], "hardcoded_choices": []},
+        {"event_type": f"{CA}_clean", "errors": [], "warnings": [{"code": "schema_transform"}], "hardcoded_choices": []},
+        {"event_type": f"{CA}_already", "errors": [{"code": "version_validation"}], "hardcoded_choices": []},
+        {"event_type": f"{CA}_broken", "errors": [{"code": "schema_parse"}], "hardcoded_choices": []},
         {
-            "event_type": "long",
+            "event_type": f"{CA}_long",
             "errors": [],
             "hardcoded_choices": [{"choices": [{"value": "x" * 101}, {"value": "short"}]}],
         },
+        {"event_type": "rhino_sighting_rep", "errors": [{"code": "schema_transform"}], "hardcoded_choices": []},
     ]
 
     summary = summarize_dry_run(results, max_value_length=100)
 
-    assert summary["evaluated"] == 4
+    assert summary["evaluated"] == 5
     assert summary["already_v2"] == 1
     assert summary["problems"] == {
-        "broken": {"errors": ["schema_parse"], "long_values": []},
-        "long": {"errors": [], "long_values": ["x" * 101]},
+        f"{CA}_broken": {"errors": ["schema_parse"], "long_values": []},
+        f"{CA}_long": {"errors": [], "long_values": ["x" * 101]},
     }
+    # Hand-made v1 types are reported but never sent to the migrate endpoint.
+    assert summary["other_problems"] == {"rhino_sighting_rep": {"errors": ["schema_transform"], "long_values": []}}
 
 
 @pytest.fixture
@@ -114,18 +120,28 @@ def test_command_dry_run_reports_problem_types(requests_mock, pair):
         requests_mock,
         "2.147.0",
         [
-            {"event_type": "ok", "errors": [], "hardcoded_choices": []},
-            {"event_type": "bad", "errors": [{"code": "schema_parse"}], "hardcoded_choices": []},
+            {"event_type": f"{CA}_ok", "errors": [], "hardcoded_choices": []},
+            {"event_type": f"{CA}_bad", "errors": [{"code": "schema_parse"}], "hardcoded_choices": []},
+            {"event_type": "handmade", "errors": [{"code": "schema_transform"}], "hardcoded_choices": []},
+            {
+                "event_type": f"{CA}_long",
+                "errors": [],
+                "hardcoded_choices": [{"choices": [{"value": "k" * 120}]}],
+            },
         ],
     )
     out = StringIO()
 
-    with pytest.raises(CommandError, match="1 preflight failure"):
-        call_command("er_smart_sync_preflight", "--migrate-dry-run", stdout=out)
+    with pytest.raises(CommandError, match="2 preflight failure"):
+        call_command("er_smart_sync_preflight", "--migrate-dry-run", "--show-values", stdout=out)
 
     assert migrate.last_request.json() == {"dry_run": True, "event_types": []}
-    assert "2 v1 types evaluated, 0 already v2, 1 with problems" in out.getvalue()
-    assert "bad: errors=schema_parse" in out.getvalue()
+    text = out.getvalue()
+    assert "4 v1 types evaluated, 0 already v2, 2 SMART-derived with problems, 1 other v1 types" in text
+    assert f"{CA}_bad: errors=schema_parse" in text
+    assert "(other) handmade: errors=schema_transform" in text
+    assert "1 distinct over-long choice value(s):" in text
+    assert "[120] " + "k" * 120 in text
 
 
 def test_command_uses_password_grant_without_token(requests_mock, pair):
