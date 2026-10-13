@@ -1001,6 +1001,8 @@ def test_opting_out_removes_the_sourceless_cover(
     )
     assert response.status_code == status.HTTP_200_OK, response.content
     assert response.json()["excludes_default_source"] is True
+    # The stored opt-out is readable, so state the API accepted is reconstructable.
+    assert response.json()["include_default_source"] is False
 
     detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
     rule = detail.json()["filters"][str(source_filter.destination_id)]
@@ -1078,3 +1080,105 @@ def test_a_widened_scope_carries_the_cover_for_the_new_provider(
     by_provider = detail.json()["filters"][str(source_filter.destination_id)]["by_provider"]
     assert "default-source" in by_provider[str(provider_movebank_ewt.id)]
     assert "default-source" in by_provider[str(provider_lotek_panthera.id)]
+
+
+def test_the_flag_is_readable_on_the_list(
+        api_client, superuser, organization, route_1, lotek_sources
+):
+    api_client.force_authenticate(superuser)
+    response = api_client.get(_list_url(route_1))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["results"][0]["include_default_source"] is True
+
+
+def test_a_put_without_the_flag_keeps_the_opt_out(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        integrations_list_er
+):
+    # Tri-state must hold for PUT too: the field is required=False with no
+    # serializer default, so omission never resets the stored value. A future
+    # explicit BooleanField(default=True) declaration would break this test.
+    source_filter = route_1.source_filters.get()
+    source_filter.include_default_source = False
+    source_filter.save()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.put(
+        _detail_url(route_1, source_filter),
+        data={
+            "destination": str(source_filter.destination_id),
+            "mode": "whitelist",
+            "source_ids": [str(s.id) for s in lotek_sources],
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+    source_filter.refresh_from_db()
+    assert source_filter.include_default_source is False
+
+
+def test_the_opt_out_survives_a_mode_round_trip(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    # Deliberate: the flag is whitelist state that a detour through blacklist
+    # neither consumes nor resets - and being readable, it is never hidden.
+    source_filter = route_1.source_filters.get()
+    source_filter.include_default_source = False
+    source_filter.save()
+    api_client.force_authenticate(org_admin_user)
+
+    for mode in ("blacklist", "whitelist"):
+        response = api_client.patch(
+            _detail_url(route_1, source_filter), data={"mode": mode}, format="json"
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["include_default_source"] is False
+
+
+def test_an_explicit_false_is_welcome_on_a_blacklist(
+        api_client, org_admin_user, organization, route_1, integrations_list_er,
+        lotek_sources
+):
+    # Desired-state clients serialize the full field set; false is the
+    # blacklist's natural state, so only true is rejected there.
+    payload = {
+        **_payload(integrations_list_er[1], lotek_sources[:1]),
+        "mode": "blacklist",
+        "include_default_source": False,
+    }
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(_list_url(route_1), data=payload, format="json")
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+
+
+def test_patching_the_flag_true_onto_an_existing_blacklist_is_rejected(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    source_filter = route_1.source_filters.get()
+    source_filter.mode = SourceFilter.FilterModes.BLACKLIST
+    source_filter.save()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"include_default_source": True},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+
+
+def test_a_paused_whitelist_still_ships_the_cover(
+        api_client, superuser, organization, route_1, lotek_sources,
+        provider_lotek_panthera
+):
+    # The wire carries `enabled` and routing's rule stops speaking when paused;
+    # the block itself must stay complete so re-enabling needs no rewrite.
+    source_filter = route_1.source_filters.get()
+    source_filter.enabled = False
+    source_filter.save()
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    rule = response.json()["filters"][str(source_filter.destination_id)]
+    assert rule["enabled"] is False
+    assert "default-source" in rule["by_provider"][str(provider_lotek_panthera.id)]

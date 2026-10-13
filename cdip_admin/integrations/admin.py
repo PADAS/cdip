@@ -806,6 +806,18 @@ class SourceFilterAdminForm(ModelForm):
         model = SourceFilter
         exclude = ("sources", "covered_providers")
 
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get("include_default_source")
+            and cleaned.get("mode") == SourceFilter.FilterModes.BLACKLIST
+        ):
+            raise django_forms.ValidationError({
+                "include_default_source": "Only meaningful on a whitelist: a "
+                "blacklist already lets sourceless data through."
+            })
+        return cleaned
+
 
 @admin.register(SourceFilter)
 class SourceFilterAdmin(admin.ModelAdmin):

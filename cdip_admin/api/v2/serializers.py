@@ -1035,7 +1035,8 @@ class SourceFilterSerializer(serializers.ModelSerializer):
         model = SourceFilter
         fields = (
             "id", "destination", "type", "mode", "enabled", "name", "description",
-            "sources_count", "providers", "excludes_default_source", "updated_at",
+            "sources_count", "providers", "excludes_default_source",
+            "include_default_source", "updated_at",
         )
 
     def get_sources_count(self, obj):
@@ -1239,7 +1240,10 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         if duplicates.exists():
             raise self._duplicate_error()
 
-        if attrs.get("include_default_source") is not None:
+        # Only `true` is nonsense on a blacklist (sourceless data already passes);
+        # an explicit `false` is its natural state, so desired-state clients that
+        # always serialize the full field set keep working.
+        if attrs.get("include_default_source") is True:
             effective_mode = attrs.get("mode") or getattr(self.instance, "mode", None)
             if effective_mode == SourceFilter.FilterModes.BLACKLIST:
                 raise drf_exceptions.ValidationError({
