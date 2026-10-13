@@ -13,9 +13,6 @@ from sync_integrations.tasks import er_integrations_for
 
 pytestmark = pytest.mark.django_db
 
-PREFLIGHT = "sync_integrations.management.commands.er_smart_sync_preflight"
-
-
 @pytest.fixture
 def device_group(organization, outbound_integration_smart):
     group = DeviceGroup.objects.create(name="smart group", owner=organization)
@@ -83,34 +80,37 @@ def pair(outbound_integration_smart, inbound_integration_er, device_group):
     return outbound_integration_smart, inbound_integration_er
 
 
-def _client(mocker, version, dry_run_results=None):
-    client = mocker.MagicMock()
-    client._get.return_value = {"version": version}
-    client._post.return_value = dry_run_results or []
-    client._api_root.return_value = "https://site.pamdas.org/api/v2.0"
-    return mocker.patch(f"{PREFLIGHT}.ERClient", return_value=client).return_value
+SITE = "https://site.pamdas.org"
 
 
-def test_command_passes_on_recent_site(mocker, pair):
-    _client(mocker, "2.147.0")
+def _site(requests_mock, version, dry_run_results=None):
+    requests_mock.get(f"{SITE}/api/v1.0/status", json={"data": {"version": version}})
+    return requests_mock.post(
+        f"{SITE}/api/v2.0/activity/eventtypes/migrate/", json={"data": dry_run_results or []}
+    )
+
+
+def test_command_passes_on_recent_site(requests_mock, pair):
+    _site(requests_mock, "2.147.0")
     out = StringIO()
 
     call_command("er_smart_sync_preflight", stdout=out)
 
     assert "ER 2.147.0: OK" in out.getvalue()
     assert "0 failure(s)" in out.getvalue()
+    assert requests_mock.last_request.headers["Authorization"] == "Bearer er-token"
 
 
-def test_command_fails_on_old_site(mocker, pair):
-    _client(mocker, "2.140.0")
+def test_command_fails_on_old_site(requests_mock, pair):
+    _site(requests_mock, "2.140.0")
 
     with pytest.raises(CommandError, match="1 preflight failure"):
         call_command("er_smart_sync_preflight", stdout=StringIO())
 
 
-def test_command_dry_run_reports_problem_types(mocker, pair):
-    client = _client(
-        mocker,
+def test_command_dry_run_reports_problem_types(requests_mock, pair):
+    migrate = _site(
+        requests_mock,
         "2.147.0",
         [
             {"event_type": "ok", "errors": [], "hardcoded_choices": []},
@@ -122,18 +122,28 @@ def test_command_dry_run_reports_problem_types(mocker, pair):
     with pytest.raises(CommandError, match="1 preflight failure"):
         call_command("er_smart_sync_preflight", "--migrate-dry-run", stdout=out)
 
-    client._post.assert_called_once_with(
-        path="activity/eventtypes/migrate/",
-        payload={"dry_run": True, "event_types": []},
-        base_url="https://site.pamdas.org/api/v2.0",
-    )
+    assert migrate.last_request.json() == {"dry_run": True, "event_types": []}
     assert "2 v1 types evaluated, 0 already v2, 1 with problems" in out.getvalue()
     assert "bad: errors=schema_parse" in out.getvalue()
 
 
-def test_command_reports_unreachable_site_and_fails(mocker, pair):
-    client = _client(mocker, "2.147.0")
-    client._get.side_effect = ConnectionError("refused")
+def test_command_uses_password_grant_without_token(requests_mock, pair):
+    _, er = pair
+    er.token = ""
+    er.login = "er-user"
+    er.password = "er-pass"  # pragma: allowlist secret
+    er.save()
+    token = requests_mock.post(f"{SITE}/oauth2/token", json={"access_token": "granted"})
+    _site(requests_mock, "2.147.0")
+
+    call_command("er_smart_sync_preflight", stdout=StringIO())
+
+    assert token.last_request.text.startswith("grant_type=password")
+    assert requests_mock.last_request.headers["Authorization"] == "Bearer granted"
+
+
+def test_command_reports_unreachable_site_and_fails(requests_mock, pair):
+    requests_mock.get(f"{SITE}/api/v1.0/status", exc=ConnectionError("refused"))
 
     with pytest.raises(CommandError):
         call_command("er_smart_sync_preflight", stdout=StringIO())

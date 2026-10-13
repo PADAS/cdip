@@ -5,16 +5,42 @@ the ER site's version against the first release with the migrate endpoint,
 and optionally a dry run of that endpoint, reporting event types with error
 codes and choice values ER could not persist (its Choice value column is
 varchar(100)). Exits non-zero when any check fails.
+
+This runs on the image deployed *before* the er-smart-sync switch, so it
+depends only on Django, requests and the integration models: no erclient,
+no er-smart-sync, and a local copy of the pair query when the shared helper
+is not yet present.
 """
+from urllib.parse import urlparse
+
+import requests
 from django.core.management.base import BaseCommand, CommandError
-from erclient import ERClient
-from packaging.version import InvalidVersion, Version
+from django.db.models import Q
 
-from integrations.models import OutboundIntegrationConfiguration, OutboundIntegrationType
-from sync_integrations.er_smart_sync import build_sync_config
-from sync_integrations.tasks import er_integrations_for
+from integrations.models import (
+    Device,
+    InboundIntegrationConfiguration,
+    InboundIntegrationType,
+    OutboundIntegrationConfiguration,
+    OutboundIntegrationType,
+)
 
-MIGRATE_PATH = "activity/eventtypes/migrate/"
+try:
+    from sync_integrations.tasks import er_integrations_for
+except ImportError:  # image predates the shared helper; same query as the sync task
+    def er_integrations_for(smart_integration):
+        device_groups = smart_integration.devicegroups.all()
+        devices = Device.objects.filter(
+            devicegroup__in=device_groups,
+            inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER,
+        ).order_by("inbound_configuration_id").distinct("inbound_configuration_id").values("inbound_configuration_id")
+        idlist = [dev.get("inbound_configuration_id") for dev in devices]
+        return InboundIntegrationConfiguration.objects.filter(
+            enabled=True, type__slug=InboundIntegrationType.EARTHRANGER
+        ).filter(Q(default_devicegroup__in=device_groups) | Q(id__in=idlist))
+
+TIMEOUT = 120
+CLIENT_ID = "das_web_client"
 # "already v2" from ER's migrator: nothing to convert, not a failure.
 ALREADY_V2 = "version_validation"
 
@@ -32,28 +58,61 @@ def sync_pairs(smart_integration_id=None):
     ]
 
 
-def er_client_for(smart, er) -> ERClient:
-    config = build_sync_config(smart_config=smart, er_config=er)
-    return ERClient(
-        service_root=config.earthranger.endpoint,
-        username=config.earthranger.login,
-        password=config.earthranger.password,
-        token=config.earthranger.token,
-        client_id=config.earthranger.client_id,
-        provider_key=config.smart.provider_key,
+def er_base_url(endpoint: str) -> str:
+    """https://site.pamdas.org from either the site root or a /api/v1.0 root."""
+    parsed = urlparse(endpoint)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def auth_headers(er) -> dict:
+    """Bearer header from the integration's token, else a password grant."""
+    token = er.token
+    if not token:
+        response = requests.post(
+            f"{er_base_url(er.endpoint)}/oauth2/token",
+            data={
+                "grant_type": "password",
+                "username": er.login,
+                "password": er.password,
+                "client_id": CLIENT_ID,
+            },
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+
+
+def er_version(base_url: str, headers: dict) -> str:
+    response = requests.get(f"{base_url}/api/v1.0/status", headers=headers, timeout=TIMEOUT)
+    response.raise_for_status()
+    data = response.json().get("data") or {}
+    return str(data.get("version") or "")
+
+
+def migrate_dry_run(base_url: str, headers: dict) -> list:
+    response = requests.post(
+        f"{base_url}/api/v2.0/activity/eventtypes/migrate/",
+        json={"dry_run": True, "event_types": []},
+        headers=headers,
+        timeout=TIMEOUT,
     )
+    response.raise_for_status()
+    data = response.json().get("data")
+    return data if isinstance(data, list) else []
 
 
-def migrate_dry_run(client: ERClient) -> list[dict]:
-    results = client._post(
-        path=MIGRATE_PATH,
-        payload={"dry_run": True, "event_types": []},
-        base_url=client._api_root("v2.0"),
-    )
-    return results if isinstance(results, list) else []
+def version_tuple(version: str) -> tuple:
+    parts = []
+    for piece in version.split("."):
+        digits = "".join(ch for ch in piece if ch.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
 
 
-def summarize_dry_run(results: list[dict], max_value_length: int) -> dict:
+def summarize_dry_run(results: list, max_value_length: int) -> dict:
     """Per-type problems from a dry run: error codes and over-long choice values."""
     problems = {}
     already_v2 = 0
@@ -89,7 +148,7 @@ class Command(BaseCommand):
         pairs = sync_pairs(options["smart_integration_id"])
         if not pairs:
             raise CommandError("No enabled SMART -> EarthRanger sync pairs found.")
-        minimum = Version(options["min_er_version"])
+        minimum = version_tuple(options["min_er_version"])
         failures = 0
         checked_sites = {}
         for smart, er in pairs:
@@ -98,17 +157,17 @@ class Command(BaseCommand):
                 self.stdout.write(f"  (site already checked: {checked_sites[er.id]})")
                 continue
             try:
-                client = er_client_for(smart, er)
-                status = client._get("status") or {}
-                version = str(status.get("version") or "")
-                try:
-                    ok = Version(version) >= minimum
-                except InvalidVersion:
-                    ok = False
-                line = f"  ER {version or '?'}: {'OK' if ok else f'LOW (need >= {minimum})'}"
+                base_url = er_base_url(er.endpoint)
+                headers = auth_headers(er)
+                version = er_version(base_url, headers)
+                ok = bool(version) and version_tuple(version) >= minimum
+                verdict = "OK" if ok else f"LOW (need >= {options['min_er_version']})"
+                line = f"  ER {version or '?'}: {verdict}"
                 failures += 0 if ok else 1
                 if options["migrate_dry_run"]:
-                    summary = summarize_dry_run(migrate_dry_run(client), options["max_choice_value_length"])
+                    summary = summarize_dry_run(
+                        migrate_dry_run(base_url, headers), options["max_choice_value_length"]
+                    )
                     line += (
                         f"; dry run: {summary['evaluated']} v1 types evaluated, "
                         f"{summary['already_v2']} already v2, {len(summary['problems'])} with problems"
@@ -118,8 +177,10 @@ class Command(BaseCommand):
                         if problem["errors"]:
                             detail.append("errors=" + ",".join(problem["errors"]))
                         if problem["long_values"]:
-                            detail.append(f"{len(problem['long_values'])} choice value(s) over "
-                                          f"{options['max_choice_value_length']} chars")
+                            detail.append(
+                                f"{len(problem['long_values'])} choice value(s) over "
+                                f"{options['max_choice_value_length']} chars"
+                            )
                         self.stdout.write(f"    {value}: " + "; ".join(detail))
                     failures += len(summary["problems"])
                 self.stdout.write(line)
@@ -128,8 +189,6 @@ class Command(BaseCommand):
                 failures += 1
                 self.stdout.write(f"  ERROR {type(e).__name__}: {e}")
                 checked_sites[er.id] = f"ERROR {type(e).__name__}"
-        self.stdout.write(
-            f"{len(pairs)} pair(s), {len(checked_sites)} site(s), {failures} failure(s)"
-        )
+        self.stdout.write(f"{len(pairs)} pair(s), {len(checked_sites)} site(s), {failures} failure(s)")
         if failures:
             raise CommandError(f"{failures} preflight failure(s)")
