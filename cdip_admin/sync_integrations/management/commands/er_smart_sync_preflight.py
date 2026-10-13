@@ -27,8 +27,11 @@ from integrations.models import (
 )
 
 try:
-    from sync_integrations.tasks import er_integrations_for
-except ImportError:  # image predates the shared helper; same query as the sync task
+    from sync_integrations.tasks import er_integrations_for, er_smart_sync_paused
+except ImportError:  # image predates the shared helpers; same rules as the sync task
+    def er_smart_sync_paused(smart_integration) -> bool:
+        return bool((smart_integration.additional or {}).get("er_smart_sync_paused"))
+
     def er_integrations_for(smart_integration):
         device_groups = smart_integration.devicegroups.all()
         devices = Device.objects.filter(
@@ -170,8 +173,13 @@ class Command(BaseCommand):
         minimum = version_tuple(options["min_er_version"])
         failures = 0
         checked_sites = {}
+        paused = 0
         for smart, er in pairs:
             self.stdout.write(f"{smart.name} ({smart.id}) -> {er.name} ({er.id}) {er.endpoint}")
+            if er_smart_sync_paused(smart):
+                self.stdout.write("  paused (additional.er_smart_sync_paused): not checked, Beat skips it")
+                paused += 1
+                continue
             if er.id in checked_sites:
                 self.stdout.write(f"  (site already checked: {checked_sites[er.id]})")
                 continue
@@ -217,6 +225,8 @@ class Command(BaseCommand):
                 failures += 1
                 self.stdout.write(f"  ERROR {type(e).__name__}: {e}")
                 checked_sites[er.id] = f"ERROR {type(e).__name__}"
-        self.stdout.write(f"{len(pairs)} pair(s), {len(checked_sites)} site(s), {failures} failure(s)")
+        self.stdout.write(
+            f"{len(pairs)} pair(s), {paused} paused, {len(checked_sites)} site(s) checked, {failures} failure(s)"
+        )
         if failures:
             raise CommandError(f"{failures} preflight failure(s)")

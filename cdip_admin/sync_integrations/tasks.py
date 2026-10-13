@@ -250,6 +250,17 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
+# Set `"er_smart_sync_paused": true` in a SMART integration's `additional` to
+# keep it out of the ER <-> SMART sync without disabling the integration
+# itself (which would also stop routing). Used to hold back a site whose v1
+# event types ER cannot migrate yet.
+ER_SMART_SYNC_PAUSED = "er_smart_sync_paused"
+
+
+def er_smart_sync_paused(smart_integration) -> bool:
+    return bool((smart_integration.additional or {}).get(ER_SMART_SYNC_PAUSED))
+
+
 def er_integrations_for(smart_integration):
     """The enabled ER integrations a SMART integration syncs with.
 
@@ -279,6 +290,13 @@ def run_er_smart_sync_integration(*, smart_integration_id=None):
             type__slug=OutboundIntegrationType.SMARTCONNECT)
     except OutboundIntegrationConfiguration.DoesNotExist:
         logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
+        return
+
+    if er_smart_sync_paused(smart_integration):
+        logger.warning(
+            "ER smart sync is paused for %s (%s): additional.%s is set; skipping",
+            smart_integration.name, smart_integration.id, ER_SMART_SYNC_PAUSED,
+        )
         return
 
     logger.info(f"Starting ER smart sync integration for {smart_integration.name} ({smart_integration.id}) with endpoint {smart_integration.endpoint}")

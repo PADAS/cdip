@@ -84,3 +84,16 @@ def test_sync_tasks_keep_the_soft_limit_and_gain_a_hard_limit(task):
     # limit bounds a run.
     assert task.soft_time_limit == 1800
     assert task.time_limit == 2100
+
+
+def test_run_er_smart_sync_integration_skips_paused_integration(
+    mocker, outbound_integration_smart, caplog
+):
+    outbound_integration_smart.additional = {"er_smart_sync_paused": True}
+    outbound_integration_smart.save()
+    chain = mocker.patch("sync_integrations.tasks.chain")
+
+    tasks.run_er_smart_sync_integration(smart_integration_id=str(outbound_integration_smart.id))
+
+    chain.assert_not_called()
+    assert "paused" in caplog.text

@@ -184,3 +184,16 @@ def test_command_treats_release_prefixed_old_version_as_low(requests_mock, pair)
 
     with pytest.raises(CommandError, match="1 preflight failure"):
         call_command("er_smart_sync_preflight", stdout=StringIO())
+
+
+def test_command_reports_paused_pair_without_checking_it(requests_mock, pair):
+    smart, _ = pair
+    smart.additional = {"er_smart_sync_paused": True}
+    smart.save()
+    out = StringIO()
+
+    call_command("er_smart_sync_preflight", "--migrate-dry-run", stdout=out)
+
+    assert "paused (additional.er_smart_sync_paused)" in out.getvalue()
+    assert "1 paused, 0 site(s) checked, 0 failure(s)" in out.getvalue()
+    assert requests_mock.call_count == 0
