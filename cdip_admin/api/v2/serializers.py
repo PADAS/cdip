@@ -1082,6 +1082,11 @@ class SourceFilterSerializer(serializers.ModelSerializer):
     def get_excludes_default_source(self, obj):
         if obj.mode != SourceFilter.FilterModes.WHITELIST:
             return False
+        # The flag covers sourceless data at serialization time, so a whitelist
+        # only excludes it when the API opted out AND no covered provider lists
+        # the stand-in row as plain membership either.
+        if obj.include_default_source:
+            return False
         # Answered from the rule's own sources, not from whether a `default-source` row
         # exists yet. Ingestion creates that row the first time a provider reports without
         # one, so keying off its existence would stay silent for a whitelist written before
@@ -1182,7 +1187,7 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         model = SourceFilter
         fields = (
             "id", "destination", "type", "mode", "enabled", "name", "description",
-            "source_ids", "provider_ids",
+            "source_ids", "provider_ids", "include_default_source",
         )
         # `selector` is deliberately not exposed. For type="list" the M2M is the single way
         # to say which devices a rule covers; offering both would allow two rules in one row
@@ -1234,6 +1239,13 @@ class SourceFilterCreateUpdateSerializer(serializers.ModelSerializer):
         if duplicates.exists():
             raise self._duplicate_error()
 
+        if attrs.get("include_default_source") is not None:
+            effective_mode = attrs.get("mode") or getattr(self.instance, "mode", None)
+            if effective_mode == SourceFilter.FilterModes.BLACKLIST:
+                raise drf_exceptions.ValidationError({
+                    "include_default_source": "Only meaningful on a whitelist: a "
+                    "blacklist already lets sourceless data through."
+                })
         requested_scope = attrs.get("provider_ids")
         submitted_sources = attrs.get("sources")
         if requested_scope is not None:
@@ -1816,6 +1828,18 @@ class RouteDetailSerializer(RouteRetrieveFullSerializer):
                 by_provider.setdefault(str(source.integration_id), []).append(
                     source.external_id
                 )
+            # Whitelists cover sourceless data unless the API opted out:
+            # "default-source" joins each covered provider's list here, at
+            # serialization time - never as membership, so device lists and
+            # counters in the portal stay untouched. Deduped because a rule
+            # can also hold the stand-in row as a plain member.
+            if (
+                source_filter.mode == SourceFilter.FilterModes.WHITELIST
+                and source_filter.include_default_source
+            ):
+                for external_ids in by_provider.values():
+                    if DEFAULT_SOURCE_EXTERNAL_ID not in external_ids:
+                        external_ids.append(DEFAULT_SOURCE_EXTERNAL_ID)
             filters[str(source_filter.destination_id)] = {
                 "type": source_filter.type,
                 "mode": source_filter.mode,

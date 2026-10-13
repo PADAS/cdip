@@ -645,7 +645,8 @@ def test_an_empty_whitelist_ships_closed_on_the_wire(
 
     detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
     rule = detail.json()["filters"][str(source_filter.destination_id)]
-    assert rule["by_provider"] == {str(provider_lotek_panthera.id): []}
+    # Devices are emptied; the default sourceless cover remains.
+    assert rule["by_provider"] == {str(provider_lotek_panthera.id): ["default-source"]}
 
 
 def test_create_with_explicit_scope_and_no_devices(
@@ -753,11 +754,13 @@ def test_cannot_read_filter_sources_of_another_org_route(
 def test_whitelist_omitting_default_source_is_flagged(
         api_client, superuser, organization, route_1, provider_lotek_panthera
 ):
-    # Ingestion creates this row for any client that submits without a source. A whitelist
-    # that leaves it out stops all of that provider's sourceless traffic.
+    # Ingestion creates this row for any client that submits without a source. With the
+    # flag covering sourceless data by default, the advisory only fires after an explicit
+    # API opt-out leaves that traffic uncovered.
     Source.objects.create(
         integration=provider_lotek_panthera, external_id="default-source"
     )
+    route_1.source_filters.update(include_default_source=False)
     api_client.force_authenticate(superuser)
     response = api_client.get(_list_url(route_1))
 
@@ -768,10 +771,13 @@ def test_whitelist_omitting_default_source_is_flagged(
 def test_whitelist_including_default_source_is_not_flagged(
         api_client, superuser, organization, route_1, provider_lotek_panthera
 ):
+    # Even after the opt-out, plain membership of the stand-in row still covers it.
     default_source = Source.objects.create(
         integration=provider_lotek_panthera, external_id="default-source"
     )
     source_filter = route_1.source_filters.get()
+    source_filter.include_default_source = False
+    source_filter.save()
     source_filter.sources.add(default_source)
 
     api_client.force_authenticate(superuser)
@@ -804,6 +810,7 @@ def test_default_source_of_a_provider_the_rule_does_not_cover_is_not_flagged(
     covered_default = Source.objects.create(
         integration=provider_lotek_panthera, external_id="default-source"
     )
+    route_1.source_filters.update(include_default_source=False)
     route_1.source_filters.get().sources.add(covered_default)
 
     api_client.force_authenticate(superuser)
@@ -816,12 +823,13 @@ def test_default_source_of_a_provider_the_rule_does_not_cover_is_not_flagged(
 def test_whitelist_is_flagged_before_ingestion_has_created_the_default_source(
         api_client, superuser, organization, route_1, provider_lotek_panthera
 ):
-    # No `default-source` row exists yet: the provider has never reported without one. The
-    # whitelist will still drop that traffic the moment it arrives, and this is the point at
-    # which the operator can still add it, so the advisory must not wait for the row.
+    # No `default-source` row exists yet: the provider has never reported without one. An
+    # opted-out whitelist will still drop that traffic the moment it arrives, so the
+    # advisory must not wait for the row.
     assert not Source.objects.filter(
         integration=provider_lotek_panthera, external_id="default-source"
     ).exists()
+    route_1.source_filters.update(include_default_source=False)
 
     api_client.force_authenticate(superuser)
     response = api_client.get(_list_url(route_1))
@@ -881,7 +889,8 @@ def test_a_filter_rendered_straight_from_a_write_still_reports_its_providers(
     assert response.status_code == status.HTTP_201_CREATED, response.content
     body = response.json()
     assert [p["id"] for p in body["providers"]] == [str(provider_lotek_panthera.id)]
-    assert body["excludes_default_source"] is True
+    # Sourceless data is covered by default, so a fresh whitelist is not flagged.
+    assert body["excludes_default_source"] is False
     assert body["sources_count"] == 2
 
 
@@ -952,3 +961,120 @@ def test_reject_an_unknown_mode(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
     assert "is not a valid choice" in response.content.decode()
+
+
+# ---- include_default_source (the flag) -------------------------------------
+
+
+def test_a_new_whitelist_covers_sourceless_data_by_default(
+        api_client, org_admin_user, organization, route_1, integrations_list_er,
+        lotek_sources, provider_lotek_panthera
+):
+    # The cover is injected at serialization time: no Source row is created and
+    # the rule's membership stays exactly what the client listed.
+    response = _post(
+        api_client, org_admin_user, route_1,
+        _payload(integrations_list_er[1], lotek_sources[:1]),
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    filter_id = response.json()["id"]
+
+    api_client.force_authenticate(org_admin_user)
+    detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    rule = detail.json()["filters"][str(integrations_list_er[1].id)]
+    assert "default-source" in rule["by_provider"][str(provider_lotek_panthera.id)]
+    assert not Source.objects.filter(external_id="default-source").exists()
+    assert SourceFilter.objects.get(id=filter_id).sources.count() == 1
+
+
+def test_opting_out_removes_the_sourceless_cover(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        provider_lotek_panthera
+):
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"include_default_source": False},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["excludes_default_source"] is True
+
+    detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    rule = detail.json()["filters"][str(source_filter.destination_id)]
+    assert "default-source" not in rule["by_provider"][str(provider_lotek_panthera.id)]
+
+
+def test_an_unrelated_edit_keeps_the_opt_out(
+        api_client, org_admin_user, organization, route_1, lotek_sources
+):
+    # Tri-state: omitting the field never changes the stored value.
+    source_filter = route_1.source_filters.get()
+    source_filter.include_default_source = False
+    source_filter.save()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"name": "renamed"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+    source_filter.refresh_from_db()
+    assert source_filter.include_default_source is False
+
+
+def test_blacklist_rejects_the_flag(
+        api_client, org_admin_user, organization, route_1, integrations_list_er,
+        lotek_sources
+):
+    payload = {
+        **_payload(integrations_list_er[1], lotek_sources[:1]),
+        "mode": "blacklist",
+        "include_default_source": True,
+    }
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(_list_url(route_1), data=payload, format="json")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+    assert "whitelist" in response.content.decode()
+
+
+def test_the_cover_is_deduped_when_the_stand_in_row_is_a_member(
+        api_client, superuser, organization, route_1, provider_lotek_panthera
+):
+    default_source = Source.objects.create(
+        integration=provider_lotek_panthera, external_id="default-source"
+    )
+    route_1.source_filters.get().sources.add(default_source)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    source_filter = route_1.source_filters.get()
+    ids = response.json()["filters"][str(source_filter.destination_id)]["by_provider"][
+        str(provider_lotek_panthera.id)
+    ]
+    assert ids.count("default-source") == 1
+
+
+def test_a_widened_scope_carries_the_cover_for_the_new_provider(
+        api_client, org_admin_user, organization, route_1, lotek_sources,
+        movebank_sources, provider_lotek_panthera, provider_movebank_ewt
+):
+    route_1.data_providers.add(provider_movebank_ewt)
+    source_filter = route_1.source_filters.get()
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.patch(
+        _detail_url(route_1, source_filter),
+        data={"provider_ids": [str(provider_movebank_ewt.id)]},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.content
+
+    detail = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    by_provider = detail.json()["filters"][str(source_filter.destination_id)]["by_provider"]
+    assert "default-source" in by_provider[str(provider_movebank_ewt.id)]
+    assert "default-source" in by_provider[str(provider_lotek_panthera.id)]

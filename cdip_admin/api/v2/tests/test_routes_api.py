@@ -1145,7 +1145,7 @@ def test_route_detail_carries_the_filters_block(
     assert rule["enabled"] is True
     assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
         s.external_id for s in lotek_sources
-    }
+    } | {"default-source"}
 
 
 def test_deleting_the_last_whitelisted_source_keeps_the_provider_restricted(
@@ -1164,7 +1164,8 @@ def test_deleting_the_last_whitelisted_source_keeps_the_provider_restricted(
     assert response.status_code == status.HTTP_200_OK, response.content
     source_filter = route_1.source_filters.get()
     rule = response.json()["filters"][str(source_filter.destination_id)]
-    assert rule["by_provider"] == {str(provider_lotek_panthera.id): []}
+    # Named devices are gone; the default sourceless cover remains.
+    assert rule["by_provider"] == {str(provider_lotek_panthera.id): ["default-source"]}
 
 
 def test_route_list_does_not_carry_the_filters_block(
@@ -1209,7 +1210,9 @@ def test_filters_block_groups_identical_external_ids_by_provider(
     response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
 
     by_provider = response.json()["filters"][str(source_filter.destination_id)]["by_provider"]
-    assert by_provider[str(second_provider.id)] == [borrowed.external_id]
+    assert set(by_provider[str(second_provider.id)]) == {
+        borrowed.external_id, "default-source"
+    }
     assert borrowed.external_id in by_provider[str(provider_lotek_panthera.id)]
     # Same string under two providers, kept apart.
     assert str(second_provider.id) != str(provider_lotek_panthera.id)
@@ -1269,7 +1272,7 @@ def test_filters_block_omits_types_it_cannot_carry(
     assert rule["type"] == "list"
     assert set(rule["by_provider"][str(provider_lotek_panthera.id)]) == {
         s.external_id for s in lotek_sources
-    }
+    } | {"default-source"}
 
 
 def test_filters_block_omits_a_destination_no_longer_on_the_route(
