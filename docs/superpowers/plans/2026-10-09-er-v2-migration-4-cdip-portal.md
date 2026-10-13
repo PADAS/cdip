@@ -739,12 +739,15 @@ BODY
 1. cdip-routing part 3 is live in prod.
 2. The celery worker's `REDIS_DB` is the database the old synchronizer wrote `er.function.state.*` to (`KEYS er.function.state.*` in that db returns the integrations); the charts set `REDIS_DB: "0"`.
 3. Every prod ER site the portal syncs runs ER 2.146.1 or newer. List them from the portal DB (enabled `InboundIntegrationConfiguration` rows of type `earth_ranger` linked to an enabled `smart_connect` outbound) and check each site's `/api/v1.0/status` version.
-4. ER's migrator can fail to persist a type whose inline enum holds a key longer than 100 characters (it writes the raw SMART key into its own Choice table, varchar(100); deep TREE leaves can exceed that). Before the portal runs for real, call the migrate endpoint with `dry_run: true` against one representative prod tenant that has TREE attributes and confirm no result carries a `PERSIST_FAILED` or `CHOICE_CREATION_FAILED` error. If any do, those types need an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout; the portal would otherwise abort that CA's push on every run.
+4. ER's migrator writes each inline enum key into its Choice table (`value` is varchar(100)); deep TREE leaves can exceed that, and the portal would then abort that CA's push on every run. A dry run stops before persistence, so `persist_failed` / `choice_creation_failed` never appear in it; the raw keys do, under `hardcoded_choices[].choices[].value`. Before the portal runs for real, dry-run the migrate endpoint against one representative prod tenant with TREE attributes and confirm the command below prints nothing (no type with an error code, no choice value over 100 characters). Error codes to expect otherwise: `schema_parse`, `schema_transform`, `unsupported_features`, the `choice_resolution_*` / `dependency_*` / `dynamic_choice_*` family, `exception`; `version_validation` means the type is already v2 and is fine. Warnings do not block. Any type that fails needs an ER-side fix or a spec decision (deactivate the v1 record and create v2 fresh, losing history linkage) before this rollout.
 
 ```bash
 curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json" \
   -X POST "https://<site>.pamdas.org/api/v2.0/activity/eventtypes/migrate/" \
-  -d '{"dry_run": true, "event_types": []}' | jq '.data[] | select(.errors|length>0) | {event_type, errors}'
+  -d '{"dry_run": true, "event_types": []}' | jq '
+  .data[] | {event_type, errors: [.errors[].code], warnings: [.warnings[].code],
+    long_values: [.hardcoded_choices[].choices[].value | select(length > 100)]}
+  | select((.errors|length>0) or (.long_values|length>0))'
 ```
 
 An empty `event_types` list makes ER evaluate every v1 type in the tenant.
