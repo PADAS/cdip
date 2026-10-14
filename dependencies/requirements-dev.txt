@@ -18,6 +18,7 @@ attrs==25.3.0
     # via
     #   jsonschema
     #   pytest
+    #   referencing
 autopep8==2.3.2
     # via django-silk
 babel==2.8.0
@@ -191,7 +192,7 @@ environs==9.5.0
     #   gundi-client-v2
     #   movebank-client
     #   smartconnect-client
-er-smart-sync==0.5.1
+er-smart-sync==0.6.0
     # via -r dependencies/requirements.in
 execnet==2.1.1
     # via pytest-xdist
@@ -315,8 +316,12 @@ inflection==0.5.1
     # via drf-yasg
 iniconfig==2.1.0
     # via pytest
-jsonschema==4.17.3
-    # via -r dependencies/requirements.in
+jsonschema==4.23.0
+    # via
+    #   -r dependencies/requirements.in
+    #   er-smart-sync
+jsonschema-specifications==2025.9.1
+    # via jsonschema
 kombu==5.5.4
     # via celery
 marshmallow==3.26.1
@@ -467,8 +472,6 @@ pyjwt==2.10.1
     # via
     #   -r dependencies/requirements.in
     #   social-auth-core
-pyrsistent==0.20.0
-    # via jsonschema
 pytest==6.2.5
     # via
     #   -r dependencies/requirements-dev.in
@@ -537,6 +540,10 @@ redis==6.4.0
     #   fakeredis
     #   smartconnect-client
     #   walrus
+referencing==0.37.0
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
 regex==2025.9.1
     # via dateparser
 requests==2.32.5
@@ -562,6 +569,10 @@ respx==0.22.0
     #   gundi-client
     #   gundi-client-v2
     #   movebank-client
+rpds-py==0.30.0
+    # via
+    #   jsonschema
+    #   referencing
 rsa==4.6
     # via
     #   -r dependencies/requirements.in
@@ -611,6 +622,7 @@ typing-extensions==4.15.0
     #   grpcio
     #   opentelemetry-sdk
     #   pydantic
+    #   referencing
 tzdata==2025.2
     # via
     #   django-celery-beat
