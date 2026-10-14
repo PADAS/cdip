@@ -183,10 +183,13 @@ This deploys **before** any site syncs as v2.
 ### 4. cdip (this repo)
 
 **Dependencies.** `dependencies/requirements.in`: remove the `dasclient` and
-`smartconnect_client` GitHub wheels, add `er-smart-sync==0.5.1`. This pulls
-`earthranger-client` and `smartconnect-client>=1.14`. A narrow dependency
-dry run against the current pins succeeded with no changes to existing
-packages.
+`smartconnect_client` GitHub wheels, add `er-smart-sync==0.6.0`. This pulls
+`earthranger-client` and `smartconnect-client>=1.14`, and needs
+`jsonschema>=4.23`, so the portal's `jsonschema` pin moves from 4.17.3 to
+4.23.0 (adding `referencing`, `rpds-py` and `jsonschema-specifications`,
+dropping `pyrsistent`). The portal calls only `jsonschema.validate` and
+catches `jsonschema.exceptions.ValidationError`, both unchanged across
+those versions. No other existing pin changes.
 
 **`sync_integrations/er_smart_sync.py`** becomes a factory module:
 
@@ -252,7 +255,7 @@ Preconditions:
 1. All production ER sites that the portal syncs run ER 2.146.1 or newer,
    the first release with the migrate endpoint. Verify before step 4.
 2. smartconnect-client released with `resolve_option_key`.
-3. er-smart-sync 0.5.1 released.
+3. er-smart-sync 0.6.0 released.
 
 Order:
 
@@ -301,7 +304,11 @@ reads are unaffected and v1 writes stop at the sunset regardless, so there
 is no data to undo. Setting `ER_SMART_SYNC_EVENT_TYPE_VERSION=v1` is the
 only in-place escape hatch and is meaningless after 2026-10-15.
 
-Fixed in er-smart-sync 0.5.1 (the version the portal pins): the 0.5.0
+The portal pins er-smart-sync 0.6.0. Two fixes in it matter here.
+0.6.0 stops re-sending every v2 event type on each run: the builder
+emitted a `choices` block in each CHOICE_LIST ui field, das strips that
+key on save, so the stored schema never matched and every Beat sync
+PATCHed every type on every site. Fixed in 0.5.1: the 0.5.0
 patrol publish path caught every exception as "message too large" and
 still advanced `patrol_last_poll_at`, so a Pub/Sub outage that outlasted
 the publisher's retries lost those patrols. 0.5.1 skips only an

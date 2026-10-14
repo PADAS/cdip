@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the portal's `ER_SMART_Synchronizer` with er-smart-sync 0.5.1 so every SMART-to-ER integration pushes v2 event types, migrating existing v1 ones in place, while the Celery tasks, queue and schedules stay as they are.
+**Goal:** Replace the portal's `ER_SMART_Synchronizer` with er-smart-sync 0.6.0 so every SMART-to-ER integration pushes v2 event types, migrating existing v1 ones in place, while the Celery tasks, queue and schedules stay as they are.
 
 **Architecture:** `sync_integrations/er_smart_sync.py` shrinks to two factory functions that map the Django integration rows to the library's `SyncConfig` and build an `ERSmartSynchronizer` with four portal adapters: the existing GooglePublisher and cloud storage, a new Redis state store on the existing key, and a new tracing adapter over `core.tracing`. `tasks.py` keeps every task name and the datamodels-to-events-to-patrols chain, each task calling one library method. The old synchronizer, its tests and the dasclient-based management command are deleted.
 
 **Tech Stack:** Django 4.2, Celery, Redis, pytest-django (Postgres test DB). Python 3.11 venv at `/Users/chrisdo/padas/cdip/.venv`. Work happens in this worktree on branch `chore/upgrade-smart-sync-event-types`.
 
-**Spec:** `docs/superpowers/specs/2026-10-09-er-smart-sync-v2-migration-design.md`, section "4. cdip (this repo)". Depends on part 2 (er-smart-sync 0.5.1 on PyPI) and on part 3 being deployed before the prod rollout.
+**Spec:** `docs/superpowers/specs/2026-10-09-er-smart-sync-v2-migration-design.md`, section "4. cdip (this repo)". Depends on part 2 (er-smart-sync 0.6.0 on PyPI) and on part 3 being deployed before the prod rollout.
 
 ## Global Constraints
 
-- `dependencies/requirements.in`: remove the `dasclient` and `smartconnect_client` GitHub wheel lines (currently lines 78 and 79), add `er-smart-sync==0.5.1`. `requirements.txt` is regenerated.
+- `dependencies/requirements.in`: remove the `dasclient` and `smartconnect_client` GitHub wheel lines (currently lines 78 and 79), add `er-smart-sync==0.6.0`. `requirements.txt` is regenerated.
 - Event type version is the Django setting `ER_SMART_SYNC_EVENT_TYPE_VERSION`, env-overridable, default `"v2"`. No per-integration knob.
 - `cm_variant_mode` is always `"split"`; `migrate_legacy_v1` is always `True`.
 - Redis state key stays `er.function.state.{integration_id}`; the stored JSON shape (`event_last_poll_at`, `patrol_last_poll_at`) is unchanged.
@@ -60,7 +60,7 @@ https://github.com/PADAS/smartconnect-client/releases/download/v1.11.0/smartconn
 and in their place add
 
 ```
-er-smart-sync==0.5.1
+er-smart-sync==0.6.0
 ```
 
 - [ ] **Step 2: Regenerate `requirements.txt`**
@@ -74,12 +74,12 @@ git diff --stat dependencies/requirements.txt
 grep -nE "^(er-smart-sync|smartconnect-client|earthranger-client|gpxpy|dasclient)" dependencies/requirements.txt
 ```
 
-Expected: `er-smart-sync==0.5.1`, `smartconnect-client==1.15.0` (or newer 1.x), `earthranger-client==1.15.0` (or newer), `gpxpy==1.6.2`; no `dasclient` line; no other pins change. A narrow dry run against the current pins on 2026-10-09 produced exactly these additions.
+Expected: `er-smart-sync==0.6.0`, `smartconnect-client==1.15.0` (or newer 1.x), `earthranger-client==1.15.0` (or newer), `gpxpy==1.6.2`; `jsonschema` moves from 4.17.3 to 4.23.0 (er-smart-sync 0.6.0 needs `>=4.23`), adding `referencing`, `rpds-py`, `jsonschema-specifications` and dropping `pyrsistent`; no `dasclient` line; no other pins change. A narrow dry run against the current pins on 2026-10-09 produced exactly these additions.
 
 - [ ] **Step 3: Install into the venv**
 
 ```bash
-/Users/chrisdo/padas/cdip/.venv/bin/pip install "er-smart-sync==0.5.1"
+/Users/chrisdo/padas/cdip/.venv/bin/pip install "er-smart-sync==0.6.0"
 /Users/chrisdo/padas/cdip/.venv/bin/python -c "import er_smart_sync, smartconnect, erclient; print('ok')"
 ```
 
@@ -722,7 +722,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```bash
 git push -u origin chore/upgrade-smart-sync-event-types
 gh pr create --title "Push SMART data models as ER v2 event types via er-smart-sync" --body "$(cat <<'BODY'
-Replaces the portal's ER_SMART_Synchronizer with er-smart-sync 0.5.1. Every SMART-to-ER sync now creates v2 event types with ER Choice lists, converting existing SMART-derived v1 types in place through ER's migrate endpoint before ER's 2026-10-15 v1 write sunset. Celery task names, queue, chain and Beat schedules are unchanged; last-poll state carries over on the existing Redis key.
+Replaces the portal's ER_SMART_Synchronizer with er-smart-sync 0.6.0. Every SMART-to-ER sync now creates v2 event types with ER Choice lists, converting existing SMART-derived v1 types in place through ER's migrate endpoint before ER's 2026-10-15 v1 write sunset. Celery task names, queue, chain and Beat schedules are unchanged; last-poll state carries over on the existing Redis key.
 
 Depends on cdip-routing's choice value lookup being deployed first (it maps v2 choice values back to SMART option keys).
 
