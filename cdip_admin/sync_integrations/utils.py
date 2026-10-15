@@ -36,6 +36,12 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
         connect_timeout=10.0,
     )
     ca_uuids = config.additional.get("ca_uuids")
+    if not ca_uuids:
+        logger.warning(
+            "SMART integration %s (%s) has no ca_uuids in additional; nothing to download",
+            config.name, config.id,
+        )
+        return
     configurable_models_lists = {}
     for ca_uuid in ca_uuids:
         try:

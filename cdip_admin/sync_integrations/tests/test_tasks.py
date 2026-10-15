@@ -128,3 +128,24 @@ def test_run_er_smart_sync_integration_skips_paused_integration(
 
     chain.assert_not_called()
     assert "paused" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [ValueError("boom"), tasks.SoftTimeLimitExceeded("soft limit")],
+    ids=["exception", "soft-time-limit"],
+)
+def test_handle_timeout_exceptions_logs_and_reraises_the_task_exception(exc, caplog):
+    # "args" is a reserved LogRecord attribute: passing it in extra raised
+    # KeyError inside the handler and hid the task's own exception.
+    @tasks.handle_timeout_exceptions
+    def failing_task(*args, **kwargs):
+        raise exc
+
+    with pytest.raises(type(exc)):
+        failing_task("integration-id", force=True)
+
+    record = next(r for r in caplog.records if "failing_task" in r.getMessage())
+    assert record.task_args == ("integration-id",)
+    assert record.task_kwargs == {"force": True}
+    assert record.exception_type == type(exc).__name__

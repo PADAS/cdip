@@ -33,8 +33,8 @@ def handle_timeout_exceptions(func):
                 extra={
                     'task_name': func.__name__,
                     'duration_seconds': duration,
-                    'args': args,
-                    'kwargs': kwargs,
+                    'task_args': args,
+                    'task_kwargs': kwargs,
                     'exception_type': 'SoftTimeLimitExceeded',
                     'exception_message': str(e)
                 }
@@ -47,8 +47,8 @@ def handle_timeout_exceptions(func):
                 extra={
                     'task_name': func.__name__,
                     'duration_seconds': duration,
-                    'args': args,
-                    'kwargs': kwargs,
+                    'task_args': args,
+                    'task_kwargs': kwargs,
                     'exception_type': type(e).__name__,
                     'exception_message': str(e)
                 }
