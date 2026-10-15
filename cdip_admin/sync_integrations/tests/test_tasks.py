@@ -76,6 +76,21 @@ def test_synchronize_smart_datamodels_without_valid_er_integration_logs_and_retu
     assert "er_integration_id" in caplog.text
 
 
+def test_synchronize_smart_datamodels_skips_paused_integration(
+    synchronizer, outbound_integration_smart, inbound_integration_er, caplog
+):
+    outbound_integration_smart.additional = {
+        "er_integration_id": str(inbound_integration_er.id),
+        "er_smart_sync_paused": True,
+    }
+    outbound_integration_smart.save()
+
+    tasks.synchronize_smart_datamodels(str(outbound_integration_smart.id))
+
+    tasks.build_synchronizer.assert_not_called()
+    assert "paused" in caplog.text
+
+
 @pytest.mark.parametrize(
     "task", [tasks.sync_er_smart_datamodels, tasks.sync_er_events, tasks.sync_er_patrols]
 )

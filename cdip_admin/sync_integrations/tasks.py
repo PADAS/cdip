@@ -60,6 +60,8 @@ def handle_timeout_exceptions(func):
 @handle_timeout_exceptions
 def synchronize_smart_datamodels(integration_id: str):
     smart_config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
+    if skip_if_paused(smart_config):
+        return
     logger.info('Synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
     er_integration_id = (smart_config.additional or {}).get("er_integration_id")
@@ -261,6 +263,16 @@ def er_smart_sync_paused(smart_integration) -> bool:
     return bool((smart_integration.additional or {}).get(ER_SMART_SYNC_PAUSED))
 
 
+def skip_if_paused(smart_integration) -> bool:
+    if not er_smart_sync_paused(smart_integration):
+        return False
+    logger.warning(
+        "ER smart sync is paused for %s (%s): additional.%s is set; skipping",
+        smart_integration.name, smart_integration.id, ER_SMART_SYNC_PAUSED,
+    )
+    return True
+
+
 def er_integrations_for(smart_integration):
     """The enabled ER integrations a SMART integration syncs with.
 
@@ -292,11 +304,7 @@ def run_er_smart_sync_integration(*, smart_integration_id=None):
         logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
         return
 
-    if er_smart_sync_paused(smart_integration):
-        logger.warning(
-            "ER smart sync is paused for %s (%s): additional.%s is set; skipping",
-            smart_integration.name, smart_integration.id, ER_SMART_SYNC_PAUSED,
-        )
+    if skip_if_paused(smart_integration):
         return
 
     logger.info(f"Starting ER smart sync integration for {smart_integration.name} ({smart_integration.id}) with endpoint {smart_integration.endpoint}")
