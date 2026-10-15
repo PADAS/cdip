@@ -90,8 +90,16 @@ def pair(outbound_integration_smart, inbound_integration_er, device_group):
 SITE = "https://site.pamdas.org"
 
 
-def _site(requests_mock, version, dry_run_results=None):
+NIL = "00000000-0000-0000-0000-000000000000"
+
+
+def _site(requests_mock, version, dry_run_results=None, choices=(200, 400, 404)):
+    """Mock one ER site; ``choices`` is the (GET, POST, PATCH) probe statuses."""
     requests_mock.get(f"{SITE}/api/v1.0/status", json={"data": {"version": version}})
+    view, add, change = choices
+    requests_mock.get(f"{SITE}/api/v1.0/choices", status_code=view, json={})
+    requests_mock.post(f"{SITE}/api/v1.0/choices", status_code=add, json={})
+    requests_mock.patch(f"{SITE}/api/v1.0/choices/{NIL}", status_code=change, json={})
     return requests_mock.post(
         f"{SITE}/api/v2.0/activity/eventtypes/migrate/", json={"data": dry_run_results or []}
     )
@@ -103,7 +111,7 @@ def test_command_passes_on_recent_site(requests_mock, pair):
 
     call_command("er_smart_sync_preflight", stdout=out)
 
-    assert "ER 2.147.0: OK" in out.getvalue()
+    assert "ER 2.147.0: OK; choices: view, add, change OK" in out.getvalue()
     assert "0 failure(s)" in out.getvalue()
     assert requests_mock.last_request.headers["Authorization"] == "Bearer er-token"
 
@@ -197,3 +205,47 @@ def test_command_reports_paused_pair_without_checking_it(requests_mock, pair):
     assert "paused (additional.er_smart_sync_paused)" in out.getvalue()
     assert "1 paused, 0 site(s) checked, 0 failure(s)" in out.getvalue()
     assert requests_mock.call_count == 0
+
+
+def test_command_probes_choice_permissions_without_writing(requests_mock, pair):
+    _site(requests_mock, "2.147.0")
+
+    call_command("er_smart_sync_preflight", stdout=StringIO())
+
+    probes = [r for r in requests_mock.request_history if "/choices" in r.path]
+    assert [(r.method, r.path) for r in probes] == [
+        ("GET", "/api/v1.0/choices"),
+        ("POST", "/api/v1.0/choices"),
+        ("PATCH", f"/api/v1.0/choices/{NIL}"),
+    ]
+    # An empty body fails ER's validation (value is required) after the
+    # permission check, so the POST can never create a choice.
+    assert probes[1].json() == {}
+    assert probes[2].json() == {}
+
+
+@pytest.mark.parametrize(
+    "statuses, missing",
+    [
+        ((200, 403, 403), "add, change (grant choices.add_choice, choices.change_choice)"),
+        ((403, 400, 404), "view (grant choices.view_choice)"),
+    ],
+)
+def test_command_fails_when_choice_permissions_are_missing(requests_mock, pair, statuses, missing):
+    _site(requests_mock, "2.147.0", choices=statuses)
+    out = StringIO()
+
+    with pytest.raises(CommandError, match="1 preflight failure"):
+        call_command("er_smart_sync_preflight", stdout=out)
+
+    assert f"choices: MISSING {missing}" in out.getvalue()
+
+
+def test_command_reports_unexpected_choice_probe_status_as_error(requests_mock, pair):
+    _site(requests_mock, "2.147.0", choices=(200, 500, 404))
+    out = StringIO()
+
+    with pytest.raises(CommandError, match="1 preflight failure"):
+        call_command("er_smart_sync_preflight", stdout=out)
+
+    assert "ERROR HTTPError" in out.getvalue()

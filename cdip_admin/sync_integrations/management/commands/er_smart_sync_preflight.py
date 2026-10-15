@@ -2,7 +2,8 @@
 
 For each pair the Beat schedule would chain (same query as the sync task):
 the ER site's version against the first release with the migrate endpoint,
-and optionally a dry run of that endpoint, reporting event types with error
+whether the integration's ER user may read, create and change Choices, and
+optionally a dry run of that endpoint, reporting event types with error
 codes and choice values ER could not persist (its Choice value column is
 varchar(100)). Exits non-zero when any check fails.
 
@@ -95,6 +96,37 @@ def er_version(base_url: str, headers: dict) -> str:
     response.raise_for_status()
     data = response.json().get("data") or {}
     return str(data.get("version") or "")
+
+
+# v2 event types keep their options in ER Choice records. user/me reports only
+# the activity app's permissions, so the choices.* ones are probed instead:
+# das checks model permissions before validating or looking anything up, so
+# 403 means missing and the probes below cannot write (an empty POST fails
+# validation, the PATCH targets an id that does not exist).
+NIL_UUID = "00000000-0000-0000-0000-000000000000"
+CHOICE_PROBES = (
+    ("view", "GET", "choices", 200),
+    ("add", "POST", "choices", 400),
+    ("change", "PATCH", f"choices/{NIL_UUID}", 404),
+)
+
+
+def missing_choice_permissions(base_url: str, headers: dict) -> list:
+    """The choices.* actions this user lacks on the site, e.g. ["add", "change"]."""
+    missing = []
+    for action, method, path, granted in CHOICE_PROBES:
+        kwargs = {"params": {"page_size": 1}} if method == "GET" else {"json": {}}
+        response = requests.request(
+            method, f"{base_url}/api/v1.0/{path}", headers=headers, timeout=TIMEOUT, **kwargs
+        )
+        if response.status_code == 403:
+            missing.append(action)
+        elif response.status_code != granted:
+            response.raise_for_status()
+            raise requests.HTTPError(
+                f"{method} {path}: unexpected {response.status_code}", response=response
+            )
+    return missing
 
 
 def migrate_dry_run(base_url: str, headers: dict) -> list:
@@ -191,6 +223,13 @@ class Command(BaseCommand):
                 verdict = "OK" if ok else f"LOW (need >= {options['min_er_version']})"
                 line = f"  ER {version or '?'}: {verdict}"
                 failures += 0 if ok else 1
+                missing = missing_choice_permissions(base_url, headers)
+                if missing:
+                    grants = ", ".join(f"choices.{action}_choice" for action in missing)
+                    line += f"; choices: MISSING {', '.join(missing)} (grant {grants})"
+                    failures += 1
+                else:
+                    line += "; choices: view, add, change OK"
                 if options["migrate_dry_run"]:
                     summary = summarize_dry_run(
                         migrate_dry_run(base_url, headers), options["max_choice_value_length"]

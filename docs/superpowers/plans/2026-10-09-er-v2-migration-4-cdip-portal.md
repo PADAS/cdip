@@ -738,7 +738,7 @@ BODY
 
 1. cdip-routing part 3 is live in prod.
 2. The celery worker's `REDIS_DB` is the database the old synchronizer wrote `er.function.state.*` to (`KEYS er.function.state.*` in that db returns the integrations); the charts set `REDIS_DB: "0"`.
-3. From a portal pod, run the preflight. It walks the same SMART -> ER pairs the Beat schedule chains, checks each site is on ER 2.146.1 or newer (the first release with the migrate endpoint), and with `--migrate-dry-run` evaluates every v1 event type on each site without writing anything:
+3. From a portal pod, run the preflight. It walks the same SMART -> ER pairs the Beat schedule chains, checks each site is on ER 2.146.1 or newer (the first release with the migrate endpoint), checks the integration's ER user holds `choices.view_choice`, `choices.add_choice` and `choices.change_choice` (v2 event types keep their options in Choice records), and with `--migrate-dry-run` evaluates every v1 event type on each site without writing anything:
 
 ```bash
 python manage.py er_smart_sync_preflight --migrate-dry-run
@@ -759,7 +759,8 @@ curl -sS -H "Authorization: Bearer $ER_TOKEN" -H "Content-Type: application/json
    - **WPS Laramie Ridge** (SMART integration `3e8f69ad-06a8-4b39-9243-34a75f8ed441`, CA `273807b3-…`): 42 SMART-derived v1 types carry enum keys longer than ER's `Choice.value` varchar(100), which cannot be widened in time, so ER's migrator would fail `choice_creation_failed` and the portal would abort that CA every cycle. Hold it out of the first rollout: set `"er_smart_sync_paused": true` in that SMART integration's `additional` (admin JSON editor). The Beat fan-out skips it with a warning and the preflight reports it as paused. Re-enable after an ER-side fix (wider column or migrator-side key shortening).
    - **Tanglewood** (`7338ce58-29cb-40c4-a061-815a5b4a1335`): DNS is gone; disable that ER integration.
    - **TPFA** (`695408e7-a4bd-4751-830c-0a5d9e68bed2`): no token and the password grant returns 400; set a token on the ER integration.
-   Then rerun the preflight: expected `… 1 paused, … 0 failure(s)`.
+   - **Every site**: grant the integration's ER user `choices.view_choice`, `choices.add_choice` and `choices.change_choice` (Django admin on the ER site; ER's user/me does not report these, so the preflight probes the choices endpoints: an empty POST and a PATCH of a nil id, both rejected after the permission check, so nothing is written). Existing v1 grants already cover the event type side: `activity.<category>_create` / `_update` for each SMART category, which the migrate endpoint also checks. A non-superuser does not hold those for a category the sync creates itself.
+   Then rerun the preflight: expected each site `choices: view, add, change OK` and `… 1 paused, … 0 failure(s)`.
 
 - [ ] **Step 3: Confirm the SMART data model cache was flushed**
 
