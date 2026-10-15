@@ -155,6 +155,8 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
         return
+    if skip_if_paused(smart_integration):
+        return
 
     try:
         er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
@@ -194,6 +196,8 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
         return
+    if skip_if_paused(smart_integration):
+        return
 
     try:
         er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
@@ -231,6 +235,8 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
             type__slug=InboundIntegrationType.EARTHRANGER)
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
+        return
+    if skip_if_paused(smart_integration):
         return
 
     try:

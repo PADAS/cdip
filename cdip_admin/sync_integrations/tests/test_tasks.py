@@ -94,6 +94,22 @@ def test_synchronize_smart_datamodels_skips_paused_integration(
 @pytest.mark.parametrize(
     "task", [tasks.sync_er_smart_datamodels, tasks.sync_er_events, tasks.sync_er_patrols]
 )
+def test_sync_tasks_skip_paused_integration(
+    task, synchronizer, outbound_integration_smart, inbound_integration_er, caplog
+):
+    # A chain queued before the flag was set must not run for a paused site.
+    outbound_integration_smart.additional = {"er_smart_sync_paused": True}
+    outbound_integration_smart.save()
+
+    task(**_ids(outbound_integration_smart, inbound_integration_er))
+
+    tasks.build_synchronizer.assert_not_called()
+    assert "paused" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "task", [tasks.sync_er_smart_datamodels, tasks.sync_er_events, tasks.sync_er_patrols]
+)
 def test_sync_tasks_keep_the_soft_limit_and_gain_a_hard_limit(task):
     # The library's retries swallow SoftTimeLimitExceeded, so only the hard
     # limit bounds a run.
