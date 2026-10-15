@@ -2,6 +2,7 @@ import logging
 import time
 from functools import wraps
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from celery_once import QueueOnce
 from celery import shared_task, chain, group
@@ -10,7 +11,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from integrations.models import OutboundIntegrationConfiguration, InboundIntegrationConfiguration,\
     InboundIntegrationType, OutboundIntegrationType, Device
 
-from sync_integrations.er_smart_sync import ER_SMART_Synchronizer
+from sync_integrations.er_smart_sync import build_synchronizer
 from sync_integrations.utils import (
     maintain_smart_integration,
 )
@@ -57,13 +58,23 @@ def handle_timeout_exceptions(func):
 
 @shared_task(base=QueueOnce, once={"graceful": True})
 @handle_timeout_exceptions
-def synchronize_smart_datamodels(integration_id:str):
-
+def synchronize_smart_datamodels(integration_id: str):
     smart_config = OutboundIntegrationConfiguration.objects.get(id=integration_id)
+    if skip_if_paused(smart_config):
+        return
     logger.info('Synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
-    datamodel_synchronizer = ER_SMART_Synchronizer(smart_config=smart_config)
-    datamodel_synchronizer.synchronize_datamodel()
+    er_integration_id = (smart_config.additional or {}).get("er_integration_id")
+    try:
+        er_config = InboundIntegrationConfiguration.objects.get(id=er_integration_id)
+    except (InboundIntegrationConfiguration.DoesNotExist, ValidationError, ValueError):
+        logger.error(
+            "SMART integration %s (%s) has no valid additional.er_integration_id (%r); skipping",
+            smart_config.name, smart_config.id, er_integration_id,
+        )
+        return
+
+    build_synchronizer(smart_config=smart_config, er_config=er_config).synchronize_datamodel()
     logger.info('Finished synchronizing SMART datamodels for %s (%s)', smart_config.name, smart_config.id)
 
 
@@ -123,7 +134,12 @@ def _maintain_smart_integration(integration_id:str):
     maintain_smart_integration(integration_id=integration_id, force=True)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+# Hard limit on the three sync tasks: the library's retries swallow
+# SoftTimeLimitExceeded; it checkpoints per event and the datamodel push is
+# idempotent, so a hard kill is safe.
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize SMART data models and patrol data models to EarthRanger."""
@@ -139,9 +155,11 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
         return
+    if skip_if_paused(smart_integration):
+        return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing Data Models for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -160,7 +178,9 @@ def sync_er_smart_datamodels(*, smart_integration_id=None, er_integration_id=Non
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger events to SMART."""
@@ -176,15 +196,17 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
         return
+    if skip_if_paused(smart_integration):
+        return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.synchronize_er_events_to_smart_connect(config=er_configuration)
+        er_smart_sync.synchronize_er_events()
 
         logger.info("Finished synchronizing EarthRanger events for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -196,7 +218,9 @@ def sync_er_events(*, smart_integration_id=None, er_integration_id=None):
                          er_configuration.name, er_configuration.id)
 
 
-@shared_task(base=QueueOnce, once={"graceful": True}, soft_time_limit=1800)
+@shared_task(
+    base=QueueOnce, once={"graceful": True}, soft_time_limit=1800, time_limit=2100
+)
 @handle_timeout_exceptions
 def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
     """Synchronize EarthRanger patrols to SMART."""
@@ -212,15 +236,17 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
     except (OutboundIntegrationConfiguration.DoesNotExist, InboundIntegrationConfiguration.DoesNotExist) as e:
         logger.error(f"Integration configuration does not exist: {e}")
         return
+    if skip_if_paused(smart_integration):
+        return
 
     try:
-        er_smart_sync = ER_SMART_Synchronizer(smart_config=smart_integration, er_config=er_configuration)
+        er_smart_sync = build_synchronizer(smart_config=smart_integration, er_config=er_configuration)
 
         logger.info("Synchronizing EarthRanger patrols for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
 
-        er_smart_sync.synchronize_er_patrols_to_smart_connect(config=er_configuration)
+        er_smart_sync.synchronize_er_patrols()
 
         logger.info("Finished synchronizing EarthRanger patrols for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
@@ -231,6 +257,45 @@ def sync_er_patrols(*, smart_integration_id=None, er_integration_id=None):
                          smart_integration.name, smart_integration.id,
                          er_configuration.name, er_configuration.id)
 
+
+# Set `"er_smart_sync_paused": true` in a SMART integration's `additional` to
+# keep it out of the ER <-> SMART sync without disabling the integration
+# itself (which would also stop routing). Used to hold back a site whose v1
+# event types ER cannot migrate yet.
+ER_SMART_SYNC_PAUSED = "er_smart_sync_paused"
+
+
+def er_smart_sync_paused(smart_integration) -> bool:
+    return bool((smart_integration.additional or {}).get(ER_SMART_SYNC_PAUSED))
+
+
+def skip_if_paused(smart_integration) -> bool:
+    if not er_smart_sync_paused(smart_integration):
+        return False
+    logger.warning(
+        "ER smart sync is paused for %s (%s): additional.%s is set; skipping",
+        smart_integration.name, smart_integration.id, ER_SMART_SYNC_PAUSED,
+    )
+    return True
+
+
+def er_integrations_for(smart_integration):
+    """The enabled ER integrations a SMART integration syncs with.
+
+    An ER integration qualifies when one of the SMART integration's device
+    groups is its default device group, or holds one of its devices. The
+    sync task and the preflight command share this so they cannot drift.
+    """
+    device_groups = smart_integration.devicegroups.all()
+    devices = Device.objects.filter(
+        devicegroup__in=device_groups,
+        inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER,
+    ).order_by('inbound_configuration_id').distinct('inbound_configuration_id').values('inbound_configuration_id')
+    idlist = [dev.get('inbound_configuration_id') for dev in devices]
+    return InboundIntegrationConfiguration.objects.filter(
+        enabled=True,
+        type__slug=InboundIntegrationType.EARTHRANGER,
+    ).filter(Q(default_devicegroup__in=device_groups) | Q(id__in=idlist))
 
 @shared_task(base=QueueOnce, once={"graceful": True})
 @handle_timeout_exceptions
@@ -245,26 +310,13 @@ def run_er_smart_sync_integration(*, smart_integration_id=None):
         logger.error(f"SMART integration configuration does not exist for id: {smart_integration_id}")
         return
 
+    if skip_if_paused(smart_integration):
+        return
+
     logger.info(f"Starting ER smart sync integration for {smart_integration.name} ({smart_integration.id}) with endpoint {smart_integration.endpoint}")
 
-    device_groups = smart_integration.devicegroups.all()
-
-    # Get all devices that are in the device groups and have an EarthRanger inbound integration
-    devices = Device.objects.filter(devicegroup__in=device_groups,
-                                    inbound_configuration__type__slug=InboundIntegrationType.EARTHRANGER).order_by(
-        'inbound_configuration_id').distinct('inbound_configuration_id').values('inbound_configuration_id')
-
-    idlist = [dev.get('inbound_configuration_id') for dev in devices]
-
-    # Also include any Inbound Configuration that is associated by its default device group.
-    er_integrations = InboundIntegrationConfiguration.objects.filter(
-        enabled=True,
-        type__slug=InboundIntegrationType.EARTHRANGER).filter(
-        Q(default_devicegroup__in=device_groups) | Q(id__in=idlist)
-    )
-
     # Create task chains for each ER integration
-    for er_configuration in er_integrations:
+    for er_configuration in er_integrations_for(smart_integration):
         logger.info("Creating sync chain for %s (%s) to %s (%s)",
                      smart_integration.name, smart_integration.id,
                      er_configuration.name, er_configuration.id)
