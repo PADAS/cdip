@@ -23,19 +23,22 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
     if not force and not config.state.get('download_data_models', False):
         return
 
-    version = config.additional.get("version", "7.0")
-    use_language_code = config.additional.get("use_language_code", "en")
-
-    smart_client = SmartClient(
-        api=config.endpoint,
-        username=config.login,
-        password=config.password,
-        use_language_code=use_language_code,
-        version=version,
-        read_timeout=300.0,
-        connect_timeout=10.0,
-    )
-    ca_uuids = config.additional.get("ca_uuids")
+    ca_uuids = config.additional.get("ca_uuids") or []
+    if ca_uuids:
+        smart_client = SmartClient(
+            api=config.endpoint,
+            username=config.login,
+            password=config.password,
+            use_language_code=config.additional.get("use_language_code", "en"),
+            version=config.additional.get("version", "7.0"),
+            read_timeout=300.0,
+            connect_timeout=10.0,
+        )
+    else:
+        logger.warning(
+            "SMART integration %s (%s) has no ca_uuids in additional; nothing to download",
+            config.name, config.id,
+        )
     configurable_models_lists = {}
     for ca_uuid in ca_uuids:
         try:
