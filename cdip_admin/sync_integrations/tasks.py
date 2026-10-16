@@ -30,6 +30,7 @@ def handle_timeout_exceptions(func):
             duration = time.time() - start_time
             logger.error(
                 f"Task {func.__name__} timed out after {duration:.2f} seconds",
+                exc_info=True,
                 extra={
                     'task_name': func.__name__,
                     'duration_seconds': duration,
