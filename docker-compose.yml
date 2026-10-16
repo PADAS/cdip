@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cdip_dbuser"]
+      test: ["CMD-SHELL", "pg_isready -U cdip_dbuser -d cdip_portaldb"]
       interval: 10s
       timeout: 5s
       retries: 5
