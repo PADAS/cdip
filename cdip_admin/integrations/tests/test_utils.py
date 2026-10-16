@@ -4,7 +4,7 @@ import json
 import pytest
 
 from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api_consumer_info, patch_api_consumer_info, \
-    get_prefix_from_integration_type, convert_legacy_topic_name, KONG_REQUEST_TIMEOUT
+    get_prefix_from_integration_type, convert_legacy_topic_name, KONG_REQUEST_TIMEOUT, KEYS_PATH, get_api_key
 
 pytestmark = pytest.mark.django_db
 
@@ -63,6 +63,61 @@ def test_get_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_req
     mock_kong_consumers_api_requests.get.assert_called_once_with(
         expected_url, timeout=KONG_REQUEST_TIMEOUT
     )
+
+
+def _mock_kong_get(mocker, status_code, json_data=None):
+    response = mocker.MagicMock()
+    response.status_code = status_code
+    response.ok = 200 <= status_code < 300
+    response.json.return_value = json_data
+    return response
+
+
+def test_get_api_key_returns_existing_key_without_posting(mocker, provider_ats, mock_kong_consumers_api_requests):
+    mock_kong_consumers_api_requests.get.return_value = _mock_kong_get(
+        mocker, 200, {"data": [{"key": "existing-key"}]}
+    )
+    mocker.patch("integrations.utils.requests", mock_kong_consumers_api_requests)
+
+    key = get_api_key(provider_ats)
+
+    assert key == "existing-key"
+    mock_kong_consumers_api_requests.get.assert_called_once_with(
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{provider_ats.id}{KEYS_PATH}",
+        timeout=KONG_REQUEST_TIMEOUT,
+    )
+    mock_kong_consumers_api_requests.post.assert_not_called()
+
+
+def test_get_api_key_creates_key_when_consumer_has_none(mocker, provider_ats, mock_kong_consumers_api_requests):
+    mock_kong_consumers_api_requests.get.return_value = _mock_kong_get(mocker, 200, {"data": []})
+    mock_kong_consumers_api_requests.post.return_value.content = json.dumps({"key": "new-key"})
+    mocker.patch("integrations.utils.requests", mock_kong_consumers_api_requests)
+
+    key = get_api_key(provider_ats)
+
+    assert key == "new-key"
+    mock_kong_consumers_api_requests.post.assert_called_once_with(
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{provider_ats.id}{KEYS_PATH}",
+        timeout=KONG_REQUEST_TIMEOUT,
+    )
+
+
+def test_get_api_key_creates_consumer_and_key_when_consumer_missing(
+    mocker, provider_ats, mock_kong_consumers_api_requests
+):
+    mock_kong_consumers_api_requests.get.return_value = _mock_kong_get(mocker, 404, {"message": "Not found"})
+    mock_kong_consumers_api_requests.post.return_value.content = json.dumps({"key": "new-key"})
+    mocker.patch("integrations.utils.requests", mock_kong_consumers_api_requests)
+
+    key = get_api_key(provider_ats)
+
+    assert key == "new-key"
+    post_urls = [c.args[0] for c in mock_kong_consumers_api_requests.post.call_args_list]
+    assert post_urls == [
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}",
+        f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{provider_ats.id}{KEYS_PATH}",
+    ]
 
 
 def test_patch_api_consumer_info(mocker, provider_ats, mock_kong_consumers_api_requests):

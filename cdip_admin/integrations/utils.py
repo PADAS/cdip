@@ -90,15 +90,17 @@ def create_api_key(integration):
 
 
 def get_api_key(integration):
-    create_api_consumer(integration)
-
-    # obtain key if permission checks pass
+    # Read before creating. Action runners fetch their key on nearly every run,
+    # and Kong logs every duplicate consumer insert as a failed DB write, so the
+    # consumer is only POSTed when Kong reports it missing (404).
     response = requests.get(
         f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}",
         timeout=KONG_REQUEST_TIMEOUT,
     )
 
-    if response.ok:
+    if response.status_code == 404:
+        create_api_consumer(integration)
+    elif response.ok:
         try:
             data = response.json()["data"]
             api_key = data[0]["key"] if len(data) > 0 else None
