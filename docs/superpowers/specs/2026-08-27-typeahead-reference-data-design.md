@@ -1,6 +1,6 @@
 # Typeahead Reference Data — Contract Extension Design
 
-**Date:** 2026-08-27
+**Date:** 2026-08-27 (amended 2026-10-16: `resolve`, Section 7)
 **Status:** Approved design
 **Extends:** the reference-data design in
 `gundi-integration-cmore/docs/superpowers/specs/2026-07-31-reference-data-config-ui-design.md`
@@ -99,11 +99,10 @@ With `search` declared:
 - **Unchanged**: free-text entry (`allow_free_text`), cold-start loading
   escalation copy, provider-target (`target: "provider"`) union-and-dedupe,
   fetch-failure degradation to plain text with retry.
-- **Saved-value labels (known gap, deferred)**: because there is no menu-open
-  fetch, a stored opaque ID renders as the raw ID with no label and no
-  warning badge (the badge remains gated on a successful fetch, which will not
-  have happened). A future `resolve` block — an annotation-declared lookup of
-  options by stored value — is the designed fix; it is out of scope here.
+- **Saved-value labels**: because there is no menu-open fetch, a stored
+  opaque ID renders as the raw ID with no label and no warning badge (the
+  badge remains gated on a successful fetch, which will not have happened).
+  Closed by the `resolve` block — see Section 7.
 
 ## Section 3 — cdip (this repo)
 
@@ -221,6 +220,49 @@ reference-data PR #29):
   while changing only an *unrelated* field in it and assert it validates and persists
   `["123", "456"]`. The same test asserts that without the command the update
   is rejected, pinning down why the step exists.
+
+## Section 7 — Amendment (2026-10-16): the `resolve` block
+
+Labels saved values of a typeahead field (the Section 2 gap). Optional, and
+only meaningful alongside `search`:
+
+```json
+"gundi:reference": {
+  "action": "list_taxa",
+  "target": "self",
+  "params": {},
+  "search": { "param": "q", "min_chars": 2 },
+  "resolve": { "param": "ids" },
+  "allow_free_text": true
+}
+```
+
+- **`param`** (required, string): the reference action's query-model field
+  that takes the saved values, sent as a **list of strings** in
+  `config_overrides` merged with the resolved `params`. It must differ from
+  `search.param` and every `params` key, and SHOULD be optional on the query
+  model (drift-tested in the runner, like `search.param`).
+- **Runner semantics**: when the resolve param is present, the action returns
+  the options for exactly those values (in any order) instead of searching,
+  with `truncated: false`. Values it can't find are left out; it never
+  returns a 422 for an unknown value.
+- **Widget behavior**: with values saved and no label known for them, the
+  widget sends one lookup for the unlabeled values (same execute path,
+  `$data` gating, and cache as any fetch). Returned options label the values;
+  a value the lookup left out keeps its raw display and gets the warning
+  badge. The lookup never changes the saved value, and a failed lookup is
+  silent (labels are cosmetic). Labels of options the user picks from search
+  results are remembered, so they survive the next query.
+- **Compatibility**: old widgets ignore `resolve` (raw IDs, as before); a new
+  widget against a runner without the param gets the action's empty-query
+  answer (no labels) — never an error, by the Section 1 convention.
+
+First consumer: iNaturalist `list_taxa` with `ids`
+(gundi-integration-inaturalist PR #45). The portal implements it together
+with rendering a reference list as one multi-select with the values as pills
+(gundi-portal PR #402); there, `$data` paths resolve from the list's first
+item, the semantics the iNat and cmore annotations assume (the open item
+below).
 
 ## Rollout
 
