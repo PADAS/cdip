@@ -100,14 +100,27 @@ def get_api_key(integration):
 
     if response.status_code == 404:
         create_api_consumer(integration)
-    elif response.ok:
-        try:
-            data = response.json()["data"]
-            api_key = data[0]["key"] if len(data) > 0 else None
-            if api_key:
-                return api_key
-        except:
-            logger.exception("failed getting API key for consumer %s", integration)
+        return create_api_key(integration)
+
+    # Any other failure raises rather than falling through to create_api_key:
+    # minting a key on a transient Kong error leaves the consumer with an
+    # extra live key on every retry.
+    if not response.ok:
+        logger.error(
+            "Failed reading API key for consumer %s: %s %s",
+            integration, response.status_code, response.text,
+        )
+        raise ConsumerCreationError
+
+    try:
+        keys = response.json()["data"]
+        if not isinstance(keys, list):
+            raise TypeError(f"key-auth data is {type(keys).__name__}, not list")
+        if keys:
+            return keys[0]["key"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        logger.exception("Unexpected key-auth response for consumer %s", integration)
+        raise ConsumerCreationError
 
     return create_api_key(integration)
 
