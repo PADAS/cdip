@@ -5,7 +5,7 @@ import pytest
 
 from ..utils import create_api_consumer, KONG_PROXY_URL, CONSUMERS_PATH, get_api_consumer_info, patch_api_consumer_info, \
     get_prefix_from_integration_type, convert_legacy_topic_name, KONG_REQUEST_TIMEOUT, KEYS_PATH, get_api_key, \
-    ConsumerCreationError
+    ConsumerCreationError, normalize_smart_connect_endpoint
 
 pytestmark = pytest.mark.django_db
 
@@ -189,3 +189,21 @@ def test_get_topic_prefix_from_integration_type(integration_type, expected_prefi
 ])
 def test_clean_legacy_topic_names(legacy_name, expected_cleaned_name):
     assert convert_legacy_topic_name(legacy_name) == expected_cleaned_name
+
+
+@pytest.mark.parametrize("endpoint, expected", [
+    ("https://curicaca.smartconservationtools.org/server/connect", "https://curicaca.smartconservationtools.org/server"),
+    ("https://smart.example.org/server/connect/home", "https://smart.example.org/server"),
+    ("https://smart.example.org/server/connect/home?lang=en#top", "https://smart.example.org/server"),
+    ("https://smart.example.org/server/api/", "https://smart.example.org/server"),
+    ("https://smart.example.org/server/api/info", "https://smart.example.org/server"),
+    ("https://smart.example.org/server/Connect", "https://smart.example.org/server"),
+    ("https://smart.example.org:8443/server/", "https://smart.example.org:8443/server"),
+    ("https://smart.example.org/server", "https://smart.example.org/server"),
+    ("https://smart.example.org/", "https://smart.example.org"),
+    ("http://intranet.local:8080/smart/connect", "http://intranet.local:8080/smart"),
+    ("  smart.example.org/server/connect  ", "https://smart.example.org/server"),
+    ("", ""),
+])
+def test_normalize_smart_connect_endpoint(endpoint, expected):
+    assert normalize_smart_connect_endpoint(endpoint) == expected

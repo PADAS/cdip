@@ -1,7 +1,10 @@
 import json
 import logging
 import random
+from typing import List, Optional
 
+import httpx
+import pydantic
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -13,6 +16,9 @@ from django.views.generic import ListView, DetailView, UpdateView, FormView, Tem
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from django.db.models import Count, Case, When, Value, BooleanField
+from smartconnect import SmartClient
+from smartconnect.exceptions import SMARTClientException
+from smartconnect.models import ConservationArea
 
 from cdip_admin import settings
 from core.permissions import IsGlobalAdmin, IsOrganizationMember
@@ -59,7 +65,7 @@ from .tables import (
     OutboundIntegrationConfigurationTable,
     BridgeIntegrationTable,
 )
-from .utils import get_api_key
+from .utils import get_api_key, normalize_smart_connect_endpoint
 from django.core.cache import cache
 from django.http import HttpResponse
 from crispy_forms.templatetags.crispy_forms_filters import as_crispy_field
@@ -1178,6 +1184,123 @@ def outbound_test_er_connection(request, configuration_id):
     login = request.POST.get("login") or config.login
     password = request.POST.get("password") or config.password
     return _test_er_connection(endpoint, token, login, password)
+
+
+SMART_TEST_CONNECT_TIMEOUT_SECONDS = 5.0
+SMART_TEST_READ_TIMEOUT_SECONDS = 20.0
+
+
+def _smart_json_get(session: httpx.Client, url: str):
+    """GET a SMART Connect API URL; return (check, data) where data is None unless check["ok"]."""
+    try:
+        response = session.get(url, headers={"accept": "application/json"})
+    except httpx.HTTPError as exc:
+        return {"ok": False, "url": url, "error": str(exc)}, None
+
+    check = {"url": url, "status": response.status_code}
+    if response.status_code in (401, 403):
+        return {**check, "ok": False, "error": "Not authorized. Check the login and password."}, None
+    if not response.is_success:
+        return {**check, "ok": False, "error": f"Unexpected HTTP status {response.status_code}."}, None
+    try:
+        data = response.json()
+    except ValueError:
+        content_type = response.headers.get("content-type", "unknown")
+        return {
+            **check,
+            "ok": False,
+            "error": f"Expected JSON but received {content_type}. The endpoint may point at the SMART Connect "
+                     f"web UI instead of the server base (for example https://host/server).",
+        }, None
+    return {**check, "ok": True}, data
+
+
+def _check_conservation_areas(cas_data, configured_ca_uuids: List[str]) -> dict:
+    try:
+        available = pydantic.parse_obj_as(List[ConservationArea], cas_data)
+    except pydantic.ValidationError as exc:
+        return {"ok": False, "error": f"Unexpected conservation area response: {exc}"}
+
+    labels_by_uuid = {str(ca.uuid): ca.label for ca in available}
+    configured = [
+        {
+            "uuid": ca_uuid,
+            "found": str(ca_uuid).lower() in labels_by_uuid,
+            "label": labels_by_uuid.get(str(ca_uuid).lower()),
+        }
+        for ca_uuid in configured_ca_uuids
+    ]
+    return {
+        "ok": all(item["found"] for item in configured),
+        "configured": configured,
+        "available": [{"uuid": ca_uuid, "label": label} for ca_uuid, label in labels_by_uuid.items()],
+    }
+
+
+def _test_smart_connection(
+    *, endpoint: str, login: str, password: str, configured_version: Optional[str], ca_uuids: List[str]
+) -> JsonResponse:
+    """Log in to SMART Connect and verify the API answers with JSON and exposes the configured CAs."""
+    normalized_endpoint = normalize_smart_connect_endpoint(endpoint)
+    result = {
+        "ok": False,
+        "endpoint": endpoint,
+        "normalized_endpoint": normalized_endpoint,
+        "endpoint_was_normalized": normalized_endpoint != endpoint,
+        "configured_version": configured_version,
+        "checks": {},
+    }
+    checks = result["checks"]
+
+    client = SmartClient(
+        api=normalized_endpoint,
+        username=login,
+        password=password,
+        connect_timeout=SMART_TEST_CONNECT_TIMEOUT_SECONDS,
+        read_timeout=SMART_TEST_READ_TIMEOUT_SECONDS,
+    )
+    try:
+        session = client.ensure_login()
+    except (SMARTClientException, httpx.HTTPError) as exc:
+        checks["login"] = {"ok": False, "error": str(exc)}
+        return JsonResponse(result)
+    checks["login"] = {"ok": True}
+
+    try:
+        api_info_check, api_info = _smart_json_get(session, f"{normalized_endpoint}/api/info")
+        checks["api_info"] = api_info_check
+        if not api_info_check["ok"]:
+            return JsonResponse(result)
+        checks["api_info"]["server"] = api_info
+
+        cas_check, cas_data = _smart_json_get(session, f"{normalized_endpoint}/api/conservationarea")
+    finally:
+        session.close()
+    if cas_check["ok"]:
+        cas_check = {**cas_check, **_check_conservation_areas(cas_data, ca_uuids)}
+    checks["conservation_areas"] = cas_check
+
+    result["ok"] = all(check["ok"] for check in checks.values())
+    return JsonResponse(result)
+
+
+@require_POST
+@login_required
+@permission_required("integrations.change_outboundintegrationconfiguration", raise_exception=True)
+def outbound_test_smart_connection(request, configuration_id):
+    config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
+    if not config.is_smart_site:
+        raise Http404
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        if not IsOrganizationMember.is_object_owner(request.user, config):
+            raise PermissionDenied
+    return _test_smart_connection(
+        endpoint=request.POST.get("endpoint") or config.endpoint,
+        login=request.POST.get("login") or config.login,
+        password=request.POST.get("password") or config.password,
+        configured_version=config.additional.get("version"),
+        ca_uuids=config.additional.get("ca_uuids") or [],
+    )
 
 
 class InboundIntegrationConfigurationDeleteView(LoginRequiredMixin, View):

@@ -61,3 +61,27 @@ def test_delete_periodic_tasks_on_integration_delete(provider_lotek_panthera):
     for task_id in task_ids:
         with pytest.raises(PeriodicTask.DoesNotExist):
             PeriodicTask.objects.get(id=task_id)
+
+
+def test_smart_destination_v1_endpoint_is_normalized_on_save(organization, legacy_integration_type_smart):
+    integration = OutboundIntegrationConfiguration.objects.create(
+        type=legacy_integration_type_smart,
+        name="SMART Site",
+        owner=organization,
+        endpoint="https://smart.example.org/server/connect/home",
+    )
+
+    integration.refresh_from_db()
+    assert integration.endpoint == "https://smart.example.org/server"
+
+
+def test_non_smart_destination_v1_endpoint_path_is_kept_on_save(organization, legacy_integration_type_wpswatch):
+    integration = OutboundIntegrationConfiguration.objects.create(
+        type=legacy_integration_type_wpswatch,
+        name="WPS Watch Site",
+        owner=organization,
+        endpoint="https://wps.example.org/connect/api",
+    )
+
+    integration.refresh_from_db()
+    assert integration.endpoint == "https://wps.example.org/connect/api"

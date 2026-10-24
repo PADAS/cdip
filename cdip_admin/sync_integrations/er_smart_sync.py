@@ -14,6 +14,7 @@ from er_smart_sync.config import EarthRangerConfig, SmartConnectConfig, SyncConf
 from er_smart_sync.synchronizer import ERSmartSynchronizer
 
 from core.utils import get_publisher
+from integrations.utils import normalize_smart_connect_endpoint
 from sync_integrations.smart_cache import ensure_smart_cache_generation
 from sync_integrations.state import RedisStateStore
 from sync_integrations.tracing import PortalTracing
@@ -30,7 +31,7 @@ def build_sync_config(*, smart_config, er_config) -> SyncConfig:
     """
     additional = smart_config.additional or {}
     smart = SmartConnectConfig(
-        endpoint=smart_config.endpoint,
+        endpoint=normalize_smart_connect_endpoint(smart_config.endpoint),
         login=smart_config.login,
         password=smart_config.password,
         version=additional.get("version") or "7.0",
