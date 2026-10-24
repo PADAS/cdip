@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from smartconnect import SmartClient
 
 from integrations.models import OutboundIntegrationConfiguration
+from integrations.utils import normalize_smart_connect_endpoint
 import unicodedata
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def maintain_smart_integration(*args, integration_id: str, force=False):
     ca_uuids = config.additional.get("ca_uuids") or []
     if ca_uuids:
         smart_client = SmartClient(
-            api=config.endpoint,
+            api=normalize_smart_connect_endpoint(config.endpoint),
             username=config.login,
             password=config.password,
             use_language_code=config.additional.get("use_language_code", "en"),

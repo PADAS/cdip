@@ -1,5 +1,6 @@
 import pytest
 
+from integrations.models import OutboundIntegrationConfiguration
 from sync_integrations.er_smart_sync import build_sync_config, build_synchronizer
 
 pytestmark = pytest.mark.django_db
@@ -37,6 +38,18 @@ def test_maps_smart_side(smart_integration, er_integration):
     assert config.smart.ca_uuids == ["ca-1"]
     assert config.smart.configurable_models_lists == smart_integration.additional["configurable_models_lists"]
     assert config.smart.provider_key == "smart_connect"
+
+
+def test_maps_smart_endpoint_to_server_base(smart_integration, er_integration):
+    # Bypass save() so the stored endpoint keeps a web UI URL saved before normalization existed.
+    OutboundIntegrationConfiguration.objects.filter(pk=smart_integration.pk).update(
+        endpoint="https://test2.fakesmartconnect.com/server/connect"
+    )
+    smart_integration.refresh_from_db()
+
+    config = build_sync_config(smart_config=smart_integration, er_config=er_integration)
+
+    assert config.smart.endpoint == "https://test2.fakesmartconnect.com/server"
 
 
 def test_maps_er_side_with_fixed_policy(smart_integration, er_integration, settings):

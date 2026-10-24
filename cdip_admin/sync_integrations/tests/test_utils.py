@@ -1,5 +1,6 @@
 import pytest
 
+from integrations.models import OutboundIntegrationConfiguration
 from sync_integrations.utils import maintain_smart_integration
 
 pytestmark = pytest.mark.django_db
@@ -41,3 +42,17 @@ def test_maintain_smart_integration_downloads_each_ca(mocker, outbound_integrati
     assert outbound_integration_smart.additional["configurable_models_lists"] == {"ca-1": [], "ca-2": []}
     assert outbound_integration_smart.additional["ca_uuids"] == ["ca-1", "ca-2"]
     assert outbound_integration_smart.state["download_data_models"] is False
+
+
+def test_maintain_smart_integration_uses_normalized_smart_endpoint(mocker, outbound_integration_smart):
+    smart_client_class = mocker.patch("sync_integrations.utils.SmartClient")
+    smart_client_class.return_value.list_configurable_datamodels.return_value = []
+    # Bypass save() so the stored endpoint keeps a web UI URL saved before normalization existed.
+    OutboundIntegrationConfiguration.objects.filter(pk=outbound_integration_smart.pk).update(
+        endpoint="https://test2.fakesmartconnect.com/server/connect",
+        additional={"ca_uuids": ["ca-1"]},
+    )
+
+    maintain_smart_integration(integration_id=str(outbound_integration_smart.id), force=True)
+
+    assert smart_client_class.call_args.kwargs["api"] == "https://test2.fakesmartconnect.com/server"

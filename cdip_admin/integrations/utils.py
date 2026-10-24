@@ -1,6 +1,8 @@
 import base64
 import logging
 import re
+from itertools import takewhile
+from urllib.parse import urlsplit, urlunsplit
 
 import requests as requests
 from django.conf import settings
@@ -19,6 +21,7 @@ KEYS_PATH = "/key-auth"
 # mint API keys after committing their work.
 KONG_REQUEST_TIMEOUT = 10
 INTEGRATION_TYPES_PATH = "/integration-types/"
+SMART_CONNECT_NON_BASE_PATH_SEGMENTS = frozenset({"connect", "api"})
 
 logger = logging.getLogger(__name__)
 
@@ -216,3 +219,24 @@ def register_integration_type_in_kong(integration_type):
     )
     response.raise_for_status()
     return response
+
+
+def normalize_smart_connect_endpoint(endpoint: str) -> str:
+    """
+    SMART Connect clients append "/api/..." and "/connect/home" to the endpoint themselves, so a
+    pasted web UI or API URL (e.g. "https://host/server/connect/home") must be cut back to the
+    server base ("https://host/server"). The web UI answers any path under "/connect" with a 200
+    HTML page, which otherwise makes a wrong endpoint look like a successful login.
+    """
+    value = (endpoint or "").strip()
+    if not value:
+        return value
+    if "://" not in value:
+        value = f"https://{value}"
+    parts = urlsplit(value)
+    segments = takewhile(
+        lambda segment: segment.lower() not in SMART_CONNECT_NON_BASE_PATH_SEGMENTS,
+        (segment for segment in parts.path.split("/") if segment),
+    )
+    path = "".join(f"/{segment}" for segment in segments)
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))

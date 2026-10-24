@@ -7,7 +7,11 @@ from django.dispatch import receiver
 from django.conf import settings
 from fernet_fields import EncryptedCharField
 from django_jsonform.models.fields import JSONField
-from integrations.utils import does_movebank_permissions_config_changed, get_dispatcher_topic_default_name
+from integrations.utils import (
+    does_movebank_permissions_config_changed,
+    get_dispatcher_topic_default_name,
+    normalize_smart_connect_endpoint,
+)
 from integrations.tasks import recreate_and_send_movebank_permissions_csv_file, update_mb_permissions_for_group
 from cdip_admin import celery
 from core.models import TimestampedModel
@@ -245,6 +249,9 @@ class OutboundIntegrationConfiguration(TimestampedModel):
                 scheme = "https"
 
             self.endpoint = f"{scheme}://{netloc}/"
+
+        if self.is_smart_site:
+            self.endpoint = normalize_smart_connect_endpoint(self.endpoint)
 
     def _post_save(self, *args, **kwargs):
         created = kwargs.get("created", False)
