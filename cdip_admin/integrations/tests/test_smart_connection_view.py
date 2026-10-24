@@ -2,6 +2,8 @@ import pytest
 import respx
 from django.urls import reverse
 
+from conftest import setup_account_profile_mapping
+from core.enums import RoleChoices
 from integrations.models import OutboundIntegrationConfiguration
 
 
@@ -139,3 +141,26 @@ def test_smart_connection_test_rejects_non_smart_configuration(
     response = post_connection_test(client, global_admin_user, config)
 
     assert response.status_code == 404
+
+
+def test_smart_connection_test_allows_admin_of_owning_organization(
+        client, organization_member_user, organization, smart_config, smart_server
+):
+    setup_account_profile_mapping({(organization_member_user.user, organization, RoleChoices.ADMIN)})
+
+    response = post_connection_test(client, organization_member_user, smart_config)
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_smart_connection_test_rejects_member_of_other_organization_before_any_request(
+        client, organization_member_user, other_organization, smart_config, smart_server
+):
+    setup_account_profile_mapping({(organization_member_user.user, other_organization, RoleChoices.ADMIN)})
+    attacker_endpoint = "https://attacker.example.org/server"
+
+    response = post_connection_test(client, organization_member_user, smart_config, endpoint=attacker_endpoint)
+
+    assert response.status_code == 403
+    assert smart_server.calls.call_count == 0

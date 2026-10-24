@@ -1291,6 +1291,9 @@ def outbound_test_smart_connection(request, configuration_id):
     config = get_object_or_404(OutboundIntegrationConfiguration, pk=configuration_id)
     if not config.is_smart_site:
         raise Http404
+    if not IsGlobalAdmin.has_permission(None, request, None):
+        if not IsOrganizationMember.is_object_owner(request.user, config):
+            raise PermissionDenied
     return _test_smart_connection(
         endpoint=request.POST.get("endpoint") or config.endpoint,
         login=request.POST.get("login") or config.login,
