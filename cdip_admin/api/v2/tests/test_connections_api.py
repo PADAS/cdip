@@ -500,3 +500,159 @@ def test_filter_connections_by_status_needs_review_as_superuser(
         },
         expected_integrations=[connection_with_disabled_destination]  # provider OK but destination disabled
     )
+
+
+def _min_destination_type_name(connection):
+    type_names = [
+        d["type"]["name"] for d in connection["destinations"]
+        if d.get("type") and d["type"].get("name")
+    ]
+    return min(type_names) if type_names else None
+
+
+def test_list_connections_ordered_by_destination_type_asc_as_superuser(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    # Give trap_tagger a SMART destination so more than one distinct
+    # destination type is present across connections. `integrations_list_er`
+    # members are providers on their own default routes (via
+    # `ensure_default_route`) with zero destinations, so they also contribute
+    # NULL destination_type rows the ordering must place last.
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))  # one row per connection
+
+    min_types = [_min_destination_type_name(c) for c in connections]
+    non_null = [t for t in min_types if t is not None]
+    nulls = [t for t in min_types if t is None]
+    assert nulls, "expected at least one connection with no destinations to witness NULL ordering"
+    assert non_null == sorted(non_null)
+    assert min_types == non_null + nulls  # Postgres puts NULLs last on ASC
+
+
+def test_list_connections_ordered_by_destination_type_desc_as_superuser(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "-destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))
+
+    min_types = [_min_destination_type_name(c) for c in connections]
+    non_null = [t for t in min_types if t is not None]
+    nulls = [t for t in min_types if t is None]
+    assert nulls, "expected at least one connection with no destinations to witness NULL ordering"
+    assert non_null == sorted(non_null, reverse=True)
+    assert min_types == nulls + non_null  # Postgres puts NULLs first on DESC
+
+
+def test_list_connections_ordered_by_destination_type_scoped_as_org_admin(
+        api_client, org_admin_user, organization,
+        provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list_er, route_1, route_2,
+):
+    # org_admin_user only owns `organization`, which owns integrations_list_er[:5]
+    # and provider_lotek_panthera. The other providers must not appear even
+    # though the Min() annotation joins across routes and destinations owned
+    # by other organizations.
+    allowed_provider_ids = {
+        str(p.id) for p in list(integrations_list_er[:5]) + [provider_lotek_panthera]
+    }
+    disallowed_provider_ids = {
+        str(p.id) for p in list(integrations_list_er[5:]) + [provider_movebank_ewt]
+    }
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert set(provider_ids) == allowed_provider_ids
+    assert not (set(provider_ids) & disallowed_provider_ids)
+    assert len(provider_ids) == len(set(provider_ids))  # one row per connection
+
+
+def test_list_connections_ordered_by_destination_type_no_duplicates(
+        api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt,
+        integrations_list_er, route_1, route_2,
+):
+    # route_1 attaches 10 ER destinations to provider_lotek_panthera; without
+    # the Min() annotation a naive join would return 10 rows for that provider.
+    api_client.force_authenticate(superuser)
+    response = api_client.get(
+        reverse("connections-list"),
+        data={"ordering": "destination_type"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    connections = response.json()["results"]
+
+    provider_ids = [c["provider"]["id"] for c in connections]
+    assert len(provider_ids) == len(set(provider_ids))
+    lotek_rows = [c for c in connections if c["provider"]["id"] == str(provider_lotek_panthera.id)]
+    assert len(lotek_rows) == 1
+
+
+def test_list_connections_ordered_by_destination_type_paginates_deterministically(
+        monkeypatch, api_client, superuser, organization,
+        provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger,
+        integrations_list_er, route_1, route_2, smart_destination_1,
+):
+    # Force a page size smaller than the fixture footprint so cursor pagination
+    # actually round-trips. Reproduces the regression where NULL destination
+    # types encoded as the literal "None" filtered out no-destination rows
+    # from page 2, and where tied `Min()` values could shuffle across pages.
+    from rest_framework.pagination import CursorPagination
+    from api.v2 import views
+
+    class _SmallPageCursorPagination(CursorPagination):
+        page_size = 3
+
+    monkeypatch.setattr(
+        views.ConnectionsView, "pagination_class",
+        _SmallPageCursorPagination, raising=False,
+    )
+    provider_trap_tagger.default_route.destinations.add(smart_destination_1)
+
+    expected_ids = {
+        str(p.id) for p in list(integrations_list_er)
+        + [provider_lotek_panthera, provider_movebank_ewt, provider_trap_tagger]
+    }
+
+    api_client.force_authenticate(superuser)
+    collected_ids = []
+    next_url = reverse("connections-list") + "?ordering=destination_type"
+    while next_url:
+        response = api_client.get(next_url)
+        assert response.status_code == status.HTTP_200_OK
+        page = response.json()
+        collected_ids.extend(c["provider"]["id"] for c in page["results"])
+        next_url = page.get("next")
+
+    assert len(collected_ids) == len(set(collected_ids)), "no row appears twice across pages"
+    assert set(collected_ids) == expected_ids, "no row is dropped across pages"
