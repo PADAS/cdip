@@ -14,3 +14,8 @@ spec:
     unhealthyThreshold: 2
   connectionDraining:
     drainingTimeoutSec: 30
+  # Attachment point for a Cloud Armor policy on the ingress backend; uncomment
+  # once the policy exists in the project. LB health checks reach the NEG
+  # directly and are not filtered by it.
+  # securityPolicy:
+  #   name: keycloak-master-lockdown
