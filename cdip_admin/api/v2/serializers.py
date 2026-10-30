@@ -580,6 +580,8 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
     status_details = serializers.SerializerMethodField()
+    can_send = serializers.SerializerMethodField()
+    reasons = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
@@ -596,6 +598,8 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "default_route",
             "status",
             "status_details",
+            "can_send",
+            "reasons",
         )
 
     def get_status(self, obj):
@@ -605,6 +609,65 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     def get_status_details(self, obj):
         integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
         return integration_status.status_details
+
+    # GUNDI-5730 U5, small version: whether `obj` could send data to the
+    # integration named by `?can_send_to=`, checked by action type only --
+    # no live credential or permission check yet (those become
+    # missing_credentials/no_permission reason codes in a later ticket).
+    # Known gap: a webhook-only provider has no pull action and is reported
+    # as not able to send, same limitation as today's client-side guess.
+    def get_can_send(self, obj):
+        result = self._evaluate_can_send(obj)
+        return result[0] if result else None
+
+    def get_reasons(self, obj):
+        result = self._evaluate_can_send(obj)
+        return result[1] if result else None
+
+    def _can_send_to_integration(self):
+        # One lookup for the whole list, not per row -- every row asks about
+        # the SAME target integration.
+        if not hasattr(self, "_can_send_to_integration_cache"):
+            request = self.context.get("request")
+            target_id = request.query_params.get("can_send_to") if request else None
+            target = None
+            if target_id:
+                target = Integration.objects.filter(pk=target_id).first()
+            self._can_send_to_integration_cache = target
+        return self._can_send_to_integration_cache
+
+    def _evaluate_can_send(self, obj):
+        target = self._can_send_to_integration()
+        if not target:
+            return None
+        cache = getattr(self, "_can_send_eval_cache", None)
+        if cache is None:
+            cache = self._can_send_eval_cache = {}
+        if obj.id in cache:
+            return cache[obj.id]
+
+        reasons = []
+        can_provide = IntegrationAction.objects.filter(
+            integration_type_id=obj.type_id,
+            type=IntegrationAction.ActionTypes.PULL_DATA,
+        ).exists()
+        if not can_provide:
+            reasons.append({
+                "code": "no_pull_action",
+                "message": f"{obj.name} has no way to provide data (no pull action).",
+            })
+        can_receive = IntegrationAction.objects.filter(
+            integration_type_id=target.type_id,
+            type=IntegrationAction.ActionTypes.PUSH_DATA,
+        ).exists()
+        if not can_receive:
+            reasons.append({
+                "code": "no_push_action",
+                "message": f"{target.name} has no way to receive data (no push action).",
+            })
+        result = (len(reasons) == 0, reasons)
+        cache[obj.id] = result
+        return result
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
