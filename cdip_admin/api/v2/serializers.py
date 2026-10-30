@@ -1196,6 +1196,11 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         required=False,
         nested_serializer=RouteConfigurationSerializer(required=False)
     )
+    # flow_id/direction/return_for_destination are assigned by the system (Route.save(),
+    # U1's attach/detach flow), not something a caller sets directly through this endpoint.
+    flow_id = serializers.UUIDField(read_only=True)
+    direction = serializers.CharField(read_only=True)
+    return_for_destination = IntegrationSummarySerializer(read_only=True)
 
     class Meta:
         model = Route
@@ -1207,6 +1212,10 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
+            "enabled",
+            "flow_id",
+            "direction",
+            "return_for_destination",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 
@@ -1239,6 +1248,7 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         route-context checks before any DB write happens.
         """
         if not isinstance(value, dict):
+            self._validate_configuration_ownership(value)
             return value
         existing = self.instance.configuration if self.instance else None
         nested = RouteConfigurationSerializer(
@@ -1246,6 +1256,23 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         )
         nested.is_valid(raise_exception=True)
         return nested
+
+    def _validate_configuration_ownership(self, configuration: "RouteConfiguration") -> None:
+        # A bare UUID resolves against RouteConfiguration.objects.all() with
+        # no org filter -- PKRelatedOrNestedField has no request context at
+        # field-construction time to scope it -- so without this, a config
+        # from another organization's route could be attached here. GUNDI-5698.
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return
+        route_owner_id = (
+            str(self.instance.owner_id) if self.instance
+            else self.initial_data.get("owner")
+        )
+        if route_owner_id and configuration.owner_id and str(configuration.owner_id) != str(route_owner_id):
+            raise drf_exceptions.ValidationError(
+                detail="This configuration belongs to a different organization's route."
+            )
 
     def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
@@ -1289,27 +1316,33 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return {str(item.id) for item in getattr(self.instance, field_name).all()}
 
     @staticmethod
-    def _materialize_configuration(value: Any) -> Any:
+    def _materialize_configuration(value: Any, owner) -> Any:
         """Save a deferred ``RouteConfigurationSerializer`` and unwrap to a model
-        instance suitable for FK assignment. Anything else is returned as-is."""
+        instance suitable for FK assignment. Anything else is returned as-is.
+
+        A config created through this nested path belongs to the route being
+        saved -- ``RouteConfigurationSerializer`` doesn't declare ``owner``
+        itself, so it's passed as a save() kwarg (GUNDI-5698).
+        """
         if isinstance(value, RouteConfigurationSerializer):
-            value.save()
+            value.save(owner=owner)
             return value.instance
         return value
 
-    def _materialize_validated_data(self, validated_data: dict) -> dict:
+    def _materialize_validated_data(self, validated_data: dict, owner) -> dict:
         if "configuration" not in validated_data:
             return validated_data
         return {
             **validated_data,
-            "configuration": self._materialize_configuration(validated_data["configuration"]),
+            "configuration": self._materialize_configuration(validated_data["configuration"], owner),
         }
 
     def create(self, validated_data: dict) -> Route:
-        return super().create(self._materialize_validated_data(validated_data))
+        return super().create(self._materialize_validated_data(validated_data, validated_data.get("owner")))
 
     def update(self, instance: Route, validated_data: dict) -> Route:
-        return super().update(instance, self._materialize_validated_data(validated_data))
+        owner = validated_data.get("owner", instance.owner)
+        return super().update(instance, self._materialize_validated_data(validated_data, owner))
 
 
 class RouteRetrieveFullSerializer(serializers.ModelSerializer):
@@ -1317,6 +1350,7 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
     data_providers = IntegrationSummarySerializer(many=True)
     destinations = IntegrationSummarySerializer(many=True)
     configuration = RouteConfigurationSerializer()
+    return_for_destination = IntegrationSummarySerializer(read_only=True)
 
     class Meta:
         model = Route
@@ -1328,6 +1362,9 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
+            "flow_id",
+            "direction",
+            "return_for_destination",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 

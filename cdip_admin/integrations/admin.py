@@ -669,11 +669,13 @@ class RouteAdmin(admin.ModelAdmin):
         "id",
         "name",
     )
-    # Render owner/configuration as AJAX search boxes instead of dropdowns that
-    # eagerly load every Organization/RouteConfiguration on the change page.
+    # Render owner/configuration/return_for_destination as AJAX search boxes
+    # instead of dropdowns that eagerly load every Organization/
+    # RouteConfiguration/Integration on the change page.
     autocomplete_fields = (
         "owner",
         "configuration",
+        "return_for_destination",
     )
     inlines = (
         RouteProviderInline,
