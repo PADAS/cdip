@@ -270,9 +270,12 @@ class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
 
 class ProvidersManager(models.Manager):
     def get_queryset(self):
-        # Return integrations being used as a provider in any connection
+        # Return integrations that are the provider of a real (forward) Route.
+        # GUNDI-5730: a return leg makes its own provider (the original
+        # destination, acting in reverse) match this relation too -- direction
+        # excludes that auto-created role from counting as a real connection.
         return super().get_queryset().filter(
-            routing_rules_by_provider__isnull=False
+            routing_rules_by_provider__direction=Route.Direction.FORWARD
         ).distinct()
 
 
@@ -405,15 +408,18 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     @property
     def routing_rules(self):
-        return self.routing_rules_by_provider.all()
+        # GUNDI-5730: forward only -- a return leg also has this Integration as
+        # its provider (the original destination, acting in reverse), and that
+        # auto-created role isn't a real Route the user manages.
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD)
 
     @property
     def is_used_as_provider(self):
-        return self.routing_rules_by_provider.exists()
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD).exists()
 
     @property
     def is_used_as_destination(self):
-        return self.routing_rules_by_destination.exists()
+        return self.routing_rules_by_destination.filter(direction=Route.Direction.FORWARD).exists()
 
     @property
     def destinations(self):
