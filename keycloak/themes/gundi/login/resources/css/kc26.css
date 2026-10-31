@@ -1,0 +1,171 @@
+/* Keycloak 26 (PatternFly 5) class overrides for the Gundi theme. Loads after gundi.css.
+   Strategy: retheme PatternFly through its global tokens first, then patch the few
+   components that still show blue or Red Hat defaults. */
+
+:root {
+  --pf-v5-global--FontFamily--text: var(--gundi-font);
+  --pf-v5-global--FontFamily--heading: var(--gundi-font);
+  --pf-v5-global--FontFamily--sans-serif: var(--gundi-font);
+  --pf-v5-global--primary-color--100: var(--gundi-primary);
+  --pf-v5-global--primary-color--200: var(--gundi-primary-hover);
+  --pf-v5-global--active-color--100: var(--gundi-primary);
+  --pf-v5-global--link--Color: var(--gundi-primary);
+  --pf-v5-global--link--Color--hover: var(--gundi-primary-hover);
+  --pf-v5-global--BorderRadius--sm: var(--gundi-radius-control);
+  --pf-v5-global--BorderColor--100: var(--gundi-field-outline);
+  --pf-v5-global--BorderColor--300: var(--gundi-field-outline);
+  --pf-v5-global--danger-color--100: var(--gundi-error);
+  --pf-v5-global--Color--100: var(--gundi-text);
+  --pf-v5-global--Color--200: var(--gundi-text-secondary);
+  --pf-v5-global--BackgroundColor--100: var(--gundi-card-bg);
+  --keycloak-card-top-color: var(--gundi-primary);
+}
+
+/* Flat page background instead of the darkened Keycloak backdrop */
+.login-pf body,
+body#keycloak-bg {
+  background: var(--gundi-page-bg);
+}
+
+/* The parent theme fixes the grid track at 34rem (544px) with no media query, which
+   overflows any viewport narrower than that. Let the track shrink with the viewport. */
+.pf-v5-c-login__container {
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 34rem);
+}
+
+/* Card */
+.pf-v5-c-login__main {
+  width: 100%;                               /* error/info pages would otherwise shrink to content */
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  background: var(--gundi-card-bg);
+  border: 1px solid var(--gundi-divider);
+  border-radius: var(--gundi-radius-card);
+  box-shadow: var(--gundi-shadow-card);
+  overflow: hidden;
+}
+.pf-v5-c-login__main-header {
+  --pf-v5-c-login__main-header--ColumnGap: 0; /* the empty locale-menu column otherwise nudges the title left */
+  border-top: 0;                             /* remove the thick coloured top band the parent draws */
+  padding-top: 32px;
+}
+.pf-v5-c-login__main-header::before {
+  content: "";
+  display: block;
+  grid-column: 1 / -1;                       /* the header is a title + locale-menu grid; span it */
+  width: 58px;
+  height: 48px;
+  margin: 0 auto 20px;
+  background: url("../img/gundi-mark.png") no-repeat center / contain;
+}
+.pf-v5-c-login__main-body {
+  padding-bottom: 24px;
+}
+
+/* Inputs: PF5 draws the border on the wrapping span via ::after */
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--BorderRadius: var(--gundi-radius-control);
+  --pf-v5-c-form-control--BorderWidth: 1px;
+  --pf-v5-c-form-control--after--BorderBottomColor: var(--gundi-field-outline);
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: var(--gundi-primary);
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--gundi-primary);
+  --pf-v5-c-form-control--focus--after--BorderBottomWidth: 1px;
+  border: 1px solid var(--gundi-field-outline);
+  border-radius: var(--gundi-radius-control);
+  min-height: 40px;
+}
+.pf-v5-c-form-control:focus-within {
+  border-color: var(--gundi-primary);
+  box-shadow: 0 0 0 3px var(--gundi-focus-ring);
+}
+.pf-v5-c-form-control input {
+  font-family: var(--gundi-font);
+  font-size: 15px;
+  color: var(--gundi-text);
+}
+.pf-v5-c-form__label-text {
+  font-weight: 500;
+  color: var(--gundi-text);
+}
+
+/* Buttons (the primary submit is styled by #kc-login in gundi.css; these cover other pages) */
+.pf-v5-c-button {
+  font-family: var(--gundi-font);
+  font-weight: 600;
+  border-radius: var(--gundi-radius-control);
+}
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--gundi-primary);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--gundi-primary-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--gundi-primary-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--gundi-primary-hover);
+}
+.pf-v5-c-button.pf-m-secondary {
+  --pf-v5-c-button--m-secondary--Color: var(--gundi-primary);
+  --pf-v5-c-button--m-secondary--BorderColor: var(--gundi-field-outline);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--gundi-primary-hover);
+  --pf-v5-c-button--m-secondary--hover--BorderColor: var(--gundi-primary);
+}
+.pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--gundi-primary);
+  --pf-v5-c-button--m-link--hover--Color: var(--gundi-primary-hover);
+}
+/* Password visibility toggle */
+.pf-v5-c-button.pf-m-control {
+  color: var(--gundi-primary);
+  border: 0;
+}
+
+/* Remember me */
+.pf-v5-c-check__input {
+  accent-color: var(--gundi-primary);
+}
+.pf-v5-c-check__label {
+  color: var(--gundi-text-secondary);
+  font-size: 14px;
+}
+
+/* Alerts as inline bands with a status-coloured left border */
+.pf-v5-c-alert.pf-m-inline {
+  --pf-v5-c-alert--BorderTopWidth: 0;
+  border-left: 4px solid var(--gundi-text-secondary);
+  border-radius: var(--gundi-radius-control);
+  box-shadow: none;
+  background: var(--gundi-info-bg);
+  color: var(--gundi-text);
+}
+.pf-v5-c-alert.pf-m-inline.pf-m-danger {
+  background: var(--gundi-error-bg);
+  border-left-color: var(--gundi-error);
+  --pf-v5-c-alert__icon--Color: var(--gundi-error);
+}
+.pf-v5-c-alert.pf-m-inline.pf-m-success {
+  background: var(--gundi-success-bg);
+  border-left-color: var(--gundi-primary);
+  --pf-v5-c-alert__icon--Color: var(--gundi-primary);
+}
+.pf-v5-c-alert.pf-m-inline.pf-m-warning {
+  background: var(--gundi-warning-bg);
+  border-left-color: var(--gundi-warning);
+  --pf-v5-c-alert__icon--Color: var(--gundi-warning);
+}
+.pf-v5-c-alert.pf-m-inline.pf-m-info {
+  background: var(--gundi-info-bg);
+  border-left-color: var(--gundi-text-secondary);
+  --pf-v5-c-alert__icon--Color: var(--gundi-text-secondary);
+}
+
+/* Phones: 16px gutter comes from the container so the card never exceeds the viewport */
+@media (max-width: 480px) {
+  .pf-v5-c-login__container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .pf-v5-c-login__main {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

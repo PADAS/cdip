@@ -18,6 +18,8 @@ integrations_router.register(r'actions', views.ActionTriggerView, basename='acti
 default_router.register('connections', views.ConnectionsView, basename="connections")
 default_router.register('sources', views.SourcesView, basename="sources")
 default_router.register('routes', views.RoutesView, basename="routes")
+routes_router = NestedSimpleRouter(default_router, r'routes', lookup='route')
+routes_router.register(r'filters', views.RouteFiltersView, basename='filters')
 default_router.register('observations', views.ObservationsView, basename="observations")
 default_router.register('events', views.EventsView, basename="events")
 events_router = NestedSimpleRouter(default_router, r'events', lookup='event')
@@ -56,4 +58,5 @@ urlpatterns = [
     path(r'', include(integrations_router.urls)),
     path(r'', include(organizations_router.urls)),
     path(r'', include(events_router.urls)),
+    path(r'', include(routes_router.urls)),
 ]

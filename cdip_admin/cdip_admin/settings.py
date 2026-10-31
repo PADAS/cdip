@@ -466,6 +466,7 @@ PUBSUB_ENABLED = env.bool("PUBSUB_ENABLED", True)
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
 DISPATCHER_EVENTS_SUB_ID = env.str("DISPATCHER_EVENTS_SUB_ID", "cdip-dispatcher-events-sub-prod")
 INTEGRATION_EVENTS_SUB_ID = env.str("INTEGRATION_EVENTS_SUB_ID", "cdip-integration-events-sub-prod")
+ROUTING_EVENTS_SUB_ID = env.str("ROUTING_EVENTS_SUB_ID", "cdip-routing-events-sub-prod")
 GCP_ENVIRONMENT_ENABLED = env.bool("GCP_ENVIRONMENT_ENABLED", default=True)
 DISPATCHER_DEFAULTS_SECRET = env.str("DISPATCHER_DEFAULTS_SECRET", "er-dispatcher-defaults-prod")
 DISPATCHER_DEFAULTS_SECRET_SMART = env.str("DISPATCHER_DEFAULTS_SECRET_SMART", "sm-dispatcher-defaults-prod")
@@ -475,6 +476,10 @@ MOVEBANK_DISPATCHER_DEFAULT_TOPIC = env.str("MOVEBANK_DISPATCHER_DEFAULT_TOPIC",
 
 # Sensors API to Routing
 RAW_OBSERVATIONS_TOPIC = env.str("RAW_OBSERVATIONS_TOPIC", "raw-observations-prod")
+# EarthRanger event type API version used when pushing SMART data models.
+# v1 writes end with ER's 2026-10-15 sunset; keep "v2" unless an emergency
+# rollback for one environment is needed before that date.
+ER_SMART_SYNC_EVENT_TYPE_VERSION = env.str("ER_SMART_SYNC_EVENT_TYPE_VERSION", default="v2")
 # Batch envelope publishing (docs/superpowers/specs/2026-07-29-pipeline-batch-envelope-design.md).
 # List-POSTs with at least this many non-duplicate observations publish
 # ObservationsBatchReceived envelopes instead of per-item events. This is the
@@ -484,3 +489,8 @@ OBSERVATIONS_BATCH_THRESHOLD = env.int("OBSERVATIONS_BATCH_THRESHOLD", 10)
 OBSERVATIONS_BATCH_MAX_ITEMS = env.int("OBSERVATIONS_BATCH_MAX_ITEMS", 500)
 # Events on configuration changes (for integrations, routing, etc..)
 CONFIGURATION_EVENTS_TOPIC = env.str("CONFIGURATION_EVENTS_TOPIC", "configuration-events-prod")
+
+# Upper bound on how many sources one routing filter may reference. The binding
+# constraint is the serialized route payload, which cdip-routing fetches and caches on
+# every config load — not database size, since the M2M rows are cheap.
+SOURCE_FILTER_MAX_SOURCES = env.int("SOURCE_FILTER_MAX_SOURCES", 1000)

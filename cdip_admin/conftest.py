@@ -32,7 +32,6 @@ from integrations.models import (
     IntegrationConfiguration,
     Route,
     SourceFilter,
-    ListFilter,
     Source,
     SourceState,
     SourceConfiguration,
@@ -2240,13 +2239,19 @@ def route_1(
     rule.data_providers.add(provider_lotek_panthera)
     rule.destinations.add(*integrations_list_er)
     # Filter data coming only from a subset of sources
-    SourceFilter.objects.create(
+    source_filter = SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        mode=SourceFilter.FilterModes.WHITELIST,
         name="Panthera Male Pumas",
         description="Select collars on male pumas in panthera reserve",
         order_number=1,
-        selector=ListFilter(ids=[d.external_id for d in lotek_sources]).dict(),
         routing_rule=rule,
+        destination=integrations_list_er[0],
+    )
+    source_filter.sources.set(lotek_sources)
+    # Mirrors what the API write / 0121 backfill maintain in real data.
+    source_filter.covered_providers.set(
+        {source.integration_id for source in lotek_sources}
     )
     return rule
 
@@ -2296,13 +2301,19 @@ def route_2(
     route.data_providers.add(provider_movebank_ewt)
     route.destinations.add(integrations_list_er[5])
     # Filter data coming only from a subset of sources
-    SourceFilter.objects.create(
+    source_filter = SourceFilter.objects.create(
         type=SourceFilter.SourceFilterTypes.SOURCE_LIST,
+        mode=SourceFilter.FilterModes.WHITELIST,
         name="EWT Baby Elephants",
         description="Select collars on baby elephants in EWT reserve",
         order_number=1,
-        selector=ListFilter(ids=[d.external_id for d in movebank_sources]).dict(),
         routing_rule=route,
+        destination=integrations_list_er[5],
+    )
+    source_filter.sources.set(movebank_sources)
+    # Mirrors what the API write / 0121 backfill maintain in real data.
+    source_filter.covered_providers.set(
+        {source.integration_id for source in movebank_sources}
     )
     # Add a custom configuration
     route.configuration = er_route_configuration_elephants
@@ -4559,3 +4570,51 @@ def outbound_integrations_list_wpswatch(
         )
         integrations.append(integration)
     return integrations
+
+
+@pytest.fixture
+def lotek_observation_filtered_event(mocker, lotek_observation_trace, integrations_list_er):
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "a3f0f9d1-9f2a-4f5b-8f61-6a2e3a7c0d11",
+        "timestamp": "2026-09-30 18:10:00.123456+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationFiltered",
+        "payload": {
+            "gundi_id": str(lotek_observation_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(lotek_observation_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[0].id),
+            "external_source_id": str(lotek_observation_trace.source.external_id),
+            "observation_type": "obv",
+            "filtered_by": "device_blacklist",
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message
+
+
+@pytest.fixture
+def lotek_observation_filtered_event_second_destination(
+        mocker, lotek_observation_trace, integrations_list_er
+):
+    # Same observation filtered for another destination, after the first
+    # trace row was already bound elsewhere.
+    message = mocker.MagicMock()
+    event_dict = {
+        "event_id": "b4c1e8a2-0d3b-4c6a-9e72-7b3f4b8d1e22",
+        "timestamp": "2026-09-30 18:10:05.654321+00:00",
+        "schema_version": "v1",
+        "event_type": "ObservationFiltered",
+        "payload": {
+            "gundi_id": str(lotek_observation_trace.object_id),
+            "related_to": None,
+            "data_provider_id": str(lotek_observation_trace.data_provider.id),
+            "destination_id": str(integrations_list_er[1].id),
+            "external_source_id": str(lotek_observation_trace.source.external_id),
+            "observation_type": "obv",
+            "filtered_by": "device_whitelist",
+        },
+    }
+    message.data = json.dumps(event_dict).encode("utf-8")
+    return message

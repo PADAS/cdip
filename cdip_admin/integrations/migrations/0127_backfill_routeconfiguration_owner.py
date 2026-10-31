@@ -49,7 +49,7 @@ def backfill_routeconfiguration_owner(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("integrations", "0119_routeconfiguration_owner"),
+        ("integrations", "0126_routeconfiguration_owner"),
     ]
 
     operations = [

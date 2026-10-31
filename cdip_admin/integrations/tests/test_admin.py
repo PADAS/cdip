@@ -683,3 +683,12 @@ def test_route_change_page_shows_default_route_for_panel(admin_client, visibilit
     assert "Default route for" in content
     assert "Valid provider" in content
     assert reverse("admin:integrations_integration_change", args=[visibility_zoo["valid"].pk]) in content
+
+
+def test_source_filter_admin_form_rejects_a_mode_the_api_would_reject():
+    from integrations.admin import SourceFilterAdminForm
+
+    form = SourceFilterAdminForm(data={"mode": "graylist"})
+
+    assert form.errors["mode"]
+    assert [c for c, _ in form.fields["mode"].choices] == ["whitelist", "blacklist"]

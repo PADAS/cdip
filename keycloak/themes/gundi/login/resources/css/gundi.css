@@ -1,0 +1,94 @@
+/* Shared Gundi rules. Only stable #kc-* ids, element, attribute and pseudo selectors.
+   Framework classes (PatternFly 3 / 5) belong in kc11.css / kc26.css.
+   Enforced by keycloak/tests/check-css.sh. Loads after tokens.css. */
+
+html,
+body {
+  font-family: var(--gundi-font);
+  color: var(--gundi-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Header: the realm display name renders above the card on both versions.
+   It is hidden; the Gundi mark is drawn inside the card by kc11.css / kc26.css. ---- */
+#kc-header {
+  display: none;
+}
+
+/* ---- Page title ---- */
+#kc-page-title {
+  font-family: var(--gundi-font);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--gundi-text);
+  text-align: center;
+  margin: 0 0 24px;
+}
+/* Login page only: "Sign in to Gundi" subtitle under the h1. Keycloak 26 tags the body with a
+   page id. Keycloak 11 has no page marker, so the login form's presence identifies the page via
+   :has(); :is() is forgiving, so a browser without :has() still applies the 26 branch.
+   The copy must match loginTitle in messages/messages_en.properties. */
+:is(body[data-page-id="login-login"], body:has(#kc-form-login)) #kc-page-title::after {
+  content: "Sign in to Gundi";
+  display: block;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--gundi-text-secondary);
+}
+
+/* ---- Primary submit button (same id on 11 and 26) ---- */
+#kc-login {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--gundi-radius-control);
+  background: var(--gundi-primary);
+  color: #ffffff;
+  font-family: var(--gundi-font);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 44px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+#kc-login:hover {
+  background: var(--gundi-primary-hover);
+  color: #ffffff;
+}
+#kc-login:focus-visible {
+  outline: 3px solid var(--gundi-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Links inside the form and the info block ---- */
+#kc-form a,
+#kc-form-login a,
+#kc-info a {
+  color: var(--gundi-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+#kc-form a:hover,
+#kc-form-login a:hover,
+#kc-info a:hover {
+  color: var(--gundi-primary-hover);
+  text-decoration: underline;
+}
+#kc-info {
+  color: var(--gundi-text-secondary);
+  font-size: 14px;
+}
+
+/* ---- Username / password inputs by id (other pages' inputs are styled per version) ---- */
+#username,
+#password {
+  font-family: var(--gundi-font);
+  font-size: 15px;
+  color: var(--gundi-text);
+}

@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('organizations', '0009_organization_ordering'),
-        ('integrations', '0118_integration_default_route_on_delete'),
+        ('integrations', '0125_sourcefilter_include_default_source'),
     ]
 
     operations = [

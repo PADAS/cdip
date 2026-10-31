@@ -1,6 +1,8 @@
 import base64
 import logging
 import re
+from itertools import takewhile
+from urllib.parse import urlsplit, urlunsplit
 
 import requests as requests
 from django.conf import settings
@@ -19,6 +21,7 @@ KEYS_PATH = "/key-auth"
 # mint API keys after committing their work.
 KONG_REQUEST_TIMEOUT = 10
 INTEGRATION_TYPES_PATH = "/integration-types/"
+SMART_CONNECT_NON_BASE_PATH_SEGMENTS = frozenset({"connect", "api"})
 
 logger = logging.getLogger(__name__)
 
@@ -90,22 +93,37 @@ def create_api_key(integration):
 
 
 def get_api_key(integration):
-    create_api_consumer(integration)
-
-    # obtain key if permission checks pass
+    # Read before creating. Action runners fetch their key on nearly every run,
+    # and Kong logs every duplicate consumer insert as a failed DB write, so the
+    # consumer is only POSTed when Kong reports it missing (404).
     response = requests.get(
         f"{KONG_PROXY_URL}{CONSUMERS_PATH}/integration:{str(integration.id)}{KEYS_PATH}",
         timeout=KONG_REQUEST_TIMEOUT,
     )
 
-    if response.ok:
-        try:
-            data = response.json()["data"]
-            api_key = data[0]["key"] if len(data) > 0 else None
-            if api_key:
-                return api_key
-        except:
-            logger.exception("failed getting API key for consumer %s", integration)
+    if response.status_code == 404:
+        create_api_consumer(integration)
+        return create_api_key(integration)
+
+    # Any other failure raises rather than falling through to create_api_key:
+    # minting a key on a transient Kong error leaves the consumer with an
+    # extra live key on every retry.
+    if not response.ok:
+        logger.error(
+            "Failed reading API key for consumer %s: %s %s",
+            integration, response.status_code, response.text,
+        )
+        raise ConsumerCreationError
+
+    try:
+        keys = response.json()["data"]
+        if not isinstance(keys, list):
+            raise TypeError(f"key-auth data is {type(keys).__name__}, not list")
+        if keys:
+            return keys[0]["key"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        logger.exception("Unexpected key-auth response for consumer %s", integration)
+        raise ConsumerCreationError
 
     return create_api_key(integration)
 
@@ -201,3 +219,24 @@ def register_integration_type_in_kong(integration_type):
     )
     response.raise_for_status()
     return response
+
+
+def normalize_smart_connect_endpoint(endpoint: str) -> str:
+    """
+    SMART Connect clients append "/api/..." and "/connect/home" to the endpoint themselves, so a
+    pasted web UI or API URL (e.g. "https://host/server/connect/home") must be cut back to the
+    server base ("https://host/server"). The web UI answers any path under "/connect" with a 200
+    HTML page, which otherwise makes a wrong endpoint look like a successful login.
+    """
+    value = (endpoint or "").strip()
+    if not value:
+        return value
+    if "://" not in value:
+        value = f"https://{value}"
+    parts = urlsplit(value)
+    segments = takewhile(
+        lambda segment: segment.lower() not in SMART_CONNECT_NON_BASE_PATH_SEGMENTS,
+        (segment for segment in parts.path.split("/") if segment),
+    )
+    path = "".join(f"/{segment}" for segment in segments)
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))

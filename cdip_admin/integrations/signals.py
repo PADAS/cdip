@@ -10,6 +10,7 @@ from .models.v2 import (
     Route,
     RouteDestination,
     RouteProvider,
+    Source,
     resolve_default_route,
 )
 
@@ -215,3 +216,15 @@ def on_route_provider_pre_delete(sender, instance, **kwargs):
     except Integration.DoesNotExist:
         return
     resolve_default_route(integration, exclude_route_ids=_routes_leaving_in_this_delete(instance, kwargs.get("origin")), via=via)
+
+
+@receiver(pre_delete, sender=Source)
+def log_filter_membership_lost_on_source_delete(sender, instance, **kwargs):
+    # The M2M cascade removes the device from every filter that names it without
+    # going through the API, so the policy change would otherwise leave no audit
+    # trail (proposal decision 10). pre_delete, because after the delete the
+    # through rows are gone and the affected filters can no longer be found.
+    for source_filter in instance.source_filters_by_source.all():
+        source_filter.log_sources_changed(
+            removed=[instance], cause="source_deleted"
+        )

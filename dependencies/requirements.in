@@ -60,11 +60,11 @@ packaging>=21.0
 django-extensions==3.2.0
 drf-nested-routers==0.93.4
 drf-proxy-pagination==0.2.0
-jsonschema==4.17.3
+jsonschema==4.23.0
 django-celery-beat==2.8.0
 django-storages==1.13.2
 walrus==0.9.5
-gundi-core==1.13.0
+gundi-core==1.14.0
 gundi-client==1.1.0
 gundi-client-v2==2.4.1
 google-cloud-functions==1.13.1
@@ -73,8 +73,7 @@ google-cloud-eventarc==1.10.0
 google-cloud-secret-manager==2.16.4
 django-model-utils==4.3.1
 django-crum==0.7.9
-https://github.com/PADAS/das-clients/releases/download/v.1.0.40/dasclient-1.0.40-py3-none-any.whl
-https://github.com/PADAS/smartconnect-client/releases/download/v1.11.0/smartconnect_client-1.11.0-py3-none-any.whl
+er-smart-sync==0.6.0
 https://github.com/PADAS/smart-integrate-sdk/releases/download/v1.6.0-rc/cdip_connector-1.6.0-py3-none-any.whl
 opentelemetry-api==1.14.0
 opentelemetry-sdk==1.14.0

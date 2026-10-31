@@ -460,6 +460,8 @@ def _test_create_source(api_client, user, provider, external_id="new-collar-001"
     ):
         assert field in response_data
     assert response_data["name"] == (name or "")
+    assert source.created_via == Source.CreationOrigins.MANUAL
+    assert response_data["created_via"] == "manual"
     return source
 
 
@@ -585,3 +587,73 @@ def test_create_source_with_unknown_provider_as_superuser_is_a_validation_error(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
     assert "provider" in response.json()
+
+
+# --- created_via: an immutable record of where a source came from ---------------
+#
+# "manual" means a user typed it in; "ingestion" means the integration sent data
+# for an id nobody had registered. The field exists for debugging, so it must
+# never change after creation — not via the API, and not via ingestion's upsert.
+
+def test_created_via_defaults_to_ingestion(provider_lotek_panthera):
+    # Ingestion's writers call get_or_create with no created_via, so the model
+    # default IS the ingestion path's value. The migration stamps every
+    # pre-existing row through this same default.
+    source = Source.objects.create(
+        integration=provider_lotek_panthera, external_id="collar-auto-001"
+    )
+    assert source.created_via == Source.CreationOrigins.INGESTION
+
+
+def test_manual_source_survives_ingestion_upsert(
+        api_client, superuser, provider_lotek_panthera
+):
+    source = _test_create_source(
+        api_client, superuser, provider_lotek_panthera, external_id="collar-m-001"
+    )
+    # The exact call ingestion makes when data arrives for a known external_id
+    # (api/v2/serializers.py, observation validate()): it must bind, not rewrite.
+    found, created = Source.objects.get_or_create(
+        integration=provider_lotek_panthera, external_id="collar-m-001"
+    )
+    assert not created
+    assert found.id == source.id
+    assert found.created_via == Source.CreationOrigins.MANUAL
+
+
+def test_created_via_in_payload_is_ignored_on_create(
+        api_client, superuser, provider_lotek_panthera
+):
+    api_client.force_authenticate(superuser)
+    response = api_client.post(
+        reverse("sources-list"),
+        data={
+            "provider": str(provider_lotek_panthera.id),
+            "external_id": "collar-forged-001",
+            "created_via": "ingestion",
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    source = Source.objects.get(id=response.json()["id"])
+    # The endpoint is the only writer of "manual"; a forged value is discarded.
+    assert source.created_via == Source.CreationOrigins.MANUAL
+
+
+def test_created_via_cannot_be_updated_through_the_api(
+        api_client, superuser, provider_lotek_panthera
+):
+    source = _test_create_source(
+        api_client, superuser, provider_lotek_panthera, external_id="collar-m-002"
+    )
+    response = api_client.patch(
+        reverse("sources-detail", kwargs={"pk": str(source.id)}),
+        data={"created_via": "ingestion"},
+        format="json",
+    )
+    # The view has no update mixin, so the field is unreachable — and if an update
+    # endpoint is ever added, read_only_fields keeps it unreachable there too.
+    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    source.refresh_from_db()
+    assert source.created_via == Source.CreationOrigins.MANUAL
+
