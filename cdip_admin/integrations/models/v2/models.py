@@ -270,9 +270,12 @@ class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
 
 class ProvidersManager(models.Manager):
     def get_queryset(self):
-        # Return integrations being used as a provider in any connection
+        # Return integrations that are the provider of a real (forward) Route.
+        # GUNDI-5730: a return leg makes its own provider (the original
+        # destination, acting in reverse) match this relation too -- direction
+        # excludes that auto-created role from counting as a real connection.
         return super().get_queryset().filter(
-            routing_rules_by_provider__isnull=False
+            routing_rules_by_provider__direction=Route.Direction.FORWARD
         ).distinct()
 
 
@@ -405,15 +408,18 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     @property
     def routing_rules(self):
-        return self.routing_rules_by_provider.all()
+        # GUNDI-5730: forward only -- a return leg also has this Integration as
+        # its provider (the original destination, acting in reverse), and that
+        # auto-created role isn't a real Route the user manages.
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD)
 
     @property
     def is_used_as_provider(self):
-        return self.routing_rules_by_provider.exists()
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD).exists()
 
     @property
     def is_used_as_destination(self):
-        return self.routing_rules_by_destination.exists()
+        return self.routing_rules_by_destination.filter(direction=Route.Direction.FORWARD).exists()
 
     @property
     def destinations(self):
@@ -695,6 +701,18 @@ class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Configuration"
     )
+    # Stays nullable even after backfill: a config can transiently have zero
+    # referencing routes mid-detach. Enforcement of "attach only your own
+    # org's config" lives in RouteCreateUpdateSerializer.validate_configuration,
+    # not a DB NOT NULL, for exactly that reason.
+    owner = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="route_configurations_by_owner",
+        blank=True,
+        null=True,
+        verbose_name="Owner",
+    )
     integration_field = "first_route_provider"
 
     @property
@@ -749,12 +767,36 @@ class RouteDestination(ChangeLogMixin, models.Model):
 
 
 class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    class Direction(models.TextChoices):
+        FORWARD = "forward", "Forward"
+        RETURN = "return", "Return"
+
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.CASCADE,
         related_name="routing_rules_by_owner",
         verbose_name="Owner"
+    )
+    enabled = models.BooleanField(default=True)
+    # Null only until the GUNDI-5730 backfill migration runs; every Route gets
+    # one afterward (a forward Route's own id, or its forward Route's id if
+    # this is the return leg of a bidirectional flow -- see return_for_destination).
+    flow_id = models.UUIDField(null=True, db_index=True)
+    direction = models.CharField(
+        max_length=10, choices=Direction.choices, default=Direction.FORWARD,
+    )
+    # Set only when direction=RETURN: the destination (now acting as a
+    # provider) this Route carries data back from. A Route can have many
+    # destinations, so flow_id alone can't say which one a given return leg
+    # answers for -- this is what GUNDI-5694's class of bug (the wrong Route
+    # getting treated as "the" return leg) needs to not be guessable again.
+    return_for_destination = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="return_routes",
+        blank=True,
+        null=True,
     )
     data_providers = models.ManyToManyField(
         "integrations.Integration",
@@ -790,8 +832,34 @@ class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def first_provider(self):
         return self.data_providers.first()
 
+    def save(self, *args, **kwargs):
+        # A forward Route is its own flow -- give it one at creation instead
+        # of needing a second write. Return legs get flow_id assigned
+        # explicitly by whatever creates them (GUNDI-5730 U1), tying them to
+        # their forward Route's flow.
+        was_adding = self._state.adding
+        if was_adding and not self.flow_id and self.direction == self.Direction.FORWARD:
+            self.flow_id = self.id
+        super().save(*args, **kwargs)
+        # A return leg is always named after its forward Route (GUNDI-5730 U1) --
+        # keep that in sync on rename instead of letting it go stale.
+        if not was_adding and self.direction == self.Direction.FORWARD:
+            Route.objects.filter(
+                flow_id=self.flow_id, direction=self.Direction.RETURN
+            ).exclude(name=self.name).update(name=self.name)
+
     class Meta:
         ordering = ("owner", "name", )
+        indexes = [
+            models.Index(fields=["flow_id", "direction"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["flow_id", "return_for_destination"],
+                condition=models.Q(direction="return"),
+                name="unique_return_leg_per_flow_destination",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.owner}: {self.name}"

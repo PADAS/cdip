@@ -592,6 +592,8 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     default_route = RoutingRuleSummarySerializer(read_only=True)
     status = serializers.SerializerMethodField()
     status_details = serializers.SerializerMethodField()
+    can_send = serializers.SerializerMethodField()
+    reasons = serializers.SerializerMethodField()
 
     class Meta:
         model = Integration
@@ -608,6 +610,8 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             "default_route",
             "status",
             "status_details",
+            "can_send",
+            "reasons",
         )
 
     def get_status(self, obj):
@@ -617,6 +621,65 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     def get_status_details(self, obj):
         integration_status, _ = IntegrationStatus.objects.get_or_create(integration=obj)
         return integration_status.status_details
+
+    # GUNDI-5730 U5, small version: whether `obj` could send data to the
+    # integration named by `?can_send_to=`, checked by action type only --
+    # no live credential or permission check yet (those become
+    # missing_credentials/no_permission reason codes in a later ticket).
+    # Known gap: a webhook-only provider has no pull action and is reported
+    # as not able to send, same limitation as today's client-side guess.
+    def get_can_send(self, obj):
+        result = self._evaluate_can_send(obj)
+        return result[0] if result else None
+
+    def get_reasons(self, obj):
+        result = self._evaluate_can_send(obj)
+        return result[1] if result else None
+
+    def _can_send_to_integration(self):
+        # One lookup for the whole list, not per row -- every row asks about
+        # the SAME target integration.
+        if not hasattr(self, "_can_send_to_integration_cache"):
+            request = self.context.get("request")
+            target_id = request.query_params.get("can_send_to") if request else None
+            target = None
+            if target_id:
+                target = Integration.objects.filter(pk=target_id).first()
+            self._can_send_to_integration_cache = target
+        return self._can_send_to_integration_cache
+
+    def _evaluate_can_send(self, obj):
+        target = self._can_send_to_integration()
+        if not target:
+            return None
+        cache = getattr(self, "_can_send_eval_cache", None)
+        if cache is None:
+            cache = self._can_send_eval_cache = {}
+        if obj.id in cache:
+            return cache[obj.id]
+
+        reasons = []
+        can_provide = IntegrationAction.objects.filter(
+            integration_type_id=obj.type_id,
+            type=IntegrationAction.ActionTypes.PULL_DATA,
+        ).exists()
+        if not can_provide:
+            reasons.append({
+                "code": "no_pull_action",
+                "message": f"{obj.name} has no way to provide data (no pull action).",
+            })
+        can_receive = IntegrationAction.objects.filter(
+            integration_type_id=target.type_id,
+            type=IntegrationAction.ActionTypes.PUSH_DATA,
+        ).exists()
+        if not can_receive:
+            reasons.append({
+                "code": "no_push_action",
+                "message": f"{target.name} has no way to receive data (no push action).",
+            })
+        result = (len(reasons) == 0, reasons)
+        cache[obj.id] = result
+        return result
 
 
 class IntegrationConfigurationCreateUpdateSerializer(serializers.ModelSerializer):
@@ -1600,6 +1663,11 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         required=False,
         nested_serializer=RouteConfigurationSerializer(required=False)
     )
+    # flow_id/direction/return_for_destination are assigned by the system (Route.save(),
+    # U1's attach/detach flow), not something a caller sets directly through this endpoint.
+    flow_id = serializers.UUIDField(read_only=True)
+    direction = serializers.CharField(read_only=True)
+    return_for_destination = IntegrationSummarySerializer(read_only=True)
 
     class Meta:
         model = Route
@@ -1611,6 +1679,10 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
+            "enabled",
+            "flow_id",
+            "direction",
+            "return_for_destination",
             # "filters"  # ToDo: Support "filters" or "rules"
         )
 
@@ -1643,6 +1715,7 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         route-context checks before any DB write happens.
         """
         if not isinstance(value, dict):
+            self._validate_configuration_ownership(value)
             return value
         existing = self.instance.configuration if self.instance else None
         nested = RouteConfigurationSerializer(
@@ -1650,6 +1723,23 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         )
         nested.is_valid(raise_exception=True)
         return nested
+
+    def _validate_configuration_ownership(self, configuration: "RouteConfiguration") -> None:
+        # A bare UUID resolves against RouteConfiguration.objects.all() with
+        # no org filter -- PKRelatedOrNestedField has no request context at
+        # field-construction time to scope it -- so without this, a config
+        # from another organization's route could be attached here. GUNDI-5698.
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return
+        route_owner_id = (
+            str(self.instance.owner_id) if self.instance
+            else self.initial_data.get("owner")
+        )
+        if route_owner_id and configuration.owner_id and str(configuration.owner_id) != str(route_owner_id):
+            raise drf_exceptions.ValidationError(
+                detail="This configuration belongs to a different organization's route."
+            )
 
     def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
@@ -1693,31 +1783,37 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         return {str(item.id) for item in getattr(self.instance, field_name).all()}
 
     @staticmethod
-    def _materialize_configuration(value: Any) -> Any:
+    def _materialize_configuration(value: Any, owner) -> Any:
         """Save a deferred ``RouteConfigurationSerializer`` and unwrap to a model
-        instance suitable for FK assignment. Anything else is returned as-is."""
+        instance suitable for FK assignment. Anything else is returned as-is.
+
+        A config created through this nested path belongs to the route being
+        saved -- ``RouteConfigurationSerializer`` doesn't declare ``owner``
+        itself, so it's passed as a save() kwarg (GUNDI-5698).
+        """
         if isinstance(value, RouteConfigurationSerializer):
-            value.save()
+            value.save(owner=owner)
             return value.instance
         return value
 
-    def _materialize_validated_data(self, validated_data: dict) -> dict:
+    def _materialize_validated_data(self, validated_data: dict, owner) -> dict:
         if "configuration" not in validated_data:
             return validated_data
         return {
             **validated_data,
-            "configuration": self._materialize_configuration(validated_data["configuration"]),
+            "configuration": self._materialize_configuration(validated_data["configuration"], owner),
         }
 
     def create(self, validated_data: dict) -> Route:
-        return super().create(self._materialize_validated_data(validated_data))
+        return super().create(self._materialize_validated_data(validated_data, validated_data.get("owner")))
 
     def update(self, instance: Route, validated_data: dict) -> Route:
+        owner = validated_data.get("owner", instance.owner)
         # Only an update that touches the route's own M2Ms can orphan a filter;
         # a name-only PATCH must not pay for (or race with) the prune.
         shape_changed = "destinations" in validated_data or "data_providers" in validated_data
         with transaction.atomic():
-            route = super().update(instance, self._materialize_validated_data(validated_data))
+            route = super().update(instance, self._materialize_validated_data(validated_data, owner))
             if shape_changed:
                 self._prune_filters(route)
         return route
@@ -1771,6 +1867,7 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
     data_providers = IntegrationSummarySerializer(many=True)
     destinations = IntegrationSummarySerializer(many=True)
     configuration = RouteConfigurationSerializer()
+    return_for_destination = IntegrationSummarySerializer(read_only=True)
 
     class Meta:
         model = Route
@@ -1782,6 +1879,9 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
+            "flow_id",
+            "direction",
+            "return_for_destination",
             # No "filters" here on purpose — see RouteDetailSerializer.
         )
 

@@ -31,6 +31,9 @@ def _test_list_routes(api_client, user):
         assert "destinations" in route
         assert "configuration" in route
         assert "additional" in route
+        assert "flow_id" in route
+        assert "direction" in route
+        assert "return_for_destination" in route
 
 
 def test_list_routes_as_superuser(api_client, superuser, organization, integrations_list_er):
@@ -52,6 +55,27 @@ def test_list_routes_as_org_viewer(api_client, org_viewer_user, organization, in
         api_client=api_client,
         user=org_viewer_user,
     )
+
+
+def test_filter_routes_by_direction(api_client, superuser, organization, route_1):
+    return_route = Route.objects.create(
+        name="Return leg",
+        owner=organization,
+        direction=Route.Direction.RETURN,
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.get(reverse("routes-list"), {"direction": Route.Direction.FORWARD})
+    assert response.status_code == status.HTTP_200_OK
+    route_ids = {route["id"] for route in response.json()["results"]}
+    assert str(route_1.id) in route_ids
+    assert str(return_route.id) not in route_ids
+
+    response = api_client.get(reverse("routes-list"), {"direction": Route.Direction.RETURN})
+    assert response.status_code == status.HTTP_200_OK
+    route_ids = {route["id"] for route in response.json()["results"]}
+    assert str(return_route.id) in route_ids
+    assert str(route_1.id) not in route_ids
 
 
 def _test_create_route(api_client, user, data):
@@ -1003,6 +1027,91 @@ def test_patch_route_updates_existing_configuration_in_place(
     assert RouteConfiguration.objects.filter(id=original_config_id).count() == 1
 
 
+def test_route_detail_exposes_return_for_destination(api_client, superuser, route_1, organization):
+    destination = route_1.destinations.first()
+    return_leg = Route.objects.create(
+        name=route_1.name,
+        owner=organization,
+        flow_id=route_1.flow_id,
+        direction=Route.Direction.RETURN,
+        return_for_destination=destination,
+    )
+
+    api_client.force_authenticate(superuser)
+
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["return_for_destination"] is None
+
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": return_leg.id}))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["return_for_destination"]["id"] == str(destination.id)
+
+
+def test_patch_route_updates_enabled(api_client, superuser, route_2):
+    api_client.force_authenticate(superuser)
+
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"enabled": False},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["enabled"] is False
+    route_2.refresh_from_db()
+    assert route_2.enabled is False
+
+
+def test_patch_route_configuration_while_disabled_still_succeeds(
+    api_client, superuser, route_2, provider_movebank_ewt
+):
+    route_2.enabled = False
+    route_2.save()
+    destination = route_2.destinations.first()
+    new_configuration = {
+        "name": route_2.configuration.name,
+        "data": {
+            "subject_type": "elephant",
+            "field_mappings": _build_field_mappings(
+                provider_movebank_ewt.id, destination.id
+            ),
+        },
+    }
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": new_configuration},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    route_2.refresh_from_db()
+    assert "field_mappings" in route_2.configuration.data
+
+
+def test_renaming_forward_route_renames_its_return_leg(api_client, superuser, route_1, organization):
+    return_leg = Route.objects.create(
+        name="stale name",
+        owner=organization,
+        flow_id=route_1.flow_id,
+        direction=Route.Direction.RETURN,
+        return_for_destination=route_1.destinations.first(),
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"name": "Renamed forward route"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    return_leg.refresh_from_db()
+    assert return_leg.name == "Renamed forward route"
+
+
 def test_patch_route_configuration_without_field_mappings_passes(
     api_client, superuser, route_2
 ):
@@ -1124,6 +1233,148 @@ def test_cannot_delete_unrelated_route_configuration_as_org_admin(
     assert response.status_code == status.HTTP_404_NOT_FOUND
     route_2.refresh_from_db()
     assert route_2.configuration is not None
+
+
+# --- GUNDI-5698: RouteConfiguration must stay scoped to the caller's org -----
+
+def test_create_route_rejects_cross_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, other_organization,
+    integrations_list_er, provider_lotek_panthera,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(foreign_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+
+
+def test_create_route_allows_same_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, integrations_list_er, provider_lotek_panthera,
+):
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(own_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    route = Route.objects.get(id=response.json()["id"])
+    assert route.configuration_id == own_config.id
+
+
+def test_update_route_rejects_cross_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, other_organization, route_1,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+    original_config_id = route_1.configuration_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(foreign_config.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.configuration_id == original_config_id
+
+
+def test_create_route_with_cross_org_configuration_as_superuser(
+    api_client, superuser, organization, other_organization, integrations_list_er, provider_lotek_panthera,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(foreign_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+
+
+def test_create_route_with_nested_configuration_sets_owner(
+    api_client, org_admin_user, organization, integrations_list_er, provider_lotek_panthera,
+):
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": {"name": "New config", "data": {}},
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    route = Route.objects.get(id=response.json()["id"])
+    assert route.configuration.owner_id == organization.id
+
+
+def test_patch_route_updates_existing_configuration_in_place_keeps_owner(
+    api_client, org_admin_user, organization, route_1,
+):
+    route_1.configuration = RouteConfiguration.objects.create(
+        name="Original", data={}, owner=organization,
+    )
+    route_1.save(update_fields=["configuration"])
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": {"name": "Renamed", "data": {}}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    route_1.refresh_from_db()
+    assert route_1.configuration.owner_id == organization.id
+    assert route_1.configuration.name == "Renamed"
 
 
 # ---- The filters block cdip-routing reads (GUNDI-5178) --------------------

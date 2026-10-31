@@ -646,6 +646,7 @@ class RouteFilter(django_filters_rest.FilterSet):
         model = Route
         fields = {
             'id': ['exact', 'iexact', 'in'],
+            'direction': ['exact'],
         }
 
     def filter_by_destination_url(self, queryset, name, value):
