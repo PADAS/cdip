@@ -1112,6 +1112,35 @@ def test_renaming_forward_route_renames_its_return_leg(api_client, superuser, ro
     assert return_leg.name == "Renamed forward route"
 
 
+def test_renaming_a_not_yet_backfilled_forward_route_does_not_mass_rename_other_orgs_return_legs(
+    api_client, superuser, route_1, route_2, organization, other_organization,
+):
+    # route_1 predates the GUNDI-5894 backfill: flow_id is still NULL. Without
+    # the flow_id-is-not-None guard, renaming it would match Route.objects
+    # .filter(flow_id=None, direction=RETURN) -- every OTHER not-yet-
+    # backfilled return leg across every org, NULL having no identity to
+    # scope by -- and rename them all to route_1's new name.
+    Route.objects.filter(pk=route_1.pk).update(flow_id=None)
+    unrelated_return_leg = Route.objects.create(
+        name="unrelated return leg, different org",
+        owner=other_organization,
+        flow_id=None,
+        direction=Route.Direction.RETURN,
+        return_for_destination=route_2.data_providers.first(),
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"name": "Renamed forward route"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    unrelated_return_leg.refresh_from_db()
+    assert unrelated_return_leg.name == "unrelated return leg, different org"
+
+
 def test_patch_route_configuration_without_field_mappings_passes(
     api_client, superuser, route_2
 ):
@@ -1308,6 +1337,66 @@ def test_update_route_rejects_cross_org_configuration_as_org_admin(
     assert "different organization" in response.content.decode()
     route_1.refresh_from_db()
     assert route_1.configuration_id == original_config_id
+
+
+def test_patch_route_rejects_configuration_mismatched_with_new_owner_in_same_request(
+    api_client, org_admin_user, org_admin_user_2, organization, other_organization, route_1,
+):
+    # route_1 starts owned by `organization`, with a configuration owned by
+    # the same org. A single PATCH reassigning both `owner` and
+    # `configuration` must be checked against the NEW owner, not the route's
+    # stale pre-update one -- otherwise this combination would persist a
+    # route pointed at another org's configuration.
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+    route_1.configuration = own_config
+    route_1.save(update_fields=["configuration"])
+    original_owner_id = route_1.owner_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"owner": str(other_organization.id), "configuration": str(own_config.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.owner_id == original_owner_id
+
+
+def test_patch_route_claims_an_unowned_configuration_then_blocks_other_orgs(
+    api_client, org_admin_user, org_admin_user_2, organization, other_organization, route_1, route_2,
+):
+    # A RouteConfiguration left owner=None (e.g. by the GUNDI-5698 backfill,
+    # which can't attribute a config with no referencing route at migration
+    # time) must be claimed by whichever route attaches it first, so every
+    # OTHER org's subsequent attach attempt is blocked instead of silently
+    # sharing the same row.
+    unowned_config = RouteConfiguration.objects.create(
+        name="Unowned", data={}, owner=None,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    first_attach = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(unowned_config.id)},
+        format="json",
+    )
+    assert first_attach.status_code == status.HTTP_200_OK, first_attach.content
+    unowned_config.refresh_from_db()
+    assert unowned_config.owner_id == organization.id
+
+    api_client.force_authenticate(org_admin_user_2)
+    second_attach = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": str(unowned_config.id)},
+        format="json",
+    )
+    assert second_attach.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in second_attach.content.decode()
 
 
 def test_create_route_with_cross_org_configuration_as_superuser(

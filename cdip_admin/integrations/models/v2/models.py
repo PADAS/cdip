@@ -359,7 +359,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
-                if self.is_used_as_provider:
+                if self.has_any_provider_role:
                     # Disable/Enable related periodic tasks for pull actions
                     for config in self.periodic_pull_action_configurations:
                         if config.periodic_task:
@@ -416,6 +416,18 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     @property
     def is_used_as_provider(self):
         return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD).exists()
+
+    @property
+    def has_any_provider_role(self):
+        # Direction-agnostic on purpose, unlike is_used_as_provider above: pull
+        # tasks must run whenever ANY Route (forward or return) needs this
+        # integration's data, regardless of whether that role is the one shown
+        # in search/filters/UI. Used to gate periodic pull tasks (Integration/
+        # IntegrationConfiguration._post_save, signals.disable_pull_tasks_when_
+        # no_longer_a_provider) so a return leg's provider role -- e.g. after
+        # the GUNDI-5894 backfill tags an existing one -- doesn't get its
+        # already-working pulls silently disabled or never enabled.
+        return self.routing_rules_by_provider.exists()
 
     @property
     def is_used_as_destination(self):
@@ -563,7 +575,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             periodic_task_params = {
                 "name": task_name,
                 "task": "integrations.tasks.run_integration",
-                "enabled": self.integration.is_used_as_provider,  # Disable pull action trigger until used as provider
+                "enabled": self.integration.has_any_provider_role,  # Disable pull action trigger until used as provider
                 "kwargs": json.dumps({
                     "integration_id": str(self.integration_id),
                     "action_id": self.action.value,
@@ -843,10 +855,21 @@ class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         super().save(*args, **kwargs)
         # A return leg is always named after its forward Route (GUNDI-5730 U1) --
         # keep that in sync on rename instead of letting it go stale.
-        if not was_adding and self.direction == self.Direction.FORWARD:
-            Route.objects.filter(
+        # flow_id is not None guards a route that predates the GUNDI-5894
+        # backfill: with flow_id still NULL, this filter would otherwise match
+        # every other not-yet-backfilled return leg across every org (NULL has
+        # no identity to scope by) and rename them all to this route's name.
+        if not was_adding and self.direction == self.Direction.FORWARD and self.flow_id is not None:
+            return_legs = Route.objects.filter(
                 flow_id=self.flow_id, direction=self.Direction.RETURN
-            ).exclude(name=self.name).update(name=self.name)
+            ).exclude(name=self.name)
+            # .save() per row, not a bulk .update(), so each rename still goes
+            # through ChangeLogMixin and lands in ActivityLog -- otherwise the
+            # return leg's own history has no record explaining why its name
+            # changed.
+            for return_leg in return_legs:
+                return_leg.name = self.name
+                return_leg.save()
 
     class Meta:
         ordering = ("owner", "name", )

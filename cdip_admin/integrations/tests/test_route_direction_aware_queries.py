@@ -68,3 +68,16 @@ def test_destinations_property_only_follows_forward_routes(provider_and_destinat
     # destination's only provider-role Route is the return leg, so it has no
     # real destinations of its own.
     assert list(destination.destinations.values_list("id", flat=True)) == []
+
+
+def test_has_any_provider_role_counts_the_return_leg_unlike_is_used_as_provider(provider_and_destination):
+    # Deliberately direction-agnostic, unlike is_used_as_provider above: pull
+    # tasks must run for a return leg's provider role too, or that
+    # integration's already-working pulls get silently disabled/never
+    # enabled once GUNDI-5894's backfill tags it (see Integration._post_save,
+    # IntegrationConfiguration._post_save, signals.disable_pull_tasks_when_
+    # no_longer_a_provider).
+    provider, destination, _, _ = provider_and_destination
+    assert provider.has_any_provider_role is True
+    assert destination.has_any_provider_role is True
+    assert destination.is_used_as_provider is False  # the distinction this property exists for

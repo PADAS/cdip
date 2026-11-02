@@ -683,7 +683,12 @@ class RouteAdmin(admin.ModelAdmin):
         RouteDestinationInline,
     )
     list_select_related = ("owner",)
-    readonly_fields = ("default_route_for_panel",)
+    # flow_id/direction are system-assigned (Route.save(), U1's attach/detach
+    # flow) -- same invariant the API serializer already enforces by marking
+    # them read_only. Editable here would let an operator create a
+    # direction=return row with flow_id still NULL, which nothing else in the
+    # model layer expects to exist.
+    readonly_fields = ("default_route_for_panel", "flow_id", "direction")
 
     def get_queryset(self, request):
         # The three new columns walk M2M/reverse FK relations; prefetch so the

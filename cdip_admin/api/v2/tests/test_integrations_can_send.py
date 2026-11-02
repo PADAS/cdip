@@ -114,3 +114,34 @@ def test_can_send_to_an_unknown_integration_does_not_error(
     assert response.status_code == status.HTTP_200_OK, response.content
     row = next(r for r in response.json()["results"] if r["id"] == str(provider.id))
     assert row["can_send"] is None
+
+
+def test_can_send_to_a_malformed_id_does_not_500(
+    api_client, superuser, organization, pull_capable_type,
+):
+    provider = _make_integration(organization, pull_capable_type, "Provider")
+    api_client.force_authenticate(superuser)
+
+    response = api_client.get(reverse("integrations-list"), {"can_send_to": "not-a-uuid"})
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    row = next(r for r in response.json()["results"] if r["id"] == str(provider.id))
+    assert row["can_send"] is None
+
+
+def test_can_send_to_an_integration_in_another_org_does_not_leak_it(
+    api_client, org_admin_user, organization, other_organization, pull_capable_type, push_capable_type,
+):
+    provider = _make_integration(organization, pull_capable_type, "Provider")
+    foreign_target = _make_integration(other_organization, push_capable_type, "Foreign Target")
+    api_client.force_authenticate(org_admin_user)
+
+    response = api_client.get(reverse("integrations-list"), {"can_send_to": foreign_target.id})
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    row = next(r for r in response.json()["results"] if r["id"] == str(provider.id))
+    # A non-superuser can't see the target at all, so this must behave like
+    # the "unknown integration" case above, not leak its name/push-capability
+    # through reasons[].message.
+    assert row["can_send"] is None
+    assert row["reasons"] is None

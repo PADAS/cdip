@@ -641,10 +641,23 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
         # the SAME target integration.
         if not hasattr(self, "_can_send_to_integration_cache"):
             request = self.context.get("request")
-            target_id = request.query_params.get("can_send_to") if request else None
+            raw_target_id = request.query_params.get("can_send_to") if request else None
             target = None
+            try:
+                target_id = str(uuid.UUID(str(raw_target_id))) if raw_target_id else None
+            except (ValueError, TypeError, AttributeError):
+                target_id = None
             if target_id:
-                target = Integration.objects.filter(pk=target_id).first()
+                # Scoped to what the caller can see -- otherwise `reasons[].message`
+                # below leaks a foreign org's integration name and push-capability
+                # to anyone who can guess its id.
+                user = getattr(request, "user", None)
+                candidates = (
+                    Integration.objects.all()
+                    if user and user.is_superuser
+                    else get_user_integrations_qs(user) if user else Integration.objects.none()
+                )
+                target = candidates.filter(pk=target_id).first()
             self._can_send_to_integration_cache = target
         return self._can_send_to_integration_cache
 
@@ -1732,10 +1745,22 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         user = self.context.get("request").user
         if user.is_superuser:
             return
+        # Prefer the owner THIS request is setting, not the route's stale
+        # pre-update owner -- a single PATCH can change `owner` and attach a
+        # `configuration` together, and checking only the old owner would let
+        # that combination persist a route pointed at another org's config.
+        submitted_owner = self.initial_data.get("owner") if hasattr(self, "initial_data") else None
         route_owner_id = (
-            str(self.instance.owner_id) if self.instance
-            else self.initial_data.get("owner")
+            str(submitted_owner) if submitted_owner
+            else str(self.instance.owner_id) if self.instance
+            else None
         )
+        # configuration.owner_id is None for configs the GUNDI-5698 backfill
+        # couldn't attribute (no referencing route at migration time) -- those
+        # are unclaimed, not "any org's". Let the attach through here; the
+        # route's actual owner claims it in _materialize_configuration below,
+        # which is what makes every OTHER org's subsequent attach attempt of
+        # the same config fail this same check instead of silently succeeding.
         if route_owner_id and configuration.owner_id and str(configuration.owner_id) != str(route_owner_id):
             raise drf_exceptions.ValidationError(
                 detail="This configuration belongs to a different organization's route."
@@ -1794,6 +1819,15 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         if isinstance(value, RouteConfigurationSerializer):
             value.save(owner=owner)
             return value.instance
+        if isinstance(value, RouteConfiguration) and value.owner_id is None and owner is not None:
+            # Claims a pre-existing, unowned config (left that way by the
+            # GUNDI-5698 backfill, which can't attribute a config with no
+            # referencing route) for the attaching route's org. Without this,
+            # the config stays ownerless and _validate_configuration_ownership's
+            # None-owner check keeps letting every other org attach it too --
+            # the same cross-org share GUNDI-5698 exists to close.
+            value.owner = owner
+            value.save(update_fields=["owner"])
         return value
 
     def _materialize_validated_data(self, validated_data: dict, owner) -> dict:
