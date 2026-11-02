@@ -661,6 +661,17 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
             self._can_send_to_integration_cache = target
         return self._can_send_to_integration_cache
 
+    def _target_can_receive(self, target):
+        # Same target for every row -- one query for the whole list, not one
+        # per row (the per-row cache below is keyed by the PROVIDER's id, so
+        # it doesn't dedupe this on its own).
+        if not hasattr(self, "_target_can_receive_cache"):
+            self._target_can_receive_cache = IntegrationAction.objects.filter(
+                integration_type_id=target.type_id,
+                type=IntegrationAction.ActionTypes.PUSH_DATA,
+            ).exists()
+        return self._target_can_receive_cache
+
     def _evaluate_can_send(self, obj):
         target = self._can_send_to_integration()
         if not target:
@@ -681,10 +692,7 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
                 "code": "no_pull_action",
                 "message": f"{obj.name} has no way to provide data (no pull action).",
             })
-        can_receive = IntegrationAction.objects.filter(
-            integration_type_id=target.type_id,
-            type=IntegrationAction.ActionTypes.PUSH_DATA,
-        ).exists()
+        can_receive = self._target_can_receive(target)
         if not can_receive:
             reasons.append({
                 "code": "no_push_action",
@@ -1731,6 +1739,13 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             self._validate_configuration_ownership(value)
             return value
         existing = self.instance.configuration if self.instance else None
+        if existing is not None:
+            # Without this, a nested PATCH edits `existing` in place regardless
+            # of who owns it -- the UUID path isn't the only way to reach a
+            # foreign-owned config. _materialize_configuration below would then
+            # reassign its owner to the caller's org, silently moving a
+            # cross-org share from one org to another.
+            self._validate_configuration_ownership(existing)
         nested = RouteConfigurationSerializer(
             instance=existing, data=value, partial=existing is not None,
         )
@@ -1913,6 +1928,7 @@ class RouteRetrieveFullSerializer(serializers.ModelSerializer):
             "destinations",
             "configuration",
             "additional",
+            "enabled",
             "flow_id",
             "direction",
             "return_for_destination",

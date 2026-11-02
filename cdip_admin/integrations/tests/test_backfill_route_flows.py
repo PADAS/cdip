@@ -141,3 +141,83 @@ def test_leaves_an_ordinary_route_with_no_reverse_counterpart_alone(organization
     plain.refresh_from_db()
     assert plain.direction == Route.Direction.FORWARD
     assert plain.return_for_destination_id is None
+
+
+def test_skips_reciprocal_mirror_routes_instead_of_converting_either(organization, integration_type_lotek):
+    # A → B and B → A each pass the name+structure check with the OTHER as
+    # their "forward" Route -- genuinely ambiguous which side is real.
+    # Converting both would leave this flow with no forward leg at all.
+    a = _make_integration(organization, integration_type_lotek, "A")
+    b = _make_integration(organization, integration_type_lotek, "B")
+    route_1 = _make_route(organization, "A → B", a, [b])
+    route_2 = _make_route(organization, "B → A", b, [a])
+
+    with pytest.raises(CommandError):
+        call_command("backfill_route_flows", "--fix")
+
+    route_1.refresh_from_db()
+    route_2.refresh_from_db()
+    assert route_1.direction == Route.Direction.FORWARD
+    assert route_2.direction == Route.Direction.FORWARD
+
+
+def test_skips_duplicate_candidates_matching_the_same_slot(organization, integration_type_lotek):
+    # Two separate legacy return-leg-looking rows both structurally and
+    # nominally match the SAME forward Route and destination. Applying both
+    # would violate unique_return_leg_per_flow_destination after the first
+    # write commits -- reject both instead of guessing which one is real.
+    a = _make_integration(organization, integration_type_lotek, "A")
+    b = _make_integration(organization, integration_type_lotek, "B")
+    forward = _make_route(organization, "A to B", a, [b])
+    _clear_flow_id(forward)
+    duplicate_1 = _make_route(organization, "B → A", b, [a])
+    duplicate_2 = _make_route(organization, "B → A", b, [a])
+
+    with pytest.raises(CommandError):
+        call_command("backfill_route_flows", "--fix")
+
+    duplicate_1.refresh_from_db()
+    duplicate_2.refresh_from_db()
+    assert duplicate_1.direction == Route.Direction.FORWARD
+    assert duplicate_2.direction == Route.Direction.FORWARD
+
+
+def test_rejects_a_candidate_whose_slot_is_already_linked(organization, integration_type_lotek):
+    a = _make_integration(organization, integration_type_lotek, "A")
+    b = _make_integration(organization, integration_type_lotek, "B")
+    forward = _make_route(organization, "A to B", a, [b])
+    already_linked = Route.objects.create(
+        owner=organization, name="B → A", flow_id=forward.flow_id,
+        direction=Route.Direction.RETURN, return_for_destination=b,
+    )
+    already_linked.data_providers.add(b)
+    already_linked.destinations.add(a)
+    another_candidate = _make_route(organization, "B → A", b, [a])
+
+    with pytest.raises(CommandError):
+        call_command("backfill_route_flows", "--fix")
+
+    another_candidate.refresh_from_db()
+    assert another_candidate.direction == Route.Direction.FORWARD
+
+
+def test_reports_a_stale_default_route_without_changing_it(organization, integration_type_lotek):
+    # Detected, not repaired here: what B's default_route SHOULD become once
+    # this route stops being a valid forward route is GUNDI-5893's design
+    # question. This tool must surface the gap, not silently leave it or
+    # silently guess a replacement.
+    a = _make_integration(organization, integration_type_lotek, "A")
+    b = _make_integration(organization, integration_type_lotek, "B")
+    forward = _make_route(organization, "A to B", a, [b])
+    _clear_flow_id(forward)
+    legacy_return = _make_route(organization, "B → A", b, [a])
+    _clear_flow_id(legacy_return)
+    b.default_route = legacy_return
+    b.save(update_fields=["default_route"])
+
+    call_command("backfill_route_flows", "--fix")
+
+    legacy_return.refresh_from_db()
+    b.refresh_from_db()
+    assert legacy_return.direction == Route.Direction.RETURN
+    assert b.default_route_id == legacy_return.id  # untouched, only flagged

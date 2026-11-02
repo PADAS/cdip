@@ -35,6 +35,16 @@ class Command(BaseCommand):
 
         matched, skipped = self._find_return_leg_matches()
 
+        # Detected, not repaired: deciding what an affected provider's
+        # default_route SHOULD become once it's no longer eligible (NULL?
+        # another forward route, chosen how?) is GUNDI-5893's design question,
+        # not this one-time tool's to guess. Surfacing it is still this tool's
+        # job -- otherwise the gap stays silent instead of reported.
+        default_route_needs_review = [
+            pair for pair in matched
+            if pair["leg_provider"].default_route_id == pair["candidate"].id
+        ]
+
         if options["fix"]:
             for route in forward_missing_flow_id:
                 route.flow_id = route.id
@@ -66,6 +76,13 @@ class Command(BaseCommand):
                 }
                 for pair in matched
             ],
+            "default_route_needs_review": [
+                {
+                    "provider": {"id": str(pair["leg_provider"].id), "name": pair["leg_provider"].name},
+                    "stale_default_route": {"id": str(pair["candidate"].id), "name": pair["candidate"].name},
+                }
+                for pair in default_route_needs_review
+            ],
             "skipped": [
                 {
                     "id": str(s["candidate"].id),
@@ -75,6 +92,7 @@ class Command(BaseCommand):
                     "forward_candidates": [
                         {"id": str(f.id), "name": f.name} for f in s["forward_candidates"]
                     ],
+                    "reason": s.get("reason"),
                 }
                 for s in skipped
             ],
@@ -150,6 +168,63 @@ class Command(BaseCommand):
                     "name_matches": name_matches,
                     "forward_candidates": forward_candidates,
                 })
+        return Command._resolve_match_conflicts(matched, skipped)
+
+    @staticmethod
+    def _resolve_match_conflicts(provisional_matches, skipped):
+        """Reject matches that would collide with each other, or with a return
+        leg already linked in the DB, before anything gets written.
+
+        Without this, applying the full provisional set could violate
+        ``unique_return_leg_per_flow_destination`` partway through --fix's save
+        loop, crashing mid-run with some candidates already converted and the
+        rest not even reported. Every case here is "report, don't guess" --
+        the same rule the name/structure gate above already follows.
+        """
+        by_candidate_pk = {pair["candidate"].pk: pair for pair in provisional_matches}
+
+        def slot_for(pair):
+            forward_route = pair["forward_route"]
+            return (forward_route.flow_id or forward_route.pk, pair["leg_provider"].pk)
+
+        slot_counts: dict = {}
+        for pair in provisional_matches:
+            slot = slot_for(pair)
+            slot_counts[slot] = slot_counts.get(slot, 0) + 1
+
+        existing_slots = set(
+            Route.objects.filter(direction=Route.Direction.RETURN, flow_id__isnull=False)
+            .values_list("flow_id", "return_for_destination_id")
+        )
+
+        matched = []
+        for pair in provisional_matches:
+            candidate = pair["candidate"]
+            forward_route = pair["forward_route"]
+            mirror = by_candidate_pk.get(forward_route.pk)
+            is_reciprocal = mirror is not None and mirror["forward_route"].pk == candidate.pk
+            slot = slot_for(pair)
+
+            if is_reciprocal:
+                reason = (
+                    f"reciprocal match with '{forward_route.name}' ({forward_route.pk}) -- "
+                    "each names the other as its forward Route, so which side is the real "
+                    "forward leg is ambiguous"
+                )
+            elif slot_counts[slot] > 1:
+                reason = "another candidate also matches this same forward Route and destination"
+            elif slot in existing_slots:
+                reason = "that flow already has a different return leg linked for this destination"
+            else:
+                matched.append(pair)
+                continue
+
+            skipped.append({
+                "candidate": candidate,
+                "name_matches": True,
+                "forward_candidates": [forward_route],
+                "reason": reason,
+            })
         return matched, skipped
 
     def _print_report(self, report, fixed):
@@ -166,9 +241,21 @@ class Command(BaseCommand):
                 f"({m['forward_route']['id']}), return_for_destination={m['return_for_destination']['name']}"
             )
 
+        if report["default_route_needs_review"]:
+            self.stdout.write(
+                f"\n{len(report['default_route_needs_review'])} provider(s) have a default_route "
+                "that is about to stop being a valid forward route (GUNDI-5893 needs to resolve "
+                "what it becomes -- not decided here):"
+            )
+            for d in report["default_route_needs_review"]:
+                self.stdout.write(
+                    f"    {d['provider']['name']} ({d['provider']['id']}) -> "
+                    f"stale default_route {d['stale_default_route']['name']} ({d['stale_default_route']['id']})"
+                )
+
         self.stdout.write(f"\n{len(report['skipped'])} candidate(s) need manual review")
         for s in report["skipped"]:
-            reason = (
+            reason = s.get("reason") or (
                 "ambiguous forward match" if s["forward_candidate_count"] > 1
                 else "no forward match" if s["forward_candidate_count"] == 0
                 else "name doesn't match the expected stamp"

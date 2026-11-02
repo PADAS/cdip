@@ -31,6 +31,7 @@ def _test_list_routes(api_client, user):
         assert "destinations" in route
         assert "configuration" in route
         assert "additional" in route
+        assert "enabled" in route
         assert "flow_id" in route
         assert "direction" in route
         assert "return_for_destination" in route
@@ -1063,6 +1064,26 @@ def test_patch_route_updates_enabled(api_client, superuser, route_2):
     assert route_2.enabled is False
 
 
+def test_get_route_after_disabling_it_reports_the_stored_state(api_client, superuser, route_2):
+    # The write-side serializer (RouteCreateUpdateSerializer) already echoes
+    # `enabled` on the PATCH response -- that alone doesn't prove the READ
+    # serializer (RouteRetrieveFullSerializer, used by list/retrieve) has it
+    # too. Without it, a client that reloads the route after a disable PATCH
+    # can't tell it's disabled.
+    api_client.force_authenticate(superuser)
+    patch_response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"enabled": False},
+        format="json",
+    )
+    assert patch_response.status_code == status.HTTP_200_OK, patch_response.content
+
+    get_response = api_client.get(reverse("routes-detail", kwargs={"pk": route_2.id}))
+
+    assert get_response.status_code == status.HTTP_200_OK, get_response.content
+    assert get_response.json()["enabled"] is False
+
+
 def test_patch_route_configuration_while_disabled_still_succeeds(
     api_client, superuser, route_2, provider_movebank_ewt
 ):
@@ -1397,6 +1418,39 @@ def test_patch_route_claims_an_unowned_configuration_then_blocks_other_orgs(
     )
     assert second_attach.status_code == status.HTTP_400_BAD_REQUEST
     assert "different organization" in second_attach.content.decode()
+
+
+def test_patch_route_rejects_nested_configuration_edit_of_a_foreign_owned_config(
+    api_client, superuser, org_admin_user, organization, other_organization, route_1,
+):
+    # A config attached by a superuser (or retained from a pre-GUNDI-5698
+    # cross-org share) can belong to a different org than the route it's on.
+    # The bare-UUID path checks ownership before touching it; a nested dict
+    # PATCH must too, or an org admin edits -- and ends up owning -- a config
+    # that was never theirs, just by never mentioning its UUID.
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+    api_client.force_authenticate(superuser)
+    attach_response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(foreign_config.id)},
+        format="json",
+    )
+    assert attach_response.status_code == status.HTTP_200_OK, attach_response.content
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": {"name": "Renamed by the wrong org", "data": {}}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    foreign_config.refresh_from_db()
+    assert foreign_config.owner_id == other_organization.id
+    assert foreign_config.name == "Belongs to the other org"
 
 
 def test_create_route_with_cross_org_configuration_as_superuser(
