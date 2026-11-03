@@ -436,7 +436,12 @@ class IntegrationAdmin(admin.ModelAdmin):
         """provider → route → destinations, default marked ★ (spec §5.3)."""
         if obj.pk is None:
             return "—"
-        routes = list(obj.routing_rules_by_provider.order_by("name").values("pk", "name"))
+        # GUNDI-5730: forward only -- a return leg's auto-created provider role
+        # must not be listed here as if it were a real one the user set up.
+        routes = list(
+            obj.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD)
+            .order_by("name").values("pk", "name")
+        )
         if not routes:
             return "Not a provider on any route (default route not required)."
         destinations = _integration_labels_by_route(RouteDestination, [r["pk"] for r in routes])
@@ -455,7 +460,11 @@ class IntegrationAdmin(admin.ModelAdmin):
     def routes_as_destination_panel(self, obj):
         if obj.pk is None:
             return "—"
-        routes = list(obj.routing_rules_by_destination.order_by("name").values("pk", "name"))
+        # GUNDI-5730: forward only -- same reasoning as routes_as_provider_panel above.
+        routes = list(
+            obj.routing_rules_by_destination.filter(direction=Route.Direction.FORWARD)
+            .order_by("name").values("pk", "name")
+        )
         if not routes:
             return "Not a destination on any route."
         providers = _integration_labels_by_route(RouteProvider, [r["pk"] for r in routes])
@@ -670,8 +679,9 @@ class RouteAdmin(admin.ModelAdmin):
         "id",
         "name",
     )
-    # Render owner/configuration as AJAX search boxes instead of dropdowns that
-    # eagerly load every Organization/RouteConfiguration on the change page.
+    # Render owner/configuration/return_for_destination as AJAX search boxes
+    # instead of dropdowns that eagerly load every Organization/
+    # RouteConfiguration/Integration on the change page.
     autocomplete_fields = (
         "owner",
         "configuration",
@@ -681,7 +691,13 @@ class RouteAdmin(admin.ModelAdmin):
         RouteDestinationInline,
     )
     list_select_related = ("owner",)
-    readonly_fields = ("default_route_for_panel",)
+    # flow_id/direction/return_for_destination are system-assigned (Route.save(),
+    # U1's attach/detach flow) -- same invariant the API serializer already
+    # enforces by marking all three read_only. Editable here would let an
+    # operator create a direction=return row with flow_id still NULL, or set
+    # return_for_destination on an ordinary forward route, either of which
+    # nothing else in the model layer expects to exist.
+    readonly_fields = ("default_route_for_panel", "flow_id", "direction", "return_for_destination")
 
     def get_queryset(self, request):
         # The three new columns walk M2M/reverse FK relations; prefetch so the

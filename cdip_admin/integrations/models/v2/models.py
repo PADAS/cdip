@@ -270,9 +270,12 @@ class IntegrationWebhook(UUIDAbstractModel, TimestampedModel):
 
 class ProvidersManager(models.Manager):
     def get_queryset(self):
-        # Return integrations being used as a provider in any connection
+        # Return integrations that are the provider of a real (forward) Route.
+        # GUNDI-5730: a return leg makes its own provider (the original
+        # destination, acting in reverse) match this relation too -- direction
+        # excludes that auto-created role from counting as a real connection.
         return super().get_queryset().filter(
-            routing_rules_by_provider__isnull=False
+            routing_rules_by_provider__direction=Route.Direction.FORWARD
         ).distinct()
 
 
@@ -356,7 +359,7 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
             HealthCheckSettings.objects.get_or_create(integration=self)
         else:  # Updated
             if self.tracker.has_changed("enabled"):
-                if self.is_used_as_provider:
+                if self.has_any_provider_role:
                     # Disable/Enable related periodic tasks for pull actions
                     for config in self.periodic_pull_action_configurations:
                         if config.periodic_task:
@@ -405,15 +408,30 @@ class Integration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
 
     @property
     def routing_rules(self):
-        return self.routing_rules_by_provider.all()
+        # GUNDI-5730: forward only -- a return leg also has this Integration as
+        # its provider (the original destination, acting in reverse), and that
+        # auto-created role isn't a real Route the user manages.
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD)
 
     @property
     def is_used_as_provider(self):
+        return self.routing_rules_by_provider.filter(direction=Route.Direction.FORWARD).exists()
+
+    @property
+    def has_any_provider_role(self):
+        # Direction-agnostic on purpose, unlike is_used_as_provider above: pull
+        # tasks must run whenever ANY Route (forward or return) needs this
+        # integration's data, regardless of whether that role is the one shown
+        # in search/filters/UI. Used to gate periodic pull tasks (Integration/
+        # IntegrationConfiguration._post_save, signals.disable_pull_tasks_when_
+        # no_longer_a_provider) so a return leg's provider role -- e.g. after
+        # the GUNDI-5894 backfill tags an existing one -- doesn't get its
+        # already-working pulls silently disabled or never enabled.
         return self.routing_rules_by_provider.exists()
 
     @property
     def is_used_as_destination(self):
-        return self.routing_rules_by_destination.exists()
+        return self.routing_rules_by_destination.filter(direction=Route.Direction.FORWARD).exists()
 
     @property
     def destinations(self):
@@ -557,7 +575,7 @@ class IntegrationConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedMod
             periodic_task_params = {
                 "name": task_name,
                 "task": "integrations.tasks.run_integration",
-                "enabled": self.integration.is_used_as_provider,  # Disable pull action trigger until used as provider
+                "enabled": self.integration.has_any_provider_role,  # Disable pull action trigger until used as provider
                 "kwargs": json.dumps({
                     "integration_id": str(self.integration_id),
                     "action_id": self.action.value,
@@ -695,6 +713,18 @@ class RouteConfiguration(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
         default=dict,
         verbose_name="JSON Configuration"
     )
+    # Stays nullable even after backfill: a config can transiently have zero
+    # referencing routes mid-detach. Enforcement of "attach only your own
+    # org's config" lives in RouteCreateUpdateSerializer.validate_configuration,
+    # not a DB NOT NULL, for exactly that reason.
+    owner = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="route_configurations_by_owner",
+        blank=True,
+        null=True,
+        verbose_name="Owner",
+    )
     integration_field = "first_route_provider"
 
     @property
@@ -749,12 +779,36 @@ class RouteDestination(ChangeLogMixin, models.Model):
 
 
 class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
+    class Direction(models.TextChoices):
+        FORWARD = "forward", "Forward"
+        RETURN = "return", "Return"
+
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.CASCADE,
         related_name="routing_rules_by_owner",
         verbose_name="Owner"
+    )
+    enabled = models.BooleanField(default=True)
+    # Null only until the GUNDI-5730 backfill migration runs; every Route gets
+    # one afterward (a forward Route's own id, or its forward Route's id if
+    # this is the return leg of a bidirectional flow -- see return_for_destination).
+    flow_id = models.UUIDField(null=True, db_index=True)
+    direction = models.CharField(
+        max_length=10, choices=Direction.choices, default=Direction.FORWARD,
+    )
+    # Set only when direction=RETURN: the destination (now acting as a
+    # provider) this Route carries data back from. A Route can have many
+    # destinations, so flow_id alone can't say which one a given return leg
+    # answers for -- this is what GUNDI-5694's class of bug (the wrong Route
+    # getting treated as "the" return leg) needs to not be guessable again.
+    return_for_destination = models.ForeignKey(
+        "integrations.Integration",
+        on_delete=models.CASCADE,
+        related_name="return_routes",
+        blank=True,
+        null=True,
     )
     data_providers = models.ManyToManyField(
         "integrations.Integration",
@@ -790,8 +844,45 @@ class Route(ChangeLogMixin, UUIDAbstractModel, TimestampedModel):
     def first_provider(self):
         return self.data_providers.first()
 
+    def save(self, *args, **kwargs):
+        # A forward Route is its own flow -- give it one at creation instead
+        # of needing a second write. Return legs get flow_id assigned
+        # explicitly by whatever creates them (GUNDI-5730 U1), tying them to
+        # their forward Route's flow.
+        was_adding = self._state.adding
+        if was_adding and not self.flow_id and self.direction == self.Direction.FORWARD:
+            self.flow_id = self.id
+        super().save(*args, **kwargs)
+        # A return leg is always named after its forward Route (GUNDI-5730 U1) --
+        # keep that in sync on rename instead of letting it go stale.
+        # flow_id is not None guards a route that predates the GUNDI-5894
+        # backfill: with flow_id still NULL, this filter would otherwise match
+        # every other not-yet-backfilled return leg across every org (NULL has
+        # no identity to scope by) and rename them all to this route's name.
+        if not was_adding and self.direction == self.Direction.FORWARD and self.flow_id is not None:
+            return_legs = Route.objects.filter(
+                flow_id=self.flow_id, direction=self.Direction.RETURN
+            ).exclude(name=self.name)
+            # .save() per row, not a bulk .update(), so each rename still goes
+            # through ChangeLogMixin and lands in ActivityLog -- otherwise the
+            # return leg's own history has no record explaining why its name
+            # changed.
+            for return_leg in return_legs:
+                return_leg.name = self.name
+                return_leg.save()
+
     class Meta:
         ordering = ("owner", "name", )
+        indexes = [
+            models.Index(fields=["flow_id", "direction"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["flow_id", "return_for_destination"],
+                condition=models.Q(direction="return"),
+                name="unique_return_leg_per_flow_destination",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.owner}: {self.name}"
