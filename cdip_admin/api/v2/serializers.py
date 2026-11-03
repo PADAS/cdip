@@ -664,12 +664,10 @@ class IntegrationRetrieveFullSerializer(serializers.ModelSerializer):
     def _target_can_receive(self, target):
         # Same target for every row -- one query for the whole list, not one
         # per row (the per-row cache below is keyed by the PROVIDER's id, so
-        # it doesn't dedupe this on its own).
+        # it doesn't dedupe this on its own). Reuses has_push_data_support
+        # rather than re-deriving the same query, so the two can't diverge.
         if not hasattr(self, "_target_can_receive_cache"):
-            self._target_can_receive_cache = IntegrationAction.objects.filter(
-                integration_type_id=target.type_id,
-                type=IntegrationAction.ActionTypes.PUSH_DATA,
-            ).exists()
+            self._target_can_receive_cache = target.has_push_data_support
         return self._target_can_receive_cache
 
     def _evaluate_can_send(self, obj):
@@ -1783,6 +1781,7 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
+        self._validate_configuration_matches_new_owner(attrs)
         field_mappings = self._extract_field_mappings(attrs)
         if not field_mappings:
             return attrs
@@ -1792,6 +1791,30 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
             destination_ids=self._resolve_relation_ids(attrs, "destinations"),
         )
         return attrs
+
+    def _validate_configuration_matches_new_owner(self, attrs: dict) -> None:
+        # A PATCH that changes `owner` alone -- without also touching
+        # `configuration` -- never runs validate_configuration at all (DRF
+        # only calls a field's validator when that field is in the request).
+        # Without this, the route's EXISTING configuration is never re-checked
+        # against the new owner, so a route can end up owned by org B while
+        # its configuration stays owned by org A.
+        if "owner" not in attrs or self.instance is None:
+            return
+        # "configuration" in attrs means validate_configuration already ran
+        # _validate_configuration_ownership against this same new owner.
+        if "configuration" in attrs:
+            return
+        user = self.context.get("request").user
+        if user.is_superuser:
+            return
+        existing = self.instance.configuration
+        if existing is None or existing.owner_id is None:
+            return
+        if str(existing.owner_id) != str(attrs["owner"].id):
+            raise drf_exceptions.ValidationError(
+                detail="This configuration belongs to a different organization's route."
+            )
 
     @staticmethod
     def _extract_field_mappings(attrs: dict) -> dict[str, Any] | None:

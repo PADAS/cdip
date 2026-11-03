@@ -1388,6 +1388,35 @@ def test_patch_route_rejects_configuration_mismatched_with_new_owner_in_same_req
     assert route_1.owner_id == original_owner_id
 
 
+def test_patch_route_rejects_owner_change_alone_when_existing_configuration_would_mismatch(
+    api_client, org_admin_user, organization, other_organization, route_1,
+):
+    # Same bug as the test above, narrower trigger: a PATCH that changes ONLY
+    # `owner` (never mentioning `configuration` at all) must still be checked
+    # against the route's EXISTING configuration -- DRF only calls
+    # validate_configuration for fields present in the request, so without a
+    # route-level check in validate(), this path skips the ownership check
+    # entirely and would leave org B's route pointed at org A's configuration.
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+    route_1.configuration = own_config
+    route_1.save(update_fields=["configuration"])
+    original_owner_id = route_1.owner_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"owner": str(other_organization.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.owner_id == original_owner_id
+
+
 def test_patch_route_claims_an_unowned_configuration_then_blocks_other_orgs(
     api_client, org_admin_user, org_admin_user_2, organization, other_organization, route_1, route_2,
 ):

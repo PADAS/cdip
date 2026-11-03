@@ -55,7 +55,13 @@ class Command(BaseCommand):
                 candidate.flow_id = forward_route.flow_id or forward_route.id
                 candidate.direction = Route.Direction.RETURN
                 candidate.return_for_destination = pair["leg_provider"]
-                candidate.save(update_fields=["flow_id", "direction", "return_for_destination"])
+                # Route.save()'s own invariant is "a return leg is always named
+                # after its forward Route" -- without setting it here too, a
+                # freshly linked leg keeps its legacy name until the forward
+                # Route happens to be renamed again, leaving that invariant
+                # false immediately after backfill.
+                candidate.name = forward_route.name
+                candidate.save(update_fields=["flow_id", "direction", "return_for_destination", "name"])
 
         report = {
             "forward_routes_missing_flow_id": [
@@ -116,13 +122,17 @@ class Command(BaseCommand):
 
     @staticmethod
     def _find_return_leg_matches():
+        # NOT pre-filtered to n_providers=1/n_destinations=1 here -- that used
+        # to drop a name-stamped candidate with more than one provider or
+        # destination out of the queryset entirely, before it ever reached the
+        # "needs review" check below. It looked like clean nothing-to-report
+        # instead of an unreviewed candidate.
         candidates = (
             Route.objects.filter(direction=Route.Direction.FORWARD)
             .annotate(
                 n_providers=Count("data_providers", distinct=True),
                 n_destinations=Count("destinations", distinct=True),
             )
-            .filter(n_providers=1, n_destinations=1)
             .prefetch_related("data_providers", "destinations")
         )
 
@@ -138,8 +148,20 @@ class Command(BaseCommand):
             if SEPARATOR not in candidate.name:
                 continue
 
-            leg_provider = candidate.data_providers.first()
-            leg_destination = candidate.destinations.first()
+            if candidate.n_providers != 1 or candidate.n_destinations != 1:
+                skipped.append({
+                    "candidate": candidate,
+                    "name_matches": False,
+                    "forward_candidates": [],
+                    "reason": "has more than one provider or destination -- can't tell which pair its name refers to",
+                })
+                continue
+
+            # .all()[0], not .first() -- .first() always issues its own query
+            # (ORDER BY + LIMIT), ignoring the prefetch_related cache above and
+            # reintroducing the 2 queries per candidate it was added to avoid.
+            leg_provider = list(candidate.data_providers.all())[0]
+            leg_destination = list(candidate.destinations.all())[0]
             expected_name = f"{leg_provider.name}{SEPARATOR}{leg_destination.name}"
             name_matches = candidate.name == expected_name
 

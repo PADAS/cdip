@@ -129,6 +129,36 @@ def test_can_send_to_a_malformed_id_does_not_500(
     assert row["can_send"] is None
 
 
+def test_can_send_true_for_org_viewer_within_their_own_org(
+    api_client, org_viewer_user, organization, pull_capable_type, push_capable_type,
+):
+    provider = _make_integration(organization, pull_capable_type, "Provider")
+    target = _make_integration(organization, push_capable_type, "Target")
+    api_client.force_authenticate(org_viewer_user)
+
+    response = api_client.get(reverse("integrations-list"), {"can_send_to": target.id})
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    row = next(r for r in response.json()["results"] if r["id"] == str(provider.id))
+    assert row["can_send"] is True
+    assert row["reasons"] == []
+
+
+def test_can_send_to_an_integration_in_another_org_does_not_leak_it_for_org_viewer(
+    api_client, org_viewer_user, organization, other_organization, pull_capable_type, push_capable_type,
+):
+    provider = _make_integration(organization, pull_capable_type, "Provider")
+    foreign_target = _make_integration(other_organization, push_capable_type, "Foreign Target")
+    api_client.force_authenticate(org_viewer_user)
+
+    response = api_client.get(reverse("integrations-list"), {"can_send_to": foreign_target.id})
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    row = next(r for r in response.json()["results"] if r["id"] == str(provider.id))
+    assert row["can_send"] is None
+    assert row["reasons"] is None
+
+
 def test_can_send_to_an_integration_in_another_org_does_not_leak_it(
     api_client, org_admin_user, organization, other_organization, pull_capable_type, push_capable_type,
 ):
