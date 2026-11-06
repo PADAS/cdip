@@ -43,7 +43,7 @@ celery==5.5.0
     #   django-celery-beat
 celery-once==1.2.0
     # via -r requirements.in
-certifi==2020.6.20
+certifi==2026.10.23
     # via
     #   -r requirements.in
     #   httpcore
@@ -268,7 +268,7 @@ gundi-core==1.14.0
     #   er-smart-sync
     #   gundi-client
     #   gundi-client-v2
-gunicorn==21.2.0
+gunicorn==22.0.0
     # via -r requirements.in
 h11==0.16.0
     # via httpcore
