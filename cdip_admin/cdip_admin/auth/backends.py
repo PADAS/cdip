@@ -6,6 +6,7 @@ from django.contrib.auth.backends import *
 from django.core.cache import cache
 
 from clients.models import ClientProfile
+from cdip_admin.auth.stateless import is_stateless_request
 
 import logging
 
@@ -49,7 +50,15 @@ class SimpleUserInfoBackend(ModelBackend):
         user = self._get_or_create_user(email, username)
 
         if client_id and self._client_profile_exists(client_id):
-            request.session["client_id"] = client_id
+            # Expose client_id on the request for IsServiceAccount. DRF wraps
+            # the Django request, so set it on the inner one where both the
+            # wrapper (via __getattr__) and middleware-level code can see it.
+            getattr(request, "_request", request).client_id = client_id
+            # Only persist it in the session for stateful (browser) requests:
+            # touching the session on a cookie-less API call would make
+            # SessionMiddleware write a django_session row per request.
+            if not is_stateless_request(request):
+                request.session["client_id"] = client_id
 
         if user is not None and self.user_can_authenticate(user):
             return user

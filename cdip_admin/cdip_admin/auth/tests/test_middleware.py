@@ -2,6 +2,7 @@ import base64
 import json
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.middleware.csrf import get_token
@@ -126,3 +127,95 @@ def test_matching_username_short_circuits_without_rotation():
     OidcRemoteUserMiddleware(_noop_response).process_request(req2)
 
     assert req2.META.get("CSRF_COOKIE_NEEDS_UPDATE") is not True
+
+
+@pytest.mark.django_db
+def test_api_request_without_session_cookie_authenticates_without_logging_in():
+    """
+    Machine clients (pull-action runners, dispatchers, Cloud Functions) never
+    send a session cookie, so every API call used to be a "first login":
+    auth.login() wrote auth_user.last_login (one hot row shared by every
+    caller), inserted a django_session row and rotated the CSRF token -- per
+    request, at ingestion volume. A cookie-less request to an API path must
+    authenticate from the header without any of that.
+    """
+    User = get_user_model()
+    user = User.objects.create(username="svc@example.com", email="svc@example.com")
+    assert user.last_login is None
+    header = _userinfo_header("svc@example.com", "svc@example.com")
+
+    req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=header)
+    SessionMiddleware(_noop_response).process_request(req)
+    AuthenticationMiddleware(_noop_response).process_request(req)
+    OidcRemoteUserMiddleware(_noop_response).process_request(req)
+
+    assert req.user.is_authenticated
+    assert req.user.email == "svc@example.com"
+    user.refresh_from_db()
+    assert user.last_login is None, "stateless API request must not write last_login"
+    assert req.session.session_key is None and not req.session.modified, (
+        "stateless API request must not create or touch a session"
+    )
+    assert req.META.get("CSRF_COOKIE_NEEDS_UPDATE") is not True
+
+
+@pytest.mark.django_db
+def test_v2_api_request_without_session_cookie_is_stateless_by_default():
+    """The v2 ingestion endpoints are the highest-volume callers."""
+    User = get_user_model()
+    user = User.objects.create(username="svc@example.com", email="svc@example.com")
+    header = _userinfo_header("svc@example.com", "svc@example.com")
+
+    req = RequestFactory().post("/v2/observations/", HTTP_X_USERINFO=header)
+    SessionMiddleware(_noop_response).process_request(req)
+    AuthenticationMiddleware(_noop_response).process_request(req)
+    OidcRemoteUserMiddleware(_noop_response).process_request(req)
+
+    assert req.user.is_authenticated
+    user.refresh_from_db()
+    assert user.last_login is None
+    assert req.session.session_key is None
+
+
+@pytest.mark.django_db
+def test_ui_request_without_session_cookie_still_logs_in():
+    """
+    A browser's first visit has no cookie either. Non-API paths must keep the
+    session-establishing login, or the UI could never start a session.
+    """
+    User = get_user_model()
+    user = User.objects.create(username="person@example.com", email="person@example.com")
+    header = _userinfo_header("person@example.com", "person@example.com")
+
+    req = RequestFactory().get("/integrations/", HTTP_X_USERINFO=header)
+    SessionMiddleware(_noop_response).process_request(req)
+    AuthenticationMiddleware(_noop_response).process_request(req)
+    OidcRemoteUserMiddleware(_noop_response).process_request(req)
+
+    assert req.user.is_authenticated
+    assert req.session.session_key is not None, "UI login must establish a session"
+    user.refresh_from_db()
+    assert user.last_login is not None
+
+
+@pytest.mark.django_db
+def test_api_request_with_session_cookie_keeps_session_login():
+    """
+    An API path reached by a browser that already carries a session cookie
+    (e.g. the browsable API after visiting the UI) keeps today's behaviour:
+    the session is (re)established and the user logged in.
+    """
+    User = get_user_model()
+    user = User.objects.create(username="person@example.com", email="person@example.com")
+    header = _userinfo_header("person@example.com", "person@example.com")
+
+    req = RequestFactory().get("/api/v1.0/organizations", HTTP_X_USERINFO=header)
+    req.COOKIES[settings.SESSION_COOKIE_NAME] = "expired-or-unknown-session-key"
+    SessionMiddleware(_noop_response).process_request(req)
+    AuthenticationMiddleware(_noop_response).process_request(req)
+    OidcRemoteUserMiddleware(_noop_response).process_request(req)
+
+    assert req.user.is_authenticated
+    assert req.session.session_key is not None
+    user.refresh_from_db()
+    assert user.last_login is not None

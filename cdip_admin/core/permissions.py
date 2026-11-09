@@ -28,7 +28,7 @@ class IsGlobalAdmin(permissions.BasePermission):
 
 class IsServiceAccount(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.session and "client_id" in request.session
+        return IsServiceAccount.get_client_id(request) is not None
 
     def has_object_permission(self, request, view, obj):
         client_id = IsServiceAccount.get_client_id(request)
@@ -37,15 +37,21 @@ class IsServiceAccount(permissions.BasePermission):
     @staticmethod
     def get_client_id(request):
         """
-        Returns the client id if one exists in the session
+        Returns the client id if one exists on the request or in the session.
+
+        Stateless API requests carry it on the request object (the auth
+        backend keeps it off the session so no django_session row is written
+        per call); browser sessions still carry it in the session.
 
         request: request to pull client_id off of
         """
-        try:
-            client_id = request.session["client_id"]
+        client_id = getattr(request, "client_id", None)
+        if client_id is not None:
             return client_id
-        except:
-            pass
+        try:
+            return request.session["client_id"]
+        except Exception:
+            return None
 
     @staticmethod
     def get_client_profile(client_id):

@@ -59,3 +59,43 @@ def test_unparseable_userinfo_is_a_normal_auth_failure():
     backend = SimpleUserInfoBackend()
     assert backend.authenticate(_request(), user_info={}) is None
     assert backend.authenticate(_request(), user_info={"email": "x@example.com"}) is None
+
+
+@pytest.mark.django_db
+def test_stateless_api_request_keeps_client_id_off_the_session(mocker):
+    """
+    Writing client_id into the session dirties it, so SessionMiddleware would
+    persist a django_session row for every cookie-less API call even when the
+    middleware skips login. For stateless requests the backend must expose
+    client_id on the request object instead (IsServiceAccount reads it there).
+    """
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+    req = RequestFactory().post("/api/v1.0/observations")
+    req.session = {}
+
+    user = SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert user is not None
+    assert req.client_id == "svc-client"
+    assert "client_id" not in req.session
+
+
+@pytest.mark.django_db
+def test_stateful_request_still_stores_client_id_in_session(mocker):
+    """Browser/UI requests keep client_id in the session as before."""
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+    req = RequestFactory().get("/")
+    req.session = {}
+
+    SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert req.session["client_id"] == "svc-client"
+    assert req.client_id == "svc-client"
