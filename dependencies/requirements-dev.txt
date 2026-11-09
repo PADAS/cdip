@@ -633,7 +633,7 @@ untangle==1.2.1
     # via smartconnect-client
 uritemplate==4.2.0
     # via drf-yasg
-urllib3==1.25.9
+urllib3==2.8.0
     # via
     #   -r dependencies/requirements.in
     #   requests
