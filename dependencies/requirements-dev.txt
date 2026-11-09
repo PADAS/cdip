@@ -46,7 +46,7 @@ celery==5.5.0
     #   django-celery-beat
 celery-once==1.2.0
     # via -r dependencies/requirements.in
-certifi==2020.6.20
+certifi==2026.10.23
     # via
     #   -r dependencies/requirements.in
     #   httpcore
@@ -286,7 +286,7 @@ gundi-core==1.14.0
     #   er-smart-sync
     #   gundi-client
     #   gundi-client-v2
-gunicorn==21.2.0
+gunicorn==22.0.0
     # via -r dependencies/requirements.in
 h11==0.16.0
     # via httpcore
@@ -633,7 +633,7 @@ untangle==1.2.1
     # via smartconnect-client
 uritemplate==4.2.0
     # via drf-yasg
-urllib3==1.25.9
+urllib3==2.8.0
     # via
     #   -r dependencies/requirements.in
     #   requests
