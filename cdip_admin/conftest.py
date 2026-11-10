@@ -1,10 +1,13 @@
 import asyncio
 import base64
 from datetime import datetime, timezone, timedelta
-from unittest.mock import PropertyMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
 import random
 from typing import NamedTuple, Any
+from celery.app.base import Celery
+from celery.app.task import Task
+from celery_once import QueueOnce
 from django.contrib.auth.models import User, Group
 from django_celery_beat.models import CrontabSchedule
 from freezegun import freeze_time
@@ -57,30 +60,28 @@ def async_return(result):
     return f
 
 
+def _dispatch_noop(self, *args, **kwargs):
+    return MagicMock(name="AsyncResult")
+
+
 @pytest.fixture(autouse=True)
-def _no_celery_dispatch(request, monkeypatch):
+def _no_celery_dispatch(monkeypatch):
     """
-    Celery dispatch is a no-op in tests unless marked ``real_celery``.
+    Celery dispatch is a no-op in tests.
 
     ActivityLog publishes a configuration event on every integration save,
     so fixture setup alone fires tens of ``.delay()`` calls per test. Each
     one costs ~0.7s against an absent broker, so the suite needs a running
-    Redis just to not crawl. Both dispatch entry points are covered:
-    ``Task.apply_async`` (behind ``.delay()``) and ``Celery.send_task``,
-    which the v1 model signals use to dispatch by name. Tests asserting on
-    dispatch patch the task's ``.delay`` themselves, which this does not
-    affect.
+    Redis just to not crawl. Three entry points reach the broker:
+    ``Task.apply_async`` (behind ``.delay()``), ``QueueOnce.apply_async``
+    (celery-once takes a Redis lock before deferring to the base class) and
+    ``Celery.send_task``, which the v1 model signals use to dispatch by
+    name and which tests that inline ``transaction.on_commit`` reach. Tests
+    asserting on dispatch patch the task's ``.delay`` themselves, which
+    this does not affect.
     """
-    if request.node.get_closest_marker("real_celery"):
-        return
-    from unittest.mock import MagicMock
-    from celery.app.base import Celery
-    from celery.app.task import Task
-
-    def _dispatch_noop(self, *args, **kwargs):
-        return MagicMock(name="AsyncResult")
-
     monkeypatch.setattr(Task, "apply_async", _dispatch_noop)
+    monkeypatch.setattr(QueueOnce, "apply_async", _dispatch_noop)
     monkeypatch.setattr(Celery, "send_task", _dispatch_noop)
 
 
