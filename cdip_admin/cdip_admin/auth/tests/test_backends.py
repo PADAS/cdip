@@ -129,3 +129,25 @@ def test_client_id_set_through_a_drf_request_is_visible_to_the_permission(mocker
 
     assert django_request.client_id == "svc-client"
     assert IsServiceAccount().has_permission(drf_request, view=None) is True
+
+
+@pytest.mark.django_db
+def test_rejected_credentials_clear_a_client_id_left_by_an_earlier_pass(mocker):
+    """
+    The middleware and DRF each run the backend on the same Django request.
+    A client_id from an earlier accepted pass must not survive a later pass
+    whose credentials are rejected.
+    """
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com", is_active=False)
+    req = RequestFactory().post("/api/v1.0/observations")
+    req.session = {}
+    req.client_id = "svc-client"
+
+    user = SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert user is None
+    assert req.client_id is None

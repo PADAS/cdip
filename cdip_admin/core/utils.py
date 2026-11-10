@@ -4,10 +4,11 @@ from enum import Enum
 import backoff
 import requests
 import time
-import rest_framework.request
 
 from abc import ABC, abstractmethod
 from django_celery_beat.models import CrontabSchedule
+
+from cdip_admin.auth.stateless import unwrap_request
 from google.cloud.pubsub_v1.publisher.exceptions import PublishToPausedOrderingKeyException
 from pytz import timezone
 from google.api_core.exceptions import GoogleAPICallError
@@ -42,10 +43,7 @@ def add_base_url(request, url):
         if not url.startswith("/"):
             url = "/" + url
 
-        if isinstance(request, rest_framework.request.Request):
-            request = request._request
-
-        url = request.build_absolute_uri(url)
+        url = unwrap_request(request).build_absolute_uri(url)
     return url
 
 

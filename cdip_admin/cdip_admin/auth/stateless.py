@@ -44,7 +44,6 @@ def is_stateless_request(request):
     if not prefixes:
         return False
     http_request = unwrap_request(request)
-    cookies = getattr(http_request, "COOKIES", None) or {}
-    if settings.SESSION_COOKIE_NAME in cookies:
+    if settings.SESSION_COOKIE_NAME in http_request.COOKIES:
         return False
-    return (getattr(http_request, "path_info", "") or "").startswith(prefixes)
+    return http_request.path_info.startswith(prefixes)

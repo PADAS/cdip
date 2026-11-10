@@ -49,6 +49,9 @@ class SimpleUserInfoBackend(ModelBackend):
         # 5xx) rather than being swallowed into a misleading auth failure.
         user = self._get_or_create_user(email, username)
 
+        # The middleware and DRF each run this on the same Django request;
+        # a client_id from an earlier pass must not outlive a rejection.
+        unwrap_request(request).client_id = None
         if user is None or not self.user_can_authenticate(user):
             return None
 
