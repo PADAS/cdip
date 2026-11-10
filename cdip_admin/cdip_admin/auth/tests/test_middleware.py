@@ -199,26 +199,60 @@ def test_ui_request_without_session_cookie_still_logs_in():
 
 
 @pytest.mark.django_db
-def test_api_request_with_session_cookie_keeps_session_login():
+def test_api_request_with_a_stale_session_cookie_is_stateless():
     """
-    An API path reached by a browser that already carries a session cookie
-    (e.g. the browsable API after visiting the UI) keeps today's behaviour:
-    the session is (re)established and the user logged in.
+    A cookie that no longer resolves to a session (expired, cleared by
+    clearsessions, or pasted into a script) carries no session user. Treating
+    it as a browser would run auth.login() on every request from that client,
+    which is exactly the per-request write this rule removes.
     """
     User = get_user_model()
-    user = User.objects.create(username="person@example.com", email="person@example.com")
-    header = _userinfo_header("person@example.com", "person@example.com")
+    user = User.objects.create(username="svc@example.com", email="svc@example.com")
+    header = _userinfo_header("svc@example.com", "svc@example.com")
 
-    req = RequestFactory().get("/api/v1.0/organizations", HTTP_X_USERINFO=header)
+    req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=header)
     req.COOKIES[settings.SESSION_COOKIE_NAME] = "expired-or-unknown-session-key"
     SessionMiddleware(_noop_response).process_request(req)
     AuthenticationMiddleware(_noop_response).process_request(req)
     OidcRemoteUserMiddleware(_noop_response).process_request(req)
 
     assert req.user.is_authenticated
-    assert req.session.session_key is not None
     user.refresh_from_db()
-    assert user.last_login is not None
+    assert user.last_login is None
+    assert req.session.session_key is None and not req.session.modified
+
+
+@pytest.mark.django_db
+def test_api_request_with_a_live_session_keeps_the_session():
+    """
+    A browser that logged in on a UI page and then reaches an API path (the
+    browsable API, the v2 docs) keeps its session: no second login, no new
+    session row.
+    """
+    User = get_user_model()
+    user = User.objects.create(username="person@example.com", email="person@example.com")
+    header = _userinfo_header("person@example.com", "person@example.com")
+
+    first = RequestFactory().get("/integrations/", HTTP_X_USERINFO=header)
+    SessionMiddleware(_noop_response).process_request(first)
+    AuthenticationMiddleware(_noop_response).process_request(first)
+    OidcRemoteUserMiddleware(_noop_response).process_request(first)
+    first.session.save()
+    session_key = first.session.session_key
+    user.refresh_from_db()
+    first_login = user.last_login
+    assert session_key and first_login
+
+    second = RequestFactory().get("/api/v1.0/organizations", HTTP_X_USERINFO=header)
+    second.COOKIES[settings.SESSION_COOKIE_NAME] = session_key
+    SessionMiddleware(_noop_response).process_request(second)
+    AuthenticationMiddleware(_noop_response).process_request(second)
+    OidcRemoteUserMiddleware(_noop_response).process_request(second)
+
+    assert second.user.is_authenticated
+    assert second.session.session_key == session_key
+    user.refresh_from_db()
+    assert user.last_login == first_login
 
 
 @pytest.mark.django_db

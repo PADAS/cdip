@@ -27,23 +27,27 @@ def _prefixes():
 def is_stateless_request(request):
     """
     True for requests that should authenticate from the Kong-provided header
-    without establishing a Django session: a request to an API path that
-    carries no session cookie.
+    without establishing a Django session: a request to an API path with no
+    authenticated session user.
 
-    Machine clients (pull-action runners, dispatchers, Cloud Functions) never
-    send a session cookie, so without this rule every API call is a "first
-    login" -- auth.login() writes auth_user.last_login (one hot row shared by
-    every caller), inserts a django_session row and rotates the CSRF token,
-    per request, at ingestion volume. Browser traffic is unaffected: with a
-    session cookie, or on any non-API path, the session login runs as before.
+    Machine clients (pull-action runners, dispatchers, Cloud Functions) have
+    no session, so without this rule every API call is a "first login" --
+    auth.login() writes auth_user.last_login (one hot row shared by every
+    caller), inserts a django_session row and rotates the CSRF token, per
+    request, at ingestion volume. The decision keys on the session user, not
+    on cookie presence: a stale or pasted session cookie carries no user and
+    must not put a client back on the per-request login path. A browser with
+    a live session, or any non-API path, keeps the session login as before.
 
-    The prefixes are matched against path_info, the URLconf-relative path, so
-    they hold under any SCRIPT_NAME mount.
+    Evaluate this while request.user still reflects the session, before the
+    middleware replaces it with the header-authenticated user. The prefixes
+    are matched against path_info, the URLconf-relative path, so they hold
+    under any SCRIPT_NAME mount.
     """
     prefixes = _prefixes()
     if not prefixes:
         return False
     http_request = unwrap_request(request)
-    if settings.SESSION_COOKIE_NAME in http_request.COOKIES:
+    if http_request.user.is_authenticated:
         return False
     return http_request.path_info.startswith(prefixes)

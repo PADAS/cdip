@@ -20,6 +20,11 @@ def _cache_key(prefix, value):
 
 class SimpleUserInfoBackend(ModelBackend):
     def authenticate(self, request, user_info=None, **kwargs):
+        # The middleware and DRF each run this on the same Django request;
+        # a client_id from an earlier pass must not outlive any rejection
+        # below, so it is cleared before anything can return.
+        if request is not None:
+            unwrap_request(request).client_id = None
         # Parsing the token is cheap and never touches the DB. A failure here
         # means we genuinely can't identify the caller -> not authenticated.
         try:
@@ -49,13 +54,10 @@ class SimpleUserInfoBackend(ModelBackend):
         # 5xx) rather than being swallowed into a misleading auth failure.
         user = self._get_or_create_user(email, username)
 
-        # The middleware and DRF each run this on the same Django request;
-        # a client_id from an earlier pass must not outlive a rejection.
-        unwrap_request(request).client_id = None
         if user is None or not self.user_can_authenticate(user):
             return None
 
-        if client_id and self._client_profile_exists(client_id):
+        if request is not None and client_id and self._client_profile_exists(client_id):
             # IsServiceAccount reads client_id from the request, which DRF's
             # authenticator populates on every API call. It lives on the inner
             # Django request so the DRF wrapper and middleware see the same

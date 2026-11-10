@@ -151,3 +151,26 @@ def test_rejected_credentials_clear_a_client_id_left_by_an_earlier_pass(mocker):
 
     assert user is None
     assert req.client_id is None
+
+
+@pytest.mark.django_db
+def test_unparseable_header_clears_a_client_id_left_by_an_earlier_pass():
+    """Every rejection path must honour the reset, not only the active-user check."""
+    req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=b"not-base64-json")
+    req.client_id = "svc-client"
+
+    assert SimpleUserInfoBackend().authenticate(req) is None
+    assert req.client_id is None
+
+
+@pytest.mark.django_db
+def test_explicit_user_info_without_a_request_authenticates():
+    """Django's authenticate() contract allows request=None with explicit credentials."""
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+
+    user = SimpleUserInfoBackend().authenticate(
+        None, user_info={"username": "svc", "email": "svc@example.com"}
+    )
+
+    assert user is not None and user.username == "svc"
