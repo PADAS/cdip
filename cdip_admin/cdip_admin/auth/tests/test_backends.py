@@ -59,3 +59,118 @@ def test_unparseable_userinfo_is_a_normal_auth_failure():
     backend = SimpleUserInfoBackend()
     assert backend.authenticate(_request(), user_info={}) is None
     assert backend.authenticate(_request(), user_info={"email": "x@example.com"}) is None
+
+
+@pytest.mark.django_db
+def test_client_id_is_exposed_on_the_request_and_never_on_the_session(mocker):
+    """
+    IsServiceAccount reads client_id from the request, which the DRF
+    authenticator populates on every API call. Writing it to the session
+    would dirty the session (a django_session row per cookie-less call) and
+    leave a stale client_id behind after the header stops carrying it.
+    """
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+    req = RequestFactory().get("/")
+    req.session = {}
+
+    user = SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert user is not None
+    assert req.client_id == "svc-client"
+    assert req.session == {}
+
+
+@pytest.mark.django_db
+def test_inactive_user_gets_no_client_id(mocker):
+    """
+    A deactivated service account must not pass IsServiceAccount: the backend
+    returns None, and DRF then carries user=None, so client_id must not be
+    attached either.
+    """
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com", is_active=False)
+    req = RequestFactory().post("/api/v1.0/observations")
+    req.session = {}
+
+    user = SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert user is None
+    assert getattr(req, "client_id", None) is None
+
+
+@pytest.mark.django_db
+def test_client_id_set_through_a_drf_request_is_visible_to_the_permission(mocker):
+    """
+    In production the backend runs inside DRF's authenticator with a DRF
+    Request, and the permission reads from the same wrapper. The value must
+    land on the inner Django request so both sides see it.
+    """
+    from rest_framework.request import Request
+
+    from core.permissions import IsServiceAccount
+
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+    django_request = RequestFactory().post("/api/v1.0/observations")
+    django_request.session = {}
+    drf_request = Request(django_request)
+
+    SimpleUserInfoBackend().authenticate(
+        drf_request, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert django_request.client_id == "svc-client"
+    assert IsServiceAccount().has_permission(drf_request, view=None) is True
+
+
+@pytest.mark.django_db
+def test_rejected_credentials_clear_a_client_id_left_by_an_earlier_pass(mocker):
+    """
+    The middleware and DRF each run the backend on the same Django request.
+    A client_id from an earlier accepted pass must not survive a later pass
+    whose credentials are rejected.
+    """
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com", is_active=False)
+    req = RequestFactory().post("/api/v1.0/observations")
+    req.session = {}
+    req.client_id = "svc-client"
+
+    user = SimpleUserInfoBackend().authenticate(
+        req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert user is None
+    assert req.client_id is None
+
+
+@pytest.mark.django_db
+def test_unparseable_header_clears_a_client_id_left_by_an_earlier_pass():
+    """Every rejection path must honour the reset, not only the active-user check."""
+    req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=b"not-base64-json")
+    req.client_id = "svc-client"
+
+    assert SimpleUserInfoBackend().authenticate(req) is None
+    assert req.client_id is None
+
+
+@pytest.mark.django_db
+def test_explicit_user_info_without_a_request_authenticates():
+    """Django's authenticate() contract allows request=None with explicit credentials."""
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+
+    user = SimpleUserInfoBackend().authenticate(
+        None, user_info={"username": "svc", "email": "svc@example.com"}
+    )
+
+    assert user is not None and user.username == "svc"

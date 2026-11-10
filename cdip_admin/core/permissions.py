@@ -3,6 +3,7 @@ from rest_framework import permissions
 from rest_framework.permissions import SAFE_METHODS
 
 from accounts.models import AccountProfile, AccountProfileOrganization
+from cdip_admin.auth.stateless import unwrap_request
 from clients.models import ClientProfile
 from core.enums import RoleChoices, DjangoGroups
 
@@ -28,7 +29,7 @@ class IsGlobalAdmin(permissions.BasePermission):
 
 class IsServiceAccount(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.session and "client_id" in request.session
+        return IsServiceAccount.get_client_id(request) is not None
 
     def has_object_permission(self, request, view, obj):
         client_id = IsServiceAccount.get_client_id(request)
@@ -37,15 +38,11 @@ class IsServiceAccount(permissions.BasePermission):
     @staticmethod
     def get_client_id(request):
         """
-        Returns the client id if one exists in the session
+        The client id the auth backend attached to the request, or None.
 
         request: request to pull client_id off of
         """
-        try:
-            client_id = request.session["client_id"]
-            return client_id
-        except:
-            pass
+        return getattr(unwrap_request(request), "client_id", None)
 
     @staticmethod
     def get_client_profile(client_id):

@@ -3036,9 +3036,9 @@ def organization_member_user(db, django_user_model):
 
 """
 Provisions a django user that simulates a service account or "client". Proper user info is added so that requests can be
-made with header "HTTP_X_USERINFO" so that our middleware and backend appropriately add the client_id to the requests 
-session, allowing the permissions checks to pass for IsServiceAccount. The associated client profile and 
-dependent objects related to that client are also created here. 
+made with header "HTTP_X_USERINFO" so that the auth backend attaches the client_id to the Django request object
+(never to the session), allowing the permissions checks to pass for IsServiceAccount. The associated client profile and
+dependent objects related to that client are also created here.
 """
 
 

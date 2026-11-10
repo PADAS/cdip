@@ -10,6 +10,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import SimpleLazyObject
 
+from cdip_admin.auth.stateless import is_stateless_request
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,10 +89,17 @@ class OidcRemoteUserMiddleware(MiddlewareMixin):
         # Remember who (if anyone) is already authenticated so we only re-login
         # when the session user actually changes.
         current_user_pk = request.user.pk if request.user.is_authenticated else None
+        stateless = is_stateless_request(request)
         # Attempt to authenticate the user from the header.
         user = auth.authenticate(request, user_info=user_info)
         if user:
             request.user = user
+            if stateless:
+                # API call with no session user: the header is the credential
+                # on every request, so there is no session to establish.
+                # Skipping auth.login() avoids the per-request last_login
+                # UPDATE, django_session INSERT and CSRF rotation.
+                return
             if user.pk != current_user_pk:
                 # New or changed session user. auth.login() calls
                 # rotate_token(); calling it on every request -- as happens when

@@ -151,6 +151,13 @@ AUTHENTICATION_BACKENDS = {
 # ingestion path off the database. 0 (or any non-positive value) disables it.
 AUTH_IDENTITY_CACHE_TTL = env.int("AUTH_IDENTITY_CACHE_TTL", 300)
 
+# Requests to these path prefixes with no authenticated session user are
+# machine clients: authenticate them from the Kong header without
+# auth.login(), so no auth_user.last_login write, no django_session row and no
+# CSRF rotation per request. A live browser session, or any other path, keeps
+# the session login. Empty list disables the behaviour.
+STATELESS_AUTH_PATH_PREFIXES = env.list("STATELESS_AUTH_PATH_PREFIXES", default=["/api/", "/v2/"])
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
