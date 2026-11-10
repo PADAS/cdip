@@ -4,10 +4,12 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, PropertyMock
 import pytest
 import random
+import uuid
 from typing import NamedTuple, Any
 from celery.app.base import Celery
 from celery.app.task import Task
 from celery_once import QueueOnce
+import kombu.serialization
 from django.contrib.auth.models import User, Group
 from django_celery_beat.models import CrontabSchedule
 from freezegun import freeze_time
@@ -61,13 +63,18 @@ def async_return(result):
 
 
 def _dispatch_noop(self, *args, **kwargs):
-    return MagicMock(name="AsyncResult")
+    # Serialize exactly what production would put on the wire, so an
+    # argument that JSON cannot encode fails here rather than in production.
+    task_args = kwargs.get("args", args[0] if args else None) or ()
+    task_kwargs = kwargs.get("kwargs", args[1] if len(args) > 1 else None) or {}
+    kombu.serialization.dumps([list(task_args), dict(task_kwargs)], serializer="json")
+    return MagicMock(name="AsyncResult", id=str(uuid.uuid4()))
 
 
-@pytest.fixture(autouse=True)
-def _no_celery_dispatch(monkeypatch):
+@pytest.fixture(autouse=True, scope="session")
+def _no_celery_dispatch():
     """
-    Celery dispatch is a no-op in tests.
+    Celery dispatch is a no-op for the whole session.
 
     ActivityLog publishes a configuration event on every integration save,
     so fixture setup alone fires tens of ``.delay()`` calls per test. Each
@@ -76,13 +83,18 @@ def _no_celery_dispatch(monkeypatch):
     ``Task.apply_async`` (behind ``.delay()``), ``QueueOnce.apply_async``
     (celery-once takes a Redis lock before deferring to the base class) and
     ``Celery.send_task``, which the v1 model signals use to dispatch by
-    name and which tests that inline ``transaction.on_commit`` reach. Tests
-    asserting on dispatch patch the task's ``.delay`` themselves, which
-    this does not affect.
+    name and which tests that inline ``transaction.on_commit`` reach. The
+    patch is session-scoped so saves made by module- or session-scoped
+    fixtures and by database setup are covered too. Tests asserting on
+    dispatch patch the task's ``.delay`` themselves, which this does not
+    affect.
     """
-    monkeypatch.setattr(Task, "apply_async", _dispatch_noop)
-    monkeypatch.setattr(QueueOnce, "apply_async", _dispatch_noop)
-    monkeypatch.setattr(Celery, "send_task", _dispatch_noop)
+    patch = pytest.MonkeyPatch()
+    patch.setattr(Task, "apply_async", _dispatch_noop)
+    patch.setattr(QueueOnce, "apply_async", _dispatch_noop)
+    patch.setattr(Celery, "send_task", _dispatch_noop)
+    yield
+    patch.undo()
 
 
 @pytest.fixture(autouse=True)
