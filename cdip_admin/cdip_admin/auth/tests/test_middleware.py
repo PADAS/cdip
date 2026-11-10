@@ -1,6 +1,3 @@
-import base64
-import json
-
 import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,12 +9,7 @@ from cdip_admin.auth.middleware import (
     AuthenticationMiddleware,
     OidcRemoteUserMiddleware,
 )
-
-
-def _userinfo_header(username, email):
-    return base64.b64encode(
-        json.dumps({"username": username, "email": email}).encode("utf-8")
-    )
+from cdip_admin.auth.tests.helpers import userinfo_header
 
 
 def _noop_response(request):
@@ -41,7 +33,7 @@ def test_authenticated_user_with_mismatched_username_does_not_rotate_csrf_token(
     email = "person@example.com"
     # Stored Django username == email, but Keycloak sends a short username claim.
     User.objects.create(username=email, email=email)
-    header = _userinfo_header(username="person", email=email)
+    header = userinfo_header(username="person", email=email)
 
     factory = RequestFactory()
 
@@ -85,7 +77,7 @@ def test_genuine_user_switch_still_logs_in_the_new_user():
     factory = RequestFactory()
 
     # Session belongs to `first`.
-    req1 = factory.get("/", HTTP_X_USERINFO=_userinfo_header("first@example.com", "first@example.com"))
+    req1 = factory.get("/", HTTP_X_USERINFO=userinfo_header("first@example.com", "first@example.com"))
     SessionMiddleware(_noop_response).process_request(req1)
     AuthenticationMiddleware(_noop_response).process_request(req1)
     OidcRemoteUserMiddleware(_noop_response).process_request(req1)
@@ -93,7 +85,7 @@ def test_genuine_user_switch_still_logs_in_the_new_user():
     req1.session.save()
 
     # A request arrives in the same session but with `second` in the header.
-    req2 = factory.get("/", HTTP_X_USERINFO=_userinfo_header("second@example.com", "second@example.com"))
+    req2 = factory.get("/", HTTP_X_USERINFO=userinfo_header("second@example.com", "second@example.com"))
     req2.session = req1.session
     AuthenticationMiddleware(_noop_response).process_request(req2)
     OidcRemoteUserMiddleware(_noop_response).process_request(req2)
@@ -112,7 +104,7 @@ def test_matching_username_short_circuits_without_rotation():
     """
     User = get_user_model()
     User.objects.create(username="match@example.com", email="match@example.com")
-    header = _userinfo_header("match@example.com", "match@example.com")
+    header = userinfo_header("match@example.com", "match@example.com")
 
     factory = RequestFactory()
     req1 = factory.get("/", HTTP_X_USERINFO=header)
@@ -142,7 +134,7 @@ def test_api_request_without_session_cookie_authenticates_without_logging_in():
     User = get_user_model()
     user = User.objects.create(username="svc@example.com", email="svc@example.com")
     assert user.last_login is None
-    header = _userinfo_header("svc@example.com", "svc@example.com")
+    header = userinfo_header("svc@example.com", "svc@example.com")
 
     req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=header)
     SessionMiddleware(_noop_response).process_request(req)
@@ -164,7 +156,7 @@ def test_v2_api_request_without_session_cookie_is_stateless_by_default():
     """The v2 ingestion endpoints are the highest-volume callers."""
     User = get_user_model()
     user = User.objects.create(username="svc@example.com", email="svc@example.com")
-    header = _userinfo_header("svc@example.com", "svc@example.com")
+    header = userinfo_header("svc@example.com", "svc@example.com")
 
     req = RequestFactory().post("/v2/observations/", HTTP_X_USERINFO=header)
     SessionMiddleware(_noop_response).process_request(req)
@@ -185,7 +177,7 @@ def test_ui_request_without_session_cookie_still_logs_in():
     """
     User = get_user_model()
     user = User.objects.create(username="person@example.com", email="person@example.com")
-    header = _userinfo_header("person@example.com", "person@example.com")
+    header = userinfo_header("person@example.com", "person@example.com")
 
     req = RequestFactory().get("/integrations/", HTTP_X_USERINFO=header)
     SessionMiddleware(_noop_response).process_request(req)
@@ -208,7 +200,7 @@ def test_api_request_with_a_stale_session_cookie_is_stateless():
     """
     User = get_user_model()
     user = User.objects.create(username="svc@example.com", email="svc@example.com")
-    header = _userinfo_header("svc@example.com", "svc@example.com")
+    header = userinfo_header("svc@example.com", "svc@example.com")
 
     req = RequestFactory().post("/api/v1.0/observations", HTTP_X_USERINFO=header)
     req.COOKIES[settings.SESSION_COOKIE_NAME] = "expired-or-unknown-session-key"
@@ -231,7 +223,7 @@ def test_api_request_with_a_live_session_keeps_the_session():
     """
     User = get_user_model()
     user = User.objects.create(username="person@example.com", email="person@example.com")
-    header = _userinfo_header("person@example.com", "person@example.com")
+    header = userinfo_header("person@example.com", "person@example.com")
 
     first = RequestFactory().get("/integrations/", HTTP_X_USERINFO=header)
     SessionMiddleware(_noop_response).process_request(first)
@@ -263,7 +255,7 @@ def test_api_request_is_stateless_under_a_mount_prefix():
     """
     User = get_user_model()
     user = User.objects.create(username="svc@example.com", email="svc@example.com")
-    header = _userinfo_header("svc@example.com", "svc@example.com")
+    header = userinfo_header("svc@example.com", "svc@example.com")
 
     req = RequestFactory().post(
         "/api/v1.0/observations", HTTP_X_USERINFO=header, SCRIPT_NAME="/portal"
