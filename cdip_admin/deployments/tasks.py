@@ -457,6 +457,12 @@ def get_function_request(configuration, function_name, topic_path):
         service_account_email=deployment_settings.get("service_account"),
         environment_variables=env_vars,
         available_cpu=deployment_settings.get("cpu", "1"),
+        # Cloud Functions defaults to 256M when unset. A dispatcher handling
+        # `concurrency` observation batches at once (200 rows each for ER)
+        # gets killed at that limit under load, so make it configurable per
+        # deployment; the default stays at the platform value so existing
+        # deployments do not change until their settings say so.
+        available_memory=deployment_settings.get("memory", "256M"),
         min_instance_count=deployment_settings.get("min_instances", 0),
         max_instance_count=deployment_settings.get("max_instances", 2),
         max_instance_request_concurrency=deployment_settings.get("concurrency", 4),
