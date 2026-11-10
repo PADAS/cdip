@@ -1,10 +1,15 @@
 import asyncio
 import base64
 from datetime import datetime, timezone, timedelta
-from unittest.mock import PropertyMock
+from unittest.mock import MagicMock, PropertyMock
 import pytest
 import random
+import uuid
 from typing import NamedTuple, Any
+from celery.app.base import Celery
+from celery.app.task import Task
+from celery_once import QueueOnce
+import kombu.serialization
 from django.contrib.auth.models import User, Group
 from django_celery_beat.models import CrontabSchedule
 from freezegun import freeze_time
@@ -55,6 +60,49 @@ def async_return(result):
     f = asyncio.Future()
     f.set_result(result)
     return f
+
+
+def _dispatched(task_args, task_kwargs):
+    # Serialize exactly what production would put on the wire, so an
+    # argument that JSON cannot encode fails here rather than in production.
+    kombu.serialization.dumps(
+        [list(task_args or ()), dict(task_kwargs or {})], serializer="json"
+    )
+    return MagicMock(name="AsyncResult", id=str(uuid.uuid4()))
+
+
+def _apply_async_noop(self, args=None, kwargs=None, **options):
+    return _dispatched(args, kwargs)
+
+
+def _send_task_noop(self, name, args=None, kwargs=None, **options):
+    return _dispatched(args, kwargs)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_celery_dispatch():
+    """
+    Celery dispatch is a no-op for the whole session.
+
+    ActivityLog publishes a configuration event on every integration save,
+    so fixture setup alone fires tens of ``.delay()`` calls per test. Each
+    one costs ~0.7s against an absent broker, so the suite needs a running
+    Redis just to not crawl. Three entry points reach the broker:
+    ``Task.apply_async`` (behind ``.delay()``), ``QueueOnce.apply_async``
+    (celery-once takes a Redis lock before deferring to the base class) and
+    ``Celery.send_task``, which the v1 model signals use to dispatch by
+    name and which tests that inline ``transaction.on_commit`` reach. The
+    patch is session-scoped so saves made by module- or session-scoped
+    fixtures and by database setup are covered too. Tests asserting on
+    dispatch patch the task's ``.delay`` themselves, which this does not
+    affect.
+    """
+    patch = pytest.MonkeyPatch()
+    patch.setattr(Task, "apply_async", _apply_async_noop)
+    patch.setattr(QueueOnce, "apply_async", _apply_async_noop)
+    patch.setattr(Celery, "send_task", _send_task_noop)
+    yield
+    patch.undo()
 
 
 @pytest.fixture(autouse=True)
