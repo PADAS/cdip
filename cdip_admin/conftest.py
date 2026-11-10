@@ -58,6 +58,33 @@ def async_return(result):
 
 
 @pytest.fixture(autouse=True)
+def _no_celery_dispatch(request, monkeypatch):
+    """
+    Celery dispatch is a no-op in tests unless marked ``real_celery``.
+
+    ActivityLog publishes a configuration event on every integration save,
+    so fixture setup alone fires tens of ``.delay()`` calls per test. Each
+    one costs ~0.7s against an absent broker, so the suite needs a running
+    Redis just to not crawl. Both dispatch entry points are covered:
+    ``Task.apply_async`` (behind ``.delay()``) and ``Celery.send_task``,
+    which the v1 model signals use to dispatch by name. Tests asserting on
+    dispatch patch the task's ``.delay`` themselves, which this does not
+    affect.
+    """
+    if request.node.get_closest_marker("real_celery"):
+        return
+    from unittest.mock import MagicMock
+    from celery.app.base import Celery
+    from celery.app.task import Task
+
+    def _dispatch_noop(self, *args, **kwargs):
+        return MagicMock(name="AsyncResult")
+
+    monkeypatch.setattr(Task, "apply_async", _dispatch_noop)
+    monkeypatch.setattr(Celery, "send_task", _dispatch_noop)
+
+
+@pytest.fixture(autouse=True)
 def _clear_cache():
     """
     The default cache is a per-process LocMemCache that outlives individual
