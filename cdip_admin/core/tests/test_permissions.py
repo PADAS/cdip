@@ -1,3 +1,4 @@
+import pytest
 from django.test import RequestFactory
 
 from core.permissions import IsServiceAccount
@@ -30,4 +31,27 @@ def test_service_account_permission_denies_without_client_id():
     req.session = {}
 
     assert not IsServiceAccount().has_permission(req, view=None)
+    assert IsServiceAccount.get_client_id(req) is None
+
+
+def test_service_account_permission_surfaces_session_backend_errors():
+    """
+    A failing session store must raise, not be swallowed into a 403; the
+    only expected miss is a missing key.
+    """
+
+    class BrokenSession(dict):
+        def get(self, key, default=None):
+            raise RuntimeError("session store down")
+
+    req = RequestFactory().get("/")
+    req.session = BrokenSession()
+
+    with pytest.raises(RuntimeError):
+        IsServiceAccount.get_client_id(req)
+
+
+def test_service_account_permission_denies_without_session_attribute():
+    req = RequestFactory().get("/")
+
     assert IsServiceAccount.get_client_id(req) is None

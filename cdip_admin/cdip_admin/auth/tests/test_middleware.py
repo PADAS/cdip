@@ -219,3 +219,27 @@ def test_api_request_with_session_cookie_keeps_session_login():
     assert req.session.session_key is not None
     user.refresh_from_db()
     assert user.last_login is not None
+
+
+@pytest.mark.django_db
+def test_api_request_is_stateless_under_a_mount_prefix():
+    """
+    The prefixes are written against the URLconf path, so a portal mounted
+    under SCRIPT_NAME must still recognise its API routes.
+    """
+    User = get_user_model()
+    user = User.objects.create(username="svc@example.com", email="svc@example.com")
+    header = _userinfo_header("svc@example.com", "svc@example.com")
+
+    req = RequestFactory().post(
+        "/api/v1.0/observations", HTTP_X_USERINFO=header, SCRIPT_NAME="/portal"
+    )
+    SessionMiddleware(_noop_response).process_request(req)
+    AuthenticationMiddleware(_noop_response).process_request(req)
+    OidcRemoteUserMiddleware(_noop_response).process_request(req)
+
+    assert req.path == "/portal/api/v1.0/observations"
+    assert req.user.is_authenticated
+    user.refresh_from_db()
+    assert user.last_login is None
+    assert req.session.session_key is None and not req.session.modified

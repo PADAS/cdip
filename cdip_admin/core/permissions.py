@@ -3,6 +3,7 @@ from rest_framework import permissions
 from rest_framework.permissions import SAFE_METHODS
 
 from accounts.models import AccountProfile, AccountProfileOrganization
+from cdip_admin.auth.stateless import unwrap_request
 from clients.models import ClientProfile
 from core.enums import RoleChoices, DjangoGroups
 
@@ -45,13 +46,11 @@ class IsServiceAccount(permissions.BasePermission):
 
         request: request to pull client_id off of
         """
-        client_id = getattr(request, "client_id", None)
+        client_id = getattr(unwrap_request(request), "client_id", None)
         if client_id is not None:
             return client_id
-        try:
-            return request.session["client_id"]
-        except Exception:
-            return None
+        session = getattr(request, "session", None)
+        return session.get("client_id") if session is not None else None
 
     @staticmethod
     def get_client_profile(client_id):

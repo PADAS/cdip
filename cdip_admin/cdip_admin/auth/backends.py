@@ -6,7 +6,7 @@ from django.contrib.auth.backends import *
 from django.core.cache import cache
 
 from clients.models import ClientProfile
-from cdip_admin.auth.stateless import is_stateless_request
+from cdip_admin.auth.stateless import is_stateless_request, unwrap_request
 
 import logging
 
@@ -53,7 +53,7 @@ class SimpleUserInfoBackend(ModelBackend):
             # Expose client_id on the request for IsServiceAccount. DRF wraps
             # the Django request, so set it on the inner one where both the
             # wrapper (via __getattr__) and middleware-level code can see it.
-            getattr(request, "_request", request).client_id = client_id
+            unwrap_request(request).client_id = client_id
             # Only persist it in the session for stateful (browser) requests:
             # touching the session on a cookie-less API call would make
             # SessionMiddleware write a django_session row per request.
