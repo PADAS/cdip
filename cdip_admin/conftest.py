@@ -62,13 +62,21 @@ def async_return(result):
     return f
 
 
-def _dispatch_noop(self, *args, **kwargs):
+def _dispatched(task_args, task_kwargs):
     # Serialize exactly what production would put on the wire, so an
     # argument that JSON cannot encode fails here rather than in production.
-    task_args = kwargs.get("args", args[0] if args else None) or ()
-    task_kwargs = kwargs.get("kwargs", args[1] if len(args) > 1 else None) or {}
-    kombu.serialization.dumps([list(task_args), dict(task_kwargs)], serializer="json")
+    kombu.serialization.dumps(
+        [list(task_args or ()), dict(task_kwargs or {})], serializer="json"
+    )
     return MagicMock(name="AsyncResult", id=str(uuid.uuid4()))
+
+
+def _apply_async_noop(self, args=None, kwargs=None, **options):
+    return _dispatched(args, kwargs)
+
+
+def _send_task_noop(self, name, args=None, kwargs=None, **options):
+    return _dispatched(args, kwargs)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -90,9 +98,9 @@ def _no_celery_dispatch():
     affect.
     """
     patch = pytest.MonkeyPatch()
-    patch.setattr(Task, "apply_async", _dispatch_noop)
-    patch.setattr(QueueOnce, "apply_async", _dispatch_noop)
-    patch.setattr(Celery, "send_task", _dispatch_noop)
+    patch.setattr(Task, "apply_async", _apply_async_noop)
+    patch.setattr(QueueOnce, "apply_async", _apply_async_noop)
+    patch.setattr(Celery, "send_task", _send_task_noop)
     yield
     patch.undo()
 
