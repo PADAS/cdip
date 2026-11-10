@@ -62,17 +62,17 @@ def test_unparseable_userinfo_is_a_normal_auth_failure():
 
 
 @pytest.mark.django_db
-def test_stateless_api_request_keeps_client_id_off_the_session(mocker):
+def test_client_id_is_exposed_on_the_request_and_never_on_the_session(mocker):
     """
-    Writing client_id into the session dirties it, so SessionMiddleware would
-    persist a django_session row for every cookie-less API call even when the
-    middleware skips login. For stateless requests the backend must expose
-    client_id on the request object instead (IsServiceAccount reads it there).
+    IsServiceAccount reads client_id from the request, which the DRF
+    authenticator populates on every API call. Writing it to the session
+    would dirty the session (a django_session row per cookie-less call) and
+    leave a stale client_id behind after the header stops carrying it.
     """
     mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
     User = get_user_model()
     User.objects.create(username="svc", email="svc@example.com")
-    req = RequestFactory().post("/api/v1.0/observations")
+    req = RequestFactory().get("/")
     req.session = {}
 
     user = SimpleUserInfoBackend().authenticate(
@@ -81,21 +81,51 @@ def test_stateless_api_request_keeps_client_id_off_the_session(mocker):
 
     assert user is not None
     assert req.client_id == "svc-client"
-    assert "client_id" not in req.session
+    assert req.session == {}
 
 
 @pytest.mark.django_db
-def test_stateful_request_still_stores_client_id_in_session(mocker):
-    """Browser/UI requests keep client_id in the session as before."""
+def test_inactive_user_gets_no_client_id(mocker):
+    """
+    A deactivated service account must not pass IsServiceAccount: the backend
+    returns None, and DRF then carries user=None, so client_id must not be
+    attached either.
+    """
     mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
     User = get_user_model()
-    User.objects.create(username="svc", email="svc@example.com")
-    req = RequestFactory().get("/")
+    User.objects.create(username="svc", email="svc@example.com", is_active=False)
+    req = RequestFactory().post("/api/v1.0/observations")
     req.session = {}
 
-    SimpleUserInfoBackend().authenticate(
+    user = SimpleUserInfoBackend().authenticate(
         req, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
     )
 
-    assert req.session["client_id"] == "svc-client"
-    assert req.client_id == "svc-client"
+    assert user is None
+    assert getattr(req, "client_id", None) is None
+
+
+@pytest.mark.django_db
+def test_client_id_set_through_a_drf_request_is_visible_to_the_permission(mocker):
+    """
+    In production the backend runs inside DRF's authenticator with a DRF
+    Request, and the permission reads from the same wrapper. The value must
+    land on the inner Django request so both sides see it.
+    """
+    from rest_framework.request import Request
+
+    from core.permissions import IsServiceAccount
+
+    mocker.patch.object(SimpleUserInfoBackend, "_client_profile_exists", return_value=True)
+    User = get_user_model()
+    User.objects.create(username="svc", email="svc@example.com")
+    django_request = RequestFactory().post("/api/v1.0/observations")
+    django_request.session = {}
+    drf_request = Request(django_request)
+
+    SimpleUserInfoBackend().authenticate(
+        drf_request, user_info={"username": "svc", "email": "svc@example.com", "client_id": "svc-client"}
+    )
+
+    assert django_request.client_id == "svc-client"
+    assert IsServiceAccount().has_permission(drf_request, view=None) is True

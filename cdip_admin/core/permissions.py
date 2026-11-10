@@ -38,19 +38,11 @@ class IsServiceAccount(permissions.BasePermission):
     @staticmethod
     def get_client_id(request):
         """
-        Returns the client id if one exists on the request or in the session.
-
-        Stateless API requests carry it on the request object (the auth
-        backend keeps it off the session so no django_session row is written
-        per call); browser sessions still carry it in the session.
+        The client id the auth backend attached to the request, or None.
 
         request: request to pull client_id off of
         """
-        client_id = getattr(unwrap_request(request), "client_id", None)
-        if client_id is not None:
-            return client_id
-        session = getattr(request, "session", None)
-        return session.get("client_id") if session is not None else None
+        return getattr(unwrap_request(request), "client_id", None)
 
     @staticmethod
     def get_client_profile(client_id):

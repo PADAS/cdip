@@ -6,7 +6,7 @@ from django.contrib.auth.backends import *
 from django.core.cache import cache
 
 from clients.models import ClientProfile
-from cdip_admin.auth.stateless import is_stateless_request, unwrap_request
+from cdip_admin.auth.stateless import unwrap_request
 
 import logging
 
@@ -49,20 +49,18 @@ class SimpleUserInfoBackend(ModelBackend):
         # 5xx) rather than being swallowed into a misleading auth failure.
         user = self._get_or_create_user(email, username)
 
-        if client_id and self._client_profile_exists(client_id):
-            # Expose client_id on the request for IsServiceAccount. DRF wraps
-            # the Django request, so set it on the inner one where both the
-            # wrapper (via __getattr__) and middleware-level code can see it.
-            unwrap_request(request).client_id = client_id
-            # Only persist it in the session for stateful (browser) requests:
-            # touching the session on a cookie-less API call would make
-            # SessionMiddleware write a django_session row per request.
-            if not is_stateless_request(request):
-                request.session["client_id"] = client_id
+        if user is None or not self.user_can_authenticate(user):
+            return None
 
-        if user is not None and self.user_can_authenticate(user):
-            return user
-        return None
+        if client_id and self._client_profile_exists(client_id):
+            # IsServiceAccount reads client_id from the request, which DRF's
+            # authenticator populates on every API call. It lives on the inner
+            # Django request so the DRF wrapper and middleware see the same
+            # value, and it is never copied to the session: that would write a
+            # django_session row per cookie-less call and leave a stale
+            # client_id behind once the header stops carrying it.
+            unwrap_request(request).client_id = client_id
+        return user
 
     def _get_or_create_user(self, email, username):
         if not email:

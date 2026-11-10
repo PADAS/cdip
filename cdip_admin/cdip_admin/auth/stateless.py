@@ -12,6 +12,18 @@ def unwrap_request(request):
     return getattr(request, "_request", request)
 
 
+def _prefixes():
+    """
+    The configured prefixes as a tuple of stripped, non-empty strings. A
+    single string stays one prefix: iterating it would yield "/" and match
+    every path.
+    """
+    configured = getattr(settings, "STATELESS_AUTH_PATH_PREFIXES", ()) or ()
+    if isinstance(configured, str):
+        configured = (configured,)
+    return tuple(p.strip() for p in configured if p and p.strip())
+
+
 def is_stateless_request(request):
     """
     True for requests that should authenticate from the Kong-provided header
@@ -28,7 +40,7 @@ def is_stateless_request(request):
     The prefixes are matched against path_info, the URLconf-relative path, so
     they hold under any SCRIPT_NAME mount.
     """
-    prefixes = tuple(getattr(settings, "STATELESS_AUTH_PATH_PREFIXES", ()) or ())
+    prefixes = _prefixes()
     if not prefixes:
         return False
     http_request = unwrap_request(request)
