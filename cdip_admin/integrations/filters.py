@@ -478,8 +478,13 @@ class IntegrationFilter(django_filters_rest.FilterSet):
         }
 
     def filter_is_used_as_provider(self, queryset, name, value):
-        # Get integrations set as provider in any route
-        return queryset.filter(routing_rules_by_provider__isnull=(not value))
+        # GUNDI-5730: forward only, matching Integration.is_used_as_provider --
+        # a return leg's auto-created provider role must not count here either,
+        # or this filter and the property it's named after disagree for the
+        # same integration.
+        if value:
+            return queryset.filter(routing_rules_by_provider__direction=Route.Direction.FORWARD).distinct()
+        return queryset.exclude(routing_rules_by_provider__direction=Route.Direction.FORWARD)
 
 
 class ConnectionFilter(django_filters_rest.FilterSet):
@@ -646,6 +651,7 @@ class RouteFilter(django_filters_rest.FilterSet):
         model = Route
         fields = {
             'id': ['exact', 'iexact', 'in'],
+            'direction': ['exact'],
         }
 
     def filter_by_destination_url(self, queryset, name, value):

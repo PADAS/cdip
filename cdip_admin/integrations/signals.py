@@ -55,8 +55,9 @@ def disable_pull_tasks_when_no_longer_a_provider(sender, **kwargs):
     except Integration.DoesNotExist:
         # The integration itself was deleted (cascade) — its tasks go with it.
         return
-    if integration.is_used_as_provider:
-        # Still a provider via another route; leave the tasks enabled.
+    if integration.has_any_provider_role:
+        # Still a provider via another route (forward or return); leave the
+        # tasks enabled.
         return
     for config in integration.periodic_pull_action_configurations:
         if config.periodic_task and config.periodic_task.enabled:
