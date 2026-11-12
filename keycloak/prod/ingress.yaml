@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: cdip-auth
+spec:
+  rules:
+  - host: cdip-auth.pamdas.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: keycloak
+            port:
+              number: 8080
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - cdip-auth.pamdas.org
+    # Rotated certificate secret; the name carries the expiry date and changes
+    # at each renewal — keep in sync with the live object.
+    secretName: ingress-tls-20261227

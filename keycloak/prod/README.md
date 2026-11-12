@@ -6,11 +6,16 @@ here, checking the diff, and applying with server-side apply. Rollout steps are 
 | File | Object | Restart on change? |
 |---|---|---|
 | `deployment.yaml` | Deployment `keycloak` | Yes, if anything under `spec.template` changes |
-| `service.yaml` | Service `keycloak` (GKE load balancer, NEG) | No |
+| `service.yaml` | Service `keycloak` (ClusterIP; the ingress reaches pods via NEGs) | No |
 | `backendconfig.yaml` | BackendConfig `keycloak` (load balancer health check, draining) | No |
+| `ingress.yaml` | Ingress `keycloak` (GCE LB for `cdip-auth.pamdas.org`; TLS secret name rotates with cert renewals) | No |
+| `nightly-restart.yaml` | Suspended emergency-restart CronJob and its RBAC | No |
 
 Not in git: Secret `keycloak-credentials` (`KEYCLOAK_USER`, `KEYCLOAK_PASSWORD`, `DB_USER`, `DB_PASSWORD`). The
-Deployment references it by key. To rotate a value, update the Secret and run `kubectl rollout restart deploy/keycloak`.
+Deployment references it by key. To recreate it from scratch: `kubectl -n cdip-auth create secret generic
+keycloak-credentials --from-literal=KEYCLOAK_USER=... --from-literal=KEYCLOAK_PASSWORD=...
+--from-literal=DB_USER=... --from-literal=DB_PASSWORD=...`.
+To rotate a value, update the Secret and run `kubectl rollout restart deploy/keycloak`.
 `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` only seed the admin user on an empty database; changing them does not change
 the existing admin password.
 
@@ -48,3 +53,6 @@ Commit the edit in the same change as the apply, so the files never lag prod.
 - `-Dkeycloak.profile.feature.upload_scripts=enabled` was already set before these files existed. Keep it unless
   you have confirmed nothing depends on it.
 - `DB_ADDR` is the Cloud SQL instance's private IP. It is internal-only, which is why it is acceptable in git.
+- The Service is `ClusterIP` because the ingress reaches the pods through NEGs; a Service-level load balancer is
+  redundant with the ingress. Admin console access that must not go through the public hostname works with
+  `kubectl -n cdip-auth port-forward deploy/keycloak 8080:8080` → `http://localhost:8080/auth/admin/`.
