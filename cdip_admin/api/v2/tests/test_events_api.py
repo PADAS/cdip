@@ -272,6 +272,60 @@ def test_create_single_event_with_status(api_client, mocker, mock_publisher, moc
     assert data_kwarg.get("payload", {}).get("status") == "active"
 
 
+@pytest.mark.parametrize("priority", [300, 0])
+def test_create_single_event_with_priority(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger, priority):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    _test_create_event(
+        api_client=api_client,
+        mock_publisher=mock_publisher,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        data={
+            "source": "camera123",
+            "title": "Animal Detected",
+            "event_type": "animals",
+            "recorded_at": "2024-08-22 13:01:26-0300",
+            "location": {
+                "lon": -109.239682,
+                "lat": -27.104423
+            },
+            "event_details": {
+                "species": "lion"
+            },
+            "priority": priority
+        }
+    )
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    assert data_kwarg.get("payload", {}).get("priority") == priority
+
+
+def test_create_single_event_without_priority_leaves_it_out(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    _test_create_event(
+        api_client=api_client,
+        mock_publisher=mock_publisher,
+        keyauth_headers=keyauth_headers_trap_tagger,
+        data={
+            "source": "camera123",
+            "title": "Animal Detected",
+            "event_type": "animals",
+            "recorded_at": "2024-08-22 13:01:26-0300",
+            "location": {
+                "lon": -109.239682,
+                "lat": -27.104423
+            },
+            "event_details": {
+                "species": "lion"
+            }
+        }
+    )
+    data_kwarg = mock_publisher.publish.call_args.kwargs["data"]
+    assert "priority" not in data_kwarg.get("payload", {})
+
+
 def test_create_single_event_with_provider_metadata(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
