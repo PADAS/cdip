@@ -122,6 +122,7 @@ def send_events_to_routing(events, gundi_ids):
                 geometry=event.get("geometry", None),
                 observation_type=StreamPrefixEnum.event.value,
                 status=event.get("status"),
+                priority=event.get("priority"),
                 provider_metadata=event.get("provider_metadata"),
             )
             # Log info for traffic anomaly detection.
