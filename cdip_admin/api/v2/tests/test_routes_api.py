@@ -31,6 +31,10 @@ def _test_list_routes(api_client, user):
         assert "destinations" in route
         assert "configuration" in route
         assert "additional" in route
+        assert "enabled" in route
+        assert "flow_id" in route
+        assert "direction" in route
+        assert "return_for_destination" in route
 
 
 def test_list_routes_as_superuser(api_client, superuser, organization, integrations_list_er):
@@ -52,6 +56,27 @@ def test_list_routes_as_org_viewer(api_client, org_viewer_user, organization, in
         api_client=api_client,
         user=org_viewer_user,
     )
+
+
+def test_filter_routes_by_direction(api_client, superuser, organization, route_1):
+    return_route = Route.objects.create(
+        name="Return leg",
+        owner=organization,
+        direction=Route.Direction.RETURN,
+    )
+    api_client.force_authenticate(superuser)
+
+    response = api_client.get(reverse("routes-list"), {"direction": Route.Direction.FORWARD})
+    assert response.status_code == status.HTTP_200_OK
+    route_ids = {route["id"] for route in response.json()["results"]}
+    assert str(route_1.id) in route_ids
+    assert str(return_route.id) not in route_ids
+
+    response = api_client.get(reverse("routes-list"), {"direction": Route.Direction.RETURN})
+    assert response.status_code == status.HTTP_200_OK
+    route_ids = {route["id"] for route in response.json()["results"]}
+    assert str(return_route.id) in route_ids
+    assert str(route_1.id) not in route_ids
 
 
 def _test_create_route(api_client, user, data):
@@ -1003,6 +1028,140 @@ def test_patch_route_updates_existing_configuration_in_place(
     assert RouteConfiguration.objects.filter(id=original_config_id).count() == 1
 
 
+def test_route_detail_exposes_return_for_destination(api_client, superuser, route_1, organization):
+    destination = route_1.destinations.first()
+    return_leg = Route.objects.create(
+        name=route_1.name,
+        owner=organization,
+        flow_id=route_1.flow_id,
+        direction=Route.Direction.RETURN,
+        return_for_destination=destination,
+    )
+
+    api_client.force_authenticate(superuser)
+
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": route_1.id}))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["return_for_destination"] is None
+
+    response = api_client.get(reverse("routes-detail", kwargs={"pk": return_leg.id}))
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["return_for_destination"]["id"] == str(destination.id)
+
+
+def test_patch_route_updates_enabled(api_client, superuser, route_2):
+    api_client.force_authenticate(superuser)
+
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"enabled": False},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert response.json()["enabled"] is False
+    route_2.refresh_from_db()
+    assert route_2.enabled is False
+
+
+def test_get_route_after_disabling_it_reports_the_stored_state(api_client, superuser, route_2):
+    # The write-side serializer (RouteCreateUpdateSerializer) already echoes
+    # `enabled` on the PATCH response -- that alone doesn't prove the READ
+    # serializer (RouteRetrieveFullSerializer, used by list/retrieve) has it
+    # too. Without it, a client that reloads the route after a disable PATCH
+    # can't tell it's disabled.
+    api_client.force_authenticate(superuser)
+    patch_response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"enabled": False},
+        format="json",
+    )
+    assert patch_response.status_code == status.HTTP_200_OK, patch_response.content
+
+    get_response = api_client.get(reverse("routes-detail", kwargs={"pk": route_2.id}))
+
+    assert get_response.status_code == status.HTTP_200_OK, get_response.content
+    assert get_response.json()["enabled"] is False
+
+
+def test_patch_route_configuration_while_disabled_still_succeeds(
+    api_client, superuser, route_2, provider_movebank_ewt
+):
+    route_2.enabled = False
+    route_2.save()
+    destination = route_2.destinations.first()
+    new_configuration = {
+        "name": route_2.configuration.name,
+        "data": {
+            "subject_type": "elephant",
+            "field_mappings": _build_field_mappings(
+                provider_movebank_ewt.id, destination.id
+            ),
+        },
+    }
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": new_configuration},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    route_2.refresh_from_db()
+    assert "field_mappings" in route_2.configuration.data
+
+
+def test_renaming_forward_route_renames_its_return_leg(api_client, superuser, route_1, organization):
+    return_leg = Route.objects.create(
+        name="stale name",
+        owner=organization,
+        flow_id=route_1.flow_id,
+        direction=Route.Direction.RETURN,
+        return_for_destination=route_1.destinations.first(),
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"name": "Renamed forward route"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    return_leg.refresh_from_db()
+    assert return_leg.name == "Renamed forward route"
+
+
+def test_renaming_a_not_yet_backfilled_forward_route_does_not_mass_rename_other_orgs_return_legs(
+    api_client, superuser, route_1, route_2, organization, other_organization,
+):
+    # route_1 predates the GUNDI-5894 backfill: flow_id is still NULL. Without
+    # the flow_id-is-not-None guard, renaming it would match Route.objects
+    # .filter(flow_id=None, direction=RETURN) -- every OTHER not-yet-
+    # backfilled return leg across every org, NULL having no identity to
+    # scope by -- and rename them all to route_1's new name.
+    Route.objects.filter(pk=route_1.pk).update(flow_id=None)
+    unrelated_return_leg = Route.objects.create(
+        name="unrelated return leg, different org",
+        owner=other_organization,
+        flow_id=None,
+        direction=Route.Direction.RETURN,
+        return_for_destination=route_2.data_providers.first(),
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"name": "Renamed forward route"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    unrelated_return_leg.refresh_from_db()
+    assert unrelated_return_leg.name == "unrelated return leg, different org"
+
+
 def test_patch_route_configuration_without_field_mappings_passes(
     api_client, superuser, route_2
 ):
@@ -1124,6 +1283,270 @@ def test_cannot_delete_unrelated_route_configuration_as_org_admin(
     assert response.status_code == status.HTTP_404_NOT_FOUND
     route_2.refresh_from_db()
     assert route_2.configuration is not None
+
+
+# --- GUNDI-5698: RouteConfiguration must stay scoped to the caller's org -----
+
+def test_create_route_rejects_cross_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, other_organization,
+    integrations_list_er, provider_lotek_panthera,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(foreign_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+
+
+def test_create_route_allows_same_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, integrations_list_er, provider_lotek_panthera,
+):
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(own_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    route = Route.objects.get(id=response.json()["id"])
+    assert route.configuration_id == own_config.id
+
+
+def test_update_route_rejects_cross_org_configuration_as_org_admin(
+    api_client, org_admin_user, organization, other_organization, route_1,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+    original_config_id = route_1.configuration_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(foreign_config.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.configuration_id == original_config_id
+
+
+def test_patch_route_rejects_configuration_mismatched_with_new_owner_in_same_request(
+    api_client, org_admin_user, org_admin_user_2, organization, other_organization, route_1,
+):
+    # route_1 starts owned by `organization`, with a configuration owned by
+    # the same org. A single PATCH reassigning both `owner` and
+    # `configuration` must be checked against the NEW owner, not the route's
+    # stale pre-update one -- otherwise this combination would persist a
+    # route pointed at another org's configuration.
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+    route_1.configuration = own_config
+    route_1.save(update_fields=["configuration"])
+    original_owner_id = route_1.owner_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"owner": str(other_organization.id), "configuration": str(own_config.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.owner_id == original_owner_id
+
+
+def test_patch_route_rejects_owner_change_alone_when_existing_configuration_would_mismatch(
+    api_client, org_admin_user, organization, other_organization, route_1,
+):
+    # Same bug as the test above, narrower trigger: a PATCH that changes ONLY
+    # `owner` (never mentioning `configuration` at all) must still be checked
+    # against the route's EXISTING configuration -- DRF only calls
+    # validate_configuration for fields present in the request, so without a
+    # route-level check in validate(), this path skips the ownership check
+    # entirely and would leave org B's route pointed at org A's configuration.
+    own_config = RouteConfiguration.objects.create(
+        name="Belongs to this org", data={}, owner=organization,
+    )
+    route_1.configuration = own_config
+    route_1.save(update_fields=["configuration"])
+    original_owner_id = route_1.owner_id
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"owner": str(other_organization.id)},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    route_1.refresh_from_db()
+    assert route_1.owner_id == original_owner_id
+
+
+def test_patch_route_claims_an_unowned_configuration_then_blocks_other_orgs(
+    api_client, org_admin_user, org_admin_user_2, organization, other_organization, route_1, route_2,
+):
+    # A RouteConfiguration left owner=None (e.g. by the GUNDI-5698 backfill,
+    # which can't attribute a config with no referencing route at migration
+    # time) must be claimed by whichever route attaches it first, so every
+    # OTHER org's subsequent attach attempt is blocked instead of silently
+    # sharing the same row.
+    unowned_config = RouteConfiguration.objects.create(
+        name="Unowned", data={}, owner=None,
+    )
+
+    api_client.force_authenticate(org_admin_user)
+    first_attach = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(unowned_config.id)},
+        format="json",
+    )
+    assert first_attach.status_code == status.HTTP_200_OK, first_attach.content
+    unowned_config.refresh_from_db()
+    assert unowned_config.owner_id == organization.id
+
+    api_client.force_authenticate(org_admin_user_2)
+    second_attach = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_2.id}),
+        data={"configuration": str(unowned_config.id)},
+        format="json",
+    )
+    assert second_attach.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in second_attach.content.decode()
+
+
+def test_patch_route_rejects_nested_configuration_edit_of_a_foreign_owned_config(
+    api_client, superuser, org_admin_user, organization, other_organization, route_1,
+):
+    # A config attached by a superuser (or retained from a pre-GUNDI-5698
+    # cross-org share) can belong to a different org than the route it's on.
+    # The bare-UUID path checks ownership before touching it; a nested dict
+    # PATCH must too, or an org admin edits -- and ends up owning -- a config
+    # that was never theirs, just by never mentioning its UUID.
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+    api_client.force_authenticate(superuser)
+    attach_response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": str(foreign_config.id)},
+        format="json",
+    )
+    assert attach_response.status_code == status.HTTP_200_OK, attach_response.content
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": {"name": "Renamed by the wrong org", "data": {}}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "different organization" in response.content.decode()
+    foreign_config.refresh_from_db()
+    assert foreign_config.owner_id == other_organization.id
+    assert foreign_config.name == "Belongs to the other org"
+
+
+def test_create_route_with_cross_org_configuration_as_superuser(
+    api_client, superuser, organization, other_organization, integrations_list_er, provider_lotek_panthera,
+):
+    foreign_config = RouteConfiguration.objects.create(
+        name="Belongs to the other org", data={}, owner=other_organization,
+    )
+
+    api_client.force_authenticate(superuser)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": str(foreign_config.id),
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+
+
+def test_create_route_with_nested_configuration_sets_owner(
+    api_client, org_admin_user, organization, integrations_list_er, provider_lotek_panthera,
+):
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.post(
+        reverse("routes-list"),
+        data={
+            "name": "Lotek to ER",
+            "owner": str(organization.id),
+            "data_providers": [str(provider_lotek_panthera.id)],
+            "destinations": [str(integrations_list_er[0].id)],
+            "configuration": {"name": "New config", "data": {}},
+            "additional": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    route = Route.objects.get(id=response.json()["id"])
+    assert route.configuration.owner_id == organization.id
+
+
+def test_patch_route_updates_existing_configuration_in_place_keeps_owner(
+    api_client, org_admin_user, organization, route_1,
+):
+    route_1.configuration = RouteConfiguration.objects.create(
+        name="Original", data={}, owner=organization,
+    )
+    route_1.save(update_fields=["configuration"])
+
+    api_client.force_authenticate(org_admin_user)
+    response = api_client.patch(
+        reverse("routes-detail", kwargs={"pk": route_1.id}),
+        data={"configuration": {"name": "Renamed", "data": {}}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    route_1.refresh_from_db()
+    assert route_1.configuration.owner_id == organization.id
+    assert route_1.configuration.name == "Renamed"
 
 
 # ---- The filters block cdip-routing reads (GUNDI-5178) --------------------

@@ -558,6 +558,11 @@ class Command(BaseCommand):
         # provider_key. Shape per api/v2/serializers.py field-mapping schema.
         configuration = RouteConfiguration.objects.create(
             name=f"Provider key for {provider.name}"[:200],
+            # Without an owner, GUNDI-5698's ownership check treats this config
+            # as unclaimed -- the first org to PATCH a route referencing its id
+            # would silently claim it, which could reject THIS provider's own
+            # org from later editing the config this command just made for it.
+            owner=provider.owner,
             data={
                 "field_mappings": {
                     str(provider.id): {

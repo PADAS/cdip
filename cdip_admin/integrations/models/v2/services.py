@@ -78,7 +78,10 @@ def annotate_default_route_state(queryset):
 
 
 def _providers_only(queryset):
-    return queryset.filter(routing_rules_by_provider__isnull=False).distinct()
+    # GUNDI-5730: forward only, matching Integration.providers (ProvidersManager) --
+    # a return leg's auto-created provider role must not count here either.
+    Route = apps.get_model("integrations", "Route")
+    return queryset.filter(routing_rules_by_provider__direction=Route.Direction.FORWARD).distinct()
 
 
 def filter_by_default_route_state(queryset, state):
@@ -262,12 +265,19 @@ def calculate_integration_status(integration_id):
 
 
 def filter_connections_by_status(queryset, status):
+    # GUNDI-5730: scoped to this integration's FORWARD routes -- otherwise an
+    # integration that is also the provider side of an unrelated return leg
+    # (reverse-labeled flow, see ProvidersManager) has that flow's own
+    # destination's health bleed into this connection's status.
+    Route = apps.get_model("integrations", "Route")
     provider_disabled_q = Q(status__status=IntegrationStatus.Status.DISABLED.value)
     destinations_disabled_q = Q(
+        routing_rules_by_provider__direction=Route.Direction.FORWARD,
         routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.DISABLED.value)
     provider_healthy_q = Q(status__status=IntegrationStatus.Status.HEALTHY.value)
     provider_unhealthy_q = Q(status__status=IntegrationStatus.Status.UNHEALTHY.value)
     destinations_unhealthy_q = Q(
+        routing_rules_by_provider__direction=Route.Direction.FORWARD,
         routing_rules_by_provider__destinations__status__status=IntegrationStatus.Status.UNHEALTHY.value
     )
     connection_unhealthy_q = Q(
