@@ -3,6 +3,7 @@ from unittest.mock import ANY
 from django.urls import reverse
 from django.conf import settings
 from gundi_core.schemas.v2 import StreamPrefixEnum
+from integrations.models import GundiTrace
 from rest_framework import status
 
 
@@ -272,7 +273,7 @@ def test_create_single_event_with_status(api_client, mocker, mock_publisher, moc
     assert data_kwarg.get("payload", {}).get("status") == "active"
 
 
-@pytest.mark.parametrize("priority", [300, 0])
+@pytest.mark.parametrize("priority", [0, 100, 200, 300])
 def test_create_single_event_with_priority(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger, priority):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
@@ -391,6 +392,75 @@ def test_update_event(api_client, mocker, request, request_data, trap_tagger_eve
     assert mock_publisher.publish.call_args.kwargs["ordering_key"] == gundi_id
     assert extra_arg.get("gundi_version") == "v2"
     assert extra_arg.get("observation_type") == StreamPrefixEnum.event_update.value
+
+
+@pytest.mark.parametrize("bad_priority", [150, 400, -1, 300.5, "high", True, None])
+def test_create_event_with_priority_outside_the_domain_returns_400(
+        api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger, bad_priority
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    traces_before = GundiTrace.objects.count()
+    response = api_client.post(
+        reverse("events-list"),
+        data={
+            "source": "camera123",
+            "title": "Animal Detected",
+            "event_type": "animals",
+            "recorded_at": "2024-08-22 13:01:26-0300",
+            "location": {
+                "lon": -109.239682,
+                "lat": -27.104423
+            },
+            "priority": bad_priority
+        },
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "priority" in response.json()
+    # Nothing is stored or sent to routing for a rejected event
+    assert GundiTrace.objects.count() == traces_before
+    assert not mock_publisher.publish.called
+
+
+@pytest.mark.parametrize("bad_priority", [150, 400, "high"])
+def test_update_event_with_priority_outside_the_domain_returns_400(
+        api_client, mocker, trap_tagger_event_trace, mock_publisher, mock_deduplication,
+        keyauth_headers_trap_tagger, bad_priority
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    response = api_client.patch(
+        reverse("events-detail", kwargs={"pk": trap_tagger_event_trace.object_id}),
+        data={"priority": bad_priority},
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "priority" in response.json()
+    assert not mock_publisher.publish.called
+
+
+@pytest.mark.parametrize("priority", [0, 100, 200, 300])
+def test_update_event_with_every_priority_in_the_domain(
+        api_client, mocker, trap_tagger_event_trace, mock_publisher, mock_deduplication,
+        keyauth_headers_trap_tagger, priority
+):
+    # Mock external dependencies
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    response = api_client.patch(
+        reverse("events-detail", kwargs={"pk": trap_tagger_event_trace.object_id}),
+        data={"priority": priority},
+        format='json',
+        **keyauth_headers_trap_tagger
+    )
+    assert response.status_code == status.HTTP_200_OK
+    payload = mock_publisher.publish.call_args.kwargs["data"].get("payload", {})
+    assert payload.get("changes") == {"priority": priority}
 
 
 def test_event_with_invalid_lat_returns_400(api_client, mocker, mock_publisher, mock_deduplication, keyauth_headers_trap_tagger):
