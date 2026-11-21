@@ -24,7 +24,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db import IntegrityError, transaction
 from django.core import exceptions as django_exceptions
 from django_celery_beat.models import CrontabSchedule
-from gundi_core.schemas.v2 import StreamPrefixEnum
+from gundi_core.schemas.v2 import EventPriority, StreamPrefixEnum
 from .utils import send_events_to_routing, send_attachments_to_routing, send_observations_to_routing, \
     send_event_update_to_routing, send_text_messages_to_routing
 
@@ -1981,7 +1981,19 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
     # so they flow through to the EventUpdate.changes dict for downstream routing.
     # Used by provider runners that need to forward field-level edits and per-note
     # additions to destination integrations (e.g. ER → CMORE comments).
-    priority = serializers.IntegerField(write_only=True, required=False)
+    # Checked here, on create and update, because this is the only point where
+    # the caller can be told: a value the destination rejects otherwise fails
+    # at delivery, long after this request returned.
+    priority = serializers.ChoiceField(
+        choices=[p.value for p in EventPriority],
+        write_only=True,
+        required=False,
+        error_messages={
+            "invalid_choice": "priority must be one of "
+            + ", ".join(str(p.value) for p in EventPriority)
+            + ". Leave it out to keep the destination's default."
+        },
+    )
     notes = serializers.JSONField(write_only=True, required=False)
     # Provider-injected origin metadata (gundi-core 1.12.0+). Lets a provider
     # runner attach things like a deep-link URL back to the source system's UI
