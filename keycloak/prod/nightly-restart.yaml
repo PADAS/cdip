@@ -1,0 +1,87 @@
+# Nightly rollout-restart of Keycloak. Suspended since mid-Sept 2026: the
+# memory growth that motivated it was fixed client-side, so the job is kept
+# only as an emergency lever (flip suspend to false).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keycloak-restart
+  namespace: cdip-auth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keycloak-restart
+  namespace: cdip-auth
+rules:
+- apiGroups:
+  - apps
+  resourceNames:
+  - keycloak
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keycloak-restart
+  namespace: cdip-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: keycloak-restart
+subjects:
+- kind: ServiceAccount
+  name: keycloak-restart
+  namespace: cdip-auth
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: keycloak-nightly-restart
+  namespace: cdip-auth
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  schedule: 0 2 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: true
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 600
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: keycloak-nightly-restart
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              kubectl rollout restart deployment/keycloak -n cdip-auth
+              kubectl rollout status deployment/keycloak -n cdip-auth --timeout=8m
+            image: alpine/k8s:1.34.8
+            imagePullPolicy: IfNotPresent
+            name: kubectl
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+          restartPolicy: Never
+          serviceAccountName: keycloak-restart
