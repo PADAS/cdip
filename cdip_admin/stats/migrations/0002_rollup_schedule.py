@@ -4,16 +4,21 @@ FREQUENT_TASK = "stats.tasks.refresh_recent_stats_rollups"
 DAILY_TASK = "stats.tasks.reconcile_stats_rollups"
 
 
+def _utc_crontab(CrontabSchedule, minute, hour):
+    # Integration schedules store one crontab row per timezone, so the same
+    # fields can exist several times: match on UTC and tolerate duplicates.
+    fields = dict(
+        minute=minute, hour=hour, day_of_week="*", day_of_month="*", month_of_year="*", timezone="UTC",
+    )
+    return CrontabSchedule.objects.filter(**fields).first() or CrontabSchedule.objects.create(**fields)
+
+
 def create_rollup_schedule(apps, schema_editor):
     CrontabSchedule = apps.get_model("django_celery_beat", "CrontabSchedule")
     PeriodicTask = apps.get_model("django_celery_beat", "PeriodicTask")
 
-    every_ten_minutes, _ = CrontabSchedule.objects.get_or_create(
-        minute="*/10", hour="*", day_of_week="*", day_of_month="*", month_of_year="*",
-    )
-    daily, _ = CrontabSchedule.objects.get_or_create(
-        minute="30", hour="3", day_of_week="*", day_of_month="*", month_of_year="*",
-    )
+    every_ten_minutes = _utc_crontab(CrontabSchedule, minute="*/10", hour="*")
+    daily = _utc_crontab(CrontabSchedule, minute="30", hour="3")
     # Both tasks are created disabled. An operator enables them in Django admin
     # after checking the query cost in production, and disables them to stop
     # the job without a deploy.

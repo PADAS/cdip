@@ -439,3 +439,69 @@ def test_every_source_query_is_bounded_by_a_time_range_on_an_indexed_column(
     for sql in trace_selects + log_selects:
         assert any(marker in sql for marker in indexed_ranges), sql
     assert any("statement_timeout" in s for s in statements)
+
+
+def test_failing_bucket_does_not_stop_the_buckets_after_it(provider_lotek_panthera, mocker):
+    make_trace(provider_lotek_panthera)
+    make_trace(provider_lotek_panthera, created_at=BUCKET + HOUR + datetime.timedelta(minutes=1))
+    real = services._throughput_rows
+
+    def fail_on_first(bucket):
+        if bucket == BUCKET:
+            raise RuntimeError("boom")
+        return real(bucket)
+
+    mocker.patch.object(services, "_throughput_rows", side_effect=fail_on_first)
+
+    # The run still fails as a whole, but an hour that keeps failing must not
+    # starve the hours after it.
+    with pytest.raises(RuntimeError):
+        aggregate([BUCKET, BUCKET + HOUR], now=BUCKET + 2 * HOUR)
+
+    assert throughput(Metric.RECEIVED, bucket=BUCKET) == 0
+    assert throughput(Metric.RECEIVED, bucket=BUCKET + HOUR) == 1
+
+
+def test_statement_timeout_is_enforced_and_fails_the_bucket(provider_lotek_panthera, stats_settings, mocker):
+    from django.db.utils import OperationalError
+
+    stats_settings.STATS_ROLLUP_STATEMENT_TIMEOUT_MS = 50
+    make_trace(provider_lotek_panthera)
+    aggregate()
+
+    def slow(start, end):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_sleep(2)")
+        return []
+
+    make_trace(provider_lotek_panthera)
+    mocker.patch.object(services, "_count_errors", side_effect=slow)
+
+    with pytest.raises(OperationalError, match="statement timeout"):
+        aggregate()
+
+    # The timed-out bucket keeps its previous rows.
+    assert throughput(Metric.RECEIVED) == 1
+
+
+def test_statement_timeout_does_not_outlive_the_bucket_transaction(provider_lotek_panthera, stats_settings):
+    stats_settings.STATS_ROLLUP_STATEMENT_TIMEOUT_MS = 12345
+
+    with CaptureQueriesContext(connection) as queries:
+        aggregate()
+
+    statements = [q["sql"] for q in queries]
+    # SET LOCAL, never a session-wide SET: the worker's connection is reused.
+    assert any(s.startswith("SET LOCAL statement_timeout") for s in statements)
+    assert not any(s.startswith("SET statement_timeout") for s in statements)
+
+
+def test_bucket_replacement_is_serialized_by_an_advisory_lock_taken_before_the_timeout():
+    with CaptureQueriesContext(connection) as queries:
+        aggregate()
+
+    statements = [q["sql"] for q in queries]
+    lock = next(i for i, s in enumerate(statements) if "pg_advisory_xact_lock" in s)
+    timeout = next(i for i, s in enumerate(statements) if "statement_timeout" in s)
+    first_write = next(i for i, s in enumerate(statements) if s.startswith("DELETE"))
+    assert lock < timeout < first_write

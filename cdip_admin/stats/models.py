@@ -30,9 +30,11 @@ class ThroughputRollup(models.Model):
 
     class Meta:
         ordering = ("-bucket",)
+        # The unique indexes below are partial, so PostgreSQL cannot use them
+        # for a lookup by bucket alone: reads and bucket replacement need this.
+        indexes = [models.Index(fields=["bucket"])]
         # PostgreSQL treats NULLs as distinct, so one constraint cannot cover
-        # rows with and without a destination. Both lead with the bucket, which
-        # also serves the time-range scans of the read side.
+        # rows with and without a destination.
         constraints = [
             models.UniqueConstraint(
                 fields=["bucket", "data_provider_id", "destination_id", "object_type", "metric"],
@@ -66,6 +68,7 @@ class ErrorRollup(models.Model):
 
     class Meta:
         ordering = ("-bucket",)
+        indexes = [models.Index(fields=["bucket"])]
         constraints = [
             models.UniqueConstraint(
                 fields=["bucket", "integration_id", "origin", "value", "log_level"],

@@ -162,3 +162,40 @@ def test_rebuild_command_keeps_and_reports_error_buckets_older_than_retention(pr
 def test_rebuild_command_rejects_a_bad_range(args):
     with pytest.raises(CommandError):
         call_command("rebuild_stats_rollups", *args)
+
+
+def test_schedule_migration_uses_utc_crontabs_and_tolerates_same_fields_in_other_timezones():
+    from django.apps import apps as django_apps
+    from django_celery_beat.models import CrontabSchedule
+
+    migration = importlib.import_module("stats.migrations.0002_rollup_schedule")
+    PeriodicTask.objects.filter(task__in=[FREQUENT_TASK, DAILY_TASK]).delete()
+    # Integration schedules store one crontab row per timezone.
+    for timezone_name in ("America/Bogota", "Africa/Nairobi"):
+        for minute, hour in (("*/10", "*"), ("30", "3")):
+            CrontabSchedule.objects.create(minute=minute, hour=hour, timezone=timezone_name)
+
+    migration.create_rollup_schedule(django_apps, None)
+
+    for task in (FREQUENT_TASK, DAILY_TASK):
+        assert str(PeriodicTask.objects.get(task=task).crontab.timezone) == "UTC"
+
+
+def test_run_after_a_gap_longer_than_its_window_warns_about_the_uncovered_hours(caplog):
+    state = RollupRunState.load()
+    state.frequent_run_completed_at = datetime.datetime.now(UTC) - datetime.timedelta(days=3)
+    state.save()
+
+    with caplog.at_level("WARNING", logger="stats.services"):
+        tasks.refresh_recent_stats_rollups.run()
+
+    assert "rebuild_stats_rollups" in caplog.text
+
+
+def test_run_inside_its_window_does_not_warn(caplog):
+    tasks.refresh_recent_stats_rollups.run()
+
+    with caplog.at_level("WARNING", logger="stats.services"):
+        tasks.refresh_recent_stats_rollups.run()
+
+    assert "rebuild_stats_rollups" not in caplog.text

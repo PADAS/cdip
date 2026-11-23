@@ -7,6 +7,7 @@ ActivityLog: those are only read by the rollup job (stats.services).
 """
 import datetime
 
+from django.conf import settings
 from django.db import connection
 
 from activity_log.models import ActivityLog
@@ -77,8 +78,6 @@ ERRORS_DIMENSIONS = {
     "origin": Dimension("r.origin"),
     "kind": Dimension("r.value"),
 }
-# Dimensions whose filter value is an id.
-UUID_FILTERS = ("organization", "data_provider", "destination", "integration")
 
 
 def resolve_range(from_date, to_date, interval, now=None):
@@ -88,35 +87,46 @@ def resolve_range(from_date, to_date, interval, now=None):
     """
     now = now or datetime.datetime.now(UTC)
     end = (to_date or now).astimezone(UTC)
-    start = (from_date or end - DEFAULT_RANGE).astimezone(UTC)
-    start = start.replace(minute=0, second=0, microsecond=0)
+    requested_start = (from_date or end - DEFAULT_RANGE).astimezone(UTC)
+    start = requested_start.replace(minute=0, second=0, microsecond=0)
     if interval == "day":
         start = start.replace(hour=0)
     if start >= end:
         raise StatsQueryError("from_date must be earlier than to_date.")
     limit = MAX_RANGE[interval]
-    if end - start > limit:
+    # The limit applies to the range as requested: flooring the start to the
+    # interval must not turn a request for exactly the limit into a rejection.
+    if end - requested_start > limit:
         raise StatsQueryError(
             f"The range is too long for interval '{interval}': the limit is {limit.days} days."
         )
     return start, end
 
 
-def _freshness():
+def _freshness(throughput=False):
     state = RollupRunState.objects.filter(pk=RollupRunState.SINGLETON_PK).first()
-    return {
+    freshness = {
         "data_as_of": state.frequent_run_completed_at if state else None,
         "reconciled_as_of": state.daily_run_completed_at if state else None,
     }
+    if throughput:
+        # The job aggregates throughput only from this time on, and not at all
+        # while it is unset. A run that aggregated errors alone must not make
+        # throughput look fresh.
+        available_from = settings.STATS_THROUGHPUT_START
+        freshness["throughput_available_from"] = available_from
+        if available_from is None:
+            freshness["data_as_of"] = freshness["reconciled_as_of"] = None
+    return freshness
 
 
-def _envelope(start, end, interval, group_by, results, **extra):
+def _envelope(start, end, interval, group_by, results, throughput=False, **extra):
     return {
         "from": start,
         "to": end,
         "interval": interval,
         "group_by": list(group_by),
-        **_freshness(),
+        **_freshness(throughput),
         **extra,
         "results": results,
     }
@@ -175,7 +185,7 @@ def throughput(start, end, interval, group_by=(), filters=None):
     rows = _bucketed(
         THROUGHPUT_FROM, THROUGHPUT_DIMENSIONS, metrics, start, end, interval, group_by, filters or {}
     )
-    return _envelope(start, end, interval, group_by, rows)
+    return _envelope(start, end, interval, group_by, rows, throughput=True)
 
 
 def errors(start, end, interval, group_by=(), filters=None, include_retriable=False):
@@ -257,4 +267,4 @@ def usage(start, end, interval, limit=DEFAULT_RANKING_LIMIT):
         *_ranking("destination", "r.destination_id", dimensions["destination"].label_sql,
                   "delivered", start, end, limit, where="AND r.destination_id IS NOT NULL"),
     ]
-    return _envelope(start, end, interval, (), results, totals=totals)
+    return _envelope(start, end, interval, (), results, throughput=True, totals=totals)

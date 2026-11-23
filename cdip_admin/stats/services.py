@@ -48,6 +48,8 @@ class AggregationResult:
     # Buckets whose errors were left untouched because the activity log no
     # longer holds that hour.
     skipped_errors: list = dataclasses.field(default_factory=list)
+    # Buckets that raised; they keep their previous rows.
+    failed: list = dataclasses.field(default_factory=list)
 
 
 def floor_to_hour(moment):
@@ -168,11 +170,22 @@ def _error_rows(bucket):
     ]
 
 
-def _set_statement_timeout():
-    # The database has no global statement_timeout. SET LOCAL lasts until the
-    # end of the surrounding transaction.
+# Arbitrary constant identifying "stats rollup bucket replacement" among
+# PostgreSQL advisory locks.
+_ADVISORY_LOCK_KEY = 5_810_001
+
+
+def _prepare_bucket_transaction():
     timeout_ms = int(settings.STATS_ROLLUP_STATEMENT_TIMEOUT_MS)
     with connection.cursor() as cursor:
+        # The frequent task, the daily reconcile and the rebuild command can
+        # all replace the same bucket. Without this lock the second writer's
+        # DELETE misses the first one's uncommitted rows and its INSERT then
+        # violates the unique constraints. Released at the end of the transaction.
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [_ADVISORY_LOCK_KEY])
+        # The database has no global statement_timeout. SET LOCAL lasts until
+        # the end of the surrounding transaction. It is set after taking the
+        # lock so that waiting for another run is not cut short by it.
         cursor.execute("SET LOCAL statement_timeout = %s", [timeout_ms])
 
 
@@ -180,14 +193,16 @@ def aggregate_buckets(buckets, now=None):
     """
     Recompute the rollups of the given hour buckets.
 
-    Raises on the first bucket that fails: buckets before it stay replaced,
-    the failing one keeps its previous rows, and the caller must treat the
-    run as failed.
+    A bucket that fails keeps its previous rows and does not stop the others:
+    one hour that keeps hitting the statement timeout must not starve the
+    hours after it. If any bucket failed, the first error is raised after the
+    loop, and the caller must treat the run as failed.
     """
     now = now or timezone.now()
     throughput_start = settings.STATS_THROUGHPUT_START
     errors_start = now - datetime.timedelta(days=settings.STATS_ERROR_SOURCE_RETENTION_DAYS)
     result = AggregationResult()
+    first_error = None
 
     for bucket in buckets:
         _validate_bucket(bucket)
@@ -200,16 +215,22 @@ def aggregate_buckets(buckets, now=None):
         if not (with_throughput or with_errors):
             continue
 
-        with transaction.atomic():
-            _set_statement_timeout()
-            if with_throughput:
-                rows = _throughput_rows(bucket)
-                ThroughputRollup.objects.filter(bucket=bucket).delete()
-                ThroughputRollup.objects.bulk_create(rows)
-            if with_errors:
-                rows = _error_rows(bucket)
-                ErrorRollup.objects.filter(bucket=bucket).delete()
-                ErrorRollup.objects.bulk_create(rows)
+        try:
+            with transaction.atomic():
+                _prepare_bucket_transaction()
+                if with_throughput:
+                    rows = _throughput_rows(bucket)
+                    ThroughputRollup.objects.filter(bucket=bucket).delete()
+                    ThroughputRollup.objects.bulk_create(rows)
+                if with_errors:
+                    rows = _error_rows(bucket)
+                    ErrorRollup.objects.filter(bucket=bucket).delete()
+                    ErrorRollup.objects.bulk_create(rows)
+        except Exception as error:
+            logger.exception("Stats rollup failed for bucket %s.", bucket.isoformat())
+            result.failed.append(bucket)
+            first_error = first_error or error
+            continue
         result.aggregated.append(bucket)
 
     if result.skipped_throughput and throughput_start is None:
@@ -217,15 +238,25 @@ def aggregate_buckets(buckets, now=None):
             "STATS_THROUGHPUT_START is not set: throughput was not aggregated for %d bucket(s).",
             len(result.skipped_throughput),
         )
+    if first_error is not None:
+        raise first_error
     return result
 
 
 def run_rollup(run, hours, now=None):
     """Aggregate the trailing window of a scheduled run and record its success."""
-    result = aggregate_buckets(trailing_buckets(hours, now=now), now=now)
+    buckets = trailing_buckets(hours, now=now)
+    field = _RUN_STATE_FIELDS[run]
+    previous = getattr(RollupRunState.load(), field)
+    if previous is not None and previous < buckets[0]:
+        # The job was stopped or failing for longer than its window. The hours
+        # in between are not aggregated by any scheduled run.
+        logger.warning(
+            "Stats rollup (%s) last succeeded at %s, before its %d-hour window. Hours from then to %s "
+            "are not covered: run rebuild_stats_rollups for that range.",
+            run, previous.isoformat(), hours, buckets[0].isoformat(),
+        )
+    result = aggregate_buckets(buckets, now=now)
     # Only reached when every bucket succeeded.
-    RollupRunState.load()
-    RollupRunState.objects.filter(pk=RollupRunState.SINGLETON_PK).update(
-        **{_RUN_STATE_FIELDS[run]: timezone.now()}
-    )
+    RollupRunState.objects.filter(pk=RollupRunState.SINGLETON_PK).update(**{field: timezone.now()})
     return result

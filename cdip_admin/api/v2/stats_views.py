@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from core.permissions import IsMetricsViewer
 from stats import queries
 
-from . import serializers as v2_serializers
+from . import stats_serializers
 from .permissions import IsSuperuser
 
 
@@ -35,8 +35,13 @@ class StatsView(APIView):
     def get(self, request, *args, **kwargs):
         params = self.get_params(request)
         try:
+            params["start"], params["end"] = queries.resolve_range(
+                params.get("from_date"), params.get("to_date"), params["interval"]
+            )
             return Response(self.run_query(params))
         except queries.StatsQueryError as e:
+            # Every request the service cannot serve (range or result over a
+            # limit, start after end) is reported the same way.
             raise drf_exceptions.ValidationError({"detail": str(e)})
 
 
@@ -60,18 +65,23 @@ class ThroughputStatsView(StatsView):
     picks up deliveries reported up to 48 hours late); both are null until
     that job has run. A deleted integration is labelled `unknown`.
 
+    `throughput_available_from` is the time from which throughput is
+    aggregated; while it is null no throughput is aggregated at all, and
+    `data_as_of` and `reconciled_as_of` are null too.
+
     Limits: 31 days with `interval=hour`, 366 days with `interval=day`, and
-    5000 result rows. A request over a limit gets 400.
+    5000 result rows. A request over a limit gets 400 with the limit in
+    `detail`.
     """
 
-    query_serializer_class = v2_serializers.ThroughputStatsQuerySerializer
+    query_serializer_class = stats_serializers.ThroughputStatsQuerySerializer
 
     def run_query(self, params):
         return queries.throughput(
             params["start"], params["end"], params["interval"], params.get("group_by", []), params["filters"]
         )
 
-    @swagger_auto_schema(query_serializer=v2_serializers.ThroughputStatsQuerySerializer)
+    @swagger_auto_schema(query_serializer=stats_serializers.ThroughputStatsQuerySerializer)
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -96,7 +106,7 @@ class ErrorsStatsView(StatsView):
     Range, freshness fields and limits are the same as for throughput.
     """
 
-    query_serializer_class = v2_serializers.ErrorsStatsQuerySerializer
+    query_serializer_class = stats_serializers.ErrorsStatsQuerySerializer
 
     def run_query(self, params):
         return queries.errors(
@@ -104,7 +114,7 @@ class ErrorsStatsView(StatsView):
             params["filters"], include_retriable=params["include_retriable"],
         )
 
-    @swagger_auto_schema(query_serializer=v2_serializers.ErrorsStatsQuerySerializer)
+    @swagger_auto_schema(query_serializer=stats_serializers.ErrorsStatsQuerySerializer)
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -122,18 +132,20 @@ class UsageStatsView(StatsView):
     `results` holds three rankings, told apart by `dimension`:
     `integration_type` and `organization` (of the data provider, ordered by
     `received`) and `destination` (ordered by `delivered`). Each entry has
-    `id`, `name`, `received` and `delivered`; `limit` sets the entries per
-    ranking (default 10, at most 100).
+    `id`, `name`, `received` and `delivered`; `id` is null for an
+    integration type, which is identified by its `name`. `limit` sets the
+    entries per ranking (default 10, at most 100).
 
-    The range and freshness fields are the same as for throughput. Results
+    The range and freshness fields, `throughput_available_from` included,
+    are the same as for throughput. Results
     are totals over the whole range: `interval` only sets the range limit.
     """
 
-    query_serializer_class = v2_serializers.UsageStatsQuerySerializer
+    query_serializer_class = stats_serializers.UsageStatsQuerySerializer
 
     def run_query(self, params):
         return queries.usage(params["start"], params["end"], params["interval"], limit=params["limit"])
 
-    @swagger_auto_schema(query_serializer=v2_serializers.UsageStatsQuerySerializer)
+    @swagger_auto_schema(query_serializer=stats_serializers.UsageStatsQuerySerializer)
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

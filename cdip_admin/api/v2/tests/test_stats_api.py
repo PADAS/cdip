@@ -27,11 +27,10 @@ def iso(moment):
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-@pytest.fixture
-def metrics_viewer():
-    user = User.objects.create_user(username="metrics-viewer@gundiservice.org")
-    user.groups.add(Group.objects.get(name=DjangoGroups.METRICS_VIEWER.value))
-    return user
+@pytest.fixture(autouse=True)
+def stats_settings(settings):
+    settings.STATS_THROUGHPUT_START = datetime.datetime(2020, 1, 1, tzinfo=UTC)
+    return settings
 
 
 @pytest.fixture
@@ -83,6 +82,13 @@ def test_organization_members_are_forbidden(api_client, request, endpoint, user_
 def test_global_admin_outside_the_group_is_forbidden(api_client, endpoint):
     user = User.objects.create_user(username="global-admin@gundiservice.org")
     user.groups.add(Group.objects.get(name=DjangoGroups.GLOBAL_ADMIN.value))
+    api_client.force_authenticate(user)
+    assert get(api_client, endpoint).status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.parametrize("endpoint", ENDPOINTS)
+def test_staff_user_outside_the_group_is_forbidden(api_client, endpoint):
+    user = User.objects.create_user(username="staff@gundiservice.org", is_staff=True)
     api_client.force_authenticate(user)
     assert get(api_client, endpoint).status_code == status.HTTP_403_FORBIDDEN
 
@@ -402,6 +408,65 @@ def test_empty_range_still_reports_freshness(viewer_client, endpoint):
     assert data["results"] == []
     assert data["data_as_of"] == iso(DAY1)
     assert data["reconciled_as_of"] == iso(DAY0)
+
+
+@pytest.mark.parametrize("endpoint", ("stats-throughput", "stats-usage"))
+def test_throughput_freshness_is_null_while_throughput_is_not_aggregated(
+    viewer_client, stats_settings, endpoint
+):
+    # A run that aggregated errors only must not make throughput look fresh.
+    stats_settings.STATS_THROUGHPUT_START = None
+    state = RollupRunState.load()
+    state.frequent_run_completed_at = DAY1
+    state.daily_run_completed_at = DAY0
+    state.save()
+
+    data = get(viewer_client, endpoint, **RANGE).json()
+    errors = get(viewer_client, "stats-errors", **RANGE).json()
+
+    assert data["throughput_available_from"] is None
+    assert data["data_as_of"] is None and data["reconciled_as_of"] is None
+    assert errors["data_as_of"] == iso(DAY1) and errors["reconciled_as_of"] == iso(DAY0)
+    assert "throughput_available_from" not in errors
+
+
+def test_throughput_reports_the_time_it_is_available_from(viewer_client, stats_settings):
+    stats_settings.STATS_THROUGHPUT_START = DAY0
+
+    data = get(viewer_client, "stats-throughput", **RANGE).json()
+
+    assert data["throughput_available_from"] == iso(DAY0)
+
+
+@pytest.mark.parametrize("endpoint", ENDPOINTS)
+@pytest.mark.parametrize("interval,days", [("hour", 31), ("day", 366)])
+def test_range_of_exactly_the_limit_is_served_when_the_start_is_not_aligned(
+    viewer_client, endpoint, interval, days
+):
+    end = DAY1 + datetime.timedelta(hours=13, minutes=37)
+    start = end - datetime.timedelta(days=days)
+
+    response = get(
+        viewer_client, endpoint, interval=interval, from_date=start.isoformat(), to_date=end.isoformat()
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+
+
+def test_requests_over_a_limit_share_one_error_shape(viewer_client, provider_lotek_panthera, mocker):
+    over_range = get(
+        viewer_client, "stats-throughput", from_date="2026-01-01T00:00:00Z", to_date="2026-03-01T00:00:00Z"
+    )
+    mocker.patch.object(queries, "MAX_ROWS", 0)
+    throughput_row(provider_lotek_panthera.id, Metric.RECEIVED, 1)
+    over_rows = get(viewer_client, "stats-throughput", **RANGE)
+
+    for response in (over_range, over_rows):
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert list(response.json()) == ["detail"]
+        assert isinstance(response.json()["detail"], str)
+    assert "31 days" in over_range.json()["detail"]
+    assert "0 rows" in over_rows.json()["detail"]
 
 
 @pytest.mark.parametrize("endpoint", ENDPOINTS)
