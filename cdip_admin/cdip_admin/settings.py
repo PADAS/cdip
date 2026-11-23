@@ -95,6 +95,7 @@ INSTALLED_APPS = [
     "storages",
     "deployments",
     "activity_log",
+    "stats",
 ]
 
 
