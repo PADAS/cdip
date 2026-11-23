@@ -63,6 +63,13 @@ def is_retriable_er_error(error, server_response_status, destination):
     return False
 
 
+# Text stored in GundiTrace.error. The stats rollups tell a failed delivery
+# from a delivered item whose later update failed by this text, so keep the
+# two values distinct.
+DELIVERY_FAILED_TRACE_ERROR = "Delivery Failed at the Dispatcher."
+UPDATE_FAILED_TRACE_ERROR = "Update Failed at the Dispatcher."
+
+
 def handle_observation_delivered_event(event_dict: dict):
     event = system_events.ObservationDelivered.parse_obj(event_dict)
     # Update the status and save the external id
@@ -261,7 +268,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
         )
         trace.destination_id = observation.destination_id
         trace.has_error = True
-        trace.error = "Delivery Failed at the Dispatcher."
+        trace.error = DELIVERY_FAILED_TRACE_ERROR
         trace.save()
     elif str(observation.destination_id) != str(trace.destination.id):  # Multiple destinations
         logger.debug(
@@ -279,7 +286,7 @@ def handle_observation_delivery_failed_event(event_dict: dict):
             delivered_at=observation.delivered_at,
             external_id=observation.external_id,
             has_error=True,
-            error="Delivery Failed at the Dispatcher.",
+            error=DELIVERY_FAILED_TRACE_ERROR,
             is_destination_copy=True,
         )
     else:
@@ -400,7 +407,7 @@ def handle_observation_update_failed_event(event_dict: dict):
     if traces.count() > 1:
         logger.warning(f"Multiple traces found for gundi_id {gundi_id}, destination_id: {destination_id}.")
     # Update the traces with the error
-    traces.update(has_error=True, error="Update Failed at the Dispatcher.")
+    traces.update(has_error=True, error=UPDATE_FAILED_TRACE_ERROR)
     trace = traces.first()
     # Generate Activity log to be seen in the portal
     logger.debug(
