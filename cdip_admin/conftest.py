@@ -142,6 +142,14 @@ def superuser():
 
 
 @pytest.fixture
+def metrics_viewer():
+    """A user who is neither superuser nor organization member, in the MetricsViewer group."""
+    user = User.objects.create_user(username="metrics-viewer@gundiservice.org")
+    user.groups.add(Group.objects.get(name=DjangoGroups.METRICS_VIEWER.value))
+    return user
+
+
+@pytest.fixture
 def org_admin_user(organization, org_members_group):
     email = "orgadmin@gundiservice.org"
     user, _ = User.objects.get_or_create(

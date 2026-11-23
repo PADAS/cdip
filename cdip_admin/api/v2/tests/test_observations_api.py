@@ -5,7 +5,7 @@ from django.conf import settings
 from gundi_core.schemas.v2 import StreamPrefixEnum
 from rest_framework import status
 from activity_log.models import ActivityLog
-from integrations.models import Source
+from integrations.models import GundiTrace, Source
 from .utils import _test_activity_logs_on_instance_created, _test_activity_logs_on_instance_updated
 
 pytestmark = pytest.mark.django_db
@@ -26,6 +26,10 @@ def _test_create_observation(api_client, mock_publisher, integration, keyauth_he
     for obj in response_data:
         assert "object_id" in obj
         assert "created_at" in obj
+    # Rows created on receipt are originals, never per-destination copies
+    traces = GundiTrace.objects.filter(object_id__in=[obj["object_id"] for obj in response_data])
+    assert traces.count() == len(response_data)
+    assert all(t.is_destination_copy is None for t in traces)
     # Check that sources are created
     if not isinstance(data, list):
         data = [data]

@@ -3,6 +3,7 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
 from . import views
+from . import stats_views
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested.routers import NestedSimpleRouter
 
@@ -54,6 +55,10 @@ urlpatterns = [
         ),
         name="user-details"
     ),
+    # System-wide stats, served from hourly rollups
+    path('stats/throughput/', stats_views.ThroughputStatsView.as_view(), name="stats-throughput"),
+    path('stats/errors/', stats_views.ErrorsStatsView.as_view(), name="stats-errors"),
+    path('stats/usage/', stats_views.UsageStatsView.as_view(), name="stats-usage"),
     path(r'', include(default_router.urls)),
     path(r'', include(integrations_router.urls)),
     path(r'', include(organizations_router.urls)),

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
+import datetime
 import os
 import environ
 from pathlib import Path
@@ -95,6 +96,7 @@ INSTALLED_APPS = [
     "storages",
     "deployments",
     "activity_log",
+    "stats",
 ]
 
 
@@ -368,6 +370,12 @@ CELERY_TASK_ROUTES = {
     "integrations.tasks.send_unhealthy_connections_email": {
         "queue": "healthchecks", "routing_key": "healthchecks"
     },
+    "stats.tasks.refresh_recent_stats_rollups": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    },
+    "stats.tasks.reconcile_stats_rollups": {
+        "queue": "healthchecks", "routing_key": "healthchecks"
+    },
     "activity_log.tasks.publish_configuration_event": {
         "queue": "systemevents", "routing_key": "systemevents"
     },
@@ -413,6 +421,25 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600, "fanout_prefix": 
 
 # task:
 CELERY_TASK_TRACK_STARTED = True
+# Stats rollups (stats app). See CELERY.md for how to operate the job.
+# Throughput is aggregated only for hour buckets that start at or after this
+# time (ISO 8601). Set it to a time after every event consumer runs the code
+# that marks per-destination trace copies; before that, received counts would
+# include those copies. Unset means throughput is not aggregated at all.
+STATS_THROUGHPUT_START = None
+if _stats_throughput_start := env.str("STATS_THROUGHPUT_START", ""):
+    STATS_THROUGHPUT_START = datetime.datetime.fromisoformat(
+        _stats_throughput_start.replace("Z", "+00:00")
+    )
+    if STATS_THROUGHPUT_START.tzinfo is None:
+        STATS_THROUGHPUT_START = STATS_THROUGHPUT_START.replace(tzinfo=datetime.timezone.utc)
+# Error rollups older than this are never replaced: the activity log is
+# partitioned with a three-week retention, so its older hours are gone.
+STATS_ERROR_SOURCE_RETENTION_DAYS = env.int("STATS_ERROR_SOURCE_RETENTION_DAYS", 20)
+STATS_ROLLUP_FREQUENT_HOURS = env.int("STATS_ROLLUP_FREQUENT_HOURS", 2)
+STATS_ROLLUP_RECONCILE_HOURS = env.int("STATS_ROLLUP_RECONCILE_HOURS", 48)
+STATS_ROLLUP_STATEMENT_TIMEOUT_MS = env.int("STATS_ROLLUP_STATEMENT_TIMEOUT_MS", 30000)
+
 CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES = env.int(
     "CELERY_TASK_SYNC_INTEGRATION_INTERVAL_MINUTES", 60
 )

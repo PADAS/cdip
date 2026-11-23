@@ -92,6 +92,7 @@ def handle_observation_filtered_event(event_dict: dict):
                 destination_id=destination_id,
                 discarded_at=event.timestamp,
                 discard_reason=event_data.filtered_by or "",
+                is_destination_copy=True,
             )
 
         # Filtering is configured behavior, not a failure: DEBUG like per-delivery

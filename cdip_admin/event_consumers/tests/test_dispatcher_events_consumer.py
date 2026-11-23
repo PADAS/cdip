@@ -71,6 +71,7 @@ def test_process_observation_delivered_event_with_two_er_destinations(
     )
     event_data["source_external_id"] = trace_one.source.external_id
     assert str(trace_one.external_id) == str(event_data["external_id"])
+    assert trace_one.is_destination_copy is None
     # Check that the event was recorded in the activity log
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
     assert activity_log
@@ -91,6 +92,9 @@ def test_process_observation_delivered_event_with_two_er_destinations(
     )
     event_data["source_external_id"] = trace_two.source.external_id
     assert str(trace_two.external_id) == str(event_data["external_id"])
+    assert trace_two.is_destination_copy is True
+    trace_one.refresh_from_db()
+    assert trace_one.is_destination_copy is None
     # Check that the event was recorded in the activity log
     activity_log = ActivityLog.objects.filter(integration_id=event_data["data_provider_id"]).first()
     assert activity_log
@@ -288,6 +292,8 @@ def test_process_observation_delivered_event_after_retry_with_two_destinations(
     )
     assert trap_tagger_event_trace_2.has_error
     assert trap_tagger_event_trace_2.error == "Delivery Failed at the Dispatcher."
+    assert trap_tagger_event_trace_2.is_destination_copy is True
+    assert trap_tagger_event_trace.is_destination_copy is None
 
     process_event(trap_tagger_to_er_observation_delivered_event)
     event_data = json.loads(trap_tagger_to_er_observation_delivered_event.data)["payload"]
@@ -306,6 +312,10 @@ def test_process_observation_delivered_event_after_retry_with_two_destinations(
     assert str(trap_tagger_event_trace_2.destination.id) == str(event_data["destination_id"])
     assert str(trap_tagger_event_trace_2.external_id) == str(event_data["external_id"])
     assert str(trap_tagger_event_trace_2.delivered_at) == str(event_data["delivered_at"])
+    # A later delivery updates the copy in place; it must stay marked as a copy
+    assert trap_tagger_event_trace_2.is_destination_copy is True
+    trap_tagger_event_trace.refresh_from_db()
+    assert trap_tagger_event_trace.is_destination_copy is None
 
 
 def test_process_observation_updated_event(
@@ -686,6 +696,41 @@ def test_process_observations_batch_delivered_event_second_destination(
     new_row = rows.exclude(id=lotek_observation_trace.id).first()
     assert str(new_row.destination.id) == str(second.id)
     assert new_row.delivered_at is not None
+
+
+def test_batch_delivered_event_marks_only_created_rows_as_destination_copies(
+        lotek_observation_trace, integrations_list_er
+):
+    first, second = integrations_list_er[0], integrations_list_er[1]
+    # Already bound to the batch destination: updated in place
+    known = lotek_observation_trace
+    known.destination = second
+    known.save()
+    # Bound to another destination: the batch delivery adds a row for it
+    other = GundiTrace.objects.create(
+        data_provider=known.data_provider,
+        object_type="obv",
+        source=known.source,
+        destination=first,
+    )
+    message = _make_batch_delivered_message(traces=[known, other], destination=second)
+
+    process_event(message)
+    # PubSub redelivery must update the copy, not add another one
+    process_event(message)
+
+    known.refresh_from_db()
+    other.refresh_from_db()
+    assert known.delivered_at is not None
+    assert known.is_destination_copy is None
+    assert other.is_destination_copy is None
+    other_rows = GundiTrace.objects.filter(object_id=other.object_id)
+    assert other_rows.count() == 2
+    copy = other_rows.exclude(id=other.id).get()
+    assert str(copy.destination_id) == str(second.id)
+    assert copy.delivered_at is not None
+    assert copy.is_destination_copy is True
+    assert GundiTrace.objects.filter(object_id=known.object_id).count() == 1
 
 
 def test_process_observations_batch_delivered_event_unknown_ids_are_skipped(

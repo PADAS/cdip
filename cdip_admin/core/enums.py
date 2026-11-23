@@ -12,6 +12,7 @@ class RoleChoices(Enum):
 class DjangoGroups(Enum):
     GLOBAL_ADMIN = "GlobalAdmin"
     ORGANIZATION_MEMBER = "OrganizationMember"
+    METRICS_VIEWER = "MetricsViewer"
 
     def __str__(self):
         return self.value
