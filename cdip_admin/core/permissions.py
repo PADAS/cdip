@@ -27,6 +27,24 @@ class IsGlobalAdmin(permissions.BasePermission):
         return self.has_permission(request, view)
 
 
+class IsMetricsViewer(permissions.BasePermission):
+    """
+    Members of the MetricsViewer group can read system-wide stats.
+
+    The group is not tied to an organization: a member sees numbers for all
+    of them. Membership is assigned in Django admin.
+    """
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        return user.groups.filter(name=DjangoGroups.METRICS_VIEWER.value).exists()
+
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
+
+
 class IsServiceAccount(permissions.BasePermission):
     def has_permission(self, request, view):
         return IsServiceAccount.get_client_id(request) is not None
