@@ -1071,6 +1071,15 @@ class GundiTrace(UUIDAbstractModel, TimestampedModel):
     discarded_at = models.DateTimeField(blank=True, null=True)
     # Which kind of rule dropped it; values mirror gundi-core's ObservationFilterReason.
     discard_reason = models.CharField(max_length=32, blank=True, default="")
+    # Nullable with no default so adding it to the largest table is metadata-only.
+    is_destination_copy = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text=(
+            "True on rows the event consumers add for each additional destination of an item; "
+            "null or false marks the original row. Exclude copies when counting received items."
+        ),
+    )
 
     class Meta:
         indexes = [

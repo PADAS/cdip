@@ -117,6 +117,7 @@ def handle_observation_delivered_event(event_dict: dict):
             destination_id=event_data.destination_id,
             delivered_at=event_data.delivered_at,
             external_id=event_data.external_id,
+            is_destination_copy=True,
         )
 
     logger.debug(
@@ -190,6 +191,7 @@ def handle_observations_batch_delivered_event(event_dict: dict):
                     data_provider=base.data_provider,
                     destination_id=destination_id,
                     delivered_at=details.delivered_at,
+                    is_destination_copy=True,
                 )
             )
     if to_update:
@@ -277,7 +279,8 @@ def handle_observation_delivery_failed_event(event_dict: dict):
             delivered_at=observation.delivered_at,
             external_id=observation.external_id,
             has_error=True,
-            error="Delivery Failed at the Dispatcher."
+            error="Delivery Failed at the Dispatcher.",
+            is_destination_copy=True,
         )
     else:
         logger.warning(

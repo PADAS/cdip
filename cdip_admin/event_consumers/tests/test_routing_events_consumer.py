@@ -64,6 +64,10 @@ def test_process_observation_filtered_event_with_second_destination(
     assert new_trace.source == lotek_observation_trace.source
     assert new_trace.discarded_at is not None
     assert new_trace.discard_reason == "device_whitelist"
+    assert new_trace.has_error is False
+    assert new_trace.is_destination_copy is True
+    lotek_observation_trace.refresh_from_db()
+    assert lotek_observation_trace.is_destination_copy is None
     assert ActivityLog.objects.filter(value="observation_filtered").count() == 2
 
 
