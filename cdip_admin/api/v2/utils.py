@@ -23,21 +23,35 @@ logger = logging.getLogger(__name__)
 deduplication_db = cache.get_deduplication_db()
 
 
-def is_duplicate_data(data: dict, expiration_time):
+def _deduplication_key(data: dict):
     jsonified_data = json.dumps(data, default=str)
-    # For a short time, check both the legacy, simple hash too.
-    hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
+    data_hash = md5(jsonified_data.encode("utf-8")).hexdigest()
     integration_id = str(data['integration'].id)
     source_id = str(data['source'].id)
-    hash = f"{integration_id}.{source_id}.{hash_v1}"
+    return f"{integration_id}.{source_id}.{data_hash}"
 
-    # Discard duplicates
-    is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
-    deduplication_db.setex(
-        hash, expiration_time, 1
-    )
-    deduplication_db.delete(hash_v1)
-    return is_duplicate
+
+def find_duplicate_data(items: list, expiration_time) -> list:
+    """
+    Check a list of items against the deduplication cache in one round trip.
+    Returns one flag per item, in order: True if the same data was seen within
+    the expiration time, including earlier in the same list.
+    """
+    if not items:
+        return []
+    # Commands are queued and sent together, and run in order on the server,
+    # so an item repeated in the list sees the key set by its first occurrence.
+    pipeline = deduplication_db.pipeline(transaction=False)
+    for item in items:
+        key = _deduplication_key(item)
+        pipeline.exists(key)
+        pipeline.setex(key, expiration_time, 1)
+    results = pipeline.execute()
+    return [exists > 0 for exists in results[::2]]
+
+
+def is_duplicate_data(data: dict, expiration_time):
+    return find_duplicate_data([data], expiration_time)[0]
 
 
 def is_attachment_related_event_discarded(data: dict):
@@ -326,7 +340,12 @@ def send_observations_to_routing(observations, gundi_ids):
     # happens INLINE inside the per-item span (see the else-branch below).
     is_batch = len(observations) >= settings.OBSERVATIONS_BATCH_THRESHOLD
     ready = []  # (observation_obj, gundi_id) survivors - only accumulated in batch mode
-    for observation, gundi_id in zip(observations, gundi_ids):
+    # In batch mode, check the whole request for duplicates in one round trip
+    # to the cache instead of one per observation.
+    duplicate_flags = find_duplicate_data(
+        observations, expiration_time=settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
+    ) if is_batch else None
+    for index, (observation, gundi_id) in enumerate(zip(observations, gundi_ids)):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
                 f"gundi_api.process_observation", kind=trace.SpanKind.PRODUCER
@@ -375,10 +394,13 @@ def send_observations_to_routing(observations, gundi_ids):
             log_data_received(data=observation_obj, integration_type=integration_type)
 
             # Check for duplicates
-            is_duplicate = is_duplicate_data(
-                data=observation,
-                expiration_time=settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
-            )
+            if is_batch:
+                is_duplicate = duplicate_flags[index]
+            else:
+                is_duplicate = is_duplicate_data(
+                    data=observation,
+                    expiration_time=settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
+                )
             if is_duplicate:
                 current_span.set_attribute("is_duplicate", True)
                 current_span.add_event(

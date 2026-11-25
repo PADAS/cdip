@@ -280,7 +280,7 @@ def test_create_observations_in_bulk_above_threshold_publishes_batch_envelope(
     settings.OBSERVATIONS_BATCH_THRESHOLD = 3
     settings.OBSERVATIONS_BATCH_MAX_ITEMS = 2
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.find_duplicate_data", return_value=[False] * 3)
     data = [
         {
             "source": f"batch-device-{i}",
@@ -404,7 +404,7 @@ def test_batch_publish_span_is_not_nested_under_process_observation_span(
     settings.OBSERVATIONS_BATCH_THRESHOLD = 1  # force batch mode for 2 items
     settings.OBSERVATIONS_BATCH_MAX_ITEMS = 10
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.find_duplicate_data", return_value=[False] * 2)
     entries = _record_span_nesting(mocker)
 
     data = [

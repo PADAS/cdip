@@ -1915,6 +1915,16 @@ class GundiTraceSerializer(serializers.Serializer):
         default=DEFAULT_SOURCE_EXTERNAL_ID
     )
 
+    def _get_integration(self, integration_id):
+        # A bulk request validates every item against the same integration,
+        # so look it up once per request. The context is shared by all the
+        # items of a list serializer and lives only as long as the request.
+        # The type is loaded too because routing reads it for every item.
+        cache = self.context.setdefault("_integrations_by_id", {})
+        if integration_id not in cache:
+            cache[integration_id] = Integration.objects.select_related("type").get(id=integration_id)
+        return cache[integration_id]
+
     def validate(self, data):
         # Check the integration id
         request = self.context["request"]
@@ -1923,7 +1933,7 @@ class GundiTraceSerializer(serializers.Serializer):
             if isinstance(integration, str):
                 # Convert string ID to Integration object
                 try:
-                    integration_obj = Integration.objects.get(id=integration)
+                    integration_obj = self._get_integration(integration)
                     data["integration"] = integration_obj
                     if not request.integration_id or request.integration_id != str(integration_obj.id):
                         raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
@@ -1935,7 +1945,7 @@ class GundiTraceSerializer(serializers.Serializer):
                     raise drf_exceptions.ValidationError(detail=f"Your API Key is not authorized for the integration_id")
         elif request.integration_id:
             try:
-                data["integration"] = Integration.objects.get(id=request.integration_id)
+                data["integration"] = self._get_integration(request.integration_id)
             except Integration.DoesNotExist:
                 raise drf_exceptions.ValidationError(detail=f"Cannot find the integration associated with this API Key.")
         else:
@@ -2063,10 +2073,57 @@ class EventCreateUpdateSerializer(GundiTraceSerializer):
         return trace
 
 
+# Key in the serializer context for the sources already resolved in this request,
+# as {(integration_id, external_id): Source}
+SOURCES_CONTEXT_KEY = "_sources_by_external_id"
+
+
 class ObservationBulkCreateSerializer(serializers.ListSerializer):
     """
     Custom Serializer to support bulk creation of observations
     """
+
+    def to_internal_value(self, data):
+        self._load_existing_sources(data)
+        return super().to_internal_value(data)
+
+    def _load_existing_sources(self, data):
+        """
+        Fetch the sources named in the request with one query, so validating
+        each item doesn't query for its source. This is only an optimization:
+        a source not found here (new, or named in a form not recognized below)
+        is looked up or created during the validation of the item.
+        """
+        request = self.context.get("request")
+        integration_id = getattr(request, "integration_id", None)
+        if not integration_id or not isinstance(data, list):
+            return
+        external_ids = set()
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            external_id = item.get("source", DEFAULT_SOURCE_EXTERNAL_ID)
+            # Mirror what the 'source' CharField accepts: strings (trimmed) and numbers
+            if isinstance(external_id, bool) or not isinstance(external_id, (str, int, float)):
+                continue
+            external_ids.add(str(external_id).strip())
+        if not external_ids:
+            return
+        try:
+            integration = self.child._get_integration(integration_id)
+        except (ValueError, Integration.DoesNotExist, django_exceptions.ValidationError):
+            return  # Item validation reports the problem with the integration
+        sources = self.context.setdefault(SOURCES_CONTEXT_KEY, {})
+        queryset = Source.objects.filter(integration=integration, external_id__in=external_ids)
+        # Sources record their related integration when they are instantiated
+        # (ChangeLogMixin), which costs one query per source loaded the usual
+        # way. Build them from plain rows with the integration already attached.
+        for row in queryset.values():
+            row.pop("integration_id")
+            source = Source(integration=integration, **row)
+            source._state.adding = False
+            source._state.db = queryset.db
+            sources[(str(integration.id), source.external_id)] = source
 
     def create(self, validated_data):
         observations = [self.child.create(attrs) for attrs in validated_data]
@@ -2133,14 +2190,24 @@ class ObservationCreateSerializer(GundiTraceSerializer):
 
     def validate(self, data):
         data = super().validate(data)
-        # Get or create sources as they are discovered
-        source, created = Source.objects.get_or_create(
-            integration=data["integration"],
-            external_id=data.get("source", DEFAULT_SOURCE_EXTERNAL_ID),
-            defaults={
-                "name": data.get("source_name", "")
-            }
-        )
+        # Get or create sources as they are discovered, once per source per request
+        integration = data["integration"]
+        external_id = data.get("source", DEFAULT_SOURCE_EXTERNAL_ID)
+        sources = self.context.setdefault(SOURCES_CONTEXT_KEY, {})
+        key = (str(integration.id), external_id)
+        source = sources.get(key)
+        if source is None:
+            source, created = Source.objects.get_or_create(
+                integration=integration,
+                external_id=external_id,
+                defaults={
+                    "name": data.get("source_name", "")
+                }
+            )
+            sources[key] = source
+        # Hand the source the integration already loaded for this request, so
+        # reading source.integration later (e.g. str(source)) doesn't query for it
+        source.integration = integration
         data["source"] = source
         return data
 
