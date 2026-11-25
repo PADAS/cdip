@@ -8,6 +8,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from api.v2 import utils as api_utils
 from integrations.models import GundiTrace, Source
@@ -23,12 +24,8 @@ def dedup_db(mocker):
 
 
 @pytest.fixture
-def no_duplicates(mocker):
-    mocker.patch("api.v2.utils.is_duplicate_data", return_value=False)
-    mocker.patch(
-        "api.v2.utils.find_duplicate_data",
-        side_effect=lambda items, expiration_time: [False] * len(items),
-    )
+def no_duplicates(dedup_db):
+    return dedup_db
 
 
 def _observation(source, minute=0, **extra):
@@ -164,62 +161,72 @@ def test_source_of_another_integration_is_not_reused(
     assert GundiTrace.objects.get(object_id=object_id).source_id == own.id
 
 
-def test_find_duplicate_data_flags_items_seen_before(dedup_db, provider_lotek_panthera, lotek_sources):
-    items = [
-        {"integration": provider_lotek_panthera, "source": lotek_sources[0], "recorded_at": f"t{i}"}
-        for i in range(3)
+def _items(integration, source, count):
+    return [
+        {"integration": integration, "source": source, "recorded_at": f"t{i}"}
+        for i in range(count)
     ]
 
-    first = api_utils.find_duplicate_data(items, expiration_time=60)
-    second = api_utils.find_duplicate_data(items, expiration_time=60)
 
-    assert first == [False, False, False]
-    assert second == [True, True, True]
+def test_find_duplicate_keys_flags_only_keys_marked_as_seen(dedup_db):
+    api_utils.mark_keys_as_seen(["a", "b"], expiration_time=60)
 
-
-def test_find_duplicate_data_flags_repeats_inside_one_batch(dedup_db, provider_lotek_panthera, lotek_sources):
-    item = {"integration": provider_lotek_panthera, "source": lotek_sources[0], "recorded_at": "t0"}
-    other = {"integration": provider_lotek_panthera, "source": lotek_sources[1], "recorded_at": "t0"}
-
-    flags = api_utils.find_duplicate_data([item, other, dict(item)], expiration_time=60)
-
-    assert flags == [False, False, True]
+    assert api_utils.find_duplicate_keys(["a", "c", "b"]) == [True, False, True]
 
 
-def test_find_duplicate_data_keys_expire(dedup_db, provider_lotek_panthera, lotek_sources):
-    item = {"integration": provider_lotek_panthera, "source": lotek_sources[0], "recorded_at": "t0"}
+def test_find_duplicate_keys_does_not_mark_anything(dedup_db):
+    api_utils.find_duplicate_keys(["a", "b"])
 
-    api_utils.find_duplicate_data([item], expiration_time=60)
-
-    keys = dedup_db.keys()
-    assert len(keys) == 1
-    assert 0 < dedup_db.ttl(keys[0]) <= 60
+    assert dedup_db.keys() == []
+    assert api_utils.find_duplicate_keys(["a", "b"]) == [False, False]
 
 
-def test_find_duplicate_data_uses_one_round_trip(mocker, dedup_db, provider_lotek_panthera, lotek_sources):
+def test_find_duplicate_keys_flags_repeats_inside_one_list(dedup_db):
+    assert api_utils.find_duplicate_keys(["a", "b", "a"]) == [False, False, True]
+
+
+def test_marked_keys_expire(dedup_db):
+    api_utils.mark_keys_as_seen(["a"], expiration_time=60)
+
+    assert 0 < dedup_db.ttl("a") <= 60
+
+
+def test_find_and_mark_use_one_round_trip_each(mocker, dedup_db):
     execute = mocker.spy(fakeredis.FakeStrictRedis().pipeline().__class__, "execute")
-    items = [
-        {"integration": provider_lotek_panthera, "source": lotek_sources[0], "recorded_at": f"t{i}"}
-        for i in range(25)
-    ]
+    keys = [f"key-{i}" for i in range(25)]
 
-    api_utils.find_duplicate_data(items, expiration_time=60)
+    api_utils.find_duplicate_keys(keys)
+    api_utils.mark_keys_as_seen(keys, expiration_time=60)
 
-    assert execute.call_count == 1
+    assert execute.call_count == 2
 
 
-def test_find_duplicate_data_with_no_items(dedup_db):
-    assert api_utils.find_duplicate_data([], expiration_time=60) == []
+def test_find_and_mark_with_no_keys(dedup_db):
+    assert api_utils.find_duplicate_keys([]) == []
+    api_utils.mark_keys_as_seen([], expiration_time=60)
+
+
+def test_deduplication_key_is_scoped_to_integration_and_source(provider_lotek_panthera, lotek_sources):
+    first, second = (
+        {"integration": provider_lotek_panthera, "source": source, "recorded_at": "t0"}
+        for source in lotek_sources[:2]
+    )
+
+    assert api_utils.get_deduplication_key(first) == api_utils.get_deduplication_key(dict(first))
+    assert api_utils.get_deduplication_key(first) != api_utils.get_deduplication_key(second)
+    assert api_utils.get_deduplication_key(first).startswith(
+        f"{provider_lotek_panthera.id}.{lotek_sources[0].id}."
+    )
 
 
 def test_is_duplicate_data_still_detects_a_repeat(dedup_db, provider_lotek_panthera, lotek_sources):
-    item = {"integration": provider_lotek_panthera, "source": lotek_sources[0], "recorded_at": "t0"}
+    item = _items(provider_lotek_panthera, lotek_sources[0], 1)[0]
 
     assert api_utils.is_duplicate_data(item, expiration_time=60) is False
     assert api_utils.is_duplicate_data(item, expiration_time=60) is True
 
 
-def test_bulk_request_checks_duplicates_in_one_round_trip_and_drops_them(
+def test_bulk_request_checks_duplicates_in_bulk_and_drops_them(
         api_client, mocker, mock_publisher, dedup_db,
         provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
 ):
@@ -232,7 +239,7 @@ def test_bulk_request_checks_duplicates_in_one_round_trip_and_drops_them(
     response = _post(api_client, data, keyauth_headers_lotek)
 
     assert response.status_code == status.HTTP_200_OK
-    assert execute.call_count == 1
+    assert execute.call_count == 2  # One to check the request, one to mark what was published
     published = mock_publisher.publish.call_args.kwargs["data"]["payload"]["observations"]
     assert len(published) == 12
     object_ids = [item["object_id"] for item in response.json()]
@@ -248,3 +255,73 @@ def test_bulk_request_checks_duplicates_in_one_round_trip_and_drops_them(
     response = _post(api_client, data, keyauth_headers_lotek)
     assert response.status_code == status.HTTP_200_OK
     assert not mock_publisher.publish.called
+
+
+def _published_recorded_at(mock_publisher):
+    recorded = []
+    for call in mock_publisher.publish.call_args_list:
+        payload = call.kwargs["data"]["payload"]
+        for obs in payload.get("observations", [payload]):
+            recorded.append(str(obs["recorded_at"]))
+    return recorded
+
+
+@pytest.mark.parametrize("count", [2, 12])  # Below and above the batch threshold
+def test_observations_are_published_on_retry_after_a_failed_publish(
+        mocker, mock_publisher, dedup_db, count,
+        provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
+):
+    api_client = APIClient(raise_request_exception=False)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    external_id = str(lotek_sources[0].external_id)
+    data = [_observation(external_id, minute=i) for i in range(count)]
+
+    mock_publisher.publish.side_effect = RuntimeError("Pub/Sub is unavailable")
+    response = _post(api_client, data, keyauth_headers_lotek)
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    mock_publisher.publish.reset_mock(side_effect=True)
+    response = _post(api_client, data, keyauth_headers_lotek)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(_published_recorded_at(mock_publisher)) == count
+    object_ids = [item["object_id"] for item in response.json()]
+    assert not GundiTrace.objects.filter(object_id__in=object_ids, is_duplicate=True).exists()
+
+
+def test_retry_after_a_partly_published_request_sends_only_what_was_not_published(
+        mocker, mock_publisher, dedup_db, settings,
+        provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
+):
+    settings.OBSERVATIONS_BATCH_THRESHOLD = 3
+    settings.OBSERVATIONS_BATCH_MAX_ITEMS = 4
+    api_client = APIClient(raise_request_exception=False)
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    external_id = str(lotek_sources[0].external_id)
+    data = [_observation(external_id, minute=i) for i in range(6)]
+
+    # The first envelope (4 observations) is published, the second one fails
+    mock_publisher.publish.side_effect = [None, RuntimeError("Pub/Sub is unavailable")]
+    response = _post(api_client, data, keyauth_headers_lotek)
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    mock_publisher.publish.reset_mock(side_effect=True)
+    response = _post(api_client, data, keyauth_headers_lotek)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(_published_recorded_at(mock_publisher)) == 2
+
+
+def test_resending_a_duplicate_keeps_it_marked_as_seen(
+        api_client, mocker, mock_publisher, dedup_db,
+        provider_lotek_panthera, keyauth_headers_lotek, lotek_sources
+):
+    mocker.patch("api.v2.utils.publisher", mock_publisher)
+    data = [_observation(str(lotek_sources[0].external_id), minute=i) for i in range(12)]
+    _post(api_client, data, keyauth_headers_lotek)
+    for key in dedup_db.keys():
+        dedup_db.expire(key, 5)  # About to expire
+
+    _post(api_client, data, keyauth_headers_lotek)
+
+    assert all(dedup_db.ttl(key) > 5 for key in dedup_db.keys())
