@@ -23,21 +23,56 @@ logger = logging.getLogger(__name__)
 deduplication_db = cache.get_deduplication_db()
 
 
-def is_duplicate_data(data: dict, expiration_time):
+def get_deduplication_key(data: dict):
     jsonified_data = json.dumps(data, default=str)
-    # For a short time, check both the legacy, simple hash too.
-    hash_v1 = md5(jsonified_data.encode("utf-8")).hexdigest()
+    data_hash = md5(jsonified_data.encode("utf-8")).hexdigest()
     integration_id = str(data['integration'].id)
     source_id = str(data['source'].id)
-    hash = f"{integration_id}.{source_id}.{hash_v1}"
+    return f"{integration_id}.{source_id}.{data_hash}"
 
-    # Discard duplicates
-    is_duplicate = deduplication_db.exists(hash, hash_v1) > 0
-    deduplication_db.setex(
-        hash, expiration_time, 1
-    )
-    deduplication_db.delete(hash_v1)
-    return is_duplicate
+
+def find_duplicate_keys(keys: list) -> list:
+    """
+    Check a list of deduplication keys in one round trip to the cache, without
+    marking anything. Returns one flag per key, in order: True if the key was
+    marked as seen and hasn't expired, or if it appears earlier in the list.
+    """
+    if not keys:
+        return []
+    pipeline = deduplication_db.pipeline(transaction=False)
+    for key in keys:
+        pipeline.exists(key)
+    seen_before = pipeline.execute()
+    flags = []
+    seen_in_list = set()
+    for key, exists in zip(keys, seen_before):
+        flags.append(exists > 0 or key in seen_in_list)
+        seen_in_list.add(key)
+    return flags
+
+
+def mark_keys_as_seen(keys, expiration_time):
+    """
+    Mark deduplication keys as seen for the expiration time, in one round trip.
+    Call it once the data is safely published: a key marked before a publish
+    that then fails makes the sender's retry look like a duplicate.
+    """
+    if not keys:
+        return
+    pipeline = deduplication_db.pipeline(transaction=False)
+    for key in keys:
+        pipeline.setex(key, expiration_time, 1)
+    pipeline.execute()
+
+
+def is_duplicate_data(data: dict, expiration_time):
+    # Checks and marks in one step, before the caller publishes anything
+    key = get_deduplication_key(data)
+    pipeline = deduplication_db.pipeline(transaction=False)
+    pipeline.exists(key)
+    pipeline.setex(key, expiration_time, 1)
+    exists, _ = pipeline.execute()
+    return exists > 0
 
 
 def is_attachment_related_event_discarded(data: dict):
@@ -325,8 +360,17 @@ def send_observations_to_routing(observations, gundi_ids):
     # today either way, but it broke the invariant that per-item publishing
     # happens INLINE inside the per-item span (see the else-branch below).
     is_batch = len(observations) >= settings.OBSERVATIONS_BATCH_THRESHOLD
-    ready = []  # (observation_obj, gundi_id) survivors - only accumulated in batch mode
-    for observation, gundi_id in zip(observations, gundi_ids):
+    ready = []  # (observation_obj, gundi_id, deduplication_key) survivors - only accumulated in batch mode
+    # Check the whole request for duplicates in one round trip to the cache.
+    # Observations are only marked as seen after they are published, so that
+    # a request retried after a failed publish isn't discarded as duplicates.
+    expiration_time = settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
+    deduplication_keys = [get_deduplication_key(observation) for observation in observations]
+    duplicate_flags = find_duplicate_keys(deduplication_keys)
+    kept_keys = set()  # Keys of the observations that were not discarded
+    for observation, gundi_id, deduplication_key, is_duplicate in zip(
+            observations, gundi_ids, deduplication_keys, duplicate_flags
+    ):
         # Trace observations with Open Telemetry
         with tracing.tracer.start_as_current_span(
                 f"gundi_api.process_observation", kind=trace.SpanKind.PRODUCER
@@ -374,11 +418,7 @@ def send_observations_to_routing(observations, gundi_ids):
             # Log info for traffic anomaly detection.
             log_data_received(data=observation_obj, integration_type=integration_type)
 
-            # Check for duplicates
-            is_duplicate = is_duplicate_data(
-                data=observation,
-                expiration_time=settings.OBSERVATION_DUPLICATE_CHECK_SECONDS
-            )
+            # Discard duplicates
             if is_duplicate:
                 current_span.set_attribute("is_duplicate", True)
                 current_span.add_event(
@@ -388,8 +428,9 @@ def send_observations_to_routing(observations, gundi_ids):
                 GundiTrace.objects.filter(object_id=gundi_id).update(is_duplicate=True)
                 continue
 
+            kept_keys.add(deduplication_key)
             if is_batch:
-                ready.append((observation_obj, gundi_id))
+                ready.append((observation_obj, gundi_id, deduplication_key))
             else:
                 # Trickle traffic: publish INLINE, inside this span, exactly
                 # as the pre-refactor code did. This makes
@@ -399,9 +440,18 @@ def send_observations_to_routing(observations, gundi_ids):
                 # set above are still the parent context for the
                 # routing/dispatcher spans downstream.
                 _publish_single_observation(observation_obj, gundi_id)
+                mark_keys_as_seen([deduplication_key], expiration_time)
 
     if is_batch and ready:
-        _publish_observations_batched(ready)
+        _publish_observations_batched(ready, expiration_time)
+
+    # Duplicates of data seen in earlier requests stay marked for another
+    # period, counted from now. A repeat inside this request is left to the
+    # observation it repeats, which is marked only if it was published.
+    resent_keys = {
+        key for key, is_duplicate in zip(deduplication_keys, duplicate_flags) if is_duplicate
+    } - kept_keys
+    mark_keys_as_seen(resent_keys, expiration_time)
 
 
 def _publish_single_observation(observation_obj, gundi_id):
@@ -434,7 +484,7 @@ def _publish_single_observation(observation_obj, gundi_id):
         )
 
 
-def _publish_observations_batched(ready):
+def _publish_observations_batched(ready, expiration_time):
     # All observations in one API request share the provider by construction
     # (one API key = one integration), so the envelope invariant holds.
     data_provider_id = str(ready[0][0].data_provider_id)
@@ -447,7 +497,7 @@ def _publish_observations_batched(ready):
         ) as current_span:
             batch = ObservationsBatch(
                 data_provider_id=data_provider_id,
-                observations=[obs for obs, _ in chunk],
+                observations=[obs for obs, _, _ in chunk],
             )
             msg_for_routing = ObservationsBatchReceived(payload=batch)
             current_span.set_attribute("batch_id", str(batch.batch_id))
@@ -471,6 +521,9 @@ def _publish_observations_batched(ready):
                     "tracing_context": tracing_context,
                 },
             )
+            # Mark each envelope as it goes out, so a retry after a later
+            # envelope fails doesn't publish this one again
+            mark_keys_as_seen([key for _, _, key in chunk], expiration_time)
 
 
 def log_data_received(data: GundiBaseModel, integration_type, **kwargs):

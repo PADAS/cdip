@@ -1,3 +1,4 @@
+import fakeredis
 import pytest
 from unittest.mock import ANY
 from django.urls import reverse
@@ -55,7 +56,7 @@ def test_create_single_observation(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     _test_create_observation(
         api_client=api_client,
         mock_publisher=mock_publisher,
@@ -85,7 +86,7 @@ def test_create_observations_in_bulk(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     _test_create_observation(
         api_client=api_client,
         mock_publisher=mock_publisher,
@@ -134,7 +135,7 @@ def test_override_observation_source_name_with_new_source(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     observation_data = {
         "source": "STVIC",
         "subject_type": "truck",
@@ -172,7 +173,7 @@ def test_override_observation_source_name_with_existent_source(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     source = lotek_sources[0]
     observation_data = {
         "source": str(source.external_id),
@@ -212,7 +213,7 @@ def test_observation_with_invalid_lat_returns_400(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     data = {
         "source": "ABC123",
         "type": "tracking-device",
@@ -245,7 +246,7 @@ def test_observation_with_invalid_lon_returns_400(
 ):
     # Mock external dependencies
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     data = {
         "source": "ABC123",
         "type": "tracking-device",
@@ -280,7 +281,7 @@ def test_create_observations_in_bulk_above_threshold_publishes_batch_envelope(
     settings.OBSERVATIONS_BATCH_THRESHOLD = 3
     settings.OBSERVATIONS_BATCH_MAX_ITEMS = 2
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     data = [
         {
             "source": f"batch-device-{i}",
@@ -314,7 +315,7 @@ def test_create_observations_below_threshold_publishes_per_item(
 ):
     settings.OBSERVATIONS_BATCH_THRESHOLD = 10
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     data = [
         {
             "source": f"single-device-{i}",
@@ -374,7 +375,7 @@ def test_per_item_publish_span_nests_under_process_observation_span(
     # (gundi_id, integration_id, external_source_id) they used to hang under.
     settings.OBSERVATIONS_BATCH_THRESHOLD = 10  # well above 1 item -> per-item mode
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     entries = _record_span_nesting(mocker)
 
     data = [{
@@ -404,7 +405,7 @@ def test_batch_publish_span_is_not_nested_under_process_observation_span(
     settings.OBSERVATIONS_BATCH_THRESHOLD = 1  # force batch mode for 2 items
     settings.OBSERVATIONS_BATCH_MAX_ITEMS = 10
     mocker.patch("api.v2.utils.publisher", mock_publisher)
-    mocker.patch("api.v2.utils.is_duplicate_data", mock_deduplication)
+    mocker.patch("api.v2.utils.deduplication_db", fakeredis.FakeStrictRedis())
     entries = _record_span_nesting(mocker)
 
     data = [
